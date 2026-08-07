@@ -264,27 +264,54 @@ function statusTone(status: Invoice["status"]) {
 }
 
 const invoiceColumns: DataColumn<Invoice>[] = [
-  { id: "id", label: "Invoice", cell: (r) => r.id, sortValue: (r) => r.id },
-  { id: "patient", label: "Patient", cell: (r) => r.patient, sortValue: (r) => r.patient },
+  {
+    id: "id",
+    label: "Invoice",
+    width: 130,
+    cell: (r) => r.id,
+    sortValue: (r) => r.id,
+    filter: { kind: "text" },
+  },
+  {
+    id: "patient",
+    label: "Patient",
+    width: 210,
+    cell: (r) => r.patient,
+    sortValue: (r) => r.patient,
+    filter: { kind: "text" },
+  },
   {
     id: "amount",
     label: "Amount",
     align: "right",
+    width: 130,
     cell: (r) => `₹${r.amount.toLocaleString("en-IN")}`,
     sortValue: (r) => r.amount,
+    filter: { kind: "number" },
   },
   {
     id: "status",
     label: "Status",
+    width: 140,
     cell: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge>,
-    filterOptions: [
-      { value: "Paid", label: "Paid" },
-      { value: "Due", label: "Due" },
-      { value: "Overdue", label: "Overdue" },
-    ],
+    filter: {
+      kind: "enum",
+      options: [
+        { value: "Paid", label: "Paid" },
+        { value: "Due", label: "Due" },
+        { value: "Overdue", label: "Overdue" },
+      ],
+    },
     filterValue: (r) => r.status,
   },
-  { id: "date", label: "Date", cell: (r) => r.date, sortValue: (r) => r.date },
+  {
+    id: "date",
+    label: "Date",
+    width: 150,
+    cell: (r) => r.date,
+    sortValue: (r) => r.date,
+    filter: { kind: "text" },
+  },
 ];
 
 export const registry: ComponentEntry[] = [
@@ -952,10 +979,10 @@ export const registry: ComponentEntry[] = [
     group: "Data",
     name: "Data Table",
     description:
-      "The working table: search, column sorts, header filters, and pagination — all client-side, all in the world's grammar.",
+      "The working table, on TanStack Table: search, sorts, a full match-all/match-any filter builder, resizable columns, and pagination.",
     stories: [
       {
-        title: "Invoices — sort, filter, paginate",
+        title: "Invoices — sort, filter, resize, paginate",
         render: () => (
           <div style={{ width: "100%" }}>
             <DataTable
@@ -970,15 +997,17 @@ export const registry: ComponentEntry[] = [
         ),
         code: `<DataTable
   columns={[
-    { id: "id", label: "Invoice", cell: (r) => r.id, sortValue: (r) => r.id },
-    { id: "patient", label: "Patient", cell: (r) => r.patient, sortValue: (r) => r.patient },
-    { id: "amount", label: "Amount", align: "right",
-      cell: (r) => "₹" + r.amount.toLocaleString(), sortValue: (r) => r.amount },
-    { id: "status", label: "Status",
+    { id: "patient", label: "Patient", width: 210,
+      cell: (r) => r.patient, sortValue: (r) => r.patient,
+      filter: { kind: "text" } },
+    { id: "amount", label: "Amount", align: "right", width: 130,
+      cell: (r) => "₹" + r.amount.toLocaleString(), sortValue: (r) => r.amount,
+      filter: { kind: "number" } },
+    { id: "status", label: "Status", width: 140,
       cell: (r) => <Badge tone={tone(r.status)}>{r.status}</Badge>,
-      filterOptions: [{ value: "Paid", label: "Paid" }, …],
+      filter: { kind: "enum", options: [Paid, Due, Overdue] },
       filterValue: (r) => r.status },
-    { id: "date", label: "Date", cell: (r) => r.date, sortValue: (r) => r.date },
+    // …
   ]}
   rows={invoices}
   rowKey={(r) => r.id}

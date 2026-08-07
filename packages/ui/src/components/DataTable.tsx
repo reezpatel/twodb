@@ -1,17 +1,36 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  type ColumnDef,
+  type PaginationState,
+  type Row,
+  type SortingState,
+} from "@tanstack/react-table";
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  Check,
   ChevronLeft,
   ChevronRight,
   ListFilter,
+  Plus,
+  X,
 } from "lucide-react";
+import { Badge } from "./Badge";
+import { Button } from "./Button";
 import { IconButton } from "./IconButton";
-import { Menu, MenuItem } from "./Menu";
+import { Input } from "./Input";
 import { SearchInput } from "./SearchInput";
 import { Select } from "./Select";
+
+export type FilterSpec =
+  | { kind: "text" }
+  | { kind: "number" }
+  | { kind: "enum"; options: { value: string; label: string }[] };
 
 export interface DataColumn<T> {
   id: string;
@@ -19,11 +38,78 @@ export interface DataColumn<T> {
   cell: (row: T) => ReactNode;
   /** Enables sorting when provided. */
   sortValue?: (row: T) => string | number;
-  /** Enables a header filter menu when provided. */
-  filterOptions?: { value: string; label: string }[];
-  /** Row value matched against the active filter; falls back to sortValue. */
-  filterValue?: (row: T) => string;
+  /** Enables the column in the filter builder. */
+  filter?: FilterSpec;
+  /** Raw row value for filtering; falls back to sortValue. */
+  filterValue?: (row: T) => string | number;
   align?: "left" | "right";
+  /** Initial column width in px — columns are resizable. */
+  width?: number;
+}
+
+export interface FilterRule {
+  id: string;
+  columnId: string;
+  op: string;
+  value: string;
+}
+
+type Combinator = "and" | "or";
+
+const OPERATORS: Record<FilterSpec["kind"], { value: string; label: string }[]> = {
+  text: [
+    { value: "contains", label: "contains" },
+    { value: "is", label: "is" },
+    { value: "isNot", label: "is not" },
+  ],
+  number: [
+    { value: "eq", label: "equals" },
+    { value: "neq", label: "does not equal" },
+    { value: "gt", label: "more than" },
+    { value: "lt", label: "less than" },
+  ],
+  enum: [
+    { value: "is", label: "is" },
+    { value: "isNot", label: "is not" },
+  ],
+};
+
+function evalRule<T>(row: T, col: DataColumn<T>, rule: FilterRule): boolean {
+  const get = col.filterValue ?? col.sortValue;
+  if (!get || !col.filter) return true;
+  const raw = get(row);
+
+  switch (col.filter.kind) {
+    case "text": {
+      const a = String(raw).toLowerCase();
+      const b = rule.value.toLowerCase();
+      if (rule.op === "contains") return a.includes(b);
+      if (rule.op === "is") return a === b;
+      if (rule.op === "isNot") return a !== b;
+      return true;
+    }
+    case "number": {
+      const a = Number(raw);
+      const b = Number(rule.value);
+      if (Number.isNaN(a) || Number.isNaN(b)) return true;
+      if (rule.op === "eq") return a === b;
+      if (rule.op === "neq") return a !== b;
+      if (rule.op === "gt") return a > b;
+      if (rule.op === "lt") return a < b;
+      return true;
+    }
+    case "enum": {
+      const match = String(raw) === rule.value;
+      return rule.op === "isNot" ? !match : match;
+    }
+  }
+}
+
+interface FilterState {
+  query: string;
+  combinator: Combinator;
+  rules: FilterRule[];
+  searchText?: (row: unknown) => string;
 }
 
 export interface DataTableProps<T> {
@@ -39,7 +125,8 @@ export interface DataTableProps<T> {
   "aria-label"?: string;
 }
 
-type SortDir = "asc" | "desc";
+let ruleSeq = 0;
+const nextRuleId = () => `rule-${++ruleSeq}`;
 
 export function DataTable<T>({
   columns,
@@ -53,203 +140,330 @@ export function DataTable<T>({
   "aria-label": ariaLabel = "Data table",
 }: DataTableProps<T>) {
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null);
-  const [filters, setFilters] = useState<Record<string, string>>({});
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(initialPageSize);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: initialPageSize,
+  });
+  const [rules, setRules] = useState<FilterRule[]>([]);
+  const [combinator, setCombinator] = useState<Combinator>("and");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersAnchorRef = useRef<HTMLDivElement>(null);
 
-  const visible = useMemo(() => {
-    let out = rows;
+  const filterable = useMemo(() => columns.filter((c) => c.filter), [columns]);
 
-    const q = query.trim().toLowerCase();
-    if (q && searchText) {
-      out = out.filter((row) => searchText(row).toLowerCase().includes(q));
-    }
-
-    for (const col of columns) {
-      const active = filters[col.id];
-      if (!active || !col.filterOptions) continue;
-      const get = col.filterValue ?? col.sortValue;
-      if (get) out = out.filter((row) => String(get(row)) === active);
-    }
-
-    if (sort) {
-      const col = columns.find((c) => c.id === sort.id);
-      if (col?.sortValue) {
-        const get = col.sortValue;
-        out = [...out].sort((a, b) => {
-          const va = get(a);
-          const vb = get(b);
-          const cmp =
-            typeof va === "number" && typeof vb === "number"
-              ? va - vb
-              : String(va).localeCompare(String(vb));
-          return sort.dir === "asc" ? cmp : -cmp;
-        });
+  /* --- filter predicate over the whole row (search + rules) --- */
+  const rulesFilter = useMemo(
+    () => (row: Row<T>, _columnId: string, state: FilterState) => {
+      if (state.query && state.searchText) {
+        const text = state.searchText(row.original as T).toLowerCase();
+        if (!text.includes(state.query)) return false;
       }
-    }
+      const active = state.rules.filter((r) => r.columnId && r.op && r.value !== "");
+      if (active.length === 0) return true;
+      const results = active.map((rule) => {
+        const col = columns.find((c) => c.id === rule.columnId);
+        return col ? evalRule(row.original as T, col, rule) : true;
+      });
+      return state.combinator === "and" ? results.every(Boolean) : results.some(Boolean);
+    },
+    [columns]
+  );
 
-    return out;
-  }, [rows, query, filters, sort, columns, searchText]);
+  const columnDefs = useMemo<ColumnDef<T, unknown>[]>(
+    () =>
+      columns.map((col) => ({
+        id: col.id,
+        header: col.label,
+        accessorFn: (row: T) => col.sortValue?.(row) ?? "",
+        size: col.width ?? 160,
+        enableSorting: !!col.sortValue,
+        enableResizing: true,
+      })),
+    [columns]
+  );
 
-  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize));
-  const safePage = Math.min(page, pageCount - 1);
-  const pageRows = visible.slice(safePage * pageSize, safePage * pageSize + pageSize);
-  const from = visible.length === 0 ? 0 : safePage * pageSize + 1;
-  const to = Math.min(visible.length, (safePage + 1) * pageSize);
+  const globalFilter: FilterState = {
+    query: query.trim().toLowerCase(),
+    combinator,
+    rules,
+    searchText: searchText as ((row: unknown) => string) | undefined,
+  };
 
-  function cycleSort(col: DataColumn<T>) {
-    setPage(0);
-    setSort((cur) => {
-      if (!cur || cur.id !== col.id) return { id: col.id, dir: "asc" };
-      if (cur.dir === "asc") return { id: col.id, dir: "desc" };
-      return null;
+  const table = useReactTable({
+    data: rows,
+    columns: columnDefs,
+    state: { sorting, pagination, globalFilter },
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    globalFilterFn: rulesFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    columnResizeMode: "onChange",
+    getRowId: (row) => rowKey(row),
+  });
+
+  /* --- close the filter panel on outside click / Escape --- */
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const onPointerDown = (e: globalThis.MouseEvent) => {
+      if (!filtersAnchorRef.current?.contains(e.target as Node)) setFiltersOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFiltersOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [filtersOpen]);
+
+  const activeRuleCount = rules.filter((r) => r.columnId && r.op && r.value !== "").length;
+
+  function cycleSort(colId: string) {
+    setSorting((cur) => {
+      if (cur[0]?.id !== colId) return [{ id: colId, desc: false }];
+      return cur[0].desc ? [] : [{ id: colId, desc: true }];
     });
   }
 
-  function setFilter(colId: string, value: string) {
-    setPage(0);
-    setFilters((cur) => {
-      const next = { ...cur };
-      if (value) next[colId] = value;
-      else delete next[colId];
-      return next;
-    });
+  function addRule() {
+    const first = filterable[0];
+    if (!first) return;
+    setRules((cur) => [
+      ...cur,
+      { id: nextRuleId(), columnId: first.id, op: OPERATORS[first.filter!.kind][0].value, value: "" },
+    ]);
   }
+
+  function updateRule(id: string, patch: Partial<FilterRule>) {
+    setRules((cur) => cur.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
+  const leafRows = table.getRowModel().rows;
+  const total = table.getFilteredRowModel().rows.length;
+  const { pageIndex, pageSize } = table.getState().pagination;
+  const pageCount = Math.max(1, table.getPageCount());
+  const from = total === 0 ? 0 : pageIndex * pageSize + 1;
+  const to = Math.min(total, (pageIndex + 1) * pageSize);
 
   return (
     <div className="tw-table-wrap">
-      {searchText ? (
+      {searchText || filterable.length > 0 ? (
         <div className="tw-datatable__toolbar">
-          <SearchInput
-            placeholder={searchPlaceholder}
-            aria-label={searchPlaceholder}
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(0);
-            }}
-          />
+          {searchText ? (
+            <SearchInput
+              placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          ) : null}
+          {filterable.length > 0 ? (
+            <div className="tw-filterpop-anchor" ref={filtersAnchorRef}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setFiltersOpen((o) => !o)}
+                aria-expanded={filtersOpen}
+              >
+                <ListFilter size={14} aria-hidden="true" />
+                Filters
+                {activeRuleCount > 0 ? (
+                  <Badge size="sm" tone="go">
+                    {activeRuleCount}
+                  </Badge>
+                ) : null}
+              </Button>
+
+              {filtersOpen ? (
+                <div className="tw-filterpop" role="dialog" aria-label="Filter builder">
+                  <div className="tw-filterpop__head">
+                    <span className="tw-cue">Show rows that</span>
+                    <div style={{ width: 132 }}>
+                      <Select
+                        aria-label="Filter combination"
+                        value={combinator}
+                        onValueChange={(v) => setCombinator(v as Combinator)}
+                        options={[
+                          { value: "and", label: "match all" },
+                          { value: "or", label: "match any" },
+                        ]}
+                      />
+                    </div>
+                  </div>
+
+                  {rules.map((rule) => {
+                    const col = columns.find((c) => c.id === rule.columnId);
+                    const spec = col?.filter;
+                    return (
+                      <div className="tw-filterpop__rule" key={rule.id}>
+                        <Select
+                          aria-label="Field"
+                          value={rule.columnId}
+                          onValueChange={(columnId) => {
+                            const next = columns.find((c) => c.id === columnId);
+                            updateRule(rule.id, {
+                              columnId,
+                              op: next?.filter ? OPERATORS[next.filter.kind][0].value : "",
+                              value: "",
+                            });
+                          }}
+                          options={filterable.map((c) => ({ value: c.id, label: c.label }))}
+                        />
+                        <Select
+                          aria-label="Operator"
+                          value={rule.op}
+                          onValueChange={(op) => updateRule(rule.id, { op })}
+                          options={spec ? OPERATORS[spec.kind] : []}
+                        />
+                        {spec?.kind === "enum" ? (
+                          <Select
+                            aria-label="Value"
+                            placeholder="Pick…"
+                            value={rule.value}
+                            onValueChange={(value) => updateRule(rule.id, { value })}
+                            options={spec.options}
+                          />
+                        ) : (
+                          <Input
+                            aria-label="Value"
+                            type={spec?.kind === "number" ? "number" : "text"}
+                            placeholder="Value…"
+                            value={rule.value}
+                            onChange={(e) => updateRule(rule.id, { value: e.target.value })}
+                          />
+                        )}
+                        <IconButton
+                          size="sm"
+                          label="Remove filter"
+                          icon={<X />}
+                          onClick={() => setRules((cur) => cur.filter((r) => r.id !== rule.id))}
+                        />
+                      </div>
+                    );
+                  })}
+
+                  <div className="tw-filterpop__foot">
+                    <Button size="sm" variant="ghost" onClick={addRule}>
+                      <Plus size={14} aria-hidden="true" />
+                      Add filter
+                    </Button>
+                    {rules.length > 0 ? (
+                      <Button size="sm" variant="ghost" onClick={() => setRules([])}>
+                        Clear all
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
       <div className="tw-table-scroll">
-        <table className="tw-table" aria-label={ariaLabel}>
+        <table
+          className="tw-table tw-table--data"
+          aria-label={ariaLabel}
+          style={{ width: table.getTotalSize(), minWidth: "100%" }}
+        >
           <thead className="tw-thead">
-            <tr className="tw-tr">
-              {columns.map((col) => {
-                const sorted = sort?.id === col.id ? sort.dir : null;
-                const filterActive = !!filters[col.id];
-                return (
-                  <th
-                    key={col.id}
-                    className={["tw-th", col.align === "right" ? "tw-th--right" : ""]
-                      .filter(Boolean)
-                      .join(" ")}
-                    aria-sort={
-                      sorted ? (sorted === "asc" ? "ascending" : "descending") : undefined
-                    }
-                  >
-                    <span className="tw-th__inner">
-                      {col.sortValue ? (
-                        <button
-                          type="button"
-                          className={["tw-th__sort", sorted ? "tw-th__sort--active" : ""]
+            {table.getHeaderGroups().map((hg) => (
+              <tr className="tw-tr" key={hg.id}>
+                {hg.headers.map((header) => {
+                  const col = columns.find((c) => c.id === header.column.id);
+                  const sorted = header.column.getIsSorted();
+                  const canSort = header.column.getCanSort();
+                  return (
+                    <th
+                      key={header.id}
+                      className={["tw-th", col?.align === "right" ? "tw-th--right" : ""]
+                        .filter(Boolean)
+                        .join(" ")}
+                      style={{ width: header.getSize() }}
+                      aria-sort={
+                        sorted ? (sorted === "asc" ? "ascending" : "descending") : undefined
+                      }
+                    >
+                      <span className="tw-th__inner">
+                        {canSort ? (
+                          <button
+                            type="button"
+                            className={["tw-th__sort", sorted ? "tw-th__sort--active" : ""]
+                              .filter(Boolean)
+                              .join(" ")}
+                            onClick={() => cycleSort(header.column.id)}
+                          >
+                            {header.column.columnDef.header as string}
+                            {sorted === "asc" ? (
+                              <ArrowUp aria-hidden="true" />
+                            ) : sorted === "desc" ? (
+                              <ArrowDown aria-hidden="true" />
+                            ) : (
+                              <ArrowUpDown aria-hidden="true" />
+                            )}
+                          </button>
+                        ) : (
+                          (header.column.columnDef.header as string)
+                        )}
+                      </span>
+                      {header.column.getCanResize() ? (
+                        <span
+                          className={[
+                            "tw-col-resize",
+                            header.column.getIsResizing() ? "tw-col-resize--active" : "",
+                          ]
                             .filter(Boolean)
                             .join(" ")}
-                          onClick={() => cycleSort(col)}
-                        >
-                          {col.label}
-                          {sorted === "asc" ? (
-                            <ArrowUp aria-hidden="true" />
-                          ) : sorted === "desc" ? (
-                            <ArrowDown aria-hidden="true" />
-                          ) : (
-                            <ArrowUpDown aria-hidden="true" />
-                          )}
-                        </button>
-                      ) : (
-                        col.label
-                      )}
-                      {col.filterOptions ? (
-                        <Menu
-                          placement="bottom-start"
-                          trigger={
-                            <IconButton
-                              size="sm"
-                              label={`Filter ${col.label}`}
-                              icon={<ListFilter />}
-                              className={[
-                                "tw-th__filter",
-                                filterActive ? "tw-th__filter--active" : "",
-                              ]
-                                .filter(Boolean)
-                                .join(" ")}
-                            />
-                          }
-                        >
-                          <MenuItem
-                            icon={!filterActive ? <Check /> : <span style={{ width: 15 }} />}
-                            onClick={() => setFilter(col.id, "")}
-                          >
-                            All
-                          </MenuItem>
-                          {col.filterOptions.map((opt) => (
-                            <MenuItem
-                              key={opt.value}
-                              icon={
-                                filters[col.id] === opt.value ? (
-                                  <Check />
-                                ) : (
-                                  <span style={{ width: 15 }} />
-                                )
-                              }
-                              onClick={() => setFilter(col.id, opt.value)}
-                            >
-                              {opt.label}
-                            </MenuItem>
-                          ))}
-                        </Menu>
+                          onMouseDown={header.getResizeHandler()}
+                          onTouchStart={header.getResizeHandler()}
+                          onDoubleClick={() => header.column.resetSize()}
+                        />
                       ) : null}
-                    </span>
-                  </th>
-                );
-              })}
-            </tr>
+                    </th>
+                  );
+                })}
+              </tr>
+            ))}
           </thead>
           <tbody className="tw-tbody">
-            {pageRows.map((row) => (
-              <tr className="tw-tr" key={rowKey(row)}>
+            {leafRows.map((row) => (
+              <tr className="tw-tr" key={row.id}>
                 {columns.map((col) => (
                   <td
                     key={col.id}
                     className={["tw-td", col.align === "right" ? "tw-td--right" : ""]
                       .filter(Boolean)
                       .join(" ")}
+                    style={{ width: table.getColumn(col.id)?.getSize() }}
                   >
-                    {col.cell(row)}
+                    {col.cell(row.original as T)}
                   </td>
                 ))}
               </tr>
             ))}
           </tbody>
         </table>
-        {pageRows.length === 0 ? <div className="tw-datatable__empty">{emptyMessage}</div> : null}
+        {leafRows.length === 0 ? <div className="tw-datatable__empty">{emptyMessage}</div> : null}
       </div>
 
       <div className="tw-datatable__footer">
         <span className="tw-tnum">
-          {from}–{to} of {visible.length}
+          {from}–{to} of {total}
         </span>
         <div className="tw-datatable__pager">
           <div className="tw-datatable__pagesize">
             <Select
               aria-label="Rows per page"
               value={String(pageSize)}
-              onValueChange={(v) => {
-                setPageSize(Number(v));
-                setPage(0);
-              }}
+              onValueChange={(v) =>
+                setPagination({ pageIndex: 0, pageSize: Number(v) })
+              }
               options={pageSizeOptions.map((n) => ({ value: String(n), label: `${n} rows` }))}
             />
           </div>
@@ -258,19 +472,19 @@ export function DataTable<T>({
             variant="secondary"
             label="Previous page"
             icon={<ChevronLeft />}
-            disabled={safePage === 0}
-            onClick={() => setPage(safePage - 1)}
+            disabled={pageIndex === 0}
+            onClick={() => table.previousPage()}
           />
           <span className="tw-tnum">
-            {safePage + 1} / {pageCount}
+            {pageIndex + 1} / {pageCount}
           </span>
           <IconButton
             size="sm"
             variant="secondary"
             label="Next page"
             icon={<ChevronRight />}
-            disabled={safePage >= pageCount - 1}
-            onClick={() => setPage(safePage + 1)}
+            disabled={pageIndex >= pageCount - 1}
+            onClick={() => table.nextPage()}
           />
         </div>
       </div>
