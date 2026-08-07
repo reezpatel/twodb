@@ -379,22 +379,46 @@ export const registry: ComponentEntry[] = [
     id: "select",
     group: "Primitives",
     name: "Select",
-    description: "Native under the hood, styled to the horizon.",
+    description:
+      "A custom listbox — no native chrome. Arrows, Enter, Escape, Home/End all work; the selection keeps its check.",
     stories: [
       {
-        title: "Default",
+        title: "States",
         render: () => (
-          <Select label="Reminder" defaultValue="morning">
-            <option value="morning">Every morning</option>
-            <option value="week">Once a week</option>
-            <option value="never">Never</option>
-          </Select>
+          <div className="row" style={{ alignItems: "flex-start" }}>
+            <div style={{ width: 220 }}>
+              <Select
+                label="Reminder"
+                defaultValue="morning"
+                options={[
+                  { value: "morning", label: "Every morning" },
+                  { value: "week", label: "Once a week" },
+                  { value: "never", label: "Never" },
+                ]}
+              />
+            </div>
+            <div style={{ width: 220 }}>
+              <Select
+                label="Assign to"
+                placeholder="Choose a person…"
+                options={[
+                  { value: "asha", label: "Dr. Asha Verma" },
+                  { value: "ravi", label: "Ravi Kumar" },
+                  { value: "meera", label: "Meera Iyer" },
+                ]}
+              />
+            </div>
+          </div>
         ),
-        code: `<Select label="Reminder" defaultValue="morning">
-  <option value="morning">Every morning</option>
-  <option value="week">Once a week</option>
-  <option value="never">Never</option>
-</Select>`,
+        code: `<Select
+  label="Reminder"
+  defaultValue="morning"
+  options={[
+    { value: "morning", label: "Every morning" },
+    { value: "week", label: "Once a week" },
+    { value: "never", label: "Never" },
+  ]}
+/>`,
       },
     ],
   },

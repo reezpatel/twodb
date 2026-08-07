@@ -25,8 +25,7 @@
 }
 
 .tw-input,
-.tw-textarea,
-.tw-select {
+.tw-textarea {
   font-family: var(--font-ui);
   font-size: var(--text-md);
   color: var(--ink);
@@ -55,13 +54,12 @@
 
 .tw-input:hover,
 .tw-textarea:hover,
-.tw-select:hover {
+.tw-select__trigger:hover {
   border-color: var(--ink-3);
 }
 
 .tw-input:focus,
-.tw-textarea:focus,
-.tw-select:focus {
+.tw-textarea:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--ring);
@@ -76,13 +74,119 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger-ink) 20%, transparent);
 }
 
+/* Select — custom listbox: hairline trigger, lit popup panel */
+
 .tw-select {
-  appearance: none;
-  padding-right: 34px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 7.5 9 4.5' stroke='%23626274' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
+  position: relative;
+  width: 100%;
+}
+
+.tw-select__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  height: 34px;
+  padding: 0 var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
   cursor: pointer;
+  transition:
+    border-color var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-1) var(--ease-out);
+}
+
+.tw-select__trigger:focus-visible,
+.tw-select__trigger[aria-expanded="true"] {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.tw-select__trigger[aria-invalid="true"] {
+  border-color: var(--danger-ink);
+}
+
+.tw-select__trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tw-select__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tw-select__value--placeholder {
+  color: var(--ink-3);
+}
+
+.tw-select__chevron {
+  width: 15px;
+  height: 15px;
+  color: var(--ink-3);
+  flex-shrink: 0;
+  transition: transform var(--dur-1) var(--ease-out);
+}
+
+.tw-select__trigger[aria-expanded="true"] .tw-select__chevron {
+  transform: rotate(180deg);
+}
+
+.tw-select__popup {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: var(--z-overlay);
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-overlay);
+  animation: tw-menu-in var(--dur-2) var(--ease-out) both;
+}
+
+.tw-select__popup--top {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.tw-select__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  font-size: var(--text-md);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease-out);
+}
+
+.tw-select__option svg {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.tw-select__option--active {
+  background: var(--bg-band-strong);
+}
+
+.tw-select__option--selected {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 /* Checkbox & Radio — a small box that lights up */
