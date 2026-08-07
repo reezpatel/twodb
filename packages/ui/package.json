@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@fontsource/oswald": "^5.2.0",
-    "@fontsource/public-sans": "^5.2.0"
+    "@fontsource/public-sans": "^5.2.0",
+    "lucide-react": "^1.29.0"
   },
   "devDependencies": {
     "@types/react": "^19.1.0",

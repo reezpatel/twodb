@@ -1,47 +1,98 @@
 import { useState, type CSSProperties } from "react";
-import { Tabs } from "@twodb/ui";
+import {
+  AccountMenu,
+  MenuDivider,
+  MenuItem,
+  NavPanel,
+  NavRail,
+  NavSection,
+  SearchInput,
+  Tabs,
+} from "@twodb/ui";
+import {
+  CircleHelp,
+  Component,
+  LogOut,
+  Palette,
+  PanelLeft,
+  Settings,
+  SlidersHorizontal,
+  User,
+} from "lucide-react";
 import { registry } from "./registry";
 
+const RAIL_GROUPS = [
+  { id: "Foundation", icon: <Palette /> },
+  { id: "Primitives", icon: <Component /> },
+  { id: "Shell", icon: <PanelLeft /> },
+];
+
 export default function App() {
+  const [group, setGroup] = useState<string>("Foundation");
   const [selected, setSelected] = useState(registry[0].id);
+  const [query, setQuery] = useState("");
   const [phase, setPhase] = useState<"day" | "night">("day");
 
   const entry = registry.find((c) => c.id === selected) ?? registry[0];
   const cueNumber = String(registry.indexOf(entry)).padStart(2, "0");
 
-  const groups = ["Foundation", "Primitives"] as const;
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? registry.filter((c) => c.name.toLowerCase().includes(q))
+    : registry.filter((c) => c.group === group);
+
+  function selectGroup(id: string) {
+    setGroup(id);
+    setQuery("");
+    const first = registry.find((c) => c.group === id);
+    if (first) setSelected(first.id);
+  }
 
   return (
     <div className="shell">
-      <aside className="rail" data-phase="night">
-        <div className="rail__brand">
-          <span className="rail__wordmark">twodb</span>
-          <span className="rail__sub">Design System</span>
-        </div>
-        <nav className="rail__nav">
-          {groups.map((group) => (
-            <div key={group} className="rail__group">
-              <span className="rail__group-label">{group}</span>
-              {registry
-                .filter((c) => c.group === group)
-                .map((c) => {
-                  const num = String(registry.indexOf(c)).padStart(2, "0");
-                  const active = c.id === selected;
-                  return (
-                    <button
-                      key={c.id}
-                      className={active ? "rail__item rail__item--active" : "rail__item"}
-                      onClick={() => setSelected(c.id)}
-                    >
-                      <span className="rail__cue tw-tnum">{num}</span>
-                      <span>{c.name}</span>
-                    </button>
-                  );
-                })}
-            </div>
-          ))}
-        </nav>
-      </aside>
+      <NavRail
+        aria-label="Library sections"
+        header={<span className="shell-brand">T</span>}
+        value={group}
+        onValueChange={selectGroup}
+        items={RAIL_GROUPS.map((g) => ({ id: g.id, icon: g.icon, label: g.id }))}
+      />
+
+      <NavPanel
+        search={
+          <SearchInput
+            placeholder="Search components…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search components"
+          />
+        }
+        footer={
+          <>
+            <NavSection
+              items={[
+                { id: "settings", label: "Settings", icon: <Settings /> },
+                { id: "help", label: "Help & shortcuts", icon: <CircleHelp /> },
+              ]}
+            />
+            <AccountMenu name="Asha Verma" sub="Design workspace">
+              <MenuItem icon={<User />}>Profile</MenuItem>
+              <MenuItem icon={<SlidersHorizontal />}>Preferences</MenuItem>
+              <MenuDivider />
+              <MenuItem icon={<LogOut />} danger>
+                Log out
+              </MenuItem>
+            </AccountMenu>
+          </>
+        }
+      >
+        <NavSection
+          label={q ? "Results" : group}
+          items={visible.map((c) => ({ id: c.id, label: c.name }))}
+          value={selected}
+          onValueChange={setSelected}
+        />
+      </NavPanel>
 
       <main className="canvas" data-phase={phase}>
         <header className="canvas__header band" style={{ "--i": 0 } as CSSProperties}>

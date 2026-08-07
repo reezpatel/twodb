@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import {
+  AccountMenu,
   Avatar,
   Badge,
   Button,
@@ -7,8 +8,16 @@ import {
   Checkbox,
   Dialog,
   Divider,
+  IconButton,
   Input,
+  Menu,
+  MenuDivider,
+  MenuItem,
+  NavPanel,
+  NavRail,
+  NavSection,
   Radio,
+  SearchInput,
   Select,
   Skeleton,
   Switch,
@@ -16,6 +25,22 @@ import {
   Textarea,
   Tooltip,
 } from "@twodb/ui";
+import {
+  Bell,
+  Copy,
+  Home,
+  LogOut,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Search,
+  Settings,
+  SlidersHorizontal,
+  StickyNote,
+  Trash2,
+  User,
+  Zap,
+} from "lucide-react";
 
 export interface Story {
   title: string;
@@ -25,7 +50,7 @@ export interface Story {
 
 export interface ComponentEntry {
   id: string;
-  group: "Foundation" | "Primitives";
+  group: "Foundation" | "Primitives" | "Shell";
   name: string;
   description: string;
   stories: Story[];
@@ -120,6 +145,85 @@ function DialogDemo() {
         It stays searchable, but leaves your daily view. You can bring it back any time.
       </Dialog>
     </>
+  );
+}
+
+/* --- Shell demos --- */
+function NavRailDemo() {
+  const [active, setActive] = useState("notes");
+  return (
+    <div className="demo-frame" style={{ height: 320 }}>
+      <NavRail
+        value={active}
+        onValueChange={setActive}
+        header={
+          <span
+            style={{
+              display: "grid",
+              placeItems: "center",
+              width: 32,
+              height: 32,
+              marginBottom: 8,
+              borderRadius: "var(--r-md)",
+              background: "var(--action)",
+              color: "#fff",
+              fontFamily: "var(--font-cue)",
+              fontWeight: 600,
+              fontSize: 15,
+            }}
+          >
+            T
+          </span>
+        }
+        items={[
+          { id: "notes", icon: <StickyNote />, label: "Notes" },
+          { id: "search", icon: <Search />, label: "Search" },
+          { id: "automations", icon: <Zap />, label: "Automations" },
+          { id: "settings", icon: <Settings />, label: "Settings" },
+        ]}
+      />
+    </div>
+  );
+}
+
+function NavPanelDemo() {
+  const [page, setPage] = useState("inbox");
+  return (
+    <div className="demo-frame" style={{ height: 460 }}>
+      <NavPanel
+        search={<SearchInput placeholder="Search notes…" aria-label="Search notes" />}
+        footer={
+          <AccountMenu name="Asha Verma" sub="Clinic workspace">
+            <MenuItem icon={<User />}>Profile</MenuItem>
+            <MenuItem icon={<SlidersHorizontal />}>Preferences</MenuItem>
+            <MenuDivider />
+            <MenuItem icon={<LogOut />} danger>
+              Log out
+            </MenuItem>
+          </AccountMenu>
+        }
+      >
+        <NavSection
+          label="Workspace"
+          value={page}
+          onValueChange={setPage}
+          items={[
+            { id: "inbox", label: "Inbox", icon: <Home />, badge: <Badge tone="go">3</Badge> },
+            { id: "notes", label: "All notes", icon: <StickyNote /> },
+            { id: "automations", label: "Automations", icon: <Zap /> },
+          ]}
+        />
+        <NavSection
+          label="Recent"
+          value={page}
+          onValueChange={setPage}
+          items={[
+            { id: "rounds", label: "Morning rounds", badge: <Badge tone="rose">AI</Badge> },
+            { id: "invoices", label: "Unpaid invoices" },
+          ]}
+        />
+      </NavPanel>
+    </div>
   );
 }
 
@@ -522,6 +626,153 @@ export const registry: ComponentEntry[] = [
         code: `<Tooltip tip="Linked to 4 notes">
   <Button variant="secondary">Hover or focus me</Button>
 </Tooltip>`,
+      },
+    ],
+  },
+  {
+    id: "icon-button",
+    group: "Shell",
+    name: "Icon Button",
+    description:
+      "An action with no visible text — the label prop is required and becomes the accessible name.",
+    stories: [
+      {
+        title: "Variants & sizes",
+        render: () => (
+          <div className="row">
+            <IconButton label="Add" icon={<Plus />} />
+            <IconButton label="Notifications" icon={<Bell />} variant="secondary" />
+            <IconButton label="More actions" icon={<MoreHorizontal />} size="sm" />
+            <IconButton label="Add large" icon={<Plus />} size="lg" variant="secondary" />
+          </div>
+        ),
+        code: `<IconButton label="Add" icon={<Plus />} />
+<IconButton label="Notifications" icon={<Bell />} variant="secondary" />
+<IconButton label="More actions" icon={<MoreHorizontal />} size="sm" />`,
+      },
+    ],
+  },
+  {
+    id: "search-input",
+    group: "Shell",
+    name: "Search Input",
+    description: "The field with its instrument built in — leading icon, full width of its tier.",
+    stories: [
+      {
+        title: "Default",
+        render: () => (
+          <div style={{ width: 260 }}>
+            <SearchInput placeholder="Search notes…" aria-label="Search notes" />
+          </div>
+        ),
+        code: `<SearchInput placeholder="Search notes…" aria-label="Search notes" />`,
+      },
+    ],
+  },
+  {
+    id: "menu",
+    group: "Shell",
+    name: "Menu",
+    description:
+      "An anchored popup for secondary actions. Closes on Escape, outside click, or selection.",
+    stories: [
+      {
+        title: "Default",
+        render: () => (
+          <Menu trigger={<Button variant="secondary">Note actions</Button>}>
+            <MenuItem icon={<Pencil />}>Rename</MenuItem>
+            <MenuItem icon={<Copy />}>Duplicate</MenuItem>
+            <MenuDivider />
+            <MenuItem icon={<Trash2 />} danger>
+              Delete
+            </MenuItem>
+          </Menu>
+        ),
+        code: `<Menu trigger={<Button variant="secondary">Note actions</Button>}>
+  <MenuItem icon={<Pencil />}>Rename</MenuItem>
+  <MenuItem icon={<Copy />}>Duplicate</MenuItem>
+  <MenuDivider />
+  <MenuItem icon={<Trash2 />} danger>Delete</MenuItem>
+</Menu>`,
+      },
+    ],
+  },
+  {
+    id: "nav-rail",
+    group: "Shell",
+    name: "Nav Rail",
+    description:
+      "The slim first tier: icons only, always night. The active space lights in cobalt; labels ride as right-side tooltips.",
+    stories: [
+      {
+        title: "Default",
+        render: () => <NavRailDemo />,
+        code: `<NavRail
+  value={space}
+  onValueChange={setSpace}
+  items={[
+    { id: "notes", icon: <StickyNote />, label: "Notes" },
+    { id: "search", icon: <Search />, label: "Search" },
+    { id: "automations", icon: <Zap />, label: "Automations" },
+    { id: "settings", icon: <Settings />, label: "Settings" },
+  ]}
+/>`,
+      },
+    ],
+  },
+  {
+    id: "nav-panel",
+    group: "Shell",
+    name: "Nav Panel",
+    description:
+      "The full second tier: search on top, sections of links, and a footer for secondary links and the account row.",
+    stories: [
+      {
+        title: "Composed",
+        render: () => <NavPanelDemo />,
+        code: `<NavPanel
+  search={<SearchInput placeholder="Search notes…" />}
+  footer={
+    <AccountMenu name="Asha Verma" sub="Clinic workspace">
+      <MenuItem icon={<User />}>Profile</MenuItem>
+      <MenuDivider />
+      <MenuItem icon={<LogOut />} danger>Log out</MenuItem>
+    </AccountMenu>
+  }
+>
+  <NavSection label="Workspace" items={…} value={page} onValueChange={setPage} />
+  <NavSection label="Recent" items={…} />
+</NavPanel>`,
+      },
+    ],
+  },
+  {
+    id: "account-menu",
+    group: "Shell",
+    name: "Account Menu",
+    description:
+      "Avatar, name, and a three-dots button that opens a menu upward — the foot of every panel.",
+    stories: [
+      {
+        title: "Default",
+        render: () => (
+          <div style={{ width: 240 }}>
+            <AccountMenu name="Asha Verma" sub="Clinic workspace">
+              <MenuItem icon={<User />}>Profile</MenuItem>
+              <MenuItem icon={<SlidersHorizontal />}>Preferences</MenuItem>
+              <MenuDivider />
+              <MenuItem icon={<LogOut />} danger>
+                Log out
+              </MenuItem>
+            </AccountMenu>
+          </div>
+        ),
+        code: `<AccountMenu name="Asha Verma" sub="Clinic workspace">
+  <MenuItem icon={<User />}>Profile</MenuItem>
+  <MenuItem icon={<SlidersHorizontal />}>Preferences</MenuItem>
+  <MenuDivider />
+  <MenuItem icon={<LogOut />} danger>Log out</MenuItem>
+</AccountMenu>`,
       },
     ],
   },

@@ -1,4 +1,4 @@
-/* twodb UI Library — the cue sheet beside the lit stage */
+/* twodb UI Library — two-tier shell: icon rail + full panel + stage */
 
 * {
   box-sizing: border-box;
@@ -11,120 +11,33 @@ body {
 
 .shell {
   display: grid;
-  grid-template-columns: 252px 1fr;
-  min-height: 100vh;
-}
-
-/* ---------- Rail: the operator's cue sheet, always night ---------- */
-
-.rail {
-  min-width: 0;
-  background: var(--bg);
-  color: var(--ink);
-  border-right: 1px solid var(--line);
-  padding: var(--space-5) var(--space-3);
-  position: sticky;
-  top: 0;
+  grid-template-columns: 56px 264px 1fr;
   height: 100vh;
-  overflow-y: auto;
 }
 
-.rail__brand {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 var(--space-2) var(--space-4);
-}
+/* ---------- Brand mark on the icon rail ---------- */
 
-.rail__wordmark {
-  font-family: var(--font-cue);
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: var(--tracking-cue);
-  text-transform: uppercase;
-  color: var(--ink);
-  width: fit-content;
-  padding-bottom: 4px;
-  border-bottom: 2px solid var(--accent);
-}
-
-.rail__sub {
-  font-size: var(--text-xs);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-
-.rail__nav {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.rail__group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.rail__group-label {
-  font-family: var(--font-cue);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: var(--tracking-cue);
-  text-transform: uppercase;
-  color: var(--ink-3);
-  padding: 0 var(--space-2) var(--space-2);
-}
-
-.rail__item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 7px var(--space-2);
-  border: none;
+.shell-brand {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-bottom: var(--space-2);
   border-radius: var(--r-md);
-  background: transparent;
-  color: var(--ink-2);
-  font-family: var(--font-ui);
-  font-size: var(--text-md);
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background var(--dur-1) var(--ease-out),
-    color var(--dur-1) var(--ease-out);
-}
-
-.rail__item:hover {
-  background: var(--bg-band-strong);
-  color: var(--ink);
-}
-
-.rail__cue {
-  width: 22px;
-  font-size: var(--text-xs);
-  color: var(--ink-3);
-  transition: color var(--dur-1) var(--ease-out);
-}
-
-/* the lit band: active cue rises in cobalt */
-.rail__item--active,
-.rail__item--active:hover {
-  background: var(--accent-soft-bg);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
-  color: var(--ink);
-}
-
-.rail__item--active .rail__cue {
-  color: var(--accent);
+  background: var(--action);
+  color: #ffffff;
+  font-family: var(--font-cue);
+  font-size: 15px;
+  font-weight: 600;
+  user-select: none;
 }
 
 /* ---------- Canvas: the stage ---------- */
 
 .canvas {
   min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
   background: var(--bg);
   color: var(--ink);
   padding: 40px 48px 120px;
@@ -211,6 +124,15 @@ body {
   font-size: 12.5px;
   line-height: 1.6;
   overflow-x: auto;
+}
+
+/* ---------- Shell demo frames (registry stories) ---------- */
+
+.demo-frame {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  display: flex;
 }
 
 /* ---------- Foundation demos ---------- */
@@ -323,46 +245,59 @@ body {
   }
 }
 
-/* ---------- Responsive: the cue sheet folds over the stage ---------- */
+/* ---------- Responsive: panel folds over the stage, rail steps back ---------- */
 
 @media (max-width: 900px) {
   .shell {
     grid-template-columns: 1fr;
+    height: auto;
   }
 
-  .rail {
-    position: static;
+  .tw-rail {
+    display: none;
+  }
+
+  .tw-panel {
+    width: auto;
     height: auto;
     border-right: none;
     border-bottom: 1px solid var(--line);
   }
 
-  .rail__nav {
+  .tw-panel__body {
     flex-direction: row;
+    align-items: center;
     gap: var(--space-4);
     overflow-x: auto;
+    overflow-y: hidden;
+    padding: var(--space-2) var(--space-3);
     /* scroll affordance: the strip fades at both edges */
     mask-image: linear-gradient(90deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
     -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
   }
 
-  .rail__group {
+  .tw-navsec {
     flex-direction: row;
     align-items: center;
-    gap: 2px;
     flex-shrink: 0;
   }
 
-  .rail__group-label {
+  .tw-navsec__label {
     padding: 0 var(--space-2) 0 0;
   }
 
-  .rail__item {
+  .tw-navlink {
     width: auto;
     white-space: nowrap;
   }
 
+  .tw-panel__footer {
+    display: none;
+  }
+
   .canvas {
+    height: auto;
+    overflow: visible;
     padding: 24px 20px 80px;
   }
 

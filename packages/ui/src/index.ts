@@ -51,4 +51,22 @@ export { Skeleton } from "./components/Skeleton";
 export type { SkeletonProps } from "./components/Skeleton";
 
 export { Tooltip } from "./components/Tooltip";
-export type { TooltipProps } from "./components/Tooltip";
+export type { TooltipProps, TooltipSide } from "./components/Tooltip";
+
+export { IconButton } from "./components/IconButton";
+export type { IconButtonProps, IconButtonVariant, IconButtonSize } from "./components/IconButton";
+
+export { Menu, MenuItem, MenuDivider } from "./components/Menu";
+export type { MenuProps, MenuItemProps, MenuPlacement } from "./components/Menu";
+
+export { SearchInput } from "./components/SearchInput";
+export type { SearchInputProps } from "./components/SearchInput";
+
+export { NavRail } from "./components/NavRail";
+export type { NavRailProps, NavRailItem } from "./components/NavRail";
+
+export { NavPanel, NavSection } from "./components/NavPanel";
+export type { NavPanelProps, NavSectionProps, NavSectionItem } from "./components/NavPanel";
+
+export { AccountMenu } from "./components/AccountMenu";
+export type { AccountMenuProps } from "./components/AccountMenu";
