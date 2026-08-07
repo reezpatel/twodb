@@ -30,7 +30,7 @@ export { Switch } from "./components/Switch";
 export type { SwitchProps } from "./components/Switch";
 
 export { Badge } from "./components/Badge";
-export type { BadgeProps, BadgeTone } from "./components/Badge";
+export type { BadgeProps, BadgeTone, BadgeSize } from "./components/Badge";
 
 export { Card } from "./components/Card";
 export type { CardProps } from "./components/Card";

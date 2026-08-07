@@ -509,6 +509,32 @@ export const registry: ComponentEntry[] = [
 <Badge tone="warning">Due soon</Badge>
 <Badge tone="danger">Failed</Badge>`,
       },
+      {
+        title: "Sizes — md pairs with small buttons, lg with medium",
+        render: () => (
+          <div className="row">
+            <Badge size="sm" tone="go">
+              Small
+            </Badge>
+            <Badge tone="go">Medium</Badge>
+            <Badge size="lg" tone="go">
+              Large
+            </Badge>
+            <Button size="sm" variant="secondary">
+              Small button
+            </Button>
+            <Button size="md" variant="secondary">
+              Medium button
+            </Button>
+          </div>
+        ),
+        code: `<Badge size="sm">Small</Badge>
+<Badge>Medium</Badge>
+<Badge size="lg">Large</Badge>
+
+<Button size="sm">…</Button> + <Badge>…</Badge>   {/* both 26px */}
+<Button size="md">…</Button> + <Badge size="lg">…</Badge> {/* both 32px */}`,
+      },
     ],
   },
   {
