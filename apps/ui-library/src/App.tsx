@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   AccountMenu,
   MenuDivider,
@@ -32,6 +32,12 @@ export default function App() {
   const [selected, setSelected] = useState(registry[0].id);
   const [query, setQuery] = useState("");
   const [phase, setPhase] = useState<"day" | "night">("day");
+
+  /* Phase lives on the document root: panel, canvas, grain, and
+     popups all switch; the icon rail stays pinned to night. */
+  useEffect(() => {
+    document.documentElement.dataset.phase = phase;
+  }, [phase]);
 
   const entry = registry.find((c) => c.id === selected) ?? registry[0];
   const cueNumber = String(registry.indexOf(entry)).padStart(2, "0");
@@ -94,7 +100,7 @@ export default function App() {
         />
       </NavPanel>
 
-      <main className="canvas" data-phase={phase}>
+      <main className="canvas">
         <header className="canvas__header band" style={{ "--i": 0 } as CSSProperties}>
           <div className="canvas__title-row">
             <span className="canvas__cue tw-tnum">{cueNumber}</span>
