@@ -32,7 +32,7 @@
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-md);
-  height: 34px;
+  height: 32px;
   padding: 0 var(--space-3);
   transition:
     border-color var(--dur-1) var(--ease-out),
@@ -87,7 +87,7 @@
   justify-content: space-between;
   gap: var(--space-2);
   width: 100%;
-  height: 34px;
+  height: 32px;
   padding: 0 var(--space-3);
   font-family: var(--font-ui);
   font-size: var(--text-md);
@@ -189,7 +189,9 @@
   font-weight: 600;
 }
 
-/* Checkbox & Radio — a small box that lights up */
+/* Checkbox — the native input stays invisible but real; the box lights cobalt,
+   the check draws itself in, indeterminate gets the dash */
+
 .tw-choice {
   display: inline-flex;
   align-items: center;
@@ -200,7 +202,88 @@
   user-select: none;
 }
 
-.tw-checkbox,
+.tw-checkbox {
+  position: relative;
+  display: inline-flex;
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+
+.tw-checkbox input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.tw-checkbox__box {
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  pointer-events: none;
+  transition:
+    background var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-1) var(--ease-out);
+}
+
+.tw-choice:hover .tw-checkbox__box {
+  border-color: var(--ink-3);
+}
+
+.tw-checkbox input:checked + .tw-checkbox__box,
+.tw-checkbox input:indeterminate + .tw-checkbox__box {
+  background: var(--action);
+  border-color: var(--action);
+}
+
+.tw-checkbox input:focus-visible + .tw-checkbox__box {
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.tw-checkbox input:disabled + .tw-checkbox__box {
+  opacity: 0.45;
+}
+
+.tw-checkbox input:disabled {
+  cursor: not-allowed;
+}
+
+.tw-checkbox__mark,
+.tw-checkbox__dash {
+  grid-area: 1 / 1;
+  width: 11px;
+  height: 11px;
+}
+
+.tw-checkbox__mark path {
+  stroke-dasharray: 12;
+  stroke-dashoffset: 12;
+  transition: stroke-dashoffset var(--dur-2) var(--ease-out);
+}
+
+.tw-checkbox input:checked + .tw-checkbox__box .tw-checkbox__mark path {
+  stroke-dashoffset: 0;
+}
+
+.tw-checkbox__dash path {
+  opacity: 0;
+  transition: opacity var(--dur-1) var(--ease-out);
+}
+
+.tw-checkbox input:indeterminate + .tw-checkbox__box .tw-checkbox__dash path {
+  opacity: 1;
+}
+
+/* Radio — the lit dot */
+
 .tw-radio {
   appearance: none;
   width: 17px;
@@ -209,6 +292,7 @@
   margin: 0;
   background: var(--surface);
   border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
   cursor: pointer;
   transition:
     background var(--dur-1) var(--ease-out),
@@ -216,29 +300,18 @@
     box-shadow var(--dur-1) var(--ease-out);
 }
 
-.tw-checkbox { border-radius: 5px; }
-.tw-radio { border-radius: var(--r-pill); }
-
-.tw-checkbox:hover,
 .tw-radio:hover { border-color: var(--ink-3); }
 
-.tw-checkbox:checked {
-  background: var(--accent) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 11 11'><path d='M2 6 4.5 8.5 9 3' stroke='white' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") center / 11px no-repeat;
-  border-color: var(--accent);
-}
-
 .tw-radio:checked {
-  border: 5.5px solid var(--accent);
+  border: 5.5px solid var(--action);
 }
 
-.tw-checkbox:focus-visible,
 .tw-radio:focus-visible,
 .tw-switch:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--ring);
 }
 
-.tw-checkbox:disabled,
 .tw-radio:disabled {
   opacity: 0.45;
   cursor: not-allowed;

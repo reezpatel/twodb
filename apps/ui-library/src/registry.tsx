@@ -426,7 +426,8 @@ export const registry: ComponentEntry[] = [
     id: "checkbox",
     group: "Primitives",
     name: "Checkbox",
-    description: "A small box that lights when chosen.",
+    description:
+      "The native input stays invisible but real — forms and keyboard keep working. The check draws itself in; a mixed group gets the dash.",
     stories: [
       {
         title: "States",
@@ -434,11 +435,13 @@ export const registry: ComponentEntry[] = [
           <div className="row">
             <Checkbox label="Sync this notebook" defaultChecked />
             <Checkbox label="Share with assistant" />
+            <Checkbox label="2 of 4 selected" indeterminate />
             <Checkbox label="Unavailable" disabled />
           </div>
         ),
         code: `<Checkbox label="Sync this notebook" defaultChecked />
 <Checkbox label="Share with assistant" />
+<Checkbox label="2 of 4 selected" indeterminate />
 <Checkbox label="Unavailable" disabled />`,
       },
     ],

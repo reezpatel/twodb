@@ -20,9 +20,9 @@
     filter var(--dur-1) var(--ease-out);
 }
 
-.tw-btn--sm { height: 28px; padding: 0 10px; font-size: var(--text-sm); border-radius: var(--r-sm); }
-.tw-btn--md { height: 34px; padding: 0 14px; font-size: var(--text-md); }
-.tw-btn--lg { height: 42px; padding: 0 20px; font-size: var(--text-lg); }
+.tw-btn--sm { height: 26px; padding: 0 9px; font-size: var(--text-sm); border-radius: var(--r-sm); }
+.tw-btn--md { height: 32px; padding: 0 13px; font-size: var(--text-md); }
+.tw-btn--lg { height: 38px; padding: 0 18px; font-size: var(--text-lg); }
 
 .tw-btn--primary {
   background: var(--action);
