@@ -222,7 +222,7 @@ body {
 /* ---------- Cue-up: bands rise once, in sequence ---------- */
 
 .band {
-  animation: cue-up var(--dur-3) var(--ease-out) both;
+  animation: cue-up var(--dur-3) var(--ease-out) backwards;
   animation-delay: calc(var(--i, 0) * 45ms);
 }
 

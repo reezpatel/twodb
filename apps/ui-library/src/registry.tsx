@@ -235,9 +235,14 @@ interface Invoice {
   amount: number;
   status: "Paid" | "Due" | "Overdue";
   date: string;
+  tags: string[];
+  received: number;
+  priority: number;
+  receipt: string;
+  portal: string;
 }
 
-const INVOICES: Invoice[] = [
+const BASE_INVOICES = [
   { id: "INV-1041", patient: "Ravi Kumar", amount: 1200, status: "Paid", date: "2026-08-01" },
   { id: "INV-1042", patient: "Meera Iyer", amount: 850, status: "Due", date: "2026-08-01" },
   { id: "INV-1043", patient: "Arjun Nair", amount: 2400, status: "Overdue", date: "2026-07-28" },
@@ -257,60 +262,126 @@ const INVOICES: Invoice[] = [
   { id: "INV-1057", patient: "Sameer Khan", amount: 760, status: "Paid", date: "2026-07-14" },
   { id: "INV-1058", patient: "Lakshmi Reddy", amount: 1120, status: "Overdue", date: "2026-07-13" },
   { id: "INV-1059", patient: "Nitin Malhotra", amount: 640, status: "Paid", date: "2026-07-12" },
+] as const;
+
+const INVOICES: Invoice[] = BASE_INVOICES.map((r, i) => ({
+  ...r,
+  status: r.status as Invoice["status"],
+  tags: i % 3 === 0 ? ["lab", "follow-up"] : i % 3 === 1 ? ["consultation"] : ["pharmacy"],
+  received: r.status === "Paid" ? 100 : r.status === "Due" ? 45 : 10,
+  priority: (i % 5) + 1,
+  receipt: `receipt-${r.id.slice(4)}.pdf`,
+  portal: `pay.twodb.in/${r.id.toLowerCase()}`,
+}));
+
+const TAG_OPTIONS = [
+  { value: "consultation", label: "Consultation", tone: "go" as const },
+  { value: "follow-up", label: "Follow-up", tone: "rose" as const },
+  { value: "lab", label: "Lab", tone: "neutral" as const },
+  { value: "pharmacy", label: "Pharmacy", tone: "warning" as const },
 ];
 
-function statusTone(status: Invoice["status"]) {
-  return status === "Paid" ? "go" : status === "Due" ? "warning" : "danger";
-}
+const STATUS_OPTIONS = [
+  { value: "Paid", label: "Paid", tone: "go" as const },
+  { value: "Due", label: "Due", tone: "warning" as const },
+  { value: "Overdue", label: "Overdue", tone: "danger" as const },
+];
 
 const invoiceColumns: DataColumn<Invoice>[] = [
   {
     id: "id",
     label: "Invoice",
+    type: "text",
     width: 130,
-    cell: (r) => r.id,
     sortValue: (r) => r.id,
     filter: { kind: "text" },
+    editValue: (r) => r.id,
+    setValue: (r, v) => ({ ...r, id: String(v) }),
   },
   {
     id: "patient",
     label: "Patient",
-    width: 210,
-    cell: (r) => r.patient,
+    type: "text",
+    width: 180,
     sortValue: (r) => r.patient,
     filter: { kind: "text" },
+    editValue: (r) => r.patient,
+    setValue: (r, v) => ({ ...r, patient: String(v) }),
+  },
+  {
+    id: "tags",
+    label: "Tags",
+    type: "chips",
+    width: 200,
+    options: TAG_OPTIONS,
+    editValue: (r) => r.tags,
+    setValue: (r, v) => ({ ...r, tags: v as string[] }),
   },
   {
     id: "amount",
     label: "Amount",
+    type: "currency",
     align: "right",
-    width: 130,
-    cell: (r) => `₹${r.amount.toLocaleString("en-IN")}`,
+    width: 120,
     sortValue: (r) => r.amount,
     filter: { kind: "number" },
+    editValue: (r) => r.amount,
+    setValue: (r, v) => ({ ...r, amount: Number(v) || 0 }),
   },
   {
     id: "status",
     label: "Status",
-    width: 140,
-    cell: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge>,
-    filter: {
-      kind: "enum",
-      options: [
-        { value: "Paid", label: "Paid" },
-        { value: "Due", label: "Due" },
-        { value: "Overdue", label: "Overdue" },
-      ],
-    },
+    type: "select",
+    width: 130,
+    options: STATUS_OPTIONS,
+    filter: { kind: "enum", options: STATUS_OPTIONS },
     filterValue: (r) => r.status,
+    editValue: (r) => r.status,
+    setValue: (r, v) => ({ ...r, status: v as Invoice["status"] }),
+  },
+  {
+    id: "received",
+    label: "Received",
+    type: "progress",
+    width: 140,
+    sortValue: (r) => r.received,
+    editValue: (r) => r.received,
+    setValue: (r, v) => ({ ...r, received: Number(v) }),
+  },
+  {
+    id: "priority",
+    label: "Priority",
+    type: "stars",
+    width: 110,
+    sortValue: (r) => r.priority,
+    editValue: (r) => r.priority,
+    setValue: (r, v) => ({ ...r, priority: Number(v) }),
+  },
+  {
+    id: "receipt",
+    label: "Receipt",
+    type: "file",
+    width: 170,
+    editValue: (r) => r.receipt,
+    setValue: (r, v) => ({ ...r, receipt: String(v) }),
+  },
+  {
+    id: "portal",
+    label: "Portal",
+    type: "url",
+    width: 200,
+    editValue: (r) => r.portal,
+    setValue: (r, v) => ({ ...r, portal: String(v) }),
   },
   {
     id: "date",
     label: "Date",
-    width: 150,
-    cell: (r) => r.date,
+    type: "text",
+    width: 130,
     sortValue: (r) => r.date,
     filter: { kind: "text" },
+    editValue: (r) => r.date,
+    setValue: (r, v) => ({ ...r, date: String(v) }),
   },
 ];
 
@@ -979,10 +1050,10 @@ export const registry: ComponentEntry[] = [
     group: "Data",
     name: "Data Table",
     description:
-      "The working table, on TanStack Table: search, sorts, a full match-all/match-any filter builder, resizable columns, and pagination.",
+      "The working table, on TanStack Table: click any cell to edit in place, filter builder, sorts, resizable columns, pagination. Header gear opens column settings.",
     stories: [
       {
-        title: "Invoices — sort, filter, resize, paginate",
+        title: "Invoices — editable cells, ten column types",
         render: () => (
           <div style={{ width: "100%" }}>
             <DataTable
@@ -992,6 +1063,7 @@ export const registry: ComponentEntry[] = [
               searchText={(r) => `${r.id} ${r.patient}`}
               searchPlaceholder="Search invoices…"
               pageSize={8}
+              editable
             />
           </div>
         ),

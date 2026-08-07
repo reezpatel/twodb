@@ -75,4 +75,7 @@ export { Table, THead, TBody, TR, TH, TD } from "./components/Table";
 export type { THProps, TDProps } from "./components/Table";
 
 export { DataTable } from "./components/DataTable";
-export type { DataTableProps, DataColumn } from "./components/DataTable";
+export type { DataTableProps, DataColumn, FilterSpec, FilterRule } from "./components/DataTable";
+
+export { CellView, CellEditor } from "./components/cells";
+export type { CellType, CellOption } from "./components/cells";

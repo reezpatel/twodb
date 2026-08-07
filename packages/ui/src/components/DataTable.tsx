@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, memo, useCallback, type ReactNode } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -26,6 +26,8 @@ import { IconButton } from "./IconButton";
 import { Input } from "./Input";
 import { SearchInput } from "./SearchInput";
 import { Select } from "./Select";
+import { CellEditor, CellView, type CellOption, type CellType } from "./cells";
+import { ColumnConfig } from "./ColumnConfig";
 
 export type FilterSpec =
   | { kind: "text" }
@@ -35,7 +37,8 @@ export type FilterSpec =
 export interface DataColumn<T> {
   id: string;
   label: string;
-  cell: (row: T) => ReactNode;
+  /** Custom display renderer. Omit to use the type's default renderer. */
+  cell?: (row: T) => ReactNode;
   /** Enables sorting when provided. */
   sortValue?: (row: T) => string | number;
   /** Enables the column in the filter builder. */
@@ -45,6 +48,14 @@ export interface DataColumn<T> {
   align?: "left" | "right";
   /** Initial column width in px — columns are resizable. */
   width?: number;
+  /** Cell type drives the default display renderer and the inline editor. */
+  type?: CellType;
+  /** Options for select / multiselect / chips columns. */
+  options?: CellOption[];
+  /** Raw cell value for the default renderer and editor. */
+  editValue?: (row: T) => unknown;
+  /** Writes an edited value back into the row; enables cell editing. */
+  setValue?: (row: T, value: unknown) => T;
 }
 
 export interface FilterRule {
@@ -122,11 +133,80 @@ export interface DataTableProps<T> {
   pageSize?: number;
   pageSizeOptions?: number[];
   emptyMessage?: string;
+  /** Enables click-to-edit cells for columns that define editValue + setValue. */
+  editable?: boolean;
+  /** Called with the full row array after any cell edit commits. */
+  onRowsChange?: (rows: T[]) => void;
   "aria-label"?: string;
 }
 
 let ruleSeq = 0;
 const nextRuleId = () => `rule-${++ruleSeq}`;
+
+/* --- Memoized row: an edit re-renders exactly one row --- */
+
+interface DataRowProps<T> {
+  row: T;
+  rowId: string;
+  columns: DataColumn<T>[];
+  editable: boolean;
+  editingColId: string | null;
+  onStartEdit: (rowId: string, colId: string) => void;
+  onCommit: (rowId: string, col: DataColumn<T>, value: unknown) => void;
+  onCancelEdit: () => void;
+}
+
+const DataRowInner = memo(function DataRowInner<T>({
+  row,
+  rowId,
+  columns,
+  editable,
+  editingColId,
+  onStartEdit,
+  onCommit,
+  onCancelEdit,
+}: DataRowProps<T>) {
+  return (
+    <tr className="tw-tr">
+      {columns.map((col) => {
+        const editableCell = editable && !!col.setValue && !!col.editValue;
+        const isEditing = editingColId === col.id;
+        return (
+          <td
+            key={col.id}
+            className={[
+              "tw-td",
+              col.align === "right" ? "tw-td--right" : "",
+              editableCell ? "tw-td--editable" : "",
+              isEditing ? "tw-td--editing" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onClick={editableCell && !isEditing ? () => onStartEdit(rowId, col.id) : undefined}
+          >
+            {isEditing ? (
+              <CellEditor
+                type={col.type ?? "text"}
+                value={col.editValue!(row)}
+                options={col.options}
+                onCommit={(v) => onCommit(rowId, col, v)}
+                onClose={onCancelEdit}
+              />
+            ) : col.cell ? (
+              col.cell(row)
+            ) : (
+              <CellView
+                type={col.type ?? "text"}
+                value={col.editValue ? col.editValue(row) : undefined}
+                options={col.options}
+              />
+            )}
+          </td>
+        );
+      })}
+    </tr>
+  );
+}) as <T>(props: DataRowProps<T>) => ReactNode;
 
 export function DataTable<T>({
   columns,
@@ -137,6 +217,8 @@ export function DataTable<T>({
   pageSize: initialPageSize = 8,
   pageSizeOptions = [8, 16, 32],
   emptyMessage = "Nothing here yet.",
+  editable = false,
+  onRowsChange,
   "aria-label": ariaLabel = "Data table",
 }: DataTableProps<T>) {
   const [query, setQuery] = useState("");
@@ -149,6 +231,32 @@ export function DataTable<T>({
   const [combinator, setCombinator] = useState<Combinator>("and");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersAnchorRef = useRef<HTMLDivElement>(null);
+
+  /* --- editable cells: one editor at a time; typing never touches table state --- */
+  const [draft, setDraft] = useState(rows);
+  const [editing, setEditing] = useState<{ rowId: string; colId: string } | null>(null);
+
+  useEffect(() => setDraft(rows), [rows]);
+
+  const handleStartEdit = useCallback((rowId: string, colId: string) => {
+    setEditing({ rowId, colId });
+  }, []);
+
+  const handleCancelEdit = useCallback(() => setEditing(null), []);
+
+  const handleCommit = useCallback(
+    (rowId: string, col: DataColumn<T>, value: unknown) => {
+      if (!col.setValue) return;
+      setDraft((cur) => {
+        const next = cur.map((r) => (rowKey(r) === rowId ? col.setValue!(r, value) : r));
+        onRowsChange?.(next);
+        return next;
+      });
+      /* multiselect commits incrementally and stays open */
+      if (col.type !== "multiselect" && col.type !== "chips") setEditing(null);
+    },
+    [rowKey, onRowsChange]
+  );
 
   const filterable = useMemo(() => columns.filter((c) => c.filter), [columns]);
 
@@ -191,7 +299,7 @@ export function DataTable<T>({
   };
 
   const table = useReactTable({
-    data: rows,
+    data: draft,
     columns: columnDefs,
     state: { sorting, pagination, globalFilter },
     onSortingChange: setSorting,
@@ -411,6 +519,7 @@ export function DataTable<T>({
                         ) : (
                           (header.column.columnDef.header as string)
                         )}
+                        <ColumnConfig label={header.column.columnDef.header as string} type={col?.type ?? "text"} />
                       </span>
                       {header.column.getCanResize() ? (
                         <span
@@ -433,19 +542,17 @@ export function DataTable<T>({
           </thead>
           <tbody className="tw-tbody">
             {leafRows.map((row) => (
-              <tr className="tw-tr" key={row.id}>
-                {columns.map((col) => (
-                  <td
-                    key={col.id}
-                    className={["tw-td", col.align === "right" ? "tw-td--right" : ""]
-                      .filter(Boolean)
-                      .join(" ")}
-                    style={{ width: table.getColumn(col.id)?.getSize() }}
-                  >
-                    {col.cell(row.original as T)}
-                  </td>
-                ))}
-              </tr>
+              <DataRowInner
+                key={row.id}
+                row={row.original as T}
+                rowId={row.id}
+                columns={columns}
+                editable={editable}
+                editingColId={editing?.rowId === row.id ? editing.colId : null}
+                onStartEdit={handleStartEdit}
+                onCommit={handleCommit}
+                onCancelEdit={handleCancelEdit}
+              />
             ))}
           </tbody>
         </table>
