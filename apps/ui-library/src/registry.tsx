@@ -41,6 +41,7 @@ import {
   User,
   Zap,
 } from "lucide-react";
+import { DataTable, Table, TBody, TD, TH, THead, TR, type DataColumn } from "@twodb/ui";
 
 export interface Story {
   title: string;
@@ -50,7 +51,7 @@ export interface Story {
 
 export interface ComponentEntry {
   id: string;
-  group: "Foundation" | "Primitives" | "Shell";
+  group: "Foundation" | "Primitives" | "Shell" | "Data";
   name: string;
   description: string;
   stories: Story[];
@@ -226,6 +227,65 @@ function NavPanelDemo() {
     </div>
   );
 }
+
+/* --- Data demos --- */
+interface Invoice {
+  id: string;
+  patient: string;
+  amount: number;
+  status: "Paid" | "Due" | "Overdue";
+  date: string;
+}
+
+const INVOICES: Invoice[] = [
+  { id: "INV-1041", patient: "Ravi Kumar", amount: 1200, status: "Paid", date: "2026-08-01" },
+  { id: "INV-1042", patient: "Meera Iyer", amount: 850, status: "Due", date: "2026-08-01" },
+  { id: "INV-1043", patient: "Arjun Nair", amount: 2400, status: "Overdue", date: "2026-07-28" },
+  { id: "INV-1044", patient: "Sana Sheikh", amount: 600, status: "Paid", date: "2026-07-27" },
+  { id: "INV-1045", patient: "Vikram Rao", amount: 1750, status: "Due", date: "2026-07-26" },
+  { id: "INV-1046", patient: "Priya Sharma", amount: 300, status: "Paid", date: "2026-07-25" },
+  { id: "INV-1047", patient: "Dev Patel", amount: 990, status: "Overdue", date: "2026-07-24" },
+  { id: "INV-1048", patient: "Anita Desai", amount: 4200, status: "Due", date: "2026-07-23" },
+  { id: "INV-1049", patient: "Farhan Ali", amount: 700, status: "Paid", date: "2026-07-22" },
+  { id: "INV-1050", patient: "Kavya Menon", amount: 1350, status: "Due", date: "2026-07-21" },
+  { id: "INV-1051", patient: "Rohan Gupta", amount: 520, status: "Paid", date: "2026-07-20" },
+  { id: "INV-1052", patient: "Isha Bose", amount: 2100, status: "Overdue", date: "2026-07-19" },
+  { id: "INV-1053", patient: "Kabir Shah", amount: 940, status: "Paid", date: "2026-07-18" },
+  { id: "INV-1054", patient: "Nisha Pillai", amount: 1680, status: "Due", date: "2026-07-17" },
+  { id: "INV-1055", patient: "Amit Joshi", amount: 450, status: "Paid", date: "2026-07-16" },
+  { id: "INV-1056", patient: "Tara Krishnan", amount: 2890, status: "Due", date: "2026-07-15" },
+  { id: "INV-1057", patient: "Sameer Khan", amount: 760, status: "Paid", date: "2026-07-14" },
+  { id: "INV-1058", patient: "Lakshmi Reddy", amount: 1120, status: "Overdue", date: "2026-07-13" },
+  { id: "INV-1059", patient: "Nitin Malhotra", amount: 640, status: "Paid", date: "2026-07-12" },
+];
+
+function statusTone(status: Invoice["status"]) {
+  return status === "Paid" ? "go" : status === "Due" ? "warning" : "danger";
+}
+
+const invoiceColumns: DataColumn<Invoice>[] = [
+  { id: "id", label: "Invoice", cell: (r) => r.id, sortValue: (r) => r.id },
+  { id: "patient", label: "Patient", cell: (r) => r.patient, sortValue: (r) => r.patient },
+  {
+    id: "amount",
+    label: "Amount",
+    align: "right",
+    cell: (r) => `₹${r.amount.toLocaleString("en-IN")}`,
+    sortValue: (r) => r.amount,
+  },
+  {
+    id: "status",
+    label: "Status",
+    cell: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge>,
+    filterOptions: [
+      { value: "Paid", label: "Paid" },
+      { value: "Due", label: "Due" },
+      { value: "Overdue", label: "Overdue" },
+    ],
+    filterValue: (r) => r.status,
+  },
+  { id: "date", label: "Date", cell: (r) => r.date, sortValue: (r) => r.date },
+];
 
 export const registry: ComponentEntry[] = [
   {
@@ -826,6 +886,105 @@ export const registry: ComponentEntry[] = [
   <MenuDivider />
   <MenuItem icon={<LogOut />} danger>Log out</MenuItem>
 </AccountMenu>`,
+      },
+    ],
+  },
+  {
+    id: "table",
+    group: "Data",
+    name: "Table",
+    description:
+      "The plain ledger: cue-caps header, hairline rows, tabular figures. Compose it by hand.",
+    stories: [
+      {
+        title: "Default",
+        render: () => (
+          <div style={{ width: "100%" }}>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Date</TH>
+                  <TH>Patient</TH>
+                  <TH align="right">Amount</TH>
+                </TR>
+              </THead>
+              <TBody>
+                <TR>
+                  <TD>Aug 1</TD>
+                  <TD>Ravi Kumar</TD>
+                  <TD align="right">₹1,200</TD>
+                </TR>
+                <TR>
+                  <TD>Aug 1</TD>
+                  <TD>Meera Iyer</TD>
+                  <TD align="right">₹850</TD>
+                </TR>
+                <TR>
+                  <TD>Jul 28</TD>
+                  <TD>Arjun Nair</TD>
+                  <TD align="right">₹2,400</TD>
+                </TR>
+              </TBody>
+            </Table>
+          </div>
+        ),
+        code: `<Table>
+  <THead>
+    <TR>
+      <TH>Date</TH>
+      <TH>Patient</TH>
+      <TH align="right">Amount</TH>
+    </TR>
+  </THead>
+  <TBody>
+    <TR>
+      <TD>Aug 1</TD>
+      <TD>Ravi Kumar</TD>
+      <TD align="right">₹1,200</TD>
+    </TR>
+  </TBody>
+</Table>`,
+      },
+    ],
+  },
+  {
+    id: "data-table",
+    group: "Data",
+    name: "Data Table",
+    description:
+      "The working table: search, column sorts, header filters, and pagination — all client-side, all in the world's grammar.",
+    stories: [
+      {
+        title: "Invoices — sort, filter, paginate",
+        render: () => (
+          <div style={{ width: "100%" }}>
+            <DataTable
+              columns={invoiceColumns}
+              rows={INVOICES}
+              rowKey={(r) => r.id}
+              searchText={(r) => `${r.id} ${r.patient}`}
+              searchPlaceholder="Search invoices…"
+              pageSize={8}
+            />
+          </div>
+        ),
+        code: `<DataTable
+  columns={[
+    { id: "id", label: "Invoice", cell: (r) => r.id, sortValue: (r) => r.id },
+    { id: "patient", label: "Patient", cell: (r) => r.patient, sortValue: (r) => r.patient },
+    { id: "amount", label: "Amount", align: "right",
+      cell: (r) => "₹" + r.amount.toLocaleString(), sortValue: (r) => r.amount },
+    { id: "status", label: "Status",
+      cell: (r) => <Badge tone={tone(r.status)}>{r.status}</Badge>,
+      filterOptions: [{ value: "Paid", label: "Paid" }, …],
+      filterValue: (r) => r.status },
+    { id: "date", label: "Date", cell: (r) => r.date, sortValue: (r) => r.date },
+  ]}
+  rows={invoices}
+  rowKey={(r) => r.id}
+  searchText={(r) => r.id + " " + r.patient}
+  pageSize={8}
+/>`,
       },
     ],
   },

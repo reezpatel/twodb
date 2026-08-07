@@ -17,6 +17,7 @@ import {
   PanelLeft,
   Settings,
   SlidersHorizontal,
+  Table2,
   User,
 } from "lucide-react";
 import { registry } from "./registry";
@@ -25,6 +26,7 @@ const RAIL_GROUPS = [
   { id: "Foundation", icon: <Palette /> },
   { id: "Primitives", icon: <Component /> },
   { id: "Shell", icon: <PanelLeft /> },
+  { id: "Data", icon: <Table2 /> },
 ];
 
 export default function App() {

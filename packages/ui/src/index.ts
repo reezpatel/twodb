@@ -70,3 +70,9 @@ export type { NavPanelProps, NavSectionProps, NavSectionItem } from "./component
 
 export { AccountMenu } from "./components/AccountMenu";
 export type { AccountMenuProps } from "./components/AccountMenu";
+
+export { Table, THead, TBody, TR, TH, TD } from "./components/Table";
+export type { THProps, TDProps } from "./components/Table";
+
+export { DataTable } from "./components/DataTable";
+export type { DataTableProps, DataColumn } from "./components/DataTable";

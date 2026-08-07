@@ -1,0 +1,150 @@
+/* Table — the ledger: hairline rules, cue-caps header, tabular data */
+
+.tw-table-wrap {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.tw-table-scroll {
+  overflow-x: auto;
+}
+
+.tw-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-md);
+}
+
+.tw-thead {
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.tw-th {
+  padding: 9px var(--space-3);
+  font-family: var(--font-cue);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: var(--tracking-cue);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tw-th--right,
+.tw-td--right {
+  text-align: right;
+}
+
+.tw-td {
+  padding: 10px var(--space-3);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.tw-tbody .tw-tr:last-child .tw-td {
+  border-bottom: none;
+}
+
+.tw-tbody .tw-tr {
+  transition: background var(--dur-1) var(--ease-out);
+}
+
+.tw-tbody .tw-tr:hover {
+  background: var(--bg-band);
+}
+
+/* numbers stay tabular in data cells by default */
+.tw-td {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- DataTable chrome: toolbar, sortable heads, filters, pagination --- */
+
+.tw-datatable__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.tw-datatable__toolbar .tw-search {
+  max-width: 260px;
+  flex: 1;
+}
+
+.tw-th__inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tw-th__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: color var(--dur-1) var(--ease-out);
+}
+
+.tw-th__sort:hover {
+  color: var(--ink);
+}
+
+.tw-th__sort svg {
+  width: 12px;
+  height: 12px;
+}
+
+.tw-th__sort--active,
+.tw-th__sort--active:hover {
+  color: var(--accent);
+}
+
+.tw-th__filter {
+  color: var(--ink-3);
+}
+
+.tw-th__filter--active {
+  color: var(--accent);
+}
+
+.tw-datatable__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 10px var(--space-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.tw-datatable__pager {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tw-datatable__pagesize {
+  width: 118px;
+}
+
+.tw-datatable__empty {
+  padding: var(--space-7) var(--space-3);
+  text-align: center;
+  color: var(--ink-3);
+  font-size: var(--text-md);
+}
