@@ -234,9 +234,11 @@
 .tw-cell-progress__bar i {
   display: block;
   height: 100%;
+  width: 100%;
   border-radius: var(--r-pill);
   background: var(--action);
-  transition: width var(--dur-2) var(--ease-out);
+  transform-origin: left;
+  transition: transform var(--dur-2) var(--ease-out);
 }
 
 .tw-cell-stars {

@@ -91,7 +91,7 @@ export function CellView({
       return (
         <span className="tw-cell-progress">
           <span className="tw-cell-progress__bar">
-            <i style={{ width: `${pct}%` }} />
+            <i style={{ transform: `scaleX(${pct / 100})` }} />
           </span>
           <span className="tw-tnum">{pct}%</span>
         </span>
