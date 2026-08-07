@@ -25,7 +25,7 @@ export default function App() {
     <main className="page">
       <header className="page__header">
         <h1>twodb web app</h1>
-        <Badge tone="success">React + Vite</Badge>
+        <Badge tone="go">React + Vite</Badge>
       </header>
 
       <Card title="Components from @twodb/ui">

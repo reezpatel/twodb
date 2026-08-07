@@ -5,7 +5,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./tokens.css": "./src/styles/tokens.css"
+  },
+  "dependencies": {
+    "@fontsource/oswald": "^5.2.0",
+    "@fontsource/public-sans": "^5.2.0"
   },
   "devDependencies": {
     "@types/react": "^19.1.0",

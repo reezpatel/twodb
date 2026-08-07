@@ -1,0 +1,61 @@
+{
+  "title": "Choose twodb's visual world",
+  "question": "This choice becomes the design system in packages/ui — every note, chat, automation, and app in twodb will speak it. The roll assigned The Card Box. Keep it, take an alternate, re-roll, or steer.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Card Box",
+      "kicker": "THE ROLL",
+      "lineage": "The index-card box (zettelkasten) — the original second brain",
+      "thesis": "Everything in twodb is a card: notes, chats, automations, apps — filed, tabbed, and linked like a well-kept card box.",
+      "palette": [
+        "#faf9f6",
+        "#ffffff",
+        "#1f2328",
+        "#2f6f4f",
+        "#c9c4b8"
+      ],
+      "materials": [
+        "warm card stock",
+        "hairline rules",
+        "divider tabs",
+        "one botanical-green ink"
+      ],
+      "viewport": "A calm card index: tabbed divider rail on the left, one open card at reading measure, hairlines instead of shadows.",
+      "risk": "Reads plain if the tabs, stock, and hairline discipline are executed timidly."
+    },
+    {
+      "id": "challenger-metro",
+      "label": "Typographic Tiles",
+      "lineage": "flat metro tile screens, giant lowercase type",
+      "thesis": "Chrome deleted: color fields and type alone are the interface.",
+      "case": "Coherent grammar, but cropped giant type fights condensed-calm legibility for this audience.",
+      "hero": "https://impeccable.style/worlds/cards/digital-design-canon-metro-typographic-tiles-hero.webp"
+    },
+    {
+      "id": "challenger-one-bit",
+      "label": "One-Bit Desktop",
+      "lineage": "early dithered desktop, window chrome, marching ants",
+      "thesis": "A two-color pixel desktop where every note is a window.",
+      "case": "Delightfully complete system, but this audience never met it — nostalgia they don't share.",
+      "hero": "https://impeccable.style/worlds/cards/medium-native-one-bit-desktop-hero.webp"
+    },
+    {
+      "id": "challenger-cyclorama",
+      "label": "Cyclorama Dawn",
+      "lineage": "stage lighting: night to day along one horizon",
+      "thesis": "Light alone structures the space, from black night to white day.",
+      "case": "Beautiful and calm-adjacent, but atmosphere-as-navigation obscures the task at hand.",
+      "hero": "https://impeccable.style/worlds/cards/stagecraft-theater-lighting-cyclorama-dawn-hero.webp"
+    }
+  ],
+  "reroll": true,
+  "steer": true,
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "The Notion-grade neutral workhorse UI, played completely straight.",
+    "viewport": "Cool-white surfaces, gray sidebar, Inter-like type, 8px corners — familiar from minute one.",
+    "risk": "Instantly familiar; indistinguishable from every neighboring tool."
+  }
+}

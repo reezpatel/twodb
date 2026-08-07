@@ -1,0 +1,161 @@
+/* ============================================================
+   twodb design tokens — "Cyclorama Dawn"
+   Light is the only chrome. Two phases: day (default working
+   surface) and night (depthless black). State arrives as light.
+   ============================================================ */
+
+:root {
+  /* --- Raw palette: the horizon, night → day --- */
+  --twdb-night: #050506;
+  --twdb-cobalt: #0a2bff;
+  --twdb-cobalt-deep: #0a22d6;
+  --twdb-cobalt-soft: #6d80ff; /* legible on night */
+  --twdb-rose: #d24bff;
+  --twdb-rose-ink: #8a1fa8; /* rose deepened for text on day */
+  --twdb-rose-light: #ff7bae;
+  --twdb-dawn: #ffd7e6;
+  --twdb-day: #ffffff;
+
+  /* --- Type --- */
+  --font-ui: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-cue: "Oswald", "Public Sans", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+
+  --text-xs: 11.5px;
+  --text-sm: 12.5px;
+  --text-md: 14px;
+  --text-lg: 16.5px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+  --text-3xl: 34px;
+
+  --tracking-cue: 0.14em;
+  --measure: 68ch;
+
+  /* --- Spacing (condensed, with air) --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* --- Radii --- */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  /* --- Motion: light rises, never bounces --- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+
+  /* --- Layering --- */
+  --z-overlay: 40;
+  --z-dialog: 50;
+  --z-tooltip: 60;
+
+  /* --- Grain (fine structure, matte) --- */
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
+
+  /* --- The sweep: identity gradient, foundation only --- */
+  /* Components stay flat (user-pinned, 2026-08): no gradient   */
+  /* fills on controls. This sweep is reserved for the Horizon  */
+  /* foundation piece and future brand moments.                 */
+  --wash: linear-gradient(
+    105deg,
+    var(--twdb-cobalt) 0%,
+    var(--twdb-rose) 55%,
+    var(--twdb-rose-light) 100%
+  );
+}
+
+/* --- Day phase (default) --- */
+:root,
+[data-phase="day"] {
+  color-scheme: light;
+
+  --bg: var(--twdb-day);
+  --bg-band: #faf9fc;
+  --bg-band-strong: #f2f0f7;
+  --surface: #ffffff;
+
+  --ink: #121218;
+  --ink-2: #40404e;
+  --ink-3: #626274;
+
+  --line: #e6e4ec;
+  --line-strong: #cfcdd9;
+
+  --accent: var(--twdb-cobalt);
+  --accent-strong: var(--twdb-cobalt-deep);
+  --accent-ink: #ffffff;
+  --accent-soft-bg: rgb(10 43 255 / 0.08);
+
+  /* solid action fill — the one lit control */
+  --action: var(--twdb-cobalt);
+  --action-strong: var(--twdb-cobalt-deep);
+
+  --rose-accent: var(--twdb-rose-ink);
+  --rose-soft-bg: rgb(210 75 255 / 0.1);
+
+  /* semantic lights */
+  --go: var(--twdb-cobalt);
+  --go-bg: rgb(10 43 255 / 0.08);
+  --warning-ink: #7a5200;
+  --warning-bg: #f8eed7;
+  --danger-ink: #9d1b4f;
+  --danger-bg: #fce3ec;
+
+  --ring: rgb(10 43 255 / 0.22);
+  --shadow-overlay: 0 12px 28px -10px rgb(5 5 6 / 0.18);
+
+  --grain-opacity: 0.06;
+  --grain-blend: multiply;
+}
+
+/* --- Night phase --- */
+[data-phase="night"] {
+  color-scheme: dark;
+
+  --bg: var(--twdb-night);
+  --bg-band: #0b0b11;
+  --bg-band-strong: #13131c;
+  --surface: #0d0d14;
+
+  --ink: #f4f3f8;
+  --ink-2: #c4c3d1;
+  --ink-3: #9291a3;
+
+  --line: rgb(244 243 248 / 0.13);
+  --line-strong: rgb(244 243 248 / 0.24);
+
+  --accent: var(--twdb-cobalt-soft);
+  --accent-strong: #8b9aff;
+  --accent-ink: #ffffff;
+  --accent-soft-bg: rgb(109 128 255 / 0.14);
+
+  /* solid action fill — the one lit control */
+  --action: #3a55ff;
+  --action-strong: #5a73ff;
+
+  --rose-accent: var(--twdb-rose-light);
+  --rose-soft-bg: rgb(255 123 174 / 0.14);
+
+  --go: var(--twdb-cobalt-soft);
+  --go-bg: rgb(109 128 255 / 0.14);
+  --warning-ink: #e8c47a;
+  --warning-bg: rgb(232 196 122 / 0.12);
+  --danger-ink: #ff9ec0;
+  --danger-bg: rgb(255 158 192 / 0.12);
+
+  --ring: rgb(109 128 255 / 0.35);
+  --shadow-overlay: 0 14px 32px -10px rgb(0 0 0 / 0.6);
+
+  --grain-opacity: 0.08;
+  --grain-blend: screen;
+}

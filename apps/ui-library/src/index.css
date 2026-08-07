@@ -1,110 +1,380 @@
+/* twodb UI Library — the cue sheet beside the lit stage */
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #f4f4f8;
-  color: #1b1b22;
+  font-family: var(--font-ui);
 }
 
-.layout {
-  display: flex;
+.shell {
+  display: grid;
+  grid-template-columns: 252px 1fr;
   min-height: 100vh;
 }
 
-/* Sidebar */
-.sidebar {
-  width: 220px;
-  flex-shrink: 0;
-  background: #ffffff;
-  border-right: 1px solid #d6d6de;
-  padding: 20px 12px;
+/* ---------- Rail: the operator's cue sheet, always night ---------- */
+
+.rail {
+  min-width: 0;
+  background: var(--bg);
+  color: var(--ink);
+  border-right: 1px solid var(--line);
+  padding: var(--space-5) var(--space-3);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
-.sidebar__brand {
-  font-size: 16px;
-  margin: 0 8px 16px;
+.rail__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 var(--space-2) var(--space-4);
 }
 
-.sidebar nav {
+.rail__wordmark {
+  font-family: var(--font-cue);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-cue);
+  text-transform: uppercase;
+  color: var(--ink);
+  width: fit-content;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--accent);
+}
+
+.rail__sub {
+  font-size: var(--text-xs);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.rail__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.rail__group {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.sidebar__item {
-  font: inherit;
-  text-align: left;
-  padding: 8px 12px;
+.rail__group-label {
+  font-family: var(--font-cue);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: var(--tracking-cue);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.rail__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px var(--space-2);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: transparent;
-  color: #1b1b22;
+  color: var(--ink-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 500;
+  text-align: left;
   cursor: pointer;
+  transition:
+    background var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out);
 }
 
-.sidebar__item:hover {
-  background: #f0f0f6;
+.rail__item:hover {
+  background: var(--bg-band-strong);
+  color: var(--ink);
 }
 
-.sidebar__item--active,
-.sidebar__item--active:hover {
-  background: #4f46e5;
-  color: #fff;
-  font-weight: 600;
+.rail__cue {
+  width: 22px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  transition: color var(--dur-1) var(--ease-out);
 }
 
-/* Canvas */
+/* the lit band: active cue rises in cobalt */
+.rail__item--active,
+.rail__item--active:hover {
+  background: var(--accent-soft-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--ink);
+}
+
+.rail__item--active .rail__cue {
+  color: var(--accent);
+}
+
+/* ---------- Canvas: the stage ---------- */
+
 .canvas {
+  min-width: 0;
+  background: var(--bg);
+  color: var(--ink);
+  padding: 40px 48px 120px;
+  transition: background var(--dur-3) var(--ease-out);
+}
+
+.canvas__header {
+  max-width: 860px;
+  margin-bottom: var(--space-6);
+}
+
+.canvas__title-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.canvas__cue {
+  font-family: var(--font-cue);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: var(--tracking-cue);
+  color: var(--ink-3);
+}
+
+.canvas__title-row h1 {
+  font-size: var(--text-2xl);
+  font-weight: 650;
   flex: 1;
-  padding: 32px 40px;
-  max-width: 900px;
 }
 
-.canvas__header h2 {
-  margin: 0 0 4px;
+.canvas__phase {
+  align-self: center;
 }
 
-.canvas__header p {
-  margin: 0 0 24px;
-  color: #6b7280;
+.canvas__phase .tw-tabs {
+  border-bottom-color: var(--line);
 }
 
-/* Stories */
+.canvas__desc {
+  margin-top: var(--space-3);
+  color: var(--ink-2);
+  font-size: var(--text-md);
+  max-width: var(--measure);
+}
+
+/* ---------- Stories ---------- */
+
 .story {
-  margin-bottom: 28px;
+  max-width: 860px;
+  margin-bottom: var(--space-7);
 }
 
 .story__title {
-  font-size: 14px;
-  margin: 0 0 8px;
-  color: #6b7280;
+  font-family: var(--font-cue);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-cue);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  margin-bottom: var(--space-2);
 }
 
 .story__preview {
-  background: #ffffff;
-  border: 1px solid #d6d6de;
-  border-radius: 12px 12px 0 0;
-  padding: 24px;
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  padding: 32px;
+}
+
+.story__preview:last-child {
+  border-radius: var(--r-lg);
 }
 
 .story__code {
   margin: 0;
-  background: #1b1b22;
-  color: #e5e7eb;
-  border-radius: 0 0 12px 12px;
-  padding: 16px 24px;
-  font-size: 13px;
+  background: var(--twdb-night);
+  color: #e8e7f0;
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+  padding: var(--space-4) 32px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
   overflow-x: auto;
 }
 
+/* ---------- Foundation demos ---------- */
+
+.horizon {
+  width: 100%;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.horizon__band {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: 14px var(--space-4);
+}
+
+.horizon__cue {
+  font-family: var(--font-cue);
+  font-weight: 500;
+  letter-spacing: var(--tracking-cue);
+  font-size: var(--text-sm);
+  opacity: 0.7;
+  width: 24px;
+}
+
+.horizon__name {
+  font-family: var(--font-cue);
+  font-weight: 500;
+  letter-spacing: var(--tracking-cue);
+  text-transform: uppercase;
+  font-size: var(--text-md);
+  flex: 1;
+}
+
+.horizon__hex {
+  font-size: var(--text-sm);
+  opacity: 0.7;
+}
+
+.type-demo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  width: 100%;
+}
+
+.type-demo__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.type-demo__cue {
+  font-family: var(--font-cue);
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  letter-spacing: var(--tracking-cue);
+  text-transform: uppercase;
+}
+
+.type-demo__title {
+  font-size: var(--text-xl);
+  font-weight: 650;
+}
+
+.type-demo__body {
+  font-size: var(--text-md);
+  color: var(--ink-2);
+  max-width: var(--measure);
+}
+
+.type-demo__data {
+  font-size: var(--text-md);
+}
+
+/* ---------- Utilities ---------- */
+
 .row {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
   align-items: center;
+}
+
+/* ---------- Cue-up: bands rise once, in sequence ---------- */
+
+.band {
+  animation: cue-up var(--dur-3) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes cue-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .band {
+    animation: none;
+  }
+}
+
+/* ---------- Responsive: the cue sheet folds over the stage ---------- */
+
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .rail {
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .rail__nav {
+    flex-direction: row;
+    gap: var(--space-4);
+    overflow-x: auto;
+    /* scroll affordance: the strip fades at both edges */
+    mask-image: linear-gradient(90deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+  }
+
+  .rail__group {
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  .rail__group-label {
+    padding: 0 var(--space-2) 0 0;
+  }
+
+  .rail__item {
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .canvas {
+    padding: 24px 20px 80px;
+  }
+
+  .canvas__title-row {
+    flex-wrap: wrap;
+  }
+
+  .story__preview {
+    padding: 20px;
+  }
+
+  .story__code {
+    padding: var(--space-4) 20px;
+  }
 }

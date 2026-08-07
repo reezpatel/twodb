@@ -1,0 +1,32 @@
+/* Card — a matte band bounded by hairlines, never shadow */
+
+.tw-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--space-5);
+  transition: border-color var(--dur-1) var(--ease-out);
+}
+
+.tw-card:hover {
+  border-color: var(--line-strong);
+}
+
+.tw-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.tw-card__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.tw-card__body {
+  color: var(--ink);
+}

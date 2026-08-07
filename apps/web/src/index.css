@@ -4,9 +4,9 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #f4f4f8;
-  color: #1b1b22;
+  font-family: var(--font-ui);
+  background: var(--bg-band);
+  color: var(--ink);
 }
 
 .page {
@@ -39,5 +39,5 @@ body {
 .api-result {
   margin: 16px 0 0;
   font-size: 14px;
-  color: #166534;
+  color: var(--go);
 }

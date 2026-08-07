@@ -1,0 +1,27 @@
+/* Avatar — a soft dawn token for a person */
+
+.tw-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--r-pill);
+  background: var(--bg-band-strong);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  user-select: none;
+}
+
+.tw-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tw-avatar--sm { width: 24px; height: 24px; font-size: 10px; }
+.tw-avatar--md { width: 32px; height: 32px; font-size: var(--text-sm); }
+.tw-avatar--lg { width: 44px; height: 44px; font-size: var(--text-lg); }

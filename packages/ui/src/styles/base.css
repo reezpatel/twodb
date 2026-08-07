@@ -1,0 +1,83 @@
+/* Base: reset, body, selection, focus floor, type defaults */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1.55;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* fine grain over large fields — matte, never glossy */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  background-image: var(--grain);
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--grain-blend);
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  line-height: 1.2;
+  font-weight: 650;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0;
+  max-width: var(--measure);
+}
+
+::selection {
+  background: var(--twdb-dawn);
+  color: var(--twdb-night);
+}
+
+[data-phase="night"] ::selection {
+  background: var(--twdb-rose);
+  color: var(--twdb-night);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Cue label register: tracked caps for instrument-style labels */
+.tw-cue {
+  font-family: var(--font-cue);
+  font-weight: 500;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-cue);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* Tabular numerals for data, times, counts */
+.tw-tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
