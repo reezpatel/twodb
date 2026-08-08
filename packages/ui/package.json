@@ -12,7 +12,8 @@
     "@fontsource/oswald": "^5.2.0",
     "@fontsource/public-sans": "^5.2.0",
     "@tanstack/react-table": "^8.21.3",
-    "lucide-react": "^1.29.0"
+    "lucide-react": "^1.29.0",
+    "react-day-picker": "^9.14.0"
   },
   "devDependencies": {
     "@types/react": "^19.1.0",

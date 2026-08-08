@@ -1,0 +1,263 @@
+/* Calendar & pickers — skinned react-day-picker in the world's grammar */
+
+.tw-cal {
+  --cell: 32px;
+  font-size: 13px;
+  user-select: none;
+}
+
+.tw-cal .rdp-root {
+  position: relative;
+}
+
+.tw-cal .rdp-months {
+  display: flex;
+  gap: var(--space-5);
+}
+
+/* caption + nav */
+
+.tw-cal .rdp-month_caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  margin-bottom: 2px;
+}
+
+.tw-cal .rdp-caption_label {
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tw-cal .rdp-nav {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.tw-cal .rdp-button_previous,
+.tw-cal .rdp-button_next {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out);
+}
+
+.tw-cal .rdp-button_previous:hover,
+.tw-cal .rdp-button_next:hover {
+  background: var(--bg-band-strong);
+  color: var(--ink);
+}
+
+.tw-cal .rdp-button_previous svg,
+.tw-cal .rdp-button_next svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* grid */
+
+.tw-cal .rdp-month_grid {
+  border-collapse: separate;
+  border-spacing: 2px;
+}
+
+.tw-cal .rdp-weekday {
+  height: 24px;
+  font-family: var(--font-cue);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: var(--tracking-cue);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.tw-cal .rdp-day {
+  width: var(--cell);
+  height: var(--cell);
+  padding: 0;
+  text-align: center;
+}
+
+.tw-cal .rdp-day_button {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    background var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-1) var(--ease-out);
+}
+
+.tw-cal .rdp-day_button:hover {
+  background: var(--bg-band-strong);
+}
+
+.tw-cal .rdp-day_button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.tw-cal .rdp-outside .rdp-day_button {
+  color: var(--ink-3);
+  opacity: 0.55;
+}
+
+.tw-cal .rdp-today .rdp-day_button {
+  box-shadow: inset 0 0 0 1px var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tw-cal .rdp-selected .rdp-day_button,
+.tw-cal .rdp-selected .rdp-day_button:hover {
+  background: var(--action);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.tw-cal .rdp-disabled .rdp-day_button {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* range: the lit band between two solid endpoints */
+
+.tw-cal .rdp-range_middle {
+  background: var(--accent-soft-bg);
+}
+
+.tw-cal .rdp-range_middle .rdp-day_button {
+  background: transparent;
+  border-radius: 0;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.tw-cal .rdp-range_start {
+  background: linear-gradient(to right, transparent 50%, var(--accent-soft-bg) 50%);
+}
+
+.tw-cal .rdp-range_end {
+  background: linear-gradient(to left, transparent 50%, var(--accent-soft-bg) 50%);
+}
+
+.tw-cal .rdp-range_start .rdp-day_button,
+.tw-cal .rdp-range_end .rdp-day_button {
+  background: var(--action);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* --- Picker fields + popups --- */
+
+.tw-picker {
+  position: relative;
+  width: 100%;
+}
+
+.tw-picker__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-1) var(--ease-out);
+}
+
+.tw-picker__trigger:hover {
+  border-color: var(--ink-3);
+}
+
+.tw-picker__trigger:focus-visible,
+.tw-picker__trigger[aria-expanded="true"] {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.tw-picker__trigger > svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+
+.tw-picker__placeholder {
+  color: var(--ink-3);
+}
+
+.tw-picker__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tw-picker__popup {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: var(--z-overlay);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-overlay);
+  animation: tw-menu-in var(--dur-2) var(--ease-out) both;
+}
+
+.tw-picker__time {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.tw-picker__time .tw-field {
+  flex: 1;
+}
+
+.tw-picker__done {
+  margin-left: auto;
+}

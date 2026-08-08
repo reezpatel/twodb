@@ -42,6 +42,8 @@ import {
   Zap,
 } from "lucide-react";
 import { DataTable, Table, TBody, TD, TH, THead, TR, type DataColumn } from "@twodb/ui";
+import { Calendar, DatePicker, DateRangePicker, DateTimePicker, TimePicker } from "@twodb/ui";
+import type { DateRange } from "@twodb/ui";
 
 export interface Story {
   title: string;
@@ -384,6 +386,62 @@ const invoiceColumns: DataColumn<Invoice>[] = [
     setValue: (r, v) => ({ ...r, date: String(v) }),
   },
 ];
+
+/* --- Picker demos --- */
+function CalendarDemo() {
+  const [day, setDay] = useState<Date | undefined>(new Date());
+  return <Calendar mode="single" selected={day} onSelect={setDay} />;
+}
+
+function DatePickerDemo() {
+  const [date, setDate] = useState<Date | undefined>();
+  return (
+    <div style={{ width: 260 }}>
+      <DatePicker
+        label="Appointment"
+        value={date}
+        onValueChange={setDate}
+        hint={date ? `Chosen: ${date.toDateString()}` : "No date chosen yet"}
+      />
+    </div>
+  );
+}
+
+function DateRangePickerDemo() {
+  const [range, setRange] = useState<DateRange | undefined>();
+  return (
+    <div style={{ width: 300 }}>
+      <DateRangePicker
+        label="Camp dates"
+        value={range}
+        onValueChange={setRange}
+        hint={
+          range?.from && range?.to
+            ? `${range.from.toDateString()} → ${range.to.toDateString()}`
+            : "Pick a start and an end"
+        }
+      />
+    </div>
+  );
+}
+
+function DateTimePickerDemo() {
+  const [value, setValue] = useState<Date | undefined>();
+  return (
+    <div style={{ width: 300 }}>
+      <DateTimePicker label="Reminder at" value={value} onValueChange={setValue} />
+    </div>
+  );
+}
+
+function TimePickerDemo() {
+  const [value, setValue] = useState<Date | undefined>();
+  return (
+    <div style={{ width: 220 }}>
+      <TimePicker label="Opens at" value={value} onValueChange={setValue} />
+    </div>
+  );
+}
 
 export const registry: ComponentEntry[] = [
   {
@@ -818,6 +876,79 @@ export const registry: ComponentEntry[] = [
           </div>
         ),
         code: `<Skeleton lines={3} />`,
+      },
+    ],
+  },
+  {
+    id: "calendar",
+    group: "Primitives",
+    name: "Calendar",
+    description:
+      "react-day-picker headless under our skin: tabular days, cobalt selection, today wears a hairline ring.",
+    stories: [
+      {
+        title: "Default",
+        render: () => <CalendarDemo />,
+        code: `const [day, setDay] = useState(new Date());
+
+<Calendar mode="single" selected={day} onSelect={setDay} />`,
+      },
+    ],
+  },
+  {
+    id: "date-picker",
+    group: "Primitives",
+    name: "Date Picker",
+    description: "A field that opens the calendar; picks one day.",
+    stories: [
+      {
+        title: "Default",
+        render: () => <DatePickerDemo />,
+        code: `const [date, setDate] = useState<Date>();
+
+<DatePicker label="Appointment" value={date} onValueChange={setDate} />`,
+      },
+    ],
+  },
+  {
+    id: "date-range-picker",
+    group: "Primitives",
+    name: "Date Range Picker",
+    description:
+      "Two months side by side; the range is a lit band between two solid endpoints.",
+    stories: [
+      {
+        title: "Two months",
+        render: () => <DateRangePickerDemo />,
+        code: `const [range, setRange] = useState<DateRange>();
+
+<DateRangePicker label="Camp dates" value={range} onValueChange={setRange} />`,
+      },
+    ],
+  },
+  {
+    id: "date-time-picker",
+    group: "Primitives",
+    name: "Date & Time Picker",
+    description: "The calendar with hour, minute, and AM/PM fields riding below it.",
+    stories: [
+      {
+        title: "Default",
+        render: () => <DateTimePickerDemo />,
+        code: `<DateTimePicker label="Reminder at" value={value} onValueChange={setValue} />`,
+      },
+    ],
+  },
+  {
+    id: "time-picker",
+    group: "Primitives",
+    name: "Time Picker",
+    description: "Just the clock: 12-hour, five-minute steps, AM/PM.",
+    stories: [
+      {
+        title: "Default",
+        render: () => <TimePickerDemo />,
+        code: `<TimePicker label="Opens at" value={value} onValueChange={setValue} />`,
       },
     ],
   },
