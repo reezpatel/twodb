@@ -98,6 +98,7 @@ import { MorningBriefMock } from "./mocks/MorningBrief";
 import { TablePlanMock } from "./mocks/TablePlan";
 import { TodoFlowMock } from "./mocks/TodoFlow";
 import { ChatMailMock } from "./mocks/ChatMail";
+import { LiveScribeMock } from "./mocks/LiveScribe";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
 import { InboxMock } from "./mocks/Inbox";
 import { MonthlyCalendarMock } from "./mocks/MonthlyCalendar";
@@ -2800,6 +2801,27 @@ export const registry: ComponentEntry[] = [
 
 {/* quick answers send instantly; star toggles;
     opening a thread clears its unread badge */}`,
+			},
+		],
+	},
+	{
+		id: "live-scribe",
+		group: "Showcase",
+		name: "Live Transcription",
+		description:
+			"A meeting that types itself: video stage with real call controls, an AI scribe card with a live waveform and lines that arrive while you watch, participant tiles, and a summary with key points.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — Ward 4 morning rounds",
+				render: () => <LiveScribeMock />,
+				code: `{/* the transcript is actually live:
+    lines append on an interval while Listening */}
+<Scribe listening onPause />
+<Stage controls=[mic, cam, end, share] />
+
+{/* Pause freezes the waveform; Transcript tab
+    mirrors every arrived line */}`,
 			},
 		],
 	},

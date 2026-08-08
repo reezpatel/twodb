@@ -601,7 +601,7 @@ body {
 /* ---------- Showcase mocks ---------- */
 
 .story--full {
-	max-width: 1180px;
+	max-width: 1280px;
 }
 
 .mock-int {
@@ -3042,4 +3042,34 @@ body {
 	.mock-dd__info {
 		display: none;
 	}
+}
+
+/* composer actions: quiet pill + night pill (per reference) */
+.mock-dd__discard {
+  border-radius: var(--r-pill);
+  background: var(--bg-band-strong);
+  color: var(--ink-2);
+  padding: 0 16px;
+}
+
+.mock-dd__discard:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+
+.mock-dd__send {
+  border-radius: var(--r-pill);
+  background: var(--twdb-night);
+  color: #ffffff;
+  padding: 0 18px;
+  box-shadow: none;
+}
+
+.mock-dd__send:hover {
+  background: #1b1b22;
+}
+
+.mock-dd__send:disabled {
+  background: var(--twdb-night);
+  color: #ffffff;
 }
