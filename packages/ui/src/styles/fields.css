@@ -362,3 +362,22 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* PasswordInput — the eye sits inside the field */
+
+.tw-pass {
+  position: relative;
+  display: block;
+}
+
+.tw-pass > .tw-input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.tw-pass > .tw-icon-btn {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+}

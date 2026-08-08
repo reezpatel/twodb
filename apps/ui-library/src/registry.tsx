@@ -28,15 +28,23 @@ import {
 } from "@twodb/ui";
 import {
 	Bell,
+	Bookmark,
+	CalendarDays,
 	Copy,
+	Heart,
 	Home,
 	LogOut,
+	MapPin,
+	MessageCircle,
 	MoreHorizontal,
 	Pencil,
 	Plus,
+	Repeat2,
 	Search,
 	Settings,
+	ShoppingBag,
 	SlidersHorizontal,
+	Star,
 	StickyNote,
 	Trash2,
 	User,
@@ -77,6 +85,7 @@ import {
 } from "@twodb/ui";
 import type { DateRange } from "@twodb/ui";
 import { IntegrationsMock } from "./mocks/Integrations";
+import { SettingsMock } from "./mocks/Settings";
 
 export interface Story {
 	title: string;
@@ -354,11 +363,16 @@ function DialogDemo() {
 }
 
 function CardsShowcase() {
+	const clinicPhoto = ph("#050506", "#0A2BFF");
+	const productPhoto = ph("#0A2BFF", "#D24BFF");
+	const articlePhoto = ph("#D24BFF", "#FFD7E6");
+	const eventPhoto = ph("#FF7BAE", "#FFFFFF");
+
 	return (
 		<div className="card-showcase">
 			<Card
 				tone="rose"
-				className="card-showcase__hero"
+				className="card-showcase__brief card-showcase__wide"
 				title="Morning brief"
 				actions={<Badge tone="rose">AI draft</Badge>}
 			>
@@ -383,6 +397,118 @@ function CardsShowcase() {
 				<Button size="sm">Open brief</Button>
 			</Card>
 
+			<Card
+				className="card-showcase__social"
+				aria-label="Twitter style post card"
+			>
+				<div className="card-showcase__post-head">
+					<Avatar name="Asha Verma" />
+					<span>
+						<strong>Dr. Asha Verma</strong>
+						<em>@clinic-notes · 12m</em>
+					</span>
+					<MoreHorizontal aria-hidden="true" />
+				</div>
+				<p>
+					Moved every follow-up from scattered messages into one twodb timeline.
+					The team can finally see what is due before the waiting room fills.
+				</p>
+				<img src={clinicPhoto} alt="Synthetic clinic timeline preview" />
+				<div className="card-showcase__actions" aria-label="Post actions">
+					<span>
+						<MessageCircle /> 18
+					</span>
+					<span>
+						<Repeat2 /> 42
+					</span>
+					<span>
+						<Heart /> 128
+					</span>
+					<span>
+						<Bookmark /> Save
+					</span>
+				</div>
+			</Card>
+
+			<Card
+				className="card-showcase__insta"
+				aria-label="Instagram style media card"
+			>
+				<div className="card-showcase__post-head">
+					<Avatar name="Meera Iyer" />
+					<span>
+						<strong>meera.records</strong>
+						<em>Camp setup</em>
+					</span>
+					<MoreHorizontal aria-hidden="true" />
+				</div>
+				<img src={articlePhoto} alt="Synthetic dawn media card" />
+				<div className="card-showcase__actions card-showcase__actions--media">
+					<span>
+						<Heart /> 2.4k
+					</span>
+					<span>
+						<MessageCircle /> 89
+					</span>
+					<span>
+						<Bookmark /> Saved
+					</span>
+				</div>
+				<p>
+					<strong>meera.records</strong> First day with one shared brief instead
+					of five group chats.
+				</p>
+			</Card>
+
+			<Card
+				className="card-showcase__product"
+				aria-label="Ecommerce product card"
+			>
+				<img src={productPhoto} alt="Synthetic product pack" />
+				<div className="card-showcase__product-copy">
+					<Badge tone="go">In stock</Badge>
+					<h3>Clinic starter kit</h3>
+					<p>Forms, reminders, and invoice workflows for a small practice.</p>
+					<div className="card-showcase__price-row">
+						<span className="tw-tnum">₹4,200</span>
+						<em>
+							<Star /> 4.8
+						</em>
+					</div>
+					<Button size="sm">
+						<ShoppingBag /> Add
+					</Button>
+				</div>
+			</Card>
+
+			<Card
+				className="card-showcase__article"
+				title="Article preview"
+				actions={<Badge>Read</Badge>}
+			>
+				<img src={articlePhoto} alt="Synthetic article cover" />
+				<h3>How a morning brief replaced the 8 a.m. meeting</h3>
+				<p>
+					A practical field note on making daily operations visible without
+					another dashboard.
+				</p>
+			</Card>
+
+			<Card tone="band" className="card-showcase__event" title="Event card">
+				<img src={eventPhoto} alt="Synthetic event poster" />
+				<div className="card-showcase__event-grid">
+					<span>
+						<CalendarDays /> Aug 14, 10:30
+					</span>
+					<span>
+						<MapPin /> West clinic
+					</span>
+				</div>
+				<Button size="sm" variant="secondary">
+					Add to day
+				</Button>
+			</Card>
+
 			<Card title="Linked record" actions={<Badge tone="go">Synced</Badge>}>
 				<div className="card-showcase__person">
 					<Avatar name="Ravi Kumar" />
@@ -392,24 +518,8 @@ function CardsShowcase() {
 					</span>
 				</div>
 				<p>
-					The card keeps a person, their latest work, and the next
-					plain-language action in one calm band.
-				</p>
-			</Card>
-
-			<Card tone="band" title="Checklist" actions={<Badge>4 tasks</Badge>}>
-				<ul className="card-showcase__list">
-					<li>Confirm Tuesday visiting hours</li>
-					<li>Send invoice reminders</li>
-					<li>Order gauze and gloves</li>
-					<li>Review AI discharge summary</li>
-				</ul>
-			</Card>
-
-			<Card density="compact" title="Quiet note">
-				<p>
-					Compact cards are for dense rails, side panels, and list previews —
-					not a new visual language.
+					The card keeps a person, latest work, and next plain-language action
+					in one calm band.
 				</p>
 			</Card>
 
@@ -1437,7 +1547,8 @@ export const registry: ComponentEntry[] = [
 		group: "Primitives",
 		name: "Card",
 		description:
-			"A family of matte content bands: default, compact, tonal, AI, warning, and danger — all hairlines, no shadows.",
+			"A real-world card gallery: social posts, media cards, product cards, article previews, event cards, records, and status cards — all using the same matte hairline primitive.",
+		fullWidth: true,
 		stories: [
 			{
 				title: "Default — quiet information band",
@@ -1456,16 +1567,18 @@ export const registry: ComponentEntry[] = [
 			{
 				title: "Showcase — card types",
 				render: () => <CardsShowcase />,
-				code: `<Card title="Morning brief" tone="rose" actions={<Badge tone="rose">AI draft</Badge>}>
-  <p>Three appointments today…</p>
-  <Button size="sm">Open brief</Button>
+				code: `<Card aria-label="Twitter style post card">
+  <PostHeader />
+  <p>Moved every follow-up into one timeline…</p>
+  <img src={preview} alt="Timeline preview" />
+  <PostActions />
 </Card>
 
-<Card title="Linked record" actions={<Badge tone="go">Synced</Badge>}>…</Card>
-<Card tone="band" title="Checklist">…</Card>
-<Card density="compact" title="Quiet note">…</Card>
-<Card tone="warning" title="Needs review">…</Card>
-<Card tone="danger" density="compact" title="Blocked automation">…</Card>`,
+<Card aria-label="Instagram style media card">…</Card>
+<Card aria-label="Ecommerce product card">…</Card>
+<Card title="Article preview" actions={<Badge>Read</Badge>}>…</Card>
+<Card tone="band" title="Event card">…</Card>
+<Card tone="warning" title="Needs review">…</Card>`,
 			},
 		],
 	},
@@ -2152,6 +2265,31 @@ export const registry: ComponentEntry[] = [
 <Card icon name desc>
   <Button size="sm" variant="secondary">Connect</Button>
 </Card>`,
+			},
+		],
+	},
+	{
+		id: "settings",
+		group: "Showcase",
+		name: "Settings",
+		description:
+			"The deep one — profile, security, privacy, a notification matrix, and appearance, all built from SettingGroup/SettingRow and live controls.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — five sections, everything works",
+				render: () => <SettingsMock />,
+				code: `<SettingGroup label="Who can see you">
+  <SettingRow label="Profile visibility"
+    control={<Select options={whoOptions} />} />
+  <SettingRow label="Activity status"
+    control={<Switch checked />} />
+</SettingGroup>
+
+{/* profile photo, password flow with validation,
+    2FA, sessions, privacy selects + switches,
+    notification matrix, quiet hours (TimePicker),
+    theme that flips the real phase */}`,
 			},
 		],
 	},
