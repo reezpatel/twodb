@@ -2267,7 +2267,7 @@ export const registry: ComponentEntry[] = [
 		group: "Chat",
 		name: "Messages",
 		description:
-			"Slack-style grouping: one avatar and header per run of messages, hover actions, and reaction pills that light cobalt when you join them.",
+			"Slack-style grouping: one avatar and header per run of messages, hover actions, reply quotes, Author badges for thread starters, nested thread replies with a connector line, an X-reply link, and reaction pills that light cobalt when you join them.",
 		stories: [
 			{
 				title: "Grouped with reactions",
@@ -2366,6 +2366,67 @@ export const registry: ComponentEntry[] = [
     <TextMessage>Thank you for the suggestion…</TextMessage>
   </ChatMessage>
 </MessageGroup>`,
+			},
+			{
+				title: "Threaded reply — Author badge, X-reply link, nested connector",
+				render: () => (
+					<div style={{ width: 540, maxWidth: "100%" }}>
+						<ChatPanel active>
+							<ChatList>
+								<MessageGroup author="Amanda" time="5h ago">
+									<ChatMessage
+										reactions={[{ emoji: "😄", count: 1 }]}
+										replyCount={1}
+									>
+										<TextMessage>
+											If you really just want to filter out the first n
+											characters of a file, the tool you want is dd which
+											allows you to specify the number of blocks to skip. If
+											you want a block size of 1, specify that with bs.
+										</TextMessage>
+									</ChatMessage>
+								</MessageGroup>
+
+								<MessageGroup
+									author="Amanda"
+									time="5h ago"
+									thread
+									authorBadge
+								>
+									<ChatMessage
+										reactions={[{ emoji: "🙌", count: 1 }]}
+									>
+										<TextMessage>
+											Okay great thats all the information i needed to know!
+										</TextMessage>
+									</ChatMessage>
+								</MessageGroup>
+							</ChatList>
+						</ChatPanel>
+					</div>
+				),
+				code: `<ChatPanel active>
+  <ChatList>
+    <MessageGroup author="Amanda" time="5h ago">
+      <ChatMessage
+        reactions={[{ emoji: "😄", count: 1 }]}
+        replyCount={1}
+      >
+        <TextMessage>If you really just want to filter out…</TextMessage>
+      </ChatMessage>
+    </MessageGroup>
+
+    {/* thread reply: indented avatar, vertical connector,
+        Author badge for the thread starter */}
+    <MessageGroup author="Amanda" time="5h ago" thread authorBadge>
+      <ChatMessage reactions={[{ emoji: "🙌", count: 1 }]}>
+        <TextMessage>Okay great thats all the information i needed to know!</TextMessage>
+      </ChatMessage>
+    </MessageGroup>
+  </ChatList>
+</ChatPanel>
+
+{/* ChatPanel \`active\` lights the cobalt outline around the whole panel */}`,
 			},
 		],
 	},

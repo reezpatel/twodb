@@ -35,7 +35,7 @@ const EVENTS: CalEvent[] = [
 	{ title: "Morning standup", day: 0, start: 9, end: 10, cat: "standup", people: ["Asha Verma", "Ravi Kumar", "Dev Patel"], more: 3 },
 	{ title: "Stock intake check", day: 0, start: 11, end: 12, cat: "admin", people: ["Dev Patel"] },
 	{ title: "Weekly review", day: 1, start: 10, end: 12, cat: "meetings", people: ["Asha Verma", "Meera Iyer", "Ravi Kumar"], more: 2 },
-	{ title: "Supplier call — gauze & gloves", day: 1, start: 12.5, end: 13.5, cat: "admin", people: ["Dev Patel"] },
+	{ title: "Supplier call", day: 1, start: 12.5, end: 13.5, cat: "admin", people: ["Dev Patel"] },
 	{ title: "Check-up block", day: 2, start: 9, end: 10, cat: "patients", people: ["Meera Iyer"], more: 6 },
 	{ title: "Invoice reminders review", day: 2, start: 12, end: 13, cat: "admin", people: ["Asha Verma", "Dev Patel"] },
 	{ title: "Team meeting", day: 3, start: 9.5, end: 10.5, cat: "meetings", people: ["Asha Verma", "Meera Iyer"], more: 5 },
