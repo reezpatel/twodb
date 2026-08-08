@@ -176,7 +176,10 @@ export function CellEditor({ type, value, options, onCommit, onClose }: EditorPr
         defaultValue={String(value ?? "")}
         placeholder={type === "file" ? "File name…" : type === "url" ? "https://…" : undefined}
         autoFocus
-        onFocus={(e) => e.target.select()}
+        onFocus={(e) => {
+          const len = e.target.value.length;
+          e.target.setSelectionRange(len, len);
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") onCommit((e.target as HTMLInputElement).value);
           if (e.key === "Escape") onClose();

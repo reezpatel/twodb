@@ -291,12 +291,17 @@ export function DataTable<T>({
     [columns]
   );
 
-  const globalFilter: FilterState = {
-    query: query.trim().toLowerCase(),
-    combinator,
-    rules,
-    searchText: searchText as ((row: unknown) => string) | undefined,
-  };
+  /* stable identity: a fresh filter object every render makes TanStack
+     invalidate -> reset -> notify -> re-render in a loop */
+  const globalFilter = useMemo<FilterState>(
+    () => ({
+      query: query.trim().toLowerCase(),
+      combinator,
+      rules,
+      searchText: searchText as ((row: unknown) => string) | undefined,
+    }),
+    [query, combinator, rules, searchText]
+  );
 
   const table = useReactTable({
     data: draft,
