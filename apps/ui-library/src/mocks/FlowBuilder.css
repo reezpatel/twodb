@@ -1,0 +1,506 @@
+/* FlowBuilder mock — node-based workflow automation */
+
+.mock-fb {
+	display: grid;
+	grid-template-columns: 240px minmax(0, 1fr) 290px;
+	width: 100%;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-lg);
+	background: var(--bg);
+	overflow: hidden;
+}
+
+/* --- node library --- */
+
+.mock-fb__lib {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	padding: var(--space-3);
+	border-right: 1px solid var(--line);
+	background: var(--surface);
+	max-height: 780px;
+	overflow-y: auto;
+}
+
+.mock-fb__libhead h3 {
+	margin: 0;
+	font-size: var(--text-xl);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-fb__libsections {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.mock-fb__sectoggle {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	padding: 8px 6px;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: none;
+	font: inherit;
+	font-size: var(--text-md);
+	font-weight: 600;
+	color: var(--ink);
+	cursor: pointer;
+}
+
+.mock-fb__sectoggle:hover {
+	background: var(--accent-soft-bg);
+}
+
+.mock-fb__sectoggle svg {
+	width: 14px;
+	height: 14px;
+	color: var(--ink-3);
+	transition: transform var(--dur-1) var(--ease-out);
+}
+
+.mock-fb__sectoggle[aria-expanded="false"] svg {
+	transform: rotate(-90deg);
+}
+
+.mock-fb__secgrid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 6px;
+	padding: 2px 2px 10px;
+}
+
+.mock-fb__libitem {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 7px 8px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-sm);
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+	cursor: grab;
+	transition:
+		border-color var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-fb__libitem:hover {
+	border-color: var(--accent);
+	color: var(--accent);
+}
+
+.mock-fb__libitem svg {
+	width: 13px;
+	height: 13px;
+	flex-shrink: 0;
+}
+
+.mock-fb__libempty {
+	margin: 0;
+	padding: var(--space-3) 6px;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+}
+
+/* --- canvas --- */
+
+.mock-fb__canvas {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	max-height: 780px;
+}
+
+.mock-fb__bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-3);
+	padding: 10px var(--space-3);
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-fb__title {
+	display: flex;
+	flex-direction: column;
+}
+
+.mock-fb__title strong {
+	font-size: var(--text-md);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-fb__title span {
+	font-size: 11px;
+	color: var(--ink-3);
+}
+
+.mock-fb__barctl {
+	display: flex;
+	gap: 4px;
+}
+
+.mock-fb__stage {
+	position: relative;
+	flex: 1;
+	overflow: auto;
+	background:
+		radial-gradient(circle, var(--line-strong) 1px, transparent 1px) 0 0 / 18px 18px;
+}
+
+.mock-fb__zoomer {
+	position: relative;
+	width: 760px;
+	height: 780px;
+	margin: 0 auto;
+	transform-origin: top center;
+	transition: transform var(--dur-2) var(--ease-out);
+}
+
+/* edges */
+
+.mock-fb__edges {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.mock-fb__edges line {
+	stroke: var(--ink-3);
+	stroke-width: 1.5;
+	stroke-dasharray: 1 5;
+	stroke-linecap: round;
+}
+
+.mock-fb__edges circle {
+	fill: var(--surface);
+	stroke: var(--ink-3);
+	stroke-width: 1.5;
+}
+
+.mock-fb__edges rect {
+	fill: var(--accent-soft-bg);
+}
+
+.mock-fb__edges text {
+	font-size: 9.5px;
+	font-weight: 600;
+	fill: var(--accent);
+	text-anchor: middle;
+}
+
+.mock-fb__edges g.is-live line {
+	stroke: var(--accent);
+	animation: mock-fb-flow 0.5s linear infinite;
+}
+
+.mock-fb__edges g.is-live circle {
+	stroke: var(--accent);
+}
+
+@keyframes mock-fb-flow {
+	to {
+		stroke-dashoffset: -6;
+	}
+}
+
+/* nodes */
+
+.mock-fb__node {
+	position: absolute;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 10px 12px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-md);
+	background: var(--surface);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	transition:
+		border-color var(--dur-1) var(--ease-out),
+		transform var(--dur-1) var(--ease-out);
+}
+
+.mock-fb__node:hover {
+	border-color: var(--accent);
+	transform: translateY(-1px);
+}
+
+.mock-fb__node.is-selected {
+	border-color: var(--accent);
+	outline: 2px solid var(--accent-soft-br, var(--accent));
+	outline-offset: 1px;
+}
+
+.mock-fb__node.is-live {
+	border-color: var(--accent);
+}
+
+.mock-fb__node.is-done {
+	border-color: var(--go-ink, #0c5c43);
+}
+
+.mock-fb__nhead {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	padding-bottom: 6px;
+}
+
+.mock-fb__nhead > svg {
+	width: 15px;
+	height: 15px;
+	margin-top: 2px;
+	color: var(--accent);
+	flex-shrink: 0;
+}
+
+.mock-fb__ntitle {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.mock-fb__ntitle strong {
+	font-size: var(--text-md);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-fb__ntitle em {
+	font-style: normal;
+	font-size: 10.5px;
+	color: var(--ink-3);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 130px;
+}
+
+.mock-fb__nkind {
+	margin-left: auto;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 9.5px;
+	font-weight: 600;
+	flex-shrink: 0;
+}
+
+.mock-fb__nkind--trigger { background: var(--accent-soft-bg); color: var(--accent); }
+.mock-fb__nkind--input { background: rgb(15 157 143 / 0.10); color: #0f9d8f; }
+.mock-fb__nkind--logic { background: rgb(124 58 237 / 0.10); color: #7c3aed; }
+.mock-fb__nkind--transform { background: rgb(217 160 63 / 0.14); color: #a57723; }
+.mock-fb__nkind--output { background: rgb(192 76 110 / 0.12); color: #c04c6e; }
+
+.mock-fb__nrow {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 3px 0;
+	font-size: 10.5px;
+	color: var(--ink-2);
+}
+
+.mock-fb__nrow span:first-child {
+	color: var(--ink-3);
+}
+
+.mock-fb__nrow--out {
+	border-top: 1px dashed var(--line);
+	margin-top: 2px;
+	padding-top: 5px;
+}
+
+.mock-fb__ncode {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	margin: 4px 0;
+	padding: 7px 9px;
+	border-radius: 6px;
+	background: var(--bg);
+	font-family: var(--font-mono);
+	font-size: 9.5px;
+	line-height: 1.55;
+	color: var(--ink-2);
+	white-space: pre;
+}
+
+/* zoom bar */
+
+.mock-fb__zoom {
+	position: sticky;
+	bottom: var(--space-3);
+	float: right;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0 var(--space-3) var(--space-3) 0;
+	padding: 4px 8px;
+	border: 1px solid var(--line-strong);
+	border-radius: 999px;
+	background: var(--surface);
+}
+
+.mock-fb__zoom span {
+	font-family: var(--font-mono);
+	font-size: 10.5px;
+	color: var(--ink-2);
+	min-width: 34px;
+	text-align: center;
+}
+
+/* --- inspector --- */
+
+.mock-fb__insp {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	padding: var(--space-3);
+	border-left: 1px solid var(--line);
+	background: var(--surface);
+	max-height: 780px;
+	overflow-y: auto;
+}
+
+.mock-fb__insphead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.mock-fb__insphead h3 {
+	margin: 0;
+	font-size: var(--text-xl);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-fb__status {
+	padding: 3px 10px;
+	border-radius: 999px;
+	background: rgb(12 92 67 / 0.10);
+	font-size: 10px;
+	font-weight: 600;
+	color: var(--go-ink, #0c5c43);
+}
+
+.mock-fb__status.is-running {
+	background: var(--accent-soft-bg);
+	color: var(--accent);
+}
+
+.mock-fb__panel {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding-top: var(--space-2);
+	border-top: 1px solid var(--line);
+}
+
+.mock-fb__panel h4 {
+	margin: 0;
+	font-family: var(--font-cue);
+	font-size: var(--text-cue);
+	font-weight: 500;
+	letter-spacing: var(--tracking-cue);
+	text-transform: uppercase;
+	color: var(--ink-3);
+}
+
+.mock-fb__props {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 0;
+}
+
+.mock-fb__props > div {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	font-size: var(--text-sm);
+}
+
+.mock-fb__props dt {
+	color: var(--ink-3);
+}
+
+.mock-fb__props dd {
+	margin: 0;
+	font-weight: 500;
+	color: var(--ink);
+	text-align: right;
+}
+
+.mock-fb__props--mono dd {
+	font-family: var(--font-mono);
+	font-size: 10.5px;
+}
+
+.mock-fb__on {
+	padding: 1px 8px;
+	border: 1px solid var(--line-strong);
+	border-radius: 999px;
+	font-size: 10px;
+}
+
+.mock-fb__selnode {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-sm);
+	background: var(--bg);
+}
+
+.mock-fb__selnode svg {
+	width: 15px;
+	height: 15px;
+	color: var(--accent);
+}
+
+.mock-fb__selnode strong {
+	font-size: var(--text-md);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-fb__selnode .mock-fb__nkind {
+	margin-left: auto;
+}
+
+.mock-fb__actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: auto;
+	padding-top: var(--space-3);
+	border-top: 1px solid var(--line);
+}
+
+.mock-fb__actions .tw-iconbtn {
+	margin-left: auto;
+	color: var(--danger, #b43a3a);
+}
+
+@media (max-width: 1100px) {
+	.mock-fb {
+		grid-template-columns: 220px minmax(0, 1fr);
+	}
+
+	.mock-fb__insp {
+		grid-column: 1 / -1;
+		border-left: 0;
+		border-top: 1px solid var(--line);
+	}
+}

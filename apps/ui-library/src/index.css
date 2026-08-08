@@ -3917,23 +3917,36 @@ body {
 }
 
 /* nodes */
+/* reference anatomy: icon tile + text floating on the canvas */
 .mock-af__node {
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	width: 220px;
-	padding: 10px var(--space-3);
-	background: var(--surface);
-	border: 1px solid var(--line-strong);
-	border-radius: var(--r-md);
-	transition:
-		border-color var(--dur-1) var(--ease-out),
-		box-shadow var(--dur-1) var(--ease-out);
+	width: 230px;
+	background: transparent;
+	border: none;
+	transition: none;
 }
 
-.mock-af__node--selected {
+.mock-af__node-tile {
+	display: grid;
+	place-items: center;
+	width: 46px;
+	height: 46px;
+	border-radius: var(--r-md);
+	background: var(--surface);
+	border: 1px solid var(--line-strong);
+	font-weight: 700;
+	font-size: 16px;
+	flex-shrink: 0;
+	transition:
+		border-color var(--dur-1) var(--ease-out),
+		background var(--dur-1) var(--ease-out);
+}
+
+.mock-af__node--selected .mock-af__node-tile {
 	border-color: var(--accent);
-	box-shadow: 0 0 0 3px var(--ring);
+	background: var(--accent-soft-bg);
 }
 
 .mock-af__node-icon {
@@ -3958,6 +3971,13 @@ body {
 .mock-af__node-icon--rose {
 	background: var(--rose-soft-bg);
 	color: var(--rose-accent);
+}
+
+/* dashed branch/condition tiles stay surface — after tone rules */
+.mock-af__node-tile--dashed {
+	border-style: dashed;
+	background: var(--surface);
+	color: var(--ink);
 }
 
 .mock-af__node-text {

@@ -109,12 +109,14 @@ import { AutomationMock } from "./mocks/Automation";
 import { FileDriveMock } from "./mocks/FileDrive";
 import { ProjectFilesMock } from "./mocks/ProjectFiles";
 import { DailyCalMock } from "./mocks/DailyCal";
+import { FlowBuilderMock } from "./mocks/FlowBuilder";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
 import { InboxMock } from "./mocks/Inbox";
 import { MonthlyCalendarMock } from "./mocks/MonthlyCalendar";
 import { DesignDiscussionMock } from "./mocks/DesignDiscussion";
 import { CompanyProfileMock } from "./mocks/CompanyProfile";
 import { AutomationBuilderMock } from "./mocks/AutomationBuilder";
+import { NotesOverviewMock } from "./mocks/NotesOverview";
 
 export interface Story {
 	title: string;
@@ -3150,6 +3152,27 @@ export const registry: ComponentEntry[] = [
 		],
 	},
 	{
+		id: "notes-overview",
+		group: "Showcase",
+		name: "Notes Overview",
+		description:
+			"Knowledge base management: stat cards with mini bar charts, Recently Updated / All Documents tabs, sortable grid-or-list document cards, live search, and a complete detail sidebar — document info, vectorisation with progress, usage stats, tags, top chunks, and a working re-index flow.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — knowledge base overview",
+				render: () => <NotesOverviewMock />,
+				code: `{/* click a card -> the sidebar follows;
+    tabs / sort / search / grid-list all live */}
+const [docs, setDocs] = useState(DOCS);
+const [sort, setSort] = useState("updated");
+
+{/* Re-index: card chip flips to Re-indexing…,
+    the sidebar progress bar fills, then Indexed */}`,
+			},
+		],
+	},
+	{
 		id: "automation",
 		group: "Showcase",
 		name: "Recipe Builder",
@@ -3164,6 +3187,27 @@ export const registry: ComponentEntry[] = [
     (icon tile + label + handles);
     click a node -> config panel swaps;
     branch node fans out QUESTION/QUESTION/DEFAULT */}`,
+			},
+		],
+	},
+	{
+		id: "flow-builder",
+		group: "Showcase",
+		name: "Flow Builder",
+		description:
+			"A node-canvas automation: the clinic's appointment reminder flow — library accordions with search, a dotted canvas with connected nodes and a labeled branch, working zoom, a simulated run, and an inspector that swaps to the selected node.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — appointment reminder flow",
+				render: () => <FlowBuilderMock />,
+				code: `{/* edges are explicit coords; the run button
+    animates dashes then settles to success */}
+<Canvas nodes={NODES} edges={EDGES} />
+<Inspector node={selected ?? flow} />
+
+{/* library search filters all sections;
+    zoom steps 75/100/125 around the flow */}`,
 			},
 		],
 	},

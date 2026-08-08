@@ -62,6 +62,8 @@ type FlowNodeData = {
 	sub: string;
 	icon: React.ReactNode;
 	tone: "night" | "cobalt" | "rose";
+	/** dashed tile border — branch/condition steps */
+	dashed?: boolean;
 	branches?: number;
 };
 
@@ -76,8 +78,11 @@ function AutomationNode({ data, selected }: NodeProps<Node<FlowNodeData>>) {
 				type="target"
 				position={Position.Top}
 				className="mock-af__handle"
+				style={{ left: 23 }}
 			/>
-			<span className={`mock-af__node-icon mock-af__node-icon--${data.tone}`}>
+			<span
+				className={`mock-af__node-tile mock-af__node-icon--${data.tone}${data.dashed ? " mock-af__node-tile--dashed" : ""}`}
+			>
 				{data.icon}
 			</span>
 			<span className="mock-af__node-text">
@@ -90,19 +95,22 @@ function AutomationNode({ data, selected }: NodeProps<Node<FlowNodeData>>) {
 						type="source"
 						position={Position.Bottom}
 						id="q1"
-						className="mock-af__handle mock-af__handle--lane1"
+						className="mock-af__handle"
+						style={{ left: 8 }}
 					/>
 					<Handle
 						type="source"
 						position={Position.Bottom}
 						id="q2"
-						className="mock-af__handle mock-af__handle--lane2"
+						className="mock-af__handle"
+						style={{ left: 23 }}
 					/>
 					<Handle
 						type="source"
 						position={Position.Bottom}
 						id="def"
-						className="mock-af__handle mock-af__handle--lane3"
+						className="mock-af__handle"
+						style={{ left: 38 }}
 					/>
 				</>
 			) : (
@@ -110,6 +118,7 @@ function AutomationNode({ data, selected }: NodeProps<Node<FlowNodeData>>) {
 					type="source"
 					position={Position.Bottom}
 					className="mock-af__handle"
+					style={{ left: 23 }}
 				/>
 			)}
 		</div>
@@ -139,6 +148,7 @@ const INITIAL_NODES: Node<FlowNodeData>[] = [
 		sub: "branch-1",
 		icon: <GitBranch size={18} />,
 		tone: "night",
+		dashed: true,
 		branches: 3,
 	}),
 	N("jira2", 170, 300, {
@@ -170,6 +180,7 @@ const INITIAL_NODES: Node<FlowNodeData>[] = [
 		sub: "boolean-1",
 		icon: <Shuffle size={18} />,
 		tone: "night",
+		dashed: true,
 	}),
 ];
 
