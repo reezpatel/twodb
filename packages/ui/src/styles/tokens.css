@@ -79,7 +79,7 @@
 [data-phase="day"] {
   color-scheme: light;
 
-  --bg: var(--twdb-day);
+  --bg: #e9e8ea; /* soft gray ground — white surfaces float on it (user-pinned) */
   --bg-band: #faf9fc;
   --bg-band-strong: #f2f0f7;
   --surface: #ffffff;

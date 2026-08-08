@@ -151,12 +151,17 @@ const UPCOMING = [
 ];
 
 function EventCard({ event }: { event: (typeof EVENTS)[number] }) {
+	const [time, detail] = event.meta.split(" · ");
+
 	return (
 		<article
 			className={`mock-weekcal__event mock-weekcal__event--${event.tone} mock-weekcal__event--col-${event.col} mock-weekcal__event--start-${event.start} mock-weekcal__event--span-${event.span}`}
 		>
 			<strong>{event.title}</strong>
-			<span>{event.meta}</span>
+			<span className="mock-weekcal__event-time">
+				<Clock3 aria-hidden="true" /> {time}
+			</span>
+			{detail ? <em>{detail}</em> : null}
 			{event.people.length ? (
 				<div className="mock-weekcal__people">
 					{event.people.slice(0, 3).map((name) => (

@@ -217,10 +217,10 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
 					}}
 					aria-label="Write a reply"
 				/>
-				<Button size="sm" variant="ghost" onClick={() => setText("")}>
+				<Button size="sm" variant="ghost" className="mock-dd__discard" onClick={() => setText("")}>
 					Discard
 				</Button>
-				<Button size="sm" onClick={send} disabled={!text.trim()}>
+				<Button size="sm" className="mock-dd__send" onClick={send} disabled={!text.trim()}>
 					Send
 				</Button>
 			</div>

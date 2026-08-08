@@ -87,6 +87,7 @@ import {
 import type { DateRange } from "@twodb/ui";
 import { ColorPicker, CURATED_COLORS } from "@twodb/ui";
 import { ComposeEmailMock } from "./mocks/ComposeEmail";
+import { DetectedAccountsMock } from "./mocks/DetectedAccounts";
 import { IntegrationsMock } from "./mocks/Integrations";
 import { ProdexDashboardMock } from "./mocks/ProdexDashboard";
 import { WeeklyCalendarMock } from "./mocks/WeeklyCalendar";
@@ -1133,7 +1134,12 @@ function ChatPanelDemo() {
 	return (
 		<div
 			className="demo-frame"
-			style={{ height: 560, width: 640, maxWidth: "100%" }}
+			style={{
+				height: 560,
+				width: 640,
+				maxWidth: "100%",
+				overflow: "auto",
+			}}
 		>
 			<ChatPanel>
 				<ChatHeader
@@ -2494,6 +2500,28 @@ export const registry: ComponentEntry[] = [
 		],
 	},
 
+
+	{
+		id: "detected-accounts",
+		group: "Showcase",
+		name: "Detected Accounts",
+		description:
+			"An automatically detected accounts section for a person profile: integration matches, confidence, split link actions, overflow account actions, and already-linked connections.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — review and link detected accounts",
+				render: () => <DetectedAccountsMock />,
+				code: `<DetectedAccountsMock />
+
+{/* Person profile account linking:
+    detected identities from integrations,
+    match confidence and evidence,
+    link / ignore actions,
+    and linked connections table. */}`,
+			},
+		],
+	},
 	{
 		id: "weekly-calendar",
 		group: "Showcase",

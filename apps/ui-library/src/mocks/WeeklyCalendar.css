@@ -417,6 +417,10 @@
 }
 
 .mock-weekcal__tz {
+	position: sticky;
+	left: 0;
+	z-index: 5;
+	background: var(--surface);
 	color: var(--ink-2);
 	font-size: 11.5px;
 	font-weight: 650;
@@ -429,6 +433,9 @@
 }
 
 .mock-weekcal__times {
+	position: sticky;
+	left: 0;
+	z-index: 3;
 	display: grid;
 	grid-template-rows: repeat(6, 192px);
 	border-right: 1px solid var(--line);
@@ -436,11 +443,23 @@
 }
 
 .mock-weekcal__times span {
-	padding-top: 12px;
+	position: relative;
+	padding-top: 18px;
 	text-align: center;
-	color: var(--ink-3);
-	font-size: 11.5px;
+	color: var(--ink-2);
+	font-size: var(--text-sm);
+	font-weight: 650;
 	font-variant-numeric: tabular-nums;
+}
+
+.mock-weekcal__times span::after {
+	position: absolute;
+	top: 27px;
+	right: -5px;
+	width: 9px;
+	height: 1px;
+	background: var(--line-strong);
+	content: "";
 }
 
 .mock-weekcal__lanes {
@@ -510,30 +529,64 @@
 	z-index: 2;
 	display: flex;
 	flex-direction: column;
-	gap: 5px;
+	gap: 7px;
 	min-height: 0;
 	overflow: hidden;
-	margin: 4px;
-	padding: 8px;
+	margin: 8px 8px 10px;
+	padding: 13px 12px 12px 16px;
 	border: 1px solid var(--event-line);
-	border-radius: var(--r-md);
+	border-radius: 12px;
 	background: var(--event-bg);
 	color: var(--ink);
 }
 
+.mock-weekcal__event::before {
+	position: absolute;
+	top: 14px;
+	bottom: 14px;
+	left: 8px;
+	width: 2px;
+	border-radius: var(--r-pill);
+	background: var(--event-accent);
+	content: "";
+}
+
 .mock-weekcal__event strong {
 	overflow: hidden;
-	font-size: var(--text-sm);
+	padding-left: 2px;
+	font-size: var(--text-md);
 	font-weight: 750;
 	line-height: 1.2;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.mock-weekcal__event span {
+.mock-weekcal__event-time {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
 	overflow: hidden;
+	padding-left: 2px;
 	color: var(--ink-2);
+	font-size: var(--text-sm);
+	font-variant-numeric: tabular-nums;
+	line-height: 1.25;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mock-weekcal__event-time svg {
+	width: 13px;
+	height: 13px;
+	color: var(--ink-3);
+}
+
+.mock-weekcal__event em {
+	overflow: hidden;
+	padding-left: 2px;
+	color: var(--ink-3);
 	font-size: 11px;
+	font-style: normal;
 	line-height: 1.25;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -543,6 +596,7 @@
 	flex-direction: row-reverse;
 	justify-content: flex-end;
 	margin-top: auto;
+	padding-left: 2px;
 }
 
 .mock-weekcal__people .tw-avatar {
@@ -558,23 +612,27 @@
 }
 
 .mock-weekcal__event--work {
-	--event-bg: rgb(10 43 255 / 0.1);
-	--event-line: rgb(10 43 255 / 0.46);
+	--event-bg: rgb(10 43 255 / 0.09);
+	--event-line: rgb(10 43 255 / 0.18);
+	--event-accent: var(--accent);
 }
 
 .mock-weekcal__event--team {
-	--event-bg: rgb(79 174 100 / 0.13);
-	--event-line: rgb(79 174 100 / 0.48);
+	--event-bg: rgb(79 174 100 / 0.12);
+	--event-line: rgb(79 174 100 / 0.2);
+	--event-accent: #2f9f56;
 }
 
 .mock-weekcal__event--personal {
-	--event-bg: #fbefd1;
-	--event-line: rgb(122 82 0 / 0.42);
+	--event-bg: #fff4d6;
+	--event-line: rgb(122 82 0 / 0.18);
+	--event-accent: #d99500;
 }
 
 .mock-weekcal__event--ai {
-	--event-bg: rgb(210 75 255 / 0.14);
-	--event-line: rgb(138 31 168 / 0.44);
+	--event-bg: rgb(210 75 255 / 0.12);
+	--event-line: rgb(138 31 168 / 0.18);
+	--event-accent: var(--rose-accent);
 }
 
 .mock-weekcal__event--col-1 {

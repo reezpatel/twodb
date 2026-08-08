@@ -39,12 +39,36 @@ const PARTICIPANTS = [
 ];
 
 const SCRIPT: { speaker: string; time: string; text: string }[] = [
-	{ speaker: "Dr. Asha Verma", time: "12:22", text: "Ward 4 first — Ravi Kumar's discharge summary is ready, but the medication dosage needs one correction before it goes out." },
-	{ speaker: "Ravi Kumar", time: "12:21", text: "The lab flagged Meera Iyer's lipid panel overnight. I've attached the report to her chart for the 9:40 review." },
-	{ speaker: "Meera Iyer", time: "12:19", text: "Stock check: gauze and medium gloves are below the reorder line. The order went out Thursday, arriving Monday." },
-	{ speaker: "Dr. Asha Verma", time: "12:17", text: "Good. Six invoices crossed thirty days this week — the reminders are drafted, someone review the wording before they send." },
-	{ speaker: "Dev Patel", time: "12:15", text: "I'll take the invoice wording. Also confirming Tuesday's visiting hours with the front desk this afternoon." },
-	{ speaker: "Ravi Kumar", time: "12:12", text: "New patient intake at 12:30 — Sana Sheikh. Consent forms are printed and at the desk." },
+	{
+		speaker: "Dr. Asha Verma",
+		time: "12:22",
+		text: "Ward 4 first — Ravi Kumar's discharge summary is ready, but the medication dosage needs one correction before it goes out.",
+	},
+	{
+		speaker: "Ravi Kumar",
+		time: "12:21",
+		text: "The lab flagged Meera Iyer's lipid panel overnight. I've attached the report to her chart for the 9:40 review.",
+	},
+	{
+		speaker: "Meera Iyer",
+		time: "12:19",
+		text: "Stock check: gauze and medium gloves are below the reorder line. The order went out Thursday, arriving Monday.",
+	},
+	{
+		speaker: "Dr. Asha Verma",
+		time: "12:17",
+		text: "Good. Six invoices crossed thirty days this week — the reminders are drafted, someone review the wording before they send.",
+	},
+	{
+		speaker: "Dev Patel",
+		time: "12:15",
+		text: "I'll take the invoice wording. Also confirming Tuesday's visiting hours with the front desk this afternoon.",
+	},
+	{
+		speaker: "Ravi Kumar",
+		time: "12:12",
+		text: "New patient intake at 12:30 — Sana Sheikh. Consent forms are printed and at the desk.",
+	},
 ];
 
 export function LiveScribeMock() {
@@ -66,7 +90,10 @@ export function LiveScribeMock() {
 	}, [listening]);
 
 	useEffect(() => {
-		scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+		scrollRef.current?.scrollTo({
+			top: scrollRef.current.scrollHeight,
+			behavior: "smooth",
+		});
 	}, [lineCount]);
 
 	const lines = SCRIPT.slice(0, lineCount);
@@ -81,8 +108,18 @@ export function LiveScribeMock() {
 					<span>City Clinic weekly review</span>
 				</div>
 				<div className="mock-ls__baractions">
-					<IconButton icon={<Search />} label="Search" variant="ghost" size="sm" />
-					<IconButton icon={<Bell />} label="Notifications" variant="ghost" size="sm" />
+					<IconButton
+						icon={<Search />}
+						label="Search"
+						variant="ghost"
+						size="sm"
+					/>
+					<IconButton
+						icon={<Bell />}
+						label="Notifications"
+						variant="ghost"
+						size="sm"
+					/>
 					<span className="mock-ls__host">
 						<Avatar name="Asha Verma" size="sm" />
 						Dr. Asha Verma
@@ -94,12 +131,22 @@ export function LiveScribeMock() {
 				{/* left: stage + live transcript */}
 				<div className="mock-ls__left">
 					<div className="mock-ls__stage">
-						<img src={STAGE_IMG} alt="Synthetic video placeholder — cobalt stage" />
+						<img
+							src={STAGE_IMG}
+							alt="Synthetic video placeholder — cobalt stage"
+						/>
 						<span className="mock-ls__speaker">
 							<Avatar name="Asha Verma" size="sm" /> Dr. Asha Verma
 						</span>
-						<span className={listening ? "mock-ls__rec is-live" : "mock-ls__rec"}>
-							<i /> {listening ? "Transcribing" : done ? "Transcript ready" : "Paused"}
+						<span
+							className={listening ? "mock-ls__rec is-live" : "mock-ls__rec"}
+						>
+							<i />{" "}
+							{listening
+								? "Transcribing"
+								: done
+									? "Transcript ready"
+									: "Paused"}
 						</span>
 						<div className="mock-ls__controls">
 							<button
@@ -108,7 +155,11 @@ export function LiveScribeMock() {
 								aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
 								aria-pressed={!micOn}
 							>
-								{micOn ? <Mic aria-hidden="true" /> : <MicOff aria-hidden="true" />}
+								{micOn ? (
+									<Mic aria-hidden="true" />
+								) : (
+									<MicOff aria-hidden="true" />
+								)}
 							</button>
 							<button
 								className={camOn ? "mock-ls__ctl" : "mock-ls__ctl is-off"}
@@ -116,9 +167,16 @@ export function LiveScribeMock() {
 								aria-label={camOn ? "Turn camera off" : "Turn camera on"}
 								aria-pressed={!camOn}
 							>
-								{camOn ? <Video aria-hidden="true" /> : <VideoOff aria-hidden="true" />}
+								{camOn ? (
+									<Video aria-hidden="true" />
+								) : (
+									<VideoOff aria-hidden="true" />
+								)}
 							</button>
-							<button className="mock-ls__ctl mock-ls__ctl--end" aria-label="Leave call">
+							<button
+								className="mock-ls__ctl mock-ls__ctl--end"
+								aria-label="Leave call"
+							>
 								<PhoneOff aria-hidden="true" />
 							</button>
 							<button className="mock-ls__ctl" aria-label="Share screen">
@@ -137,22 +195,39 @@ export function LiveScribeMock() {
 								<Waves aria-hidden="true" />
 								<span>
 									<strong>AI Scribe</strong>
-									<em>{listening ? "Listening…" : done ? "Finished" : "Paused"}</em>
+									<em>
+										{listening ? "Listening…" : done ? "Finished" : "Paused"}
+									</em>
 								</span>
 							</span>
-							<span className={listening ? "mock-ls__wave is-live" : "mock-ls__wave"} aria-hidden="true">
+							<span
+								className={
+									listening ? "mock-ls__wave is-live" : "mock-ls__wave"
+								}
+								aria-hidden="true"
+							>
 								{Array.from({ length: 28 }, (_, i) => (
 									<i key={i} style={{ animationDelay: `${(i % 9) * 0.12}s` }} />
 								))}
 							</span>
-							<Button size="sm" variant={listening ? "secondary" : "primary"} onClick={() => setListening((v) => !v)}>
+							<Button
+								size="sm"
+								variant={listening ? "secondary" : "primary"}
+								onClick={() => setListening((v) => !v)}
+							>
 								{listening ? "Pause" : done ? "Replay" : "Resume"}
 							</Button>
 						</div>
 						<div className="mock-ls__langs">
-							<span className="mock-ls__lang">English <ChevronDown aria-hidden="true" /></span>
-							<span className="mock-ls__swap"><Sparkles aria-hidden="true" /></span>
-							<span className="mock-ls__lang">हिन्दी <ChevronDown aria-hidden="true" /></span>
+							<span className="mock-ls__lang">
+								English <ChevronDown aria-hidden="true" />
+							</span>
+							<span className="mock-ls__swap">
+								<Sparkles aria-hidden="true" />
+							</span>
+							<span className="mock-ls__lang">
+								हिन्दी <ChevronDown aria-hidden="true" />
+							</span>
 						</div>
 						<div className="mock-ls__lines" ref={scrollRef}>
 							{lines.map((l, i) => (
@@ -168,7 +243,11 @@ export function LiveScribeMock() {
 							))}
 							{listening && !done ? (
 								<div className="mock-ls__line mock-ls__line--pending">
-									<span className="mock-ls__dots"><i /><i /><i /></span>
+									<span className="mock-ls__dots">
+										<i />
+										<i />
+										<i />
+									</span>
 								</div>
 							) : null}
 						</div>
@@ -185,12 +264,17 @@ export function LiveScribeMock() {
 						<div className="mock-ls__tiles">
 							{PARTICIPANTS.map((p) => (
 								<div className="mock-ls__tile" key={p.name}>
-									<img src={p.img} alt={`Synthetic video placeholder — ${p.name}`} />
+									<img
+										src={p.img}
+										alt={`Synthetic video placeholder — ${p.name}`}
+									/>
 									<span className="mock-ls__tname">
 										<Avatar name={p.name} size="sm" /> {p.name}
 									</span>
 									{p.micOff ? (
-										<span className="mock-ls__tmic"><MicOff aria-hidden="true" /></span>
+										<span className="mock-ls__tmic">
+											<MicOff aria-hidden="true" />
+										</span>
 									) : null}
 								</div>
 							))}
@@ -213,7 +297,9 @@ export function LiveScribeMock() {
 								<button
 									className="mock-ls__acc"
 									aria-expanded={openKey === "overview"}
-									onClick={() => setOpenKey(openKey === "overview" ? null : "overview")}
+									onClick={() =>
+										setOpenKey(openKey === "overview" ? null : "overview")
+									}
 								>
 									<ClipboardList aria-hidden="true" /> Overview
 									<ChevronDown aria-hidden="true" />
@@ -230,18 +316,28 @@ export function LiveScribeMock() {
 								<button
 									className="mock-ls__acc"
 									aria-expanded={openKey === "points"}
-									onClick={() => setOpenKey(openKey === "points" ? null : "points")}
+									onClick={() =>
+										setOpenKey(openKey === "points" ? null : "points")
+									}
 								>
 									<Sparkles aria-hidden="true" /> Key points
 									<ChevronDown aria-hidden="true" />
 								</button>
 								{openKey === "points" ? (
 									<ol className="mock-ls__points">
-										<li>Correct Ravi Kumar's dosage before the summary goes out.</li>
-										<li>Review Meera Iyer's flagged lipid panel before 9:40.</li>
-										<li>Stock order arrives Monday — confirm quantities at intake.</li>
+										<li>
+											Correct Ravi Kumar's dosage before the summary goes out.
+										</li>
+										<li>
+											Review Meera Iyer's flagged lipid panel before 9:40.
+										</li>
+										<li>
+											Stock order arrives Monday — confirm quantities at intake.
+										</li>
 										<li>Dev reviews invoice reminder wording today.</li>
-										<li>Tuesday visiting hours to be confirmed by the front desk.</li>
+										<li>
+											Tuesday visiting hours to be confirmed by the front desk.
+										</li>
 									</ol>
 								) : null}
 							</div>
@@ -251,10 +347,14 @@ export function LiveScribeMock() {
 							{lines.map((l, i) => (
 								<div className="mock-ls__sline" key={i}>
 									<span className="mock-ls__stime">{l.time}</span>
-									<p><strong>{l.speaker}:</strong> {l.text}</p>
+									<p>
+										<strong>{l.speaker}:</strong> {l.text}
+									</p>
 								</div>
 							))}
-							{!lines.length ? <p className="mock-ls__accbody">Nothing transcribed yet.</p> : null}
+							{!lines.length ? (
+								<p className="mock-ls__accbody">Nothing transcribed yet.</p>
+							) : null}
 						</div>
 					)}
 				</aside>
