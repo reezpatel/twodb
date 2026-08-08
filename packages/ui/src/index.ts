@@ -177,4 +177,7 @@ export { ScoreRing } from "./components/ScoreRing";
 export type { ScoreRingProps } from "./components/ScoreRing";
 
 export { DayTimeline } from "./components/DayTimeline";
-export type { DayTimelineProps, TimelineSegment } from "./components/DayTimeline";
+export type {
+	DayTimelineProps,
+	TimelineSegment,
+} from "./components/DayTimeline";

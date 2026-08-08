@@ -86,6 +86,7 @@ import {
 } from "@twodb/ui";
 import type { DateRange } from "@twodb/ui";
 import { ColorPicker, CURATED_COLORS } from "@twodb/ui";
+import { ComposeEmailMock } from "./mocks/ComposeEmail";
 import { IntegrationsMock } from "./mocks/Integrations";
 import { ProdexDashboardMock } from "./mocks/ProdexDashboard";
 import { ShareSettingsMock } from "./mocks/ShareSettings";
@@ -96,6 +97,7 @@ import { MorningBriefMock } from "./mocks/MorningBrief";
 import { TablePlanMock } from "./mocks/TablePlan";
 import { TodoFlowMock } from "./mocks/TodoFlow";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
+import { InboxMock } from "./mocks/Inbox";
 
 export interface Story {
 	title: string;
@@ -2146,7 +2148,11 @@ export const registry: ComponentEntry[] = [
 							tracking
 							segments={[
 								{ label: "Nexora Web", start: 10 * 60, end: 14 * 60 + 15 },
-								{ label: "Bluemint App", start: 14 * 60 + 15, end: 18 * 60 + 20 },
+								{
+									label: "Bluemint App",
+									start: 14 * 60 + 15,
+									end: 18 * 60 + 20,
+								},
 								{ label: "Klaro", start: 18 * 60 + 20, end: 20 * 60 + 30 },
 								{ label: "FEST", start: 20 * 60 + 30, end: 21 * 60 },
 							]}
@@ -2361,6 +2367,27 @@ export const registry: ComponentEntry[] = [
 		],
 	},
 
+
+	{
+		id: "compose-email",
+		group: "Showcase",
+		name: "Compose Email",
+		description:
+			"A large compose window inspired by the supplied reference: sender and recipient chips, subject/body, attachment cards, round compose tools, and a primary send action.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — composed email with attachments",
+				render: () => <ComposeEmailMock />,
+				code: `<ComposeEmailMock />
+
+{/* Full compose state:
+    from/to chips, cc/bcc controls,
+    message body, attachment cards,
+    formatting/attach/link/emoji/schedule tools. */}`,
+			},
+		],
+	},
 	{
 		id: "share-settings",
 		group: "Showcase",
@@ -2568,6 +2595,25 @@ export const registry: ComponentEntry[] = [
 {/* views filter the list; checks move tasks to
     Completed; click a task for subtasks + comments;
     quick-add lands in Inbox on Tomorrow */}`,
+			},
+		],
+	},
+	{
+		id: "inbox",
+		group: "Showcase",
+		name: "Inbox",
+		description:
+			"A three-pane mail inbox: folders and labels, pinned + primary thread list with live search, and a reading pane with an AI summary card, recipient chips, and attachments.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — folders, threads, reading pane",
+				render: () => <InboxMock />,
+				code: `{/* folders rail + thread list + reading pane */}
+<NavSection items={folders} />  {/* counts as tabular badges */}
+<ThreadRow active unread time snippet />
+{/* AI summary = rose-soft panel (the AI's light) */}
+<Composer via Dialog — To / Subject / Message />`,
 			},
 		],
 	},

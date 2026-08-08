@@ -347,7 +347,11 @@ export function TodoFlowMock() {
 						<button type="button" className="mock-td__mebtn" aria-label="Inbox">
 							<Mail aria-hidden="true" />
 						</button>
-						<button type="button" className="mock-td__mebtn" aria-label="Search">
+						<button
+							type="button"
+							className="mock-td__mebtn"
+							aria-label="Search"
+						>
 							<Search aria-hidden="true" />
 						</button>
 					</span>
