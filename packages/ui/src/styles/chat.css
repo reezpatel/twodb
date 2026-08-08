@@ -156,6 +156,7 @@
   line-height: 1.5;
   color: var(--ink);
   max-width: 62ch;
+  white-space: pre-line;
 }
 
 /* reactions */
@@ -430,38 +431,64 @@
   color: var(--ink-3);
 }
 
-/* composer */
+/* composer — one rounded box: growing text above, tools below */
 
 .tw-composer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 10px var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
   border-top: 1px solid var(--line);
   background: var(--bg);
 }
 
-.tw-composer__input {
-  flex: 1;
-  height: 32px;
-  padding: 0 var(--space-3);
+.tw-composer__box {
   border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   background: var(--surface);
-  font-family: var(--font-ui);
-  font-size: var(--text-md);
-  color: var(--ink);
   transition:
     border-color var(--dur-1) var(--ease-out),
     box-shadow var(--dur-1) var(--ease-out);
+}
+
+.tw-composer__box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.tw-composer__input {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  max-height: 77px; /* 3 lines */
+  padding: 10px var(--space-3) 4px;
+  border: none;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1.5;
+  color: var(--ink);
+  resize: none;
+  outline: none;
 }
 
 .tw-composer__input::placeholder {
   color: var(--ink-3);
 }
 
-.tw-composer__input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--ring);
+.tw-composer__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px var(--space-2) 8px;
+}
+
+.tw-composer__send {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tw-composer__hint {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  white-space: nowrap;
 }

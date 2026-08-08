@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Badge, type BadgeTone } from "./Badge";
 
 export interface DataGanttMeta {
@@ -85,6 +85,10 @@ function diffDays(start: Date, end: Date): number {
 
 function clamp(value: number, min: number, max: number): number {
 	return Math.min(Math.max(value, min), max);
+}
+
+function getProgress(item: DataGanttItem): number {
+	return clamp(item.progress ?? 0, 0, 100);
 }
 
 function formatRange(start: Date, end: Date): string {
@@ -201,46 +205,6 @@ function TimelineHead({
 	);
 }
 
-function RecordRows({
-	rows,
-	activeId,
-	onSelect,
-}: {
-	rows: PreparedGanttItem[];
-	activeId: string;
-	onSelect: (id: string) => void;
-}) {
-	return (
-		<div className="tw-gantt__rows" role="list" aria-label="Timeline records">
-			{rows.map(({ item }) => {
-				const isActive = item.id === activeId;
-				return (
-					<button
-						type="button"
-						key={item.id}
-						className={`tw-gantt__record${isActive ? " tw-gantt__record--active" : ""}`}
-						onClick={() => onSelect(item.id)}
-						aria-pressed={isActive}
-					>
-						<span>
-							{item.kicker ? (
-								<span className="tw-gantt__kicker">{item.kicker}</span>
-							) : null}
-							<strong>{item.title}</strong>
-						</span>
-						<span className="tw-gantt__record-meta">
-							{item.status ? (
-								<Badge tone={item.tone ?? "neutral"}>{item.status}</Badge>
-							) : null}
-							{item.owner ? <span>{item.owner}</span> : null}
-						</span>
-					</button>
-				);
-			})}
-		</div>
-	);
-}
-
 function getBarStyle(
 	row: PreparedGanttItem,
 	window: TimelineWindow,
@@ -255,58 +219,73 @@ function getBarStyle(
 	return { left: asPct(left), width: asPct(width) };
 }
 
-function TimelineTracks({
-	rows,
+function RecordCell({
+	row,
+	activeId,
+	onSelect,
+}: {
+	row: PreparedGanttItem;
+	activeId: string;
+	onSelect: (id: string) => void;
+}) {
+	const { item, start, end } = row;
+	const isActive = item.id === activeId;
+
+	return (
+		<button
+			type="button"
+			className={`tw-gantt__record${isActive ? " tw-gantt__record--active" : ""}`}
+			onClick={() => onSelect(item.id)}
+			aria-pressed={isActive}
+		>
+			<span className="tw-gantt__record-main">
+				{item.kicker ? (
+					<span className="tw-gantt__kicker">{item.kicker}</span>
+				) : null}
+				<strong>{item.title}</strong>
+				<span className="tw-gantt__record-range tw-tnum">
+					{formatRange(start, end)}
+				</span>
+			</span>
+			<span className="tw-gantt__record-meta">
+				{item.status ? (
+					<Badge tone={item.tone ?? "neutral"}>{item.status}</Badge>
+				) : null}
+				{item.owner ? <span>{item.owner}</span> : null}
+			</span>
+		</button>
+	);
+}
+
+function TrackCell({
+	row,
 	activeId,
 	todayPosition,
 	window,
 }: {
-	rows: PreparedGanttItem[];
+	row: PreparedGanttItem;
 	activeId: string;
 	todayPosition?: number;
 	window: TimelineWindow;
 }) {
+	const { item } = row;
+	const progress = getProgress(item);
+
 	return (
-		<div className="tw-gantt__tracks" aria-hidden="true">
+		<div className="tw-gantt__track" aria-hidden="true">
 			{todayPosition !== undefined ? (
 				<span
 					className="tw-gantt__today"
 					style={{ left: asPct(todayPosition) }}
 				/>
 			) : null}
-			{rows.map((row) => (
-				<TimelineTrack
-					key={row.item.id}
-					row={row}
-					activeId={activeId}
-					window={window}
-				/>
-			))}
-		</div>
-	);
-}
-
-function TimelineTrack({
-	row,
-	activeId,
-	window,
-}: {
-	row: PreparedGanttItem;
-	activeId: string;
-	window: TimelineWindow;
-}) {
-	const { item } = row;
-	const progress = clamp(item.progress ?? 0, 0, 100) / 100;
-
-	return (
-		<div className="tw-gantt__track">
 			<span
 				className={`tw-gantt__bar tw-gantt__bar--${item.tone ?? "neutral"}${
 					item.id === activeId ? " tw-gantt__bar--active" : ""
 				}`}
 				style={getBarStyle(row, window)}
 			>
-				<span style={{ transform: `scaleX(${progress})` }} />
+				<span style={{ transform: `scaleX(${progress / 100})` }} />
 			</span>
 			{(item.milestones ?? []).map((milestone) => (
 				<TimelineMilestone
@@ -342,6 +321,9 @@ function TimelineMilestone({
 }
 
 function DefaultGanttDetail({ item }: { item: DataGanttItem }) {
+	const progress = getProgress(item);
+	const milestones = item.milestones ?? [];
+
 	return (
 		<>
 			<div className="tw-gantt__detail-head">
@@ -353,13 +335,46 @@ function DefaultGanttDetail({ item }: { item: DataGanttItem }) {
 					<Badge tone={item.tone ?? "neutral"}>{item.status}</Badge>
 				) : null}
 			</div>
-			{item.description ? (
-				<div className="tw-gantt__detail-copy">{item.description}</div>
-			) : null}
+			<div className="tw-gantt__detail-grid">
+				<div>
+					{item.description ? (
+						<div className="tw-gantt__detail-copy">{item.description}</div>
+					) : null}
+					<div className="tw-gantt__detail-progress">
+						<span>Progress</span>
+						<strong className="tw-tnum">{progress}%</strong>
+						<i>
+							<span style={{ transform: `scaleX(${progress / 100})` }} />
+						</i>
+					</div>
+				</div>
+				{milestones.length > 0 ? (
+					<div className="tw-gantt__milestones">
+						<span className="tw-cue">Milestones</span>
+						<ul>
+							{milestones.map((milestone) => (
+								<li key={`${milestone.label}-${String(milestone.date)}`}>
+									<span
+										className={`tw-gantt__milestone-dot tw-gantt__milestone-dot--${milestone.tone ?? item.tone ?? "neutral"}`}
+									/>
+									<span>{milestone.label}</span>
+									<time className="tw-tnum">
+										{shortDateFormatter.format(toDay(milestone.date))}
+									</time>
+								</li>
+							))}
+						</ul>
+					</div>
+				) : null}
+			</div>
 			<dl className="tw-gantt__facts">
 				<div>
 					<dt>Window</dt>
 					<dd>{formatRange(toDay(item.start), toDay(item.end))}</dd>
+				</div>
+				<div>
+					<dt>Progress</dt>
+					<dd>{progress}%</dd>
 				</div>
 				{item.owner ? (
 					<div>
@@ -444,13 +459,17 @@ export function DataGantt({
 					todayPosition={visibleToday}
 					window={window}
 				/>
-				<RecordRows rows={rows} activeId={active.id} onSelect={selectItem} />
-				<TimelineTracks
-					rows={rows}
-					activeId={active.id}
-					todayPosition={visibleToday}
-					window={window}
-				/>
+				{rows.map((row) => (
+					<Fragment key={row.item.id}>
+						<RecordCell row={row} activeId={active.id} onSelect={selectItem} />
+						<TrackCell
+							row={row}
+							activeId={active.id}
+							todayPosition={visibleToday}
+							window={window}
+						/>
+					</Fragment>
+				))}
 			</div>
 
 			<div className="tw-gantt__detail">

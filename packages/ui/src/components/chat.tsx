@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   Download,
   FileText,
@@ -254,31 +254,54 @@ export interface ChatComposerProps {
 
 export function ChatComposer({ placeholder = "Message…", onSend }: ChatComposerProps) {
   const [text, setText] = useState("");
+  const areaRef = useRef<HTMLTextAreaElement>(null);
 
   function send() {
     const t = text.trim();
     if (!t) return;
     onSend?.(t);
     setText("");
+    if (areaRef.current) areaRef.current.style.height = "auto";
   }
 
   return (
     <div className="tw-composer">
-      <IconButton label="Attach a file" icon={<Paperclip />} />
-      <input
-        className="tw-composer__input"
-        placeholder={placeholder}
-        value={text}
-        aria-label={placeholder}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") send();
-        }}
-      />
-      <IconButton label="Voice message" icon={<Mic />} />
-      <Button size="sm" onClick={send} disabled={!text.trim()} aria-label="Send message">
-        <Send size={14} aria-hidden="true" />
-      </Button>
+      <div className="tw-composer__box">
+        <textarea
+          ref={areaRef}
+          className="tw-composer__input"
+          placeholder={placeholder}
+          value={text}
+          rows={1}
+          aria-label={placeholder}
+          onChange={(e) => {
+            setText(e.target.value);
+            /* grow with content, capped at 3 lines by CSS max-height */
+            const el = e.target;
+            el.style.height = "auto";
+            el.style.height = `${Math.min(el.scrollHeight, 77)}px`;
+          }}
+          onKeyDown={(e) => {
+            /* Enter = new line; Ctrl/Cmd+Enter sends */
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault();
+              send();
+            }
+          }}
+        />
+        <div className="tw-composer__row">
+          <IconButton label="Attach a file" icon={<Paperclip />} />
+          <IconButton label="Add emoji" icon={<SmilePlus />} />
+          <IconButton label="Voice message" icon={<Mic />} />
+          <div className="tw-composer__send">
+            <span className="tw-composer__hint">Ctrl + Enter to send</span>
+            <Button size="sm" onClick={send} disabled={!text.trim()}>
+              <Send size={14} aria-hidden="true" />
+              Send
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
