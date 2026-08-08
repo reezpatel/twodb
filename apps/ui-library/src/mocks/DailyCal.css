@@ -218,7 +218,7 @@
 	flex-direction: column;
 	gap: 3px;
 	padding: 10px 12px;
-	border-left: 3px solid;
+	border-left: 1px solid;
 	border-radius: var(--r-sm);
 	overflow: hidden;
 	min-height: 38px;
