@@ -97,9 +97,11 @@ import { InvestorDashboardMock } from "./mocks/InvestorDashboard";
 import { MorningBriefMock } from "./mocks/MorningBrief";
 import { TablePlanMock } from "./mocks/TablePlan";
 import { TodoFlowMock } from "./mocks/TodoFlow";
+import { ChatMailMock } from "./mocks/ChatMail";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
 import { InboxMock } from "./mocks/Inbox";
 import { MonthlyCalendarMock } from "./mocks/MonthlyCalendar";
+import { DesignDiscussionMock } from "./mocks/DesignDiscussion";
 
 export interface Story {
 	title: string;
@@ -1145,6 +1147,16 @@ function ChatPanelDemo() {
 					]}
 				/>
 				<ChatList>
+					<MessageGroup id="rounds-original" author="Dev Patel" time="09:40">
+						<ChatMessage>
+							<TextMessage>
+								The resulting cell should show the value from the appropriate
+								column (and not, for instance, all equal those from x1). Any
+								idea on how this can be achieved?
+							</TextMessage>
+						</ChatMessage>
+					</MessageGroup>
+
 					<MessageGroup author="Asha Verma" time="09:41">
 						<ChatMessage>
 							<TextMessage>Morning! Ward 4 summaries are in.</TextMessage>
@@ -1202,6 +1214,29 @@ function ChatPanelDemo() {
 						</ChatMessage>
 						<ChatMessage reactions={[{ emoji: "👀", count: 1 }]}>
 							<VideoMessage poster={ph("#050506", "#0A2BFF")} duration="0:18" />
+						</ChatMessage>
+					</MessageGroup>
+
+					<MessageGroup author="Amanda" time="10:08">
+						<ChatMessage
+							reactions={[{ emoji: "🙌", count: 1 }]}
+							replyTo={{
+								id: "rounds-original",
+								author: "Dev Patel",
+								time: "09:40",
+								text: "The resulting cell should show the value from the appropriate column (and not, for instance, all equal those from x1). Any idea on how this can be achieved?",
+							}}
+							onReplyClick={(id) => {
+								document
+									.getElementById(id ?? "")
+									?.scrollIntoView({ behavior: "smooth", block: "center" });
+							}}
+						>
+							<TextMessage>
+								Thank you for the suggestion. There is still one difference from
+								the desired output though; I think the false argument in the
+								if_else() function should not be constant.
+							</TextMessage>
 						</ChatMessage>
 					</MessageGroup>
 
@@ -2256,6 +2291,74 @@ export const registry: ComponentEntry[] = [
   </ChatMessage>
 </MessageGroup>`,
 			},
+			{
+				title: "Reply quote — inline preview of the message being replied to",
+				render: () => (
+					<div style={{ width: 480, maxWidth: "100%" }}>
+						<MessageGroup id="m1" author="Dev Patel" time="10:02">
+							<ChatMessage>
+								<TextMessage>
+									If you really just want to filter out the first n characters
+									of a file, the tool you want is dd which allows you to specify
+									the number of blocks to skip. If you want a block size of 1,
+									specify that with bs.
+								</TextMessage>
+							</ChatMessage>
+						</MessageGroup>
+
+						<MessageGroup author="Amanda" time="10:08">
+							<ChatMessage
+								replyTo={{
+									id: "m1",
+									author: "Dev Patel",
+									time: "10:02",
+									text: "If you really just want to filter out the first n characters of a file, the tool you want is dd which allows you to specify the number of blocks to skip. If you want a block size of 1, specify that with bs.",
+								}}
+								onReplyClick={() => {
+									document
+										.getElementById("m1")
+										?.scrollIntoView({ behavior: "smooth", block: "center" });
+								}}
+							>
+								<TextMessage>
+									Thank you for the suggestion. There is still one difference
+									from the desired output though; I think the false argument in
+									the if_else() function should not be constant.
+								</TextMessage>
+							</ChatMessage>
+						</MessageGroup>
+
+						<MessageGroup author="Amanda" time="10:11">
+							<ChatMessage
+								reactions={[{ emoji: "🙌", count: 1 }]}
+								replyTo={{
+									id: "m1",
+									author: "Dev Patel",
+									time: "10:02",
+									text: "The resulting cell should show the value from the appropriate column (and not, for instance, all equal those from x1). Any idea on how this can be achieved?",
+								}}
+							>
+								<TextMessage>
+									Okay great, that&rsquo;s all the information I needed to know!
+								</TextMessage>
+							</ChatMessage>
+						</MessageGroup>
+					</div>
+				),
+				code: `<MessageGroup author="Amanda" time="10:08">
+  <ChatMessage
+    replyTo={{
+      id: "m1",
+      author: "Dev Patel",
+      time: "10:02",
+      text: "If you really just want to filter out the first n characters…",
+    }}
+    onReplyClick={(id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}
+  >
+    <TextMessage>Thank you for the suggestion…</TextMessage>
+  </ChatMessage>
+</MessageGroup>`,
+			},
 		],
 	},
 	{
@@ -2368,7 +2471,6 @@ export const registry: ComponentEntry[] = [
 			},
 		],
 	},
-
 
 	{
 		id: "compose-email",
@@ -2661,6 +2763,43 @@ export const registry: ComponentEntry[] = [
 
 {/* chips: cobalt / rose / warning / neutral / danger;
     "+N more…" overflow; click a day to prefill the dialog */}`,
+			},
+		],
+	},
+	{
+		id: "design-discussion",
+		group: "Showcase",
+		name: "Design Discussion",
+		description:
+			"A threaded discussion space: channel tree, posts with @mentions and toggleable reactions, a link card, a composer with working @-autocomplete, and an info panel with activity and members.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — thread, mentions, info panel",
+				render: () => <DesignDiscussionMock />,
+				code: `{/* @mentions light up cobalt; reactions toggle;
+    composer: type @ for member autocomplete;
+    Send appends your post to the thread */}`,
+			},
+		],
+	},
+	{
+		id: "chat-mail",
+		group: "Showcase",
+		name: "Chat Mail",
+		description:
+			"Email that reads like a conversation: folders rail, thread list with categories and a smart-replies toggle, and a reading pane built on the chat suite — summary card, quick answers, composer.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — the inbox as a chat",
+				render: () => <ChatMailMock />,
+				code: `{/* reading pane = ChatList + MessageGroup */}
+<MessageGroup author time><TextMessage /></MessageGroup>
+<ChatComposer onSend={reply} />
+
+{/* quick answers send instantly; star toggles;
+    opening a thread clears its unread badge */}`,
 			},
 		],
 	},
