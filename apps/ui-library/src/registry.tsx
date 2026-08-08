@@ -363,8 +363,8 @@ function CardsShowcase() {
 				actions={<Badge tone="rose">AI draft</Badge>}
 			>
 				<p>
-					Three appointments today. Two invoices unpaid. One note from yesterday links to
-					both.
+					Three appointments today. Two invoices unpaid. One note from yesterday
+					links to both.
 				</p>
 				<div className="card-showcase__facts">
 					<span>
@@ -392,8 +392,8 @@ function CardsShowcase() {
 					</span>
 				</div>
 				<p>
-					The card keeps a person, their latest work, and the next plain-language action
-					in one calm band.
+					The card keeps a person, their latest work, and the next
+					plain-language action in one calm band.
 				</p>
 			</Card>
 
@@ -408,22 +408,26 @@ function CardsShowcase() {
 
 			<Card density="compact" title="Quiet note">
 				<p>
-					Compact cards are for dense rails, side panels, and list previews — not a new
-					visual language.
+					Compact cards are for dense rails, side panels, and list previews —
+					not a new visual language.
 				</p>
 			</Card>
 
-			<Card tone="warning" title="Needs review" actions={<Badge tone="warning">Due soon</Badge>}>
+			<Card
+				tone="warning"
+				title="Needs review"
+				actions={<Badge tone="warning">Due soon</Badge>}
+			>
 				<p>
-					The automation is ready, but the first send waits for a person to approve the
-					message copy.
+					The automation is ready, but the first send waits for a person to
+					approve the message copy.
 				</p>
 			</Card>
 
 			<Card tone="danger" density="compact" title="Blocked automation">
 				<p>
-					Phone number missing for two recipients. Add the numbers before twodb sends
-					anything.
+					Phone number missing for two recipients. Add the numbers before twodb
+					sends anything.
 				</p>
 			</Card>
 		</div>
@@ -1433,12 +1437,12 @@ export const registry: ComponentEntry[] = [
 		group: "Primitives",
 		name: "Card",
 		description:
-			"A matte band bounded by hairlines — never shadow, never nested.",
+			"A family of matte content bands: default, compact, tonal, AI, warning, and danger — all hairlines, no shadows.",
 		stories: [
 			{
-				title: "Default",
+				title: "Default — quiet information band",
 				render: () => (
-					<div style={{ maxWidth: 420, width: "100%" }}>
+					<div className="card-showcase__single">
 						<Card title="Morning brief" actions={<Badge tone="rose">AI</Badge>}>
 							Three appointments today. Two invoices unpaid. One note from
 							yesterday links to both.
@@ -1450,8 +1454,18 @@ export const registry: ComponentEntry[] = [
 </Card>`,
 			},
 			{
-				title: "Composed — hero and record",
+				title: "Showcase — card types",
 				render: () => <CardsShowcase />,
+				code: `<Card title="Morning brief" tone="rose" actions={<Badge tone="rose">AI draft</Badge>}>
+  <p>Three appointments today…</p>
+  <Button size="sm">Open brief</Button>
+</Card>
+
+<Card title="Linked record" actions={<Badge tone="go">Synced</Badge>}>…</Card>
+<Card tone="band" title="Checklist">…</Card>
+<Card density="compact" title="Quiet note">…</Card>
+<Card tone="warning" title="Needs review">…</Card>
+<Card tone="danger" density="compact" title="Blocked automation">…</Card>`,
 			},
 		],
 	},
