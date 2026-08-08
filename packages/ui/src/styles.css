@@ -11,4 +11,7 @@
 @import "./styles/skeleton.css";
 @import "./styles/shell.css";
 @import "./styles/table.css";
+@import "./styles/gantt.css";
 @import "./styles/calendar.css";
+@import "./styles/chat.css";
+@import "./styles/editor.css";

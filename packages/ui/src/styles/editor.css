@@ -1,0 +1,156 @@
+/* MarkdownEditor — a calm writing surface: hairline frame, lit toolbar */
+
+.tw-editor {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  transition:
+    border-color var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-1) var(--ease-out);
+}
+
+.tw-editor:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.tw-editor--error {
+  border-color: var(--danger-ink);
+}
+
+.tw-editor--error:focus-within {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger-ink) 20%, transparent);
+}
+
+/* --- Toolbar --- */
+
+.tw-editor__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-band);
+}
+
+.tw-editor__sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--line-strong);
+  flex-shrink: 0;
+}
+
+.tw-editor__toolbar .tw-icon-btn.is-active {
+  background: var(--accent-soft-bg);
+  color: var(--accent);
+}
+
+/* --- Writing surface --- */
+
+.tw-editor__content {
+  padding: var(--space-3) var(--space-4);
+}
+
+.tw-editor__content .ProseMirror {
+  outline: none;
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.tw-editor__content .ProseMirror p {
+  margin: 0 0 var(--space-2);
+  max-width: var(--measure);
+}
+
+.tw-editor__content .ProseMirror > *:last-child {
+  margin-bottom: 0;
+}
+
+.tw-editor__content .ProseMirror h1,
+.tw-editor__content .ProseMirror h2,
+.tw-editor__content .ProseMirror h3 {
+  margin: var(--space-4) 0 var(--space-2);
+  max-width: var(--measure);
+}
+
+.tw-editor__content .ProseMirror h1 { font-size: var(--text-2xl); }
+.tw-editor__content .ProseMirror h2 { font-size: var(--text-xl); }
+.tw-editor__content .ProseMirror h3 { font-size: var(--text-lg); }
+
+.tw-editor__content .ProseMirror ul,
+.tw-editor__content .ProseMirror ol {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-5);
+  max-width: var(--measure);
+}
+
+.tw-editor__content .ProseMirror li {
+  margin-bottom: 2px;
+}
+
+.tw-editor__content .ProseMirror blockquote {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--line-strong);
+  color: var(--ink-2);
+  max-width: var(--measure);
+}
+
+.tw-editor__content .ProseMirror code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: var(--bg-band-strong);
+  border-radius: var(--r-sm);
+  padding: 1px 5px;
+}
+
+.tw-editor__content .ProseMirror pre {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--twdb-night);
+  color: #e8e7f0;
+  border-radius: var(--r-md);
+  overflow-x: auto;
+}
+
+.tw-editor__content .ProseMirror pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: 12.5px;
+}
+
+.tw-editor__content .ProseMirror hr {
+  border: 0;
+  height: 1px;
+  margin: var(--space-4) 0;
+  background: linear-gradient(90deg, transparent, var(--line-strong), transparent);
+}
+
+.tw-editor__content .ProseMirror strong {
+  font-weight: 650;
+}
+
+.tw-editor__content .ProseMirror a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* placeholder */
+.tw-editor__content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--ink-3);
+}
+
+/* readonly: no frame emphasis, content only */
+.tw-editor--readonly {
+  border-color: var(--line);
+}

@@ -13,6 +13,7 @@ import {
   CircleHelp,
   Component,
   LogOut,
+  MessagesSquare,
   Palette,
   PanelLeft,
   Settings,
@@ -27,6 +28,7 @@ const RAIL_GROUPS = [
   { id: "Primitives", icon: <Component /> },
   { id: "Shell", icon: <PanelLeft /> },
   { id: "Data", icon: <Table2 /> },
+  { id: "Chat", icon: <MessagesSquare /> },
 ];
 
 export default function App() {
