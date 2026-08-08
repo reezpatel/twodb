@@ -81,3 +81,11 @@ p {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* QRCode — night-ink modules on the local surface */
+.tw-qr {
+  display: block;
+  fill: var(--ink);
+  background: #ffffff;
+  border-radius: var(--r-sm);
+}

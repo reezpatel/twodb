@@ -1,68 +1,68 @@
 /* Settings — grouped frames of label/control rows */
 
 .tw-sgroup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
 }
 
 .tw-sgroup__head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
 }
 
 .tw-sgroup__desc {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--ink-3);
+	margin: 0;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
 }
 
 .tw-sgroup__frame {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  overflow: hidden;
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: var(--r-lg);
+	overflow: hidden;
 }
 
 .tw-sgroup__frame > * + * {
-  border-top: 1px solid var(--line);
+	border-top: 1px solid var(--line);
 }
 
 .tw-srow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: 13px var(--space-4);
+	display: flex;
+	align-items: center;
+	gap: var(--space-4);
+	padding: 13px var(--space-4);
 }
 
 .tw-srow__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
 }
 
 .tw-srow__label {
-  font-size: var(--text-md);
-  font-weight: 600;
-  color: var(--ink);
+	font-size: var(--text-md);
+	font-weight: 600;
+	color: var(--ink);
 }
 
 .tw-srow__desc {
-  font-size: var(--text-sm);
-  color: var(--ink-3);
-  line-height: 1.45;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+	line-height: 1.45;
 }
 
 .tw-srow__control {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
 }
 
 .tw-srow--custom {
-  align-items: flex-start;
+	align-items: flex-start;
 }

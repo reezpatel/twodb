@@ -153,7 +153,19 @@ export { MarkdownEditor } from "./components/MarkdownEditor";
 export type { MarkdownEditorProps } from "./components/MarkdownEditor";
 
 export { SettingGroup, SettingRow } from "./components/SettingRow";
-export type { SettingGroupProps, SettingRowProps } from "./components/SettingRow";
+export type {
+	SettingGroupProps,
+	SettingRowProps,
+} from "./components/SettingRow";
 
 export { PasswordInput } from "./components/PasswordInput";
 export type { PasswordInputProps } from "./components/PasswordInput";
+
+export { ColorPicker, CURATED_COLORS } from "./components/ColorPicker";
+export type { ColorPickerProps, ColorSwatchOption } from "./components/ColorPicker";
+
+export { QRCode } from "./components/QRCode";
+export type { QRCodeProps } from "./components/QRCode";
+
+export { CodeInput } from "./components/CodeInput";
+export type { CodeInputProps } from "./components/CodeInput";
