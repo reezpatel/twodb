@@ -3129,7 +3129,7 @@ export const registry: ComponentEntry[] = [
 	{
 		id: "automation-builder",
 		group: "Showcase",
-		name: "Automation Builder",
+		name: "Path Builder",
 		description:
 			"A visual path builder on React Flow: launch pill, trigger and step cards, a two-path branch, edge insert buttons, live node insertion from the Add Integration panel, working delete, search dimming, and zoom chrome.",
 		fullWidth: true,
@@ -3152,7 +3152,7 @@ export const registry: ComponentEntry[] = [
 	{
 		id: "automation",
 		group: "Showcase",
-		name: "Automation Builder",
+		name: "Recipe Builder",
 		description:
 			"A low-code recipe builder on React Flow: connector palette, a branched flow canvas with custom nodes and add-step edges, and a config panel that follows the selected node.",
 		fullWidth: true,

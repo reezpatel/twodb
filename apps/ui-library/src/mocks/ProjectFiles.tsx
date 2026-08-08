@@ -58,16 +58,86 @@ const TYPE_META: Record<
 };
 
 const FILES: FileRow[] = [
-	{ name: "Service_agreement.pdf", type: "pdf", size: "1.8 MB", opened: "10 min ago", owner: "Asha Verma", folder: "Contracts & Legal" },
-	{ name: "Lab_panel_Meera-Iyer.pdf", type: "pdf", size: "640 KB", opened: "12 min ago", owner: "Meera Iyer", folder: "Lab Reports" },
-	{ name: "Invoice_1042.pdf", type: "pdf", size: "220 KB", opened: "2 min ago", owner: "Dev Patel", folder: "Invoices" },
-	{ name: "Consent_Sana-Sheikh.docx", type: "doc", size: "96 KB", opened: "30 min ago", owner: "Ravi Kumar", folder: "Consent Forms" },
-	{ name: "Discharge_Ravi-Kumar.docx", type: "doc", size: "104 KB", opened: "1 hour ago", owner: "Asha Verma", folder: "Consent Forms" },
-	{ name: "Stock_March.xlsx", type: "sheet", size: "1.2 MB", opened: "2 hours ago", owner: "Dev Patel", folder: "Invoices" },
-	{ name: "Supplier_quote_gauze.xlsx", type: "sheet", size: "84 KB", opened: "Jan 28, 2026", owner: "Dev Patel", folder: "Invoices" },
-	{ name: "Lab_panel_Rao.pdf", type: "pdf", size: "588 KB", opened: "Jan 25, 2026", owner: "Meera Iyer", folder: "Lab Reports" },
-	{ name: "Waiting_room_poster.png", type: "image", size: "3.4 MB", opened: "Jan 25, 2026", owner: "Ravi Kumar", folder: "Contracts & Legal" },
-	{ name: "Clinic_floorplan.png", type: "image", size: "5.1 MB", opened: "Jan 15, 2026", owner: "Asha Verma", folder: "Contracts & Legal" },
+	{
+		name: "Service_agreement.pdf",
+		type: "pdf",
+		size: "1.8 MB",
+		opened: "10 min ago",
+		owner: "Asha Verma",
+		folder: "Contracts & Legal",
+	},
+	{
+		name: "Lab_panel_Meera-Iyer.pdf",
+		type: "pdf",
+		size: "640 KB",
+		opened: "12 min ago",
+		owner: "Meera Iyer",
+		folder: "Lab Reports",
+	},
+	{
+		name: "Invoice_1042.pdf",
+		type: "pdf",
+		size: "220 KB",
+		opened: "2 min ago",
+		owner: "Dev Patel",
+		folder: "Invoices",
+	},
+	{
+		name: "Consent_Sana-Sheikh.docx",
+		type: "doc",
+		size: "96 KB",
+		opened: "30 min ago",
+		owner: "Ravi Kumar",
+		folder: "Consent Forms",
+	},
+	{
+		name: "Discharge_Ravi-Kumar.docx",
+		type: "doc",
+		size: "104 KB",
+		opened: "1 hour ago",
+		owner: "Asha Verma",
+		folder: "Consent Forms",
+	},
+	{
+		name: "Stock_March.xlsx",
+		type: "sheet",
+		size: "1.2 MB",
+		opened: "2 hours ago",
+		owner: "Dev Patel",
+		folder: "Invoices",
+	},
+	{
+		name: "Supplier_quote_gauze.xlsx",
+		type: "sheet",
+		size: "84 KB",
+		opened: "Jan 28, 2026",
+		owner: "Dev Patel",
+		folder: "Invoices",
+	},
+	{
+		name: "Lab_panel_Rao.pdf",
+		type: "pdf",
+		size: "588 KB",
+		opened: "Jan 25, 2026",
+		owner: "Meera Iyer",
+		folder: "Lab Reports",
+	},
+	{
+		name: "Waiting_room_poster.png",
+		type: "image",
+		size: "3.4 MB",
+		opened: "Jan 25, 2026",
+		owner: "Ravi Kumar",
+		folder: "Contracts & Legal",
+	},
+	{
+		name: "Clinic_floorplan.png",
+		type: "image",
+		size: "5.1 MB",
+		opened: "Jan 15, 2026",
+		owner: "Asha Verma",
+		folder: "Contracts & Legal",
+	},
 ];
 
 const RECENT = FILES.slice(0, 4);
@@ -107,8 +177,10 @@ export function ProjectFilesMock() {
 		() =>
 			FILES.filter((f) => {
 				if (folder && f.folder !== folder) return false;
-				if (typeTab !== "all" && TYPE_META[f.type].label !== typeTab) return false;
-				if (query && !f.name.toLowerCase().includes(query.toLowerCase())) return false;
+				if (typeTab !== "all" && TYPE_META[f.type].label !== typeTab)
+					return false;
+				if (query && !f.name.toLowerCase().includes(query.toLowerCase()))
+					return false;
 				return true;
 			}),
 		[folder, typeTab, query],
@@ -134,7 +206,9 @@ export function ProjectFilesMock() {
 					<span className="mock-pf__navlabel">Main menu</span>
 					{NAV.map((n) => (
 						<span
-							className={n.active ? "mock-pf__navitem is-active" : "mock-pf__navitem"}
+							className={
+								n.active ? "mock-pf__navitem is-active" : "mock-pf__navitem"
+							}
 							key={n.label}
 						>
 							<n.icon aria-hidden="true" />
@@ -144,7 +218,11 @@ export function ProjectFilesMock() {
 					<div className="mock-pf__subnav">
 						{FOLDERS.map((f) => (
 							<button
-								className={folder === f.name ? "mock-pf__subitem is-active" : "mock-pf__subitem"}
+								className={
+									folder === f.name
+										? "mock-pf__subitem is-active"
+										: "mock-pf__subitem"
+								}
 								key={f.name}
 								onClick={() => setFolder(folder === f.name ? null : f.name)}
 							>
@@ -194,7 +272,11 @@ export function ProjectFilesMock() {
 				<div className="mock-pf__folders">
 					{FOLDERS.map((f) => (
 						<button
-							className={folder === f.name ? "mock-pf__folder is-active" : "mock-pf__folder"}
+							className={
+								folder === f.name
+									? "mock-pf__folder is-active"
+									: "mock-pf__folder"
+							}
 							key={f.name}
 							onClick={() => setFolder(folder === f.name ? null : f.name)}
 							aria-pressed={folder === f.name}
@@ -276,7 +358,10 @@ export function ProjectFilesMock() {
 							</thead>
 							<tbody>
 								{rows.map((f) => (
-									<tr key={f.name} className={selected.has(f.name) ? "is-selected" : ""}>
+									<tr
+										key={f.name}
+										className={selected.has(f.name) ? "is-selected" : ""}
+									>
 										<td className="mock-pf__check">
 											<Checkbox
 												checked={selected.has(f.name)}
@@ -332,7 +417,11 @@ export function ProjectFilesMock() {
 					<div className="mock-pf__grid">
 						{rows.map((f) => (
 							<button
-								className={selected.has(f.name) ? "mock-pf__card is-selected" : "mock-pf__card"}
+								className={
+									selected.has(f.name)
+										? "mock-pf__card is-selected"
+										: "mock-pf__card"
+								}
 								key={f.name}
 								onClick={() => toggle(f.name)}
 							>
@@ -354,7 +443,12 @@ export function ProjectFilesMock() {
 			<aside className="mock-pf__side">
 				<div className="mock-pf__sidehead">
 					<h3>Files</h3>
-					<IconButton icon={<MoreHorizontal />} label="Panel options" variant="ghost" size="sm" />
+					<IconButton
+						icon={<MoreHorizontal />}
+						label="Panel options"
+						variant="ghost"
+						size="sm"
+					/>
 				</div>
 				<Select
 					aria-label="Filter panel by type"
@@ -372,7 +466,9 @@ export function ProjectFilesMock() {
 				<div className="mock-pf__sidefolders">
 					{FOLDERS.map((f) => (
 						<button
-							className={folder === f.name ? "mock-pf__tile is-active" : "mock-pf__tile"}
+							className={
+								folder === f.name ? "mock-pf__tile is-active" : "mock-pf__tile"
+							}
 							key={f.name}
 							onClick={() => setFolder(folder === f.name ? null : f.name)}
 							aria-pressed={folder === f.name}
@@ -386,14 +482,24 @@ export function ProjectFilesMock() {
 
 				<h4 className="mock-pf__sidesect">Recent files</h4>
 				<div className="mock-pf__sidelist">
-					{FILES.filter((f) => sideType === "all" || TYPE_META[f.type].label === sideType)
+					{FILES.filter(
+						(f) => sideType === "all" || TYPE_META[f.type].label === sideType,
+					)
 						.slice(0, 5)
 						.map((f) => (
 							<button
-								className={selected.has(f.name) ? "mock-pf__siderow is-selected" : "mock-pf__siderow"}
+								className={
+									selected.has(f.name)
+										? "mock-pf__siderow is-selected"
+										: "mock-pf__siderow"
+								}
 								key={f.name}
 								onClick={() => toggle(f.name)}
-								title={selected.has(f.name) ? "Selected — click to deselect" : "Click to select in the list"}
+								title={
+									selected.has(f.name)
+										? "Selected — click to deselect"
+										: "Click to select in the list"
+								}
 							>
 								<FileIcon type={f.type} />
 								<div>
