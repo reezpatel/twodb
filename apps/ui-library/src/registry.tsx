@@ -2500,7 +2500,6 @@ export const registry: ComponentEntry[] = [
 		],
 	},
 
-
 	{
 		id: "detected-accounts",
 		group: "Showcase",

@@ -169,7 +169,7 @@
 	padding: 7px 12px 9px 14px;
 	margin-bottom: 2px;
 	border: 1px solid var(--line);
-	border-left: 3px solid var(--accent);
+	border-left: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
 	border-radius: var(--r-md);
 	background: var(--bg-band);
 	cursor: pointer;

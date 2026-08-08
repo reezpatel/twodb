@@ -1,21 +1,38 @@
 import { Badge, Button } from "@twodb/ui";
 import {
+	Building2,
 	ChevronDown,
+	Cloud,
+	Database,
 	ExternalLink,
 	Fingerprint,
 	Link2,
 	ShieldCheck,
 	UserPlus,
+	Video,
 } from "lucide-react";
 import "./DetectedAccounts.css";
 
-const DETECTED_ACCOUNTS = [
+type Brand = "salesforce" | "loom" | "google" | "supabase";
+
+const DETECTED_ACCOUNTS: Array<{
+	id: string;
+	name: string;
+	detail: string;
+	source: string;
+	sourceDetail: string;
+	proof: string;
+	brand: Brand;
+	confidence: string;
+	open?: boolean;
+}> = [
 	{
 		id: "salesforce",
 		name: "adam.davidson@twoleet.com",
-		detail: "Matched by exact email",
+		detail: "No person profile linked yet",
 		source: "Salesforce",
 		sourceDetail: "Lead owner · Healthcare pipeline",
+		proof: "Exact email",
 		brand: "salesforce",
 		confidence: "99%",
 	},
@@ -24,7 +41,8 @@ const DETECTED_ACCOUNTS = [
 		name: "Adam Davidson",
 		detail: "adam.davidson@twoleet.com",
 		source: "Loom",
-		sourceDetail: "Last recording shared 2h ago",
+		sourceDetail: "Shared recording 2h ago",
+		proof: "Email + name",
 		brand: "loom",
 		confidence: "94%",
 		open: true,
@@ -35,6 +53,7 @@ const DETECTED_ACCOUNTS = [
 		detail: "adam.davidson@twoleet.com",
 		source: "Google Workspace",
 		sourceDetail: "twoleet.com directory",
+		proof: "Domain match",
 		brand: "google",
 		confidence: "91%",
 	},
@@ -44,6 +63,7 @@ const DETECTED_ACCOUNTS = [
 		detail: "adam.davidson@twoleet.com",
 		source: "Supabase",
 		sourceDetail: "supa-base project member",
+		proof: "Project access",
 		brand: "supabase",
 		confidence: "88%",
 	},
@@ -54,26 +74,25 @@ const LINKED_ACCOUNTS = [
 	{ connection: "Linear", detail: "Support workspace", linked: "Jan 08, 2025" },
 ];
 
-function BrandMark({ brand }: { brand: string }) {
-	return (
-		<span
-			className={`mock-detect__brandmark mock-detect__brandmark--${brand}`}
-			aria-hidden="true"
-		/>
-	);
+function BrandMark({ brand }: { brand: Brand }) {
+	const icons = {
+		salesforce: <Cloud aria-hidden="true" />,
+		loom: <Video aria-hidden="true" />,
+		google: <Building2 aria-hidden="true" />,
+		supabase: <Database aria-hidden="true" />,
+	};
+
+	return <span className={`mock-detect__brandmark mock-detect__brandmark--${brand}`}>{icons[brand]}</span>;
 }
 
-function AccountRow({
-	account,
-}: {
-	account: (typeof DETECTED_ACCOUNTS)[number];
-}) {
+function AccountRow({ account }: { account: (typeof DETECTED_ACCOUNTS)[number] }) {
 	return (
-		<div className="mock-detect__row">
+		<div className={account.open ? "mock-detect__row is-open" : "mock-detect__row"}>
 			<div className="mock-detect__identity">
 				<strong>{account.name}</strong>
 				<span>{account.detail}</span>
 			</div>
+
 			<div className="mock-detect__source">
 				<BrandMark brand={account.brand} />
 				<div>
@@ -81,32 +100,24 @@ function AccountRow({
 					<span>{account.sourceDetail}</span>
 				</div>
 			</div>
-			<Badge tone="go" size="sm">
-				{account.confidence} match
-			</Badge>
+
+			<div className="mock-detect__evidence">
+				<Badge tone="go" size="sm">{account.confidence}</Badge>
+				<span>{account.proof}</span>
+			</div>
+
 			<div className="mock-detect__actions">
-				<Button variant="ghost" size="sm">
-					Ignore
-				</Button>
+				<Button variant="ghost" size="sm">Ignore</Button>
 				<div className="mock-detect__split">
-					<Button size="sm">
-						<Link2 aria-hidden="true" /> Link to Adam
-					</Button>
-					<button
-						type="button"
-						aria-label={`More link actions for ${account.source}`}
-					>
+					<Button variant="secondary" size="sm"><Link2 aria-hidden="true" /> Link to Adam</Button>
+					<button type="button" aria-label={`More link actions for ${account.source}`}>
 						<ChevronDown aria-hidden="true" />
 					</button>
 					{account.open ? (
 						<div className="mock-detect__menu" role="menu">
 							<span>Account action</span>
-							<button type="button" role="menuitem">
-								<Link2 aria-hidden="true" /> Link to another person…
-							</button>
-							<button type="button" role="menuitem">
-								<UserPlus aria-hidden="true" /> Add as new person…
-							</button>
+							<button type="button" role="menuitem"><Link2 aria-hidden="true" /> Link to another person…</button>
+							<button type="button" role="menuitem"><UserPlus aria-hidden="true" /> Add as new person…</button>
 						</div>
 					) : null}
 				</div>
@@ -117,81 +128,53 @@ function AccountRow({
 
 export function DetectedAccountsMock() {
 	return (
-		<div
-			className="mock-detect"
-			aria-label="Automatically detected accounts showcase"
-		>
+		<div className="mock-detect" aria-label="Automatically detected accounts showcase">
 			<section className="mock-detect__profile">
 				<div className="mock-detect__avatar">AD</div>
 				<div>
 					<h2>Adam Davidson</h2>
-					<p>Person profile · customer success lead</p>
+					<p>Person profile · customer success lead · twoleet.com</p>
 				</div>
 				<div className="mock-detect__profile-meta">
-					<span>Accounts</span>
-					<strong>2 linked</strong>
+					<span>Linked accounts</span>
+					<strong>2 connected</strong>
 				</div>
 			</section>
 
 			<section className="mock-detect__panel">
 				<header className="mock-detect__head">
 					<div>
-						<span className="mock-detect__icon">
-							<Fingerprint aria-hidden="true" />
-						</span>
+						<span className="mock-detect__icon"><Fingerprint aria-hidden="true" /></span>
 						<div>
 							<h3>Automatically detected accounts</h3>
-							<p>
-								twodb found 4 accounts from connected integrations that are
-								probably this same person.
-							</p>
+							<p>Review likely integration identities before twodb merges history, files, and activity into this profile.</p>
 						</div>
 					</div>
-					<Button variant="ghost" size="sm">
-						<Link2 aria-hidden="true" /> Link all to Adam
-					</Button>
+					<Button size="sm"><Link2 aria-hidden="true" /> Link all to Adam</Button>
 				</header>
 
 				<div className="mock-detect__match-strip">
-					<div>
-						<ShieldCheck aria-hidden="true" />
-						<span>Exact email and domain matches are prioritized.</span>
-					</div>
-					<Badge tone="neutral" size="sm">
-						Review queue
-					</Badge>
+					<div><ShieldCheck aria-hidden="true" /><span>4 suggestions found from connected tools. Nothing is linked until you confirm.</span></div>
+					<Badge tone="neutral" size="sm">Review queue</Badge>
 				</div>
 
 				<div className="mock-detect__list">
-					{DETECTED_ACCOUNTS.map((account) => (
-						<AccountRow key={account.id} account={account} />
-					))}
+					{DETECTED_ACCOUNTS.map((account) => <AccountRow key={account.id} account={account} />)}
 				</div>
 			</section>
 
 			<section className="mock-detect__linked">
 				<div className="mock-detect__linked-head">
 					<h3>Already linked</h3>
-					<Button variant="secondary" size="sm">
-						<ExternalLink aria-hidden="true" /> Export
-					</Button>
+					<Button variant="secondary" size="sm"><ExternalLink aria-hidden="true" /> Export</Button>
 				</div>
 				<div className="mock-detect__table">
-					<div className="mock-detect__table-head">
-						<span>Connection</span>
-						<span>Linked</span>
-						<span>Action</span>
-					</div>
+					<div className="mock-detect__table-head"><span>Connection</span><span>Linked</span><span>Action</span></div>
 					{LINKED_ACCOUNTS.map((account) => (
 						<div key={account.connection} className="mock-detect__table-row">
-							<div>
-								<strong>{account.connection}</strong>
-								<span>{account.detail}</span>
-							</div>
+							<div><strong>{account.connection}</strong><span>{account.detail}</span></div>
 							<time>{account.linked}</time>
-							<button type="button">
-								<Link2 aria-hidden="true" /> Unlink
-							</button>
+							<button type="button"><Link2 aria-hidden="true" /> Unlink</button>
 						</div>
 					))}
 				</div>
