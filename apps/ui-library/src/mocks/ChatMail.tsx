@@ -198,7 +198,7 @@ export function ChatMailMock() {
 	const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
 	const [selectedId, setSelectedId] = useState("c1");
 	const [smartReplies, setSmartReplies] = useState(true);
-	const [read, setRead] = useState<Record<string, boolean>>({});
+	const [read, setRead] = useState<Record<string, boolean>>({ c1: true });
 	const [starred, setStarred] = useState<Record<string, boolean>>(
 		Object.fromEntries(CONVERSATIONS.filter((c) => c.starred).map((c) => [c.id, true])),
 	);
