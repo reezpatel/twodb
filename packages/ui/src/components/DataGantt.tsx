@@ -1,4 +1,10 @@
-import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import {
+	Fragment,
+	useMemo,
+	useState,
+	type CSSProperties,
+	type ReactNode,
+} from "react";
 import { Badge, type BadgeTone } from "./Badge";
 
 export interface DataGanttMeta {

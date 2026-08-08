@@ -238,6 +238,91 @@ function MarkdownEditorDemo() {
 	);
 }
 
+const BLOG_MD = [
+	"# The five-minute morning brief",
+	"",
+	"*How a clinic of eleven people replaced the 8 a.m. chaos with one quiet page — Aug 3, 2026 · 6 min read*",
+	"",
+	"**Every morning used to start the same way.** Four phone calls, two registers, and a whiteboard nobody trusted. The front desk knew half the schedule; the nurses knew the other half. By nine, the day was already behind.",
+	"",
+	"This is the story of how that stopped — and the exact page they use now, which you can copy in an afternoon.",
+	"",
+	"![The morning brief page, synthetic demo image](IMG1)",
+	"",
+	"## The problem was never people",
+	"",
+	"Clinics don't forget patients because they care too little. They forget because the remembering lives in eleven places at once: a diary at reception, sticky notes on the pathology fridge, a WhatsApp group that scrolls too fast, and the head nurse's famously reliable memory — which retires the day she does.",
+	"",
+	"When information lives in fragments, the morning becomes an archaeology dig. The brief is the opposite: one page, written by the day itself, waiting before anyone asks.",
+	"",
+	"> The goal is not more information in the morning. It is fewer questions.",
+	"",
+	"## What goes on the page",
+	"",
+	"The brief answers five questions and nothing more:",
+	"",
+	"- Who is coming today, and who needs preparation before they arrive?",
+	"- Which reports came back overnight, and which are still pending?",
+	"- What stock crossed below its reorder line yesterday?",
+	"- Which invoices aged past thirty days this week?",
+	"- What is the one thing the whole team must not forget?",
+	"",
+	"Everything else is noise, and noise is what mornings are made of.",
+	"",
+	"## How it gets assembled",
+	"",
+	"Nobody *writes* the brief. The system keeps a gentle eye on the same ledgers the team already maintains, and at 06:30 it drafts the page:",
+	"",
+	"1. Appointments are read off the calendar — no re-entry, ever.",
+	"2. Lab reports attach themselves to the right patient automatically.",
+	"3. Stock counts below their threshold surface with a suggested order quantity.",
+	"4. Anything unresolved from yesterday rolls forward with a small `↻ carried` mark.",
+	"",
+	"The rule that makes it trustworthy: if the data isn't already in the system, it doesn't get on the page. A brief someone has to maintain dies by the third week.",
+	"",
+	"```",
+	"06:30  draft brief from overnight data",
+	"06:45  head nurse reviews, adds one line",
+	"07:55  page opens on every desk — no meeting",
+	"```",
+	"",
+	"## What changed in six weeks",
+	"",
+	"The numbers the clinic tracked, before and after:",
+	"",
+	"| Measure | Before | After six weeks |",
+	"| --- | --- | --- |",
+	"| Morning phone calls | 14–18 | 2–3 |",
+	"| Patients asked to wait while files were found | ~9 / day | ~1 / day |",
+	"| Stock-out incidents per week | 3 | 0 |",
+	"| Invoices older than 30 days | 22 | 6 |",
+	"| Staff meeting minutes per morning | 25 | 0 |",
+	"",
+	"The head nurse's summary was shorter than any table: *\"I stopped being the hospital's search engine.\"*",
+	"",
+	"![The reorder view, synthetic demo image](IMG2)",
+	"",
+	"## Start tomorrow, not next quarter",
+	"",
+	"The temptation is to design the perfect brief. Resist it. Write tomorrow's five answers by hand tonight, put the page where everyone already looks, and let the routine prove which questions deserve to stay. Most teams delete two of their first five within a month — the page earns its shape.",
+	"",
+	"---",
+	"",
+	"*The morning brief is one of twelve templates in the [twodb starter library](#). Also ~~deprecated~~ retired: the 8 a.m. all-hands.*",
+].join("\n");
+
+function MarkdownBlogDemo() {
+	const md = BLOG_MD.replace("IMG1", ph("#050506", "#0A2BFF")).replace(
+		"IMG2",
+		ph("#D24BFF", "#FFD7E6"),
+	);
+	return (
+		<div style={{ width: "100%", maxWidth: 760 }}>
+			<MarkdownEditor defaultValue={md} readOnly minHeight={0} />
+		</div>
+	);
+}
+
 function DialogDemo() {
 	const [open, setOpen] = useState(false);
 	return (
@@ -1089,6 +1174,14 @@ export const registry: ComponentEntry[] = [
   hint="Markdown shortcuts work — # heading, **bold**, - list"
   placeholder="Patient was discharged in stable condition…"
 />`,
+			},
+			{
+				title: "Blog preview — every block",
+				render: () => <MarkdownBlogDemo />,
+				code: `<MarkdownEditor defaultValue={blogMarkdown} readOnly />
+
+// renders headings, images, lists, quote, code,
+// a pipe table, hr, links — no toolbar, just the page`,
 			},
 		],
 	},
