@@ -2453,4 +2453,23 @@ export const registry: ComponentEntry[] = [
 			},
 		],
 	},
+	{
+		id: "table-plan",
+		group: "Showcase",
+		name: "Table Management",
+		description:
+			"Hotel floor service: reservation cards with time chips and payment states, zone floors with per-table chairs, and a two-way selection between the list and the plan.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — Main Dining, Terrace, Outdoor",
+				render: () => <TablePlanMock />,
+				code: `<FloorPlan zone={zone} tables={FLOORS[zone]} />
+<ReservationList filter search select />
+
+{/* click a reservation → its table lights up;
+    click a table → its card selects */}`,
+			},
+		],
+	},
 ];
