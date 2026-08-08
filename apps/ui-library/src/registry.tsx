@@ -105,13 +105,16 @@ import { LiveScribeMock } from "./mocks/LiveScribe";
 import { WeeklyCalMock } from "./mocks/WeeklyCal";
 import { FileManagerMock } from "./mocks/FileManager";
 import { CommunicationMock } from "./mocks/Communication";
+import { AutomationMock } from "./mocks/Automation";
 import { FileDriveMock } from "./mocks/FileDrive";
 import { ProjectFilesMock } from "./mocks/ProjectFiles";
+import { DailyCalMock } from "./mocks/DailyCal";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
 import { InboxMock } from "./mocks/Inbox";
 import { MonthlyCalendarMock } from "./mocks/MonthlyCalendar";
 import { DesignDiscussionMock } from "./mocks/DesignDiscussion";
 import { CompanyProfileMock } from "./mocks/CompanyProfile";
+import { AutomationBuilderMock } from "./mocks/AutomationBuilder";
 
 export interface Story {
 	title: string;
@@ -2021,15 +2024,23 @@ export const registry: ComponentEntry[] = [
 							aria-label="Demo folders"
 							defaultExpanded={["inspiration"]}
 							nodes={[
-								{ id: "sources", label: "Project sources", children: [
-									{ id: "s1", label: "Source files" },
-									{ id: "s2", label: "Exports" },
-								] },
-								{ id: "inspiration", label: "Design inspiration", children: [
-									{ id: "pd", label: "Product design", count: 4 },
-									{ id: "br", label: "Branding" },
-									{ id: "da", label: "Digital art" },
-								] },
+								{
+									id: "sources",
+									label: "Project sources",
+									children: [
+										{ id: "s1", label: "Source files" },
+										{ id: "s2", label: "Exports" },
+									],
+								},
+								{
+									id: "inspiration",
+									label: "Design inspiration",
+									children: [
+										{ id: "pd", label: "Product design", count: 4 },
+										{ id: "br", label: "Branding" },
+										{ id: "da", label: "Digital art" },
+									],
+								},
 								{ id: "neu", label: "NEU documents" },
 							]}
 						/>
@@ -3091,6 +3102,68 @@ export const registry: ComponentEntry[] = [
 				code: `{/* waveform player (play/pause), transcription
     disclosure, suggestion ✓ -> tasks 1/2,
     Email/SMS tabs switch the composer */}`,
+			},
+		],
+	},
+	{
+		id: "daily-calendar",
+		group: "Showcase",
+		name: "Daily Calendar",
+		description:
+			"One day, hour by hour: a timeline with a now-line at 14:00, spanning and overlapping event cards, category chips that filter, and an agenda checklist that strikes through as you finish the day.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — the clinic day",
+				render: () => <DailyCalMock />,
+				code: `{/* three navigable days share one shape;
+    overlapped events split the lane (col/cols) */}
+<Timeline events={day.events} now={14} />
+<Agenda onToggle={strikeThrough} />
+
+{/* category chips dim AND filter; the mini month
+    jumps between the three days */}`,
+			},
+		],
+	},
+	{
+		id: "automation-builder",
+		group: "Showcase",
+		name: "Automation Builder",
+		description:
+			"A visual path builder on React Flow: launch pill, trigger and step cards, a two-path branch, edge insert buttons, live node insertion from the Add Integration panel, working delete, search dimming, and zoom chrome.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — path builder canvas",
+				render: () => <AutomationBuilderMock />,
+				code: `{/* React Flow under the twodb skin:
+    custom step/paths/launch/add nodes,
+    smoothstep edges with mid-edge "+" insert */}
+<ReactFlow nodes={nodes} edges={edges}
+  nodeTypes={nodeTypes} edgeTypes={edgeTypes}
+  nodesConnectable={false} fitView />
+
+{/* edge "+" opens Add Integration;
+    Continue splices the new step into the path */}`,
+			},
+		],
+	},
+	{
+		id: "automation",
+		group: "Showcase",
+		name: "Automation Builder",
+		description:
+			"A low-code recipe builder on React Flow: connector palette, a branched flow canvas with custom nodes and add-step edges, and a config panel that follows the selected node.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — palette, canvas, config",
+				render: () => <AutomationMock />,
+				code: `{/* React Flow + custom AutomationNode
+    (icon tile + label + handles);
+    click a node -> config panel swaps;
+    branch node fans out QUESTION/QUESTION/DEFAULT */}`,
 			},
 		],
 	},
