@@ -2380,22 +2380,15 @@ export const registry: ComponentEntry[] = [
 									>
 										<TextMessage>
 											If you really just want to filter out the first n
-											characters of a file, the tool you want is dd which
-											allows you to specify the number of blocks to skip. If
-											you want a block size of 1, specify that with bs.
+											characters of a file, the tool you want is dd which allows
+											you to specify the number of blocks to skip. If you want a
+											block size of 1, specify that with bs.
 										</TextMessage>
 									</ChatMessage>
 								</MessageGroup>
 
-								<MessageGroup
-									author="Amanda"
-									time="5h ago"
-									thread
-									authorBadge
-								>
-									<ChatMessage
-										reactions={[{ emoji: "🙌", count: 1 }]}
-									>
+								<MessageGroup author="Amanda" time="5h ago" thread authorBadge>
+									<ChatMessage reactions={[{ emoji: "🙌", count: 1 }]}>
 										<TextMessage>
 											Okay great thats all the information i needed to know!
 										</TextMessage>

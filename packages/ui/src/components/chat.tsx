@@ -134,10 +134,7 @@ export function MessageGroup({
 	time,
 	children,
 }: MessageGroupProps) {
-	const cls = [
-		"tw-msg-group",
-		thread ? "tw-msg-group--thread" : "",
-	]
+	const cls = ["tw-msg-group", thread ? "tw-msg-group--thread" : ""]
 		.filter(Boolean)
 		.join(" ");
 	return (
@@ -220,36 +217,53 @@ export function ChatMessage({
 				{children}
 			</div>
 
-			{reactions && reactions.length > 0 ? (
-				<div className="tw-msg__reactions">
-					{reactions.map((r, i) => {
-						const on = r.active || reacted.includes(i);
-						return (
+			{(reactions && reactions.length > 0) || replyCount ? (
+				<div className="tw-msg__footer">
+					{reactions && reactions.length > 0 ? (
+						<div className="tw-msg__reactions">
+							{reactions.map((r, i) => {
+								const on = r.active || reacted.includes(i);
+								return (
+									<button
+										key={r.emoji}
+										type="button"
+										className={
+											on ? "tw-reaction tw-reaction--on" : "tw-reaction"
+										}
+										aria-pressed={on}
+										onClick={() =>
+											setReacted((cur) =>
+												cur.includes(i)
+													? cur.filter((x) => x !== i)
+													: [...cur, i],
+											)
+										}
+									>
+										<span className="tw-reaction__emoji">{r.emoji}</span>
+										<span className="tw-reaction__count tw-tnum">
+											{r.count + (reacted.includes(i) && !r.active ? 1 : 0)}
+										</span>
+									</button>
+								);
+							})}
 							<button
-								key={r.emoji}
 								type="button"
-								className={on ? "tw-reaction tw-reaction--on" : "tw-reaction"}
-								aria-pressed={on}
-								onClick={() =>
-									setReacted((cur) =>
-										cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i],
-									)
-								}
+								className="tw-reaction tw-reaction--add"
+								aria-label="Add reaction"
 							>
-								<span className="tw-reaction__emoji">{r.emoji}</span>
-								<span className="tw-reaction__count tw-tnum">
-									{r.count + (reacted.includes(i) && !r.active ? 1 : 0)}
-								</span>
+								<Plus size={12} />
 							</button>
-						);
-					})}
-					<button
-						type="button"
-						className="tw-reaction tw-reaction--add"
-						aria-label="Add reaction"
-					>
-						<Plus size={12} />
-					</button>
+						</div>
+					) : null}
+					{replyCount ? (
+						<button
+							type="button"
+							className="tw-msg__reply-count"
+							onClick={onReplyCountClick}
+						>
+							{replyCount} {replyCount === 1 ? "reply" : "replies"}
+						</button>
+					) : null}
 				</div>
 			) : null}
 

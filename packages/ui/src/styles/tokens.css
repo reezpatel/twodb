@@ -79,7 +79,7 @@
 [data-phase="day"] {
 	color-scheme: light;
 
-	--bg: #f1f1f4; /* light gray ground — white surfaces float on it (user-pinned) */
+	--bg: #f5f5f7; /* light gray ground — white surfaces float on it (user-pinned) */
 	--bg-band: #faf9fc;
 	--bg-band-strong: #f2f0f7;
 	--surface: #ffffff;

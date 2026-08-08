@@ -12,6 +12,12 @@
 	overflow: hidden;
 }
 
+/* active / focused panel — lit cobalt outline */
+.tw-chat--active {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 1px var(--accent);
+}
+
 /* header */
 
 .tw-chat__header {
@@ -108,9 +114,44 @@
 	color: var(--ink);
 }
 
+.tw-msg-group__author-badge {
+	display: inline-flex;
+	align-items: center;
+	height: 18px;
+	padding: 0 7px;
+	border-radius: var(--r-sm);
+	background: var(--accent-soft-bg);
+	color: var(--accent);
+	font-size: var(--text-xs);
+	font-weight: 600;
+	letter-spacing: 0.01em;
+}
+
 .tw-msg-group__time {
 	font-size: var(--text-xs);
 	color: var(--ink-3);
+}
+
+/* thread reply — indent avatar under the parent message,
+   draw a vertical connector line down the left rail */
+.tw-msg-group--thread {
+	position: relative;
+	padding-left: 30px;
+}
+
+.tw-msg-group--thread .tw-msg-group__avatar {
+	margin-left: 0;
+}
+
+.tw-msg-group--thread::before {
+	content: "";
+	position: absolute;
+	left: 20px;
+	top: -10px;
+	width: 2px;
+	height: 14px;
+	background: var(--line-strong);
+	border-radius: 2px;
 }
 
 /* single message */
@@ -234,6 +275,38 @@
 	gap: 6px;
 	margin-top: 6px;
 	flex-wrap: wrap;
+}
+
+/* footer row — reactions on the left, reply-count link on the right */
+.tw-msg__footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-3);
+	margin-top: 6px;
+}
+
+.tw-msg__footer .tw-msg__reactions {
+	margin-top: 0;
+}
+
+.tw-msg__reply-count {
+	margin-left: auto;
+	border: none;
+	background: transparent;
+	padding: 0;
+	font-family: var(--font-ui);
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--accent);
+	cursor: pointer;
+	transition: color var(--dur-1) var(--ease-out);
+}
+
+.tw-msg__reply-count:hover {
+	color: var(--accent-strong);
+	text-decoration: underline;
+	text-underline-offset: 3px;
 }
 
 .tw-reaction {
