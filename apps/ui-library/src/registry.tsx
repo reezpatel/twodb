@@ -88,6 +88,7 @@ import { ColorPicker, CURATED_COLORS } from "@twodb/ui";
 import { IntegrationsMock } from "./mocks/Integrations";
 import { SettingsMock } from "./mocks/Settings";
 import { TwoFactorMock } from "./mocks/TwoFactor";
+import { MorningBriefMock } from "./mocks/MorningBrief";
 
 export interface Story {
 	title: string;
@@ -2384,6 +2385,29 @@ export const registry: ComponentEntry[] = [
 {/* Step 1: scan or copy the secret
     Step 2: 6-digit verify (000000 = error demo)
     Success: backup codes, copy all, regenerate */}`,
+			},
+		],
+	},
+	{
+		id: "morning-brief",
+		group: "Showcase",
+		name: "Morning Brief",
+		description:
+			"The 06:30 page from the blog post, live: appointments with prep flags, interactive task stacks with snooze/complete, overnight reports, stock below the reorder line, and the one thing.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — the 06:30 page",
+				render: () => <MorningBriefMock />,
+				code: `<Stack cue="Appointments" footer="2 need preparation">
+  <Row avatar name reason />
+  <Badge tone="warning">Prep soon</Badge> + time pill
+</Stack>
+
+<Stack cue="Tasks" action={<Button>New task</Button>}>
+  <TaskRow checkbox title snooze complete />
+  {/* completing strikes + sinks; footer strips count open tasks */}
+</Stack>`,
 			},
 		],
 	},
