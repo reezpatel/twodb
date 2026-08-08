@@ -35,6 +35,39 @@
 	color: #f4f3f8;
 }
 
+.mock-td__meactions {
+	margin-left: auto;
+	display: flex;
+	gap: 2px;
+}
+
+.mock-td__mebtn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: #9291a3;
+	cursor: pointer;
+	padding: 0;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-td__mebtn:hover {
+	background: rgb(244 243 248 / 0.09);
+	color: #f4f3f8;
+}
+
+.mock-td__mebtn svg {
+	width: 14px;
+	height: 14px;
+}
+
 .mock-td__views,
 .mock-td__lists {
 	display: flex;
@@ -110,6 +143,45 @@
 	justify-content: space-between;
 	padding: var(--space-2) 6px 0;
 	border-top: 1px solid rgb(244 243 248 / 0.13);
+}
+
+.mock-td__foot {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-top: var(--space-2);
+	padding-top: var(--space-2);
+	border-top: 1px solid rgb(244 243 248 / 0.13);
+}
+
+.mock-td__footrow {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	height: 32px;
+	padding: 0 10px;
+	border: 0;
+	border-radius: var(--r-md);
+	background: transparent;
+	color: #9291a3;
+	font: inherit;
+	font-size: var(--text-sm);
+	cursor: pointer;
+	text-align: left;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-td__footrow:hover {
+	background: rgb(244 243 248 / 0.07);
+	color: #f4f3f8;
+}
+
+.mock-td__footrow svg {
+	width: 14px;
+	height: 14px;
+	flex-shrink: 0;
 }
 
 .mock-td__day {

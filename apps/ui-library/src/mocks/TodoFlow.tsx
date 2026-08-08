@@ -10,13 +10,17 @@ import {
 	ClipboardList,
 	Inbox as InboxIcon,
 	ListChecks,
+	Mail,
 	MoreHorizontal,
 	Plus,
+	Search,
 	SendHorizonal,
+	Settings,
 	Star,
 	Sun,
 	Sunrise,
 	Trash2,
+	CircleHelp,
 } from "lucide-react";
 import "./TodoFlow.css";
 
@@ -45,11 +49,56 @@ interface Task {
 }
 
 const INITIAL_TASKS: Task[] = [
-	{ id: "t1", title: "Meeting with PM", group: "Design team", bucket: "today", time: "09:00", priority: 1, assignee: "Asha Verma", comments: [{ author: "Ravi Kumar", time: "18:32", text: "@Asha the ward 4 summary is attached" }] },
-	{ id: "t2", title: "Website redesign", group: "Design team", bucket: "today", time: "10:00", priority: 2, assignee: "Meera Iyer" },
-	{ id: "t3", title: "Promo video", group: "Design team", bucket: "today", time: "10:00", priority: 2, assignee: "Dev Patel" },
-	{ id: "t4", title: "Dark theme for iOS", group: "Design team", bucket: "tomorrow", priority: 3, assignee: "Sana Sheikh" },
-	{ id: "t5", title: "New landing page", group: "Design team", bucket: "tomorrow", priority: 0, assignee: "Asha Verma" },
+	{
+		id: "t1",
+		title: "Meeting with PM",
+		group: "Design team",
+		bucket: "today",
+		time: "09:00",
+		priority: 1,
+		assignee: "Asha Verma",
+		comments: [
+			{
+				author: "Ravi Kumar",
+				time: "18:32",
+				text: "@Asha the ward 4 summary is attached",
+			},
+		],
+	},
+	{
+		id: "t2",
+		title: "Website redesign",
+		group: "Design team",
+		bucket: "today",
+		time: "10:00",
+		priority: 2,
+		assignee: "Meera Iyer",
+	},
+	{
+		id: "t3",
+		title: "Promo video",
+		group: "Design team",
+		bucket: "today",
+		time: "10:00",
+		priority: 2,
+		assignee: "Dev Patel",
+	},
+	{
+		id: "t4",
+		title: "Dark theme for iOS",
+		group: "Design team",
+		bucket: "tomorrow",
+		priority: 3,
+		assignee: "Sana Sheikh",
+	},
+	{
+		id: "t5",
+		title: "New landing page",
+		group: "Design team",
+		bucket: "tomorrow",
+		priority: 0,
+		assignee: "Asha Verma",
+	},
 	{
 		id: "t6",
 		title: "Walmart Shopping",
@@ -65,16 +114,67 @@ const INITIAL_TASKS: Task[] = [
 			{ id: "s5", title: "Printing paper", done: false },
 		],
 		comments: [
-			{ author: "Shaw", time: "18:32", text: "@Jan pumpkin pie is sold out 😕" },
+			{
+				author: "Shaw",
+				time: "18:32",
+				text: "@Jan pumpkin pie is sold out 😕",
+			},
 			{ author: "Jan", time: "18:41", text: "Get the apple one instead" },
 		],
 	},
-	{ id: "t7", title: "#Meeting with clients", group: "Inbox", bucket: "today", time: "10:00", priority: 1, assignee: "Ravi Kumar" },
-	{ id: "t8", title: '"Corporate Finance" Seminar', group: "Inbox", bucket: "tomorrow", priority: 2, assignee: "Meera Iyer" },
-	{ id: "t9", title: "Brain storming", group: "Inbox", bucket: "week", priority: 2, assignee: "Dev Patel" },
-	{ id: "t10", title: "Team building", group: "Inbox", bucket: "week", priority: 0, assignee: "Sana Sheikh" },
-	{ id: "t11", title: "Buy groceries", group: "Inbox", bucket: "today", time: "11:00", priority: 0, assignee: "Asha Verma", done: true },
-	{ id: "t12", title: "Christmas activities", group: "Inbox", bucket: "today", time: "11:00", priority: 0, assignee: "Asha Verma", done: true },
+	{
+		id: "t7",
+		title: "#Meeting with clients",
+		group: "Inbox",
+		bucket: "today",
+		time: "10:00",
+		priority: 1,
+		assignee: "Ravi Kumar",
+	},
+	{
+		id: "t8",
+		title: '"Corporate Finance" Seminar',
+		group: "Inbox",
+		bucket: "tomorrow",
+		priority: 2,
+		assignee: "Meera Iyer",
+	},
+	{
+		id: "t9",
+		title: "Brain storming",
+		group: "Inbox",
+		bucket: "week",
+		priority: 2,
+		assignee: "Dev Patel",
+	},
+	{
+		id: "t10",
+		title: "Team building",
+		group: "Inbox",
+		bucket: "week",
+		priority: 0,
+		assignee: "Sana Sheikh",
+	},
+	{
+		id: "t11",
+		title: "Buy groceries",
+		group: "Inbox",
+		bucket: "today",
+		time: "11:00",
+		priority: 0,
+		assignee: "Asha Verma",
+		done: true,
+	},
+	{
+		id: "t12",
+		title: "Christmas activities",
+		group: "Inbox",
+		bucket: "today",
+		time: "11:00",
+		priority: 0,
+		assignee: "Asha Verma",
+		done: true,
+	},
 ];
 
 const VIEWS = [
@@ -82,7 +182,11 @@ const VIEWS = [
 	{ id: "today", label: "Today", icon: <Star aria-hidden="true" /> },
 	{ id: "tomorrow", label: "Tomorrow", icon: <Sunrise aria-hidden="true" /> },
 	{ id: "week", label: "Next 7 Days", icon: <Sun aria-hidden="true" /> },
-	{ id: "assigned", label: "Assigned to me", icon: <CircleUser aria-hidden="true" /> },
+	{
+		id: "assigned",
+		label: "Assigned to me",
+		icon: <CircleUser aria-hidden="true" />,
+	},
 	{ id: "inbox", label: "Inbox", icon: <InboxIcon aria-hidden="true" /> },
 ] as const;
 
@@ -161,7 +265,8 @@ export function TodoFlowMock() {
 			today: tasks.filter((t) => t.bucket === "today" && !t.done).length,
 			tomorrow: tasks.filter((t) => t.bucket === "tomorrow" && !t.done).length,
 			week: tasks.filter((t) => !t.done).length,
-			assigned: tasks.filter((t) => t.assignee === "Asha Verma" && !t.done).length,
+			assigned: tasks.filter((t) => t.assignee === "Asha Verma" && !t.done)
+				.length,
 			inbox: tasks.filter((t) => t.group === "Inbox" && !t.done).length,
 		}),
 		[tasks],
@@ -170,7 +275,9 @@ export function TodoFlowMock() {
 	const selected = tasks.find((t) => t.id === selectedId) ?? null;
 
 	function toggleTask(id: string) {
-		setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+		setTasks((ts) =>
+			ts.map((t) => (t.id === id ? { ...t, done: !t.done } : t)),
+		);
 	}
 
 	function toggleSubtask(taskId: string, subId: string) {
@@ -236,6 +343,14 @@ export function TodoFlowMock() {
 				<div className="mock-td__me">
 					<Avatar name="Asha Verma" size="sm" />
 					<span>Asha</span>
+					<span className="mock-td__meactions">
+						<button type="button" className="mock-td__mebtn" aria-label="Inbox">
+							<Mail aria-hidden="true" />
+						</button>
+						<button type="button" className="mock-td__mebtn" aria-label="Search">
+							<Search aria-hidden="true" />
+						</button>
+					</span>
 				</div>
 				<div className="mock-td__views">
 					{VIEWS.map((v) => (
@@ -278,6 +393,14 @@ export function TodoFlowMock() {
 						</span>
 					))}
 				</div>
+				<div className="mock-td__foot">
+					<button type="button" className="mock-td__footrow">
+						<Settings aria-hidden="true" /> Settings
+					</button>
+					<button type="button" className="mock-td__footrow">
+						<CircleHelp aria-hidden="true" /> Help &amp; shortcuts
+					</button>
+				</div>
 			</nav>
 
 			{/* ------- center: grouped tasks ------- */}
@@ -285,8 +408,18 @@ export function TodoFlowMock() {
 				<header className="mock-td__head">
 					<h2>{VIEWS.find((v) => v.id === view)?.label}</h2>
 					<span className="mock-td__headtools">
-						<IconButton icon={<ArrowUpDown />} label="Sort" variant="ghost" size="sm" />
-						<IconButton icon={<MoreHorizontal />} label="More" variant="ghost" size="sm" />
+						<IconButton
+							icon={<ArrowUpDown />}
+							label="Sort"
+							variant="ghost"
+							size="sm"
+						/>
+						<IconButton
+							icon={<MoreHorizontal />}
+							label="More"
+							variant="ghost"
+							size="sm"
+						/>
 					</span>
 				</header>
 
@@ -311,9 +444,7 @@ export function TodoFlowMock() {
 								<button
 									className="mock-td__grouphead"
 									aria-expanded={!isCollapsed}
-									onClick={() =>
-										setCollapsed((c) => ({ ...c, [g]: !c[g] }))
-									}
+									onClick={() => setCollapsed((c) => ({ ...c, [g]: !c[g] }))}
 								>
 									{isCollapsed ? (
 										<ChevronRight aria-hidden="true" />
@@ -415,9 +546,7 @@ export function TodoFlowMock() {
 										/>
 										<span
 											className={
-												s.done
-													? "mock-td__subtext is-done"
-													: "mock-td__subtext"
+												s.done ? "mock-td__subtext is-done" : "mock-td__subtext"
 											}
 										>
 											{s.title}
@@ -461,9 +590,24 @@ export function TodoFlowMock() {
 						</div>
 
 						<div className="mock-td__detailtools">
-							<IconButton icon={<CalendarDays />} label="Schedule" variant="ghost" size="sm" />
-							<IconButton icon={<Trash2 />} label="Delete task" variant="ghost" size="sm" />
-							<IconButton icon={<MoreHorizontal />} label="More actions" variant="ghost" size="sm" />
+							<IconButton
+								icon={<CalendarDays />}
+								label="Schedule"
+								variant="ghost"
+								size="sm"
+							/>
+							<IconButton
+								icon={<Trash2 />}
+								label="Delete task"
+								variant="ghost"
+								size="sm"
+							/>
+							<IconButton
+								icon={<MoreHorizontal />}
+								label="More actions"
+								variant="ghost"
+								size="sm"
+							/>
 						</div>
 					</>
 				) : (
