@@ -478,3 +478,8 @@
   color: var(--ink-3);
   font-size: var(--text-md);
 }
+
+/* keep the last column's resize handle inside the scroll frame */
+.tw-table--data .tw-th:last-child .tw-col-resize {
+  right: 0;
+}
