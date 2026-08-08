@@ -1,0 +1,18 @@
+/* ScoreRing — a score as an arc of light on a quiet track */
+
+.tw-ring {
+  display: block;
+  flex-shrink: 0;
+}
+
+.tw-ring__track {
+  stroke: var(--bg-band-strong);
+}
+
+.tw-ring__arc {
+  stroke: var(--accent);
+}
+
+.tw-ring--danger .tw-ring__arc {
+  stroke: var(--danger-ink);
+}

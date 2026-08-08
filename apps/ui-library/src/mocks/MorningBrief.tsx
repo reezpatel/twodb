@@ -21,7 +21,11 @@ interface Appointment {
 }
 
 const APPOINTMENTS: Appointment[] = [
-	{ name: "Ravi Kumar", reason: "Follow-up · discharge review", time: "9:00 am" },
+	{
+		name: "Ravi Kumar",
+		reason: "Follow-up · discharge review",
+		time: "9:00 am",
+	},
 	{
 		name: "Meera Iyer",
 		reason: "Lab draw — fasting panel",
@@ -158,11 +162,7 @@ export function MorningBriefMock() {
 	const [frontDesk, setFrontDesk] = useState(FRONT_DESK_TASKS);
 	const [lab, setLab] = useState(LAB_TASKS);
 
-	function toggle(
-		setter: typeof setFrontDesk,
-		id: string,
-		done: boolean,
-	) {
+	function toggle(setter: typeof setFrontDesk, id: string, done: boolean) {
 		setter((ts) =>
 			[...ts]
 				.map((t) => (t.id === id ? { ...t, done } : t))
@@ -262,7 +262,9 @@ export function MorningBriefMock() {
 					</span>
 					<span className="mock-brief__body">
 						<span className="mock-brief__title">Lipid panel — Meera Iyer</span>
-						<span className="mock-brief__sub">Received 02:14 · within range</span>
+						<span className="mock-brief__sub">
+							Received 02:14 · within range
+						</span>
 					</span>
 					<Badge size="sm" tone="go">
 						Reviewed

@@ -387,41 +387,41 @@
 /* CodeInput — a row of boxes, one digit each */
 
 .tw-codeinput {
-  display: flex;
-  gap: var(--space-2);
+	display: flex;
+	gap: var(--space-2);
 }
 
 .tw-codeinput__box {
-  width: 40px;
-  height: 46px;
-  text-align: center;
-  font-family: var(--font-ui);
-  font-size: var(--text-xl);
-  font-weight: 600;
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
-  caret-color: var(--accent);
-  transition:
-    border-color var(--dur-1) var(--ease-out),
-    box-shadow var(--dur-1) var(--ease-out);
+	width: 40px;
+	height: 46px;
+	text-align: center;
+	font-family: var(--font-ui);
+	font-size: var(--text-xl);
+	font-weight: 600;
+	color: var(--ink);
+	background: var(--surface);
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-md);
+	caret-color: var(--accent);
+	transition:
+		border-color var(--dur-1) var(--ease-out),
+		box-shadow var(--dur-1) var(--ease-out);
 }
 
 .tw-codeinput__box:hover {
-  border-color: var(--ink-3);
+	border-color: var(--ink-3);
 }
 
 .tw-codeinput__box:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--ring);
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--ring);
 }
 
 .tw-codeinput--error .tw-codeinput__box {
-  border-color: var(--danger-ink);
+	border-color: var(--danger-ink);
 }
 
 .tw-codeinput--error .tw-codeinput__box:focus {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger-ink) 20%, transparent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger-ink) 20%, transparent);
 }

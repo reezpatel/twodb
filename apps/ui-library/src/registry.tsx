@@ -86,9 +86,12 @@ import {
 import type { DateRange } from "@twodb/ui";
 import { ColorPicker, CURATED_COLORS } from "@twodb/ui";
 import { IntegrationsMock } from "./mocks/Integrations";
+import { ProdexDashboardMock } from "./mocks/ProdexDashboard";
 import { SettingsMock } from "./mocks/Settings";
 import { TwoFactorMock } from "./mocks/TwoFactor";
+import { InvestorDashboardMock } from "./mocks/InvestorDashboard";
 import { MorningBriefMock } from "./mocks/MorningBrief";
+import { TablePlanMock } from "./mocks/TablePlan";
 
 export interface Story {
 	title: string;
@@ -2317,6 +2320,27 @@ export const registry: ComponentEntry[] = [
 		],
 	},
 	{
+		id: "prodex-dashboard",
+		group: "Showcase",
+		name: "Prodex Dashboard",
+		description:
+			"A commerce analytics dashboard inspired by the supplied Prodex reference: sidebar, KPI tiles, revenue bars, category donut, activity feed, and top-products table.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — commerce analytics dashboard",
+				render: () => <ProdexDashboardMock />,
+				code: `<ProdexDashboardMock />
+
+{/* Built as a full dashboard composition:
+    sidebar + workspace switcher,
+    KPI stat cards,
+    CSS/SVG revenue + donut charts,
+    recent activity and products table. */}`,
+			},
+		],
+	},
+	{
 		id: "integrations",
 		group: "Showcase",
 		name: "Integrations",
@@ -2408,6 +2432,24 @@ export const registry: ComponentEntry[] = [
   <TaskRow checkbox title snooze complete />
   {/* completing strikes + sinks; footer strips count open tasks */}
 </Stack>`,
+			},
+		],
+	},
+	{
+		id: "investor-dashboard",
+		group: "Showcase",
+		name: "Investor Dashboard",
+		description:
+			"Portfolio SaaS: company list with score rings, metric donuts, a customer-concentration table with expandable rows, KPI strip, and revenue split bar.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — companies and concentration",
+				render: () => <InvestorDashboardMock />,
+				code: `<ScoreRing value={company.score} size={26} />
+
+{/* list → detail: pick a company, expand a customer
+    row for KPIs, revenue split, company details */}`,
 			},
 		],
 	},

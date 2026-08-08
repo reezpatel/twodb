@@ -172,3 +172,6 @@ export type { QRCodeProps } from "./components/QRCode";
 
 export { CodeInput } from "./components/CodeInput";
 export type { CodeInputProps } from "./components/CodeInput";
+
+export { ScoreRing } from "./components/ScoreRing";
+export type { ScoreRingProps } from "./components/ScoreRing";
