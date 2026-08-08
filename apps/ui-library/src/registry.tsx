@@ -8,6 +8,7 @@ import {
 	Checkbox,
 	Dialog,
 	Divider,
+	FileTree,
 	IconButton,
 	Input,
 	Menu,
@@ -2003,6 +2004,47 @@ export const registry: ComponentEntry[] = [
 		],
 	},
 	{
+		id: "file-tree",
+		group: "Shell",
+		name: "File Tree",
+		description:
+			"Folders with guide lines: click expands, the selected row lights cobalt, counts stay tabular.",
+		stories: [
+			{
+				title: "Default",
+				render: () => (
+					<div style={{ width: 280 }}>
+						<FileTree
+							aria-label="Demo folders"
+							defaultExpanded={["inspiration"]}
+							nodes={[
+								{ id: "sources", label: "Project sources", children: [
+									{ id: "s1", label: "Source files" },
+									{ id: "s2", label: "Exports" },
+								] },
+								{ id: "inspiration", label: "Design inspiration", children: [
+									{ id: "pd", label: "Product design", count: 4 },
+									{ id: "br", label: "Branding" },
+									{ id: "da", label: "Digital art" },
+								] },
+								{ id: "neu", label: "NEU documents" },
+							]}
+						/>
+					</div>
+				),
+				code: `<FileTree
+  nodes={[
+    { id: "inspiration", label: "Design inspiration",
+      children: [{ id: "pd", label: "Product design", count: 4 }, …] },
+  ]}
+  selected={id}
+  onSelect={setId}
+  defaultExpanded={["inspiration"]}
+/>`,
+			},
+		],
+	},
+	{
 		id: "nav-rail",
 		group: "Shell",
 		name: "Nav Rail",
@@ -2977,19 +3019,16 @@ export const registry: ComponentEntry[] = [
 		group: "Showcase",
 		name: "File Manager",
 		description:
-			"The clinic's documents, organized: folder cards and a rail sub-nav that filter the same list, recent chips, type tabs + search, row selection with a live count, and a grid/list toggle.",
+			"The file sidebar: night Create-new button with a menu, the FileTree folder browser, and a content grid that follows the selected folder.",
 		fullWidth: true,
 		stories: [
 			{
-				title: "Mock — project files",
+				title: "Mock — sidebar and content",
 				render: () => <FileManagerMock />,
-				code: `{/* one filter pipeline: folder cards, rail sub-nav,
-    type tabs and search all narrow the same rows */}
-<FolderCard onClick={filterFolder} />
-<Table rows={visible} selectable />
+				code: `<FileTree nodes={tree} selected={sel} onSelect={setSel} />
 
-{/* grid/list toggle switches the All files section;
-    selection count lives in the table footer */}`,
+{/* create-new = night button + Menu
+    (New folder / New document / Upload) */}`,
 			},
 		],
 	},

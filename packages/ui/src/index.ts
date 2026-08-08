@@ -189,3 +189,6 @@ export type {
 	MonthEvent,
 	CalTone,
 } from "./components/MonthCalendar";
+
+export { FileTree } from "./components/FileTree";
+export type { FileTreeProps, FileTreeNode } from "./components/FileTree";
