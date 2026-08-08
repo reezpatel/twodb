@@ -162,7 +162,10 @@ export { PasswordInput } from "./components/PasswordInput";
 export type { PasswordInputProps } from "./components/PasswordInput";
 
 export { ColorPicker, CURATED_COLORS } from "./components/ColorPicker";
-export type { ColorPickerProps, ColorSwatchOption } from "./components/ColorPicker";
+export type {
+	ColorPickerProps,
+	ColorSwatchOption,
+} from "./components/ColorPicker";
 
 export { QRCode } from "./components/QRCode";
 export type { QRCodeProps } from "./components/QRCode";

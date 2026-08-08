@@ -121,17 +121,23 @@
 .tw-colorpick__swatch:hover {
 	transform: scale(1.12);
 	z-index: 1;
-	box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent);
+	box-shadow:
+		0 0 0 2px var(--surface),
+		0 0 0 3.5px var(--accent);
 }
 
 .tw-colorpick__swatch:focus-visible {
 	outline: none;
-	box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+	box-shadow:
+		0 0 0 2px var(--surface),
+		0 0 0 4px var(--accent);
 	z-index: 1;
 }
 
 .tw-colorpick__swatch.is-selected {
-	box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent);
+	box-shadow:
+		0 0 0 2px var(--surface),
+		0 0 0 3.5px var(--accent);
 }
 
 .tw-colorpick__swatch svg {

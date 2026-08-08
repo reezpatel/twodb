@@ -87,6 +87,7 @@ import type { DateRange } from "@twodb/ui";
 import { ColorPicker, CURATED_COLORS } from "@twodb/ui";
 import { IntegrationsMock } from "./mocks/Integrations";
 import { SettingsMock } from "./mocks/Settings";
+import { TwoFactorMock } from "./mocks/TwoFactor";
 
 export interface Story {
 	title: string;
@@ -352,10 +353,7 @@ function ColorPickerDemo() {
 				<ColorPicker value={color} onValueChange={setColor} />
 			</div>
 			<div className="tw-colorpreview" aria-live="polite">
-				<div
-					className="tw-colorpreview__well"
-					style={{ background: color }}
-				/>
+				<div className="tw-colorpreview__well" style={{ background: color }} />
 				<div>
 					<span className="tw-cue">Preview</span>
 					<div className="tw-colorpreview__hex">{color}</div>
@@ -417,15 +415,23 @@ function CardsShowcase() {
 					<MoreHorizontal aria-hidden="true" />
 				</div>
 				<p>
-					Moved every follow-up into one twodb timeline. The team can see what is
-					due before the waiting room fills.
+					Moved every follow-up into one twodb timeline. The team can see what
+					is due before the waiting room fills.
 				</p>
 				<img src={clinicPhoto} alt="Synthetic clinic timeline preview" />
 				<div className="card-showcase__actions" aria-label="Post actions">
-					<span><MessageCircle /> 18</span>
-					<span><Repeat2 /> 42</span>
-					<span><Heart /> 128</span>
-					<span><Bookmark /> Save</span>
+					<span>
+						<MessageCircle /> 18
+					</span>
+					<span>
+						<Repeat2 /> 42
+					</span>
+					<span>
+						<Heart /> 128
+					</span>
+					<span>
+						<Bookmark /> Save
+					</span>
 				</div>
 			</Card>
 
@@ -443,11 +449,20 @@ function CardsShowcase() {
 				</div>
 				<img src={articlePhoto} alt="Synthetic dawn media card" />
 				<div className="card-showcase__actions card-showcase__actions--media">
-					<span><Heart /> 2.4k</span>
-					<span><MessageCircle /> 89</span>
-					<span><Bookmark /> Saved</span>
+					<span>
+						<Heart /> 2.4k
+					</span>
+					<span>
+						<MessageCircle /> 89
+					</span>
+					<span>
+						<Bookmark /> Saved
+					</span>
 				</div>
-				<p><strong>meera.records</strong> One shared brief instead of five group chats.</p>
+				<p>
+					<strong>meera.records</strong> One shared brief instead of five group
+					chats.
+				</p>
 			</Card>
 
 			<Card
@@ -461,9 +476,13 @@ function CardsShowcase() {
 					<p>Forms, reminders, and invoice workflows for a small practice.</p>
 					<div className="card-showcase__price-row">
 						<span className="tw-tnum">₹4,200</span>
-						<em><Star /> 4.8</em>
+						<em>
+							<Star /> 4.8
+						</em>
 					</div>
-					<Button size="sm"><ShoppingBag /> Add</Button>
+					<Button size="sm">
+						<ShoppingBag /> Add
+					</Button>
 				</div>
 			</Card>
 
@@ -473,11 +492,22 @@ function CardsShowcase() {
 				title="Morning brief"
 				actions={<Badge tone="rose">AI draft</Badge>}
 			>
-				<p>Three appointments today. Two invoices unpaid. One note links to both.</p>
+				<p>
+					Three appointments today. Two invoices unpaid. One note links to both.
+				</p>
 				<div className="card-showcase__facts">
-					<span><strong className="tw-tnum">07:30</strong><em>opens</em></span>
-					<span><strong className="tw-tnum">3</strong><em>follow-ups</em></span>
-					<span><strong className="tw-tnum">2</strong><em>payments</em></span>
+					<span>
+						<strong className="tw-tnum">07:30</strong>
+						<em>opens</em>
+					</span>
+					<span>
+						<strong className="tw-tnum">3</strong>
+						<em>follow-ups</em>
+					</span>
+					<span>
+						<strong className="tw-tnum">2</strong>
+						<em>payments</em>
+					</span>
 				</div>
 				<Button size="sm">Open brief</Button>
 			</Card>
@@ -489,24 +519,43 @@ function CardsShowcase() {
 			>
 				<img src={articlePhoto} alt="Synthetic article cover" />
 				<h3>How a morning brief replaced the 8 a.m. meeting</h3>
-				<p>A field note on making daily operations visible without another dashboard.</p>
+				<p>
+					A field note on making daily operations visible without another
+					dashboard.
+				</p>
 			</Card>
 
 			<Card tone="band" className="card-showcase__event" title="Event card">
 				<img src={eventPhoto} alt="Synthetic event poster" />
 				<div className="card-showcase__event-grid">
-					<span><CalendarDays /> Aug 14, 10:30</span>
-					<span><MapPin /> West clinic</span>
+					<span>
+						<CalendarDays /> Aug 14, 10:30
+					</span>
+					<span>
+						<MapPin /> West clinic
+					</span>
 				</div>
-				<Button size="sm" variant="secondary">Add to day</Button>
+				<Button size="sm" variant="secondary">
+					Add to day
+				</Button>
 			</Card>
 
-			<Card className="card-showcase__record" title="Linked record" actions={<Badge tone="go">Synced</Badge>}>
+			<Card
+				className="card-showcase__record"
+				title="Linked record"
+				actions={<Badge tone="go">Synced</Badge>}
+			>
 				<div className="card-showcase__person">
 					<Avatar name="Ravi Kumar" />
-					<span><strong>Ravi Kumar</strong><em>Visit note · invoice · lab report</em></span>
+					<span>
+						<strong>Ravi Kumar</strong>
+						<em>Visit note · invoice · lab report</em>
+					</span>
 				</div>
-				<p>The card keeps a person, latest work, and next action in one calm band.</p>
+				<p>
+					The card keeps a person, latest work, and next action in one calm
+					band.
+				</p>
 			</Card>
 
 			<Card
@@ -518,13 +567,20 @@ function CardsShowcase() {
 				<p>The first send waits for a person to approve the message copy.</p>
 			</Card>
 
-			<Card className="card-showcase__blocked" tone="danger" density="compact" title="Blocked automation">
-				<p>Phone number missing for two recipients. Add numbers before twodb sends.</p>
+			<Card
+				className="card-showcase__blocked"
+				tone="danger"
+				density="compact"
+				title="Blocked automation"
+			>
+				<p>
+					Phone number missing for two recipients. Add numbers before twodb
+					sends.
+				</p>
 			</Card>
 		</div>
 	);
 }
-
 
 /* --- Shell demos --- */
 function NavRailDemo() {
@@ -2308,6 +2364,26 @@ export const registry: ComponentEntry[] = [
     2FA, sessions, privacy selects + switches,
     notification matrix, quiet hours (TimePicker),
     theme that flips the real phase */}`,
+			},
+		],
+	},
+	{
+		id: "two-factor",
+		group: "Showcase",
+		name: "Two-Factor Auth",
+		description:
+			"Authenticator setup end to end: QR code, manual secret with copy, 6-digit verification, then backup codes — on the new QRCode and CodeInput components.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — setup flow and enabled state",
+				render: () => <TwoFactorMock />,
+				code: `<QRCode value={otpauthUri} size={168} />
+<CodeInput length={6} onComplete={verify} error={err} />
+
+{/* Step 1: scan or copy the secret
+    Step 2: 6-digit verify (000000 = error demo)
+    Success: backup codes, copy all, regenerate */}`,
 			},
 		],
 	},

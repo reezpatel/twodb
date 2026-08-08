@@ -58,7 +58,10 @@ function checkInk(hex: string): string {
 	if (!m) return "#ffffff";
 	const n = parseInt(m[1], 16);
 	const lum =
-		(0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+		(0.2126 * ((n >> 16) & 255) +
+			0.7152 * ((n >> 8) & 255) +
+			0.0722 * (n & 255)) /
+		255;
 	return lum > 0.62 ? "#17171f" : "#ffffff";
 }
 
@@ -177,7 +180,9 @@ export function ColorPicker({
 				</span>
 				<ChevronDown className="tw-colorpick__chevron" aria-hidden="true" />
 			</button>
-			{name ? <input type="hidden" name={name} value={hasValue ? `#${norm}` : ""} /> : null}
+			{name ? (
+				<input type="hidden" name={name} value={hasValue ? `#${norm}` : ""} />
+			) : null}
 			{open
 				? createPortal(
 						<div
@@ -186,10 +191,15 @@ export function ColorPicker({
 							role="dialog"
 							aria-label="Choose a color"
 						>
-							<div className="tw-colorpick__grid" role="group" aria-label="Curated colors">
+							<div
+								className="tw-colorpick__grid"
+								role="group"
+								aria-label="Curated colors"
+							>
 								{colors.map((c) => {
 									const selected =
-										hasValue && c.value.replace(/^#/, "").toUpperCase() === norm;
+										hasValue &&
+										c.value.replace(/^#/, "").toUpperCase() === norm;
 									return (
 										<button
 											key={c.value}
@@ -225,7 +235,10 @@ export function ColorPicker({
 										onChange={(hex) => commit(hex.toUpperCase())}
 									/>
 									<label className="tw-colorpick__hexfield">
-										<span className="tw-colorpick__hexprefix" aria-hidden="true">
+										<span
+											className="tw-colorpick__hexprefix"
+											aria-hidden="true"
+										>
 											#
 										</span>
 										<HexColorInput
