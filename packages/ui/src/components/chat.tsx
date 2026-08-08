@@ -19,8 +19,19 @@ import { IconButton } from "./IconButton";
 
 /* ---------------- Shell ---------------- */
 
-export function ChatPanel({ children }: { children: ReactNode }) {
-	return <div className="tw-chat">{children}</div>;
+export function ChatPanel({
+	children,
+	active,
+}: {
+	children: ReactNode;
+	/** Lit cobalt outline — for a panel that's currently focused or selected. */
+	active?: boolean;
+}) {
+	return (
+		<div className={active ? "tw-chat tw-chat--active" : "tw-chat"}>
+			{children}
+		</div>
+	);
 }
 
 export interface ChatHeaderProps {
@@ -105,6 +116,10 @@ export interface MessageGroupProps {
 	avatarSrc?: string;
 	/** Marks the sender as a bot — carries the rose light. */
 	bot?: boolean;
+	/** Marks the sender as the original thread/question author — small cobalt pill. */
+	authorBadge?: boolean;
+	/** Indents the message under its parent and draws a thread connector line. */
+	thread?: boolean;
 	time: string;
 	children: ReactNode;
 }
@@ -114,17 +129,28 @@ export function MessageGroup({
 	author,
 	avatarSrc,
 	bot,
+	authorBadge,
+	thread,
 	time,
 	children,
 }: MessageGroupProps) {
+	const cls = [
+		"tw-msg-group",
+		thread ? "tw-msg-group--thread" : "",
+	]
+		.filter(Boolean)
+		.join(" ");
 	return (
-		<div className="tw-msg-group" id={id}>
+		<div className={cls} id={id}>
 			<div className="tw-msg-group__avatar">
 				<Avatar name={author} src={avatarSrc} size="md" />
 			</div>
 			<div className="tw-msg-group__body">
 				<div className="tw-msg-group__head">
 					<span className="tw-msg-group__author">{author}</span>
+					{authorBadge ? (
+						<span className="tw-msg-group__author-badge">Author</span>
+					) : null}
 					{bot ? <Badge tone="rose">AI</Badge> : null}
 					<span className="tw-msg-group__time tw-tnum">{time}</span>
 				</div>
@@ -143,6 +169,10 @@ export interface ChatMessageProps {
 	replyTo?: ChatReplyTo;
 	/** Called when the reply preview is activated. */
 	onReplyClick?: (id: string | undefined) => void;
+	/** Number of thread replies under this message — shows a "X reply" link. */
+	replyCount?: number;
+	/** Click handler for the reply count link. */
+	onReplyCountClick?: () => void;
 }
 
 export function ChatMessage({
@@ -151,6 +181,8 @@ export function ChatMessage({
 	actions,
 	replyTo,
 	onReplyClick,
+	replyCount,
+	onReplyCountClick,
 }: ChatMessageProps) {
 	const [reacted, setReacted] = useState<number[]>([]);
 

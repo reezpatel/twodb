@@ -100,6 +100,7 @@ import { TablePlanMock } from "./mocks/TablePlan";
 import { TodoFlowMock } from "./mocks/TodoFlow";
 import { ChatMailMock } from "./mocks/ChatMail";
 import { LiveScribeMock } from "./mocks/LiveScribe";
+import { WeeklyCalMock } from "./mocks/WeeklyCal";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
 import { InboxMock } from "./mocks/Inbox";
 import { MonthlyCalendarMock } from "./mocks/MonthlyCalendar";
@@ -2849,6 +2850,27 @@ export const registry: ComponentEntry[] = [
 
 {/* Pause freezes the waveform; Transcript tab
     mirrors every arrived line */}`,
+			},
+		],
+	},
+	{
+		id: "week-planner",
+		group: "Showcase",
+		name: "Week Planner",
+		description:
+			"The week as a planner: mini month and category filters on the left, a time-grid with tinted event cards on the right. Day / Week / Month tabs, week navigation, and filters that hide whole categories.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — the clinic week",
+				render: () => <WeeklyCalMock />,
+				code: `{/* the mini month and the grid share one anchor date;
+    unchecking a category removes its cards */}
+<Calendar selected={anchor} onSelect={setAnchor} />
+<WeekGrid events={visible} />
+
+{/* Day tab collapses the grid to the anchor day;
+    Month tab jumps back to week on pick */}`,
 			},
 		],
 	},

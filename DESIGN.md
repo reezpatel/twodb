@@ -131,7 +131,7 @@ components:
 
 twodb's interface is a stage at first light. Surfaces are a horizon — quiet matte bands bounded by hairline rules — and every state change arrives as light rising: cobalt for structure and action, rose for the AI's presence. Light is the only chrome. The system refuses the category's gray-cards-and-drop-shadows default: no gradient fills on controls, no glow, no colored shadows, no ornamental decoration. Depth is tonal, not dimensional.
 
-The world runs in two phases. **Day** is the default working surface: a soft warm-gray ground (`#E9E8EA`, user-pinned 2026-08-08) with white surfaces floating on it, near-black ink, hairline rules. **Night** is depthless black (`#050506`), switched by setting `[data-phase="night"]` on any subtree — the same token names resolve to night values, so components are written once against semantic tokens (`--bg`, `--ink`, `--line`, `--accent`, `--action`) and never against raw palette values. The palette itself is a single sweep of light: night → cobalt → rose → rose-light → dawn → day. Color is never decoration; it is the phase a surface is in.
+The world runs in two phases. **Day** is the default working surface: a light gray ground (`#F1F1F4`, user-pinned 2026-08-08) with white surfaces floating on it, near-black ink, hairline rules. **Night** is depthless black (`#050506`), switched by setting `[data-phase="night"]` on any subtree — the same token names resolve to night values, so components are written once against semantic tokens (`--bg`, `--ink`, `--line`, `--accent`, `--action`) and never against raw palette values. The palette itself is a single sweep of light: night → cobalt → rose → rose-light → dawn → day. Color is never decoration; it is the phase a surface is in.
 
 Density is calm and slightly condensed, with deliberate negative space — a PRODUCT.md brand commitment. Type pairs Public Sans (UI text) with Oswald tracked caps (the "cue register": labels, section markers, wordmark). Motion is a single exponential ease-out — light rises, never bounces — with one authored "cue-up" entrance (bands rise in sequence, 45ms stagger) and `prefers-reduced-motion` honored everywhere. A fine fractal-noise grain sits over large fields at low opacity for a matte tooth, never glossy.
 
@@ -168,7 +168,7 @@ The palette is one sweep of light along a horizon, from depthless night to full 
 ### Neutral
 
 - **Depthless Night** (#050506): night-phase ground; also tooltips and code surfaces in day phase.
-- **Soft Gray Ground** (#E9E8EA): day-phase backdrop; surfaces stay white above it.
+- **Soft Gray Ground** (#F1F1F4): day-phase backdrop; surfaces stay white above it.
 - **Full Day** (#FFFFFF): day-phase surfaces and cards.
 - **Tonal bands** (#FAF9FC, #F2F0F7): quiet banding for secondary surfaces, hover fills, skeletons (night: #0B0B11, #13131C).
 - **Ink** (#121218 / #40404E / #626274): three-step text ramp — primary, secondary, muted (night: #F4F3F8 / #C4C3D1 / #9291A3).
