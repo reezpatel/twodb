@@ -4,7 +4,12 @@ import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "@tiptap/markdown";
 import { Placeholder } from "@tiptap/extensions";
 import Link from "@tiptap/extension-link";
-import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
+import {
+	Table,
+	TableRow,
+	TableCell,
+	TableHeader,
+} from "@tiptap/extension-table";
 import Image from "@tiptap/extension-image";
 import {
 	Bold,

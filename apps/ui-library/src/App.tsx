@@ -10,6 +10,7 @@ import {
   Tabs,
 } from "@twodb/ui";
 import {
+  Blocks,
   CircleHelp,
   Component,
   LogOut,
@@ -29,6 +30,7 @@ const RAIL_GROUPS = [
   { id: "Shell", icon: <PanelLeft /> },
   { id: "Data", icon: <Table2 /> },
   { id: "Chat", icon: <MessagesSquare /> },
+  { id: "Showcase", icon: <Blocks /> },
 ];
 
 export default function App() {
@@ -127,7 +129,7 @@ export default function App() {
         {entry.stories.map((story, i) => (
           <section
             key={story.title}
-            className="story band"
+            className={entry.fullWidth ? "story story--full band" : "story band"}
             style={{ "--i": i + 1 } as CSSProperties}
           >
             <h2 className="story__title">{story.title}</h2>

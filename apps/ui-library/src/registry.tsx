@@ -76,6 +76,7 @@ import {
 	VideoMessage,
 } from "@twodb/ui";
 import type { DateRange } from "@twodb/ui";
+import { IntegrationsMock } from "./mocks/Integrations";
 
 export interface Story {
 	title: string;
@@ -85,9 +86,11 @@ export interface Story {
 
 export interface ComponentEntry {
 	id: string;
-	group: "Foundation" | "Primitives" | "Shell" | "Data" | "Chat";
+	group: "Foundation" | "Primitives" | "Shell" | "Data" | "Chat" | "Showcase";
 	name: string;
 	description: string;
+	/** Full-page mocks: the story preview widens past the usual column. */
+	fullWidth?: boolean;
 	stories: Story[];
 }
 
@@ -347,6 +350,83 @@ function DialogDemo() {
 				any time.
 			</Dialog>
 		</>
+	);
+}
+
+function CardsShowcase() {
+	return (
+		<div className="card-showcase">
+			<Card
+				tone="rose"
+				className="card-showcase__hero"
+				title="Morning brief"
+				actions={<Badge tone="rose">AI draft</Badge>}
+			>
+				<p>
+					Three appointments today. Two invoices unpaid. One note from yesterday links to
+					both.
+				</p>
+				<div className="card-showcase__facts">
+					<span>
+						<strong className="tw-tnum">07:30</strong>
+						<em>opens</em>
+					</span>
+					<span>
+						<strong className="tw-tnum">3</strong>
+						<em>follow-ups</em>
+					</span>
+					<span>
+						<strong className="tw-tnum">2</strong>
+						<em>payments</em>
+					</span>
+				</div>
+				<Button size="sm">Open brief</Button>
+			</Card>
+
+			<Card title="Linked record" actions={<Badge tone="go">Synced</Badge>}>
+				<div className="card-showcase__person">
+					<Avatar name="Ravi Kumar" />
+					<span>
+						<strong>Ravi Kumar</strong>
+						<em>Visit note · invoice · lab report</em>
+					</span>
+				</div>
+				<p>
+					The card keeps a person, their latest work, and the next plain-language action
+					in one calm band.
+				</p>
+			</Card>
+
+			<Card tone="band" title="Checklist" actions={<Badge>4 tasks</Badge>}>
+				<ul className="card-showcase__list">
+					<li>Confirm Tuesday visiting hours</li>
+					<li>Send invoice reminders</li>
+					<li>Order gauze and gloves</li>
+					<li>Review AI discharge summary</li>
+				</ul>
+			</Card>
+
+			<Card density="compact" title="Quiet note">
+				<p>
+					Compact cards are for dense rails, side panels, and list previews — not a new
+					visual language.
+				</p>
+			</Card>
+
+			<Card tone="warning" title="Needs review" actions={<Badge tone="warning">Due soon</Badge>}>
+				<p>
+					The automation is ready, but the first send waits for a person to approve the
+					message copy.
+				</p>
+			</Card>
+
+			<Card tone="danger" density="compact" title="Blocked automation">
+				<p>
+					Phone number missing for two recipients. Add the numbers before twodb sends
+					anything.
+				</p>
+			</Card>
+		</div>
 	);
 }
 
@@ -1369,6 +1449,10 @@ export const registry: ComponentEntry[] = [
   Three appointments today. Two invoices unpaid.
 </Card>`,
 			},
+			{
+				title: "Composed — hero and record",
+				render: () => <CardsShowcase />,
+			},
 		],
 	},
 	{
@@ -2027,6 +2111,33 @@ export const registry: ComponentEntry[] = [
   </ChatList>
   <ChatComposer onSend={(text) => append(text)} />
 </ChatPanel>`,
+			},
+		],
+	},
+	{
+		id: "integrations",
+		group: "Showcase",
+		name: "Integrations",
+		description:
+			"A full-page mock built from system parts: category tabs, connected-first rows with issue states, and an available grid with Connect.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — plugins, tools, services",
+				render: () => <IntegrationsMock />,
+				code: `<Tabs items={[Plugins, Tools, Services]} … />
+
+{/* connected first, issues inline */}
+<Row icon name status="issue">
+  <Badge tone="danger">Issue</Badge>
+  <Button size="sm">Reconnect</Button>
+  <Menu>Configure · Sync now · Disconnect</Menu>
+</Row>
+
+{/* available grid */}
+<Card icon name desc>
+  <Button size="sm" variant="secondary">Connect</Button>
+</Card>`,
 			},
 		],
 	},

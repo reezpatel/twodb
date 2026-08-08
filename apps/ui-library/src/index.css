@@ -341,3 +341,135 @@ body {
 		padding: var(--space-4) 20px;
 	}
 }
+
+/* ---------- Showcase mocks ---------- */
+
+.story--full {
+  max-width: 1180px;
+}
+
+.mock-int {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  width: 100%;
+}
+
+.mock-int__head h2 {
+  font-size: var(--text-2xl);
+  font-weight: 650;
+  margin-bottom: 4px;
+}
+
+.mock-int__head p {
+  color: var(--ink-2);
+  font-size: var(--text-md);
+}
+
+.mock-int__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mock-int__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mock-int__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+.mock-int__row--issue {
+  border-color: color-mix(in srgb, var(--danger-ink) 35%, transparent);
+  background: color-mix(in srgb, var(--danger-bg) 35%, var(--surface));
+}
+
+.mock-int__icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--r-md);
+  background: var(--bg-band-strong);
+  color: var(--ink-2);
+}
+
+.mock-int__icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.mock-int__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mock-int__name {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.mock-int__sub {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+
+.mock-int__issue {
+  font-size: var(--text-sm);
+  color: var(--danger-ink);
+}
+
+.mock-int__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-3);
+}
+
+.mock-int__card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  transition: border-color var(--dur-1) var(--ease-out);
+}
+
+.mock-int__card:hover {
+  border-color: var(--line-strong);
+}
+
+.mock-int__card .mock-int__icon {
+  margin-bottom: 4px;
+}
+
+.mock-int__desc {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.mock-int__card-foot {
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 700px) {
+  .mock-int__row {
+    flex-wrap: wrap;
+  }
+}

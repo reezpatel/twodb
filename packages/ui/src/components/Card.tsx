@@ -1,13 +1,28 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
+export type CardTone = "default" | "band" | "rose" | "warning" | "danger";
+export type CardDensity = "normal" | "compact";
+
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   title?: string;
   actions?: ReactNode;
+  tone?: CardTone;
+  density?: CardDensity;
   children: ReactNode;
 }
 
-export function Card({ title, actions, className = "", children, ...rest }: CardProps) {
-  const classes = ["tw-card", className].filter(Boolean).join(" ");
+export function Card({
+  title,
+  actions,
+  tone = "default",
+  density = "normal",
+  className = "",
+  children,
+  ...rest
+}: CardProps) {
+  const classes = ["tw-card", `tw-card--${tone}`, `tw-card--${density}`, className]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className={classes} {...rest}>
