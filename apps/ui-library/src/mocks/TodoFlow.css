@@ -1,0 +1,407 @@
+/* TodoFlow mock — three-pane todo app (TickTick anatomy, Cyclorama grammar) */
+
+.mock-td {
+	display: grid;
+	grid-template-columns: 240px minmax(0, 1fr) 320px;
+	gap: 0;
+	width: 100%;
+	height: 720px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-lg);
+	overflow: hidden;
+	background: var(--bg);
+}
+
+/* --- left nav: the night rail grammar --- */
+
+.mock-td__nav {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+	padding: var(--space-4) var(--space-3);
+	background: var(--twdb-night);
+	color: #c4c3d1;
+}
+
+.mock-td__me {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 0 6px;
+	font-family: var(--font-cue);
+	font-size: 12px;
+	letter-spacing: var(--tracking-cue);
+	text-transform: uppercase;
+	color: #f4f3f8;
+}
+
+.mock-td__views,
+.mock-td__lists {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.mock-td__lists {
+	border-top: 1px solid rgb(244 243 248 / 0.13);
+	padding-top: var(--space-3);
+}
+
+.mock-td__lists .tw-cue {
+	color: #9291a3;
+	padding: 0 10px;
+	margin-bottom: 4px;
+}
+
+.mock-td__view,
+.mock-td__list {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	height: 34px;
+	padding: 0 10px;
+	border: 0;
+	border-radius: var(--r-md);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-size: var(--text-md);
+	cursor: pointer;
+	text-align: left;
+	transition: background var(--dur-1) var(--ease-out);
+}
+
+.mock-td__view:hover,
+.mock-td__list:hover {
+	background: rgb(244 243 248 / 0.07);
+}
+
+.mock-td__view.is-active {
+	background: rgb(109 128 255 / 0.18);
+	color: #fff;
+}
+
+.mock-td__view svg,
+.mock-td__list svg {
+	width: 15px;
+	height: 15px;
+	flex-shrink: 0;
+	color: #9291a3;
+}
+
+.mock-td__view.is-active svg {
+	color: #8b9aff;
+}
+
+.mock-td__viewlabel {
+	flex: 1;
+}
+
+.mock-td__viewcount {
+	font-family: var(--font-mono);
+	font-size: 11px;
+	color: #9291a3;
+	margin-left: auto;
+}
+
+.mock-td__week {
+	margin-top: auto;
+	display: flex;
+	justify-content: space-between;
+	padding: var(--space-2) 6px 0;
+	border-top: 1px solid rgb(244 243 248 / 0.13);
+}
+
+.mock-td__day {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 3px;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	color: #9291a3;
+	padding: 4px 5px;
+	border-radius: var(--r-sm);
+}
+
+.mock-td__day em {
+	font-style: normal;
+	font-size: 9.5px;
+	letter-spacing: 0.06em;
+}
+
+.mock-td__day.is-today {
+	background: #3a55ff;
+	color: #fff;
+}
+
+/* --- center column --- */
+
+.mock-td__center {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	border-right: 1px solid var(--line);
+	background: var(--bg);
+}
+
+.mock-td__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--space-4) var(--space-4) var(--space-2);
+}
+
+.mock-td__head h2 {
+	margin: 0;
+	font-size: var(--text-xl);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-td__headtools {
+	display: flex;
+	gap: 2px;
+}
+
+.mock-td__quickadd {
+	padding: 0 var(--space-4) var(--space-3);
+}
+
+.mock-td__scroll {
+	flex: 1;
+	overflow-y: auto;
+	padding: 0 var(--space-2) var(--space-4);
+}
+
+.mock-td__grouphead {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	padding: 8px 10px 6px;
+	border: 0;
+	background: none;
+	font: inherit;
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--ink-2);
+	cursor: pointer;
+	text-align: left;
+}
+
+.mock-td__grouphead svg {
+	width: 13px;
+	height: 13px;
+	color: var(--ink-3);
+}
+
+.mock-td__groupcount {
+	margin-left: auto;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 400;
+	color: var(--ink-3);
+}
+
+.mock-td__task {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 9px 10px;
+	border-radius: var(--r-md);
+	cursor: pointer;
+	transition: background var(--dur-1) var(--ease-out);
+}
+
+.mock-td__task:hover {
+	background: var(--bg-band);
+}
+
+.mock-td__task.is-selected {
+	background: var(--accent-soft-bg);
+}
+
+.mock-td__tasktitle {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--text-md);
+	color: var(--ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mock-td__task.is-done .mock-td__tasktitle {
+	color: var(--ink-3);
+	text-decoration: line-through;
+	text-decoration-color: var(--line-strong);
+}
+
+.mock-td__taskmeta {
+	font-family: var(--font-mono);
+	font-size: 11px;
+	color: var(--ink-3);
+}
+
+/* priority checkboxes — the TickTick colored square */
+
+.mock-td__check {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+	border-radius: 4px;
+	border: 1.5px solid var(--line-strong);
+	background: transparent;
+	cursor: pointer;
+	padding: 0;
+	color: #fff;
+	transition:
+		border-color var(--dur-1) var(--ease-out),
+		background var(--dur-1) var(--ease-out);
+}
+
+.mock-td__check svg {
+	width: 11px;
+	height: 11px;
+}
+
+.mock-td__check--p1 {
+	border-color: var(--danger-ink);
+}
+
+.mock-td__check--p2 {
+	border-color: var(--warning-ink);
+}
+
+.mock-td__check--p3 {
+	border-color: var(--accent);
+}
+
+.mock-td__check.is-done {
+	background: var(--accent);
+	border-color: var(--accent);
+}
+
+.mock-td__check:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--ring);
+}
+
+/* --- right detail pane --- */
+
+.mock-td__detail {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	padding: var(--space-4);
+	background: var(--surface);
+	min-width: 0;
+}
+
+.mock-td__detailtop {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.mock-td__detailtitle {
+	margin: 0;
+	font-size: var(--text-lg);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-td__subs {
+	display: flex;
+	flex-direction: column;
+}
+
+.mock-td__sub {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 2px;
+	border-bottom: 1px solid var(--line);
+	cursor: pointer;
+}
+
+.mock-td__sub:last-child {
+	border-bottom: 0;
+}
+
+.mock-td__subtext {
+	font-size: var(--text-md);
+	color: var(--ink);
+}
+
+.mock-td__subtext.is-done {
+	color: var(--ink-3);
+	text-decoration: line-through;
+	text-decoration-color: var(--line-strong);
+}
+
+.mock-td__nosubs {
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+}
+
+.mock-td__comments {
+	flex: 1;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	padding-top: var(--space-2);
+	border-top: 1px solid var(--line);
+}
+
+.mock-td__comment {
+	display: flex;
+	gap: 10px;
+}
+
+.mock-td__comment p {
+	margin: 2px 0 0;
+	font-size: var(--text-md);
+	color: var(--ink);
+}
+
+.mock-td__cmeta {
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+}
+
+.mock-td__cmeta strong {
+	color: var(--ink);
+	font-weight: 600;
+}
+
+.mock-td__composer {
+	display: flex;
+	gap: 6px;
+}
+
+.mock-td__composer .tw-input {
+	flex: 1;
+}
+
+.mock-td__detailtools {
+	display: flex;
+	justify-content: space-around;
+	border-top: 1px solid var(--line);
+	padding-top: var(--space-2);
+}
+
+@media (max-width: 1000px) {
+	.mock-td {
+		grid-template-columns: 200px minmax(0, 1fr);
+	}
+
+	.mock-td__detail {
+		display: none;
+	}
+}

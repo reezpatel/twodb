@@ -88,11 +88,13 @@ import type { DateRange } from "@twodb/ui";
 import { ColorPicker, CURATED_COLORS } from "@twodb/ui";
 import { IntegrationsMock } from "./mocks/Integrations";
 import { ProdexDashboardMock } from "./mocks/ProdexDashboard";
+import { ShareSettingsMock } from "./mocks/ShareSettings";
 import { SettingsMock } from "./mocks/Settings";
 import { TwoFactorMock } from "./mocks/TwoFactor";
 import { InvestorDashboardMock } from "./mocks/InvestorDashboard";
 import { MorningBriefMock } from "./mocks/MorningBrief";
 import { TablePlanMock } from "./mocks/TablePlan";
+import { TodoFlowMock } from "./mocks/TodoFlow";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
 
 export interface Story {
@@ -2358,6 +2360,26 @@ export const registry: ComponentEntry[] = [
 			},
 		],
 	},
+
+	{
+		id: "share-settings",
+		group: "Showcase",
+		name: "Share Settings",
+		description:
+			"A share dialog mock inspired by the supplied reference: access list, permissions, copy-link footer, and the active group/person search state.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — access list and search results",
+				render: () => <ShareSettingsMock />,
+				code: `<ShareSettingsMock />
+
+{/* Two dialog states side-by-side:
+    people with access + permissions,
+    and the active group/person search result list. */}`,
+			},
+		],
+	},
 	{
 		id: "prodex-dashboard",
 		group: "Showcase",
@@ -2527,6 +2549,25 @@ export const registry: ComponentEntry[] = [
   segments={[{ label, start, end }, …]} />
 
 {/* + notes (Private/Public), files, compensation history */}`,
+			},
+		],
+	},
+	{
+		id: "todo-flow",
+		group: "Showcase",
+		name: "Todo Flow",
+		description:
+			"TickTick anatomy in our grammar: night nav with smart views and a week strip, grouped tasks with priority-colored checks and quick add, and a detail pane with subtasks and live comments.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — Next 7 Days",
+				render: () => <TodoFlowMock />,
+				code: `<TodoFlow />
+
+{/* views filter the list; checks move tasks to
+    Completed; click a task for subtasks + comments;
+    quick-add lands in Inbox on Tomorrow */}`,
 			},
 		],
 	},

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Avatar, Badge, Button, IconButton, Input } from "@twodb/ui";
+import { Avatar, Badge, IconButton, Input } from "@twodb/ui";
 import {
 	ArrowUpDown,
 	CalendarDays,
