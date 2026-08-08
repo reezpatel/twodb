@@ -104,7 +104,9 @@ import { ChatMailMock } from "./mocks/ChatMail";
 import { LiveScribeMock } from "./mocks/LiveScribe";
 import { WeeklyCalMock } from "./mocks/WeeklyCal";
 import { FileManagerMock } from "./mocks/FileManager";
+import { CommunicationMock } from "./mocks/Communication";
 import { FileDriveMock } from "./mocks/FileDrive";
+import { ProjectFilesMock } from "./mocks/ProjectFiles";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
 import { InboxMock } from "./mocks/Inbox";
 import { MonthlyCalendarMock } from "./mocks/MonthlyCalendar";
@@ -3051,6 +3053,44 @@ export const registry: ComponentEntry[] = [
 
 {/* grid/list toggle switches the All files section;
     selection count lives in the table footer */}`,
+			},
+		],
+	},
+	{
+		id: "project-files",
+		group: "Showcase",
+		name: "Project Files",
+		description:
+			"The three-pane file manager from the reference: folder rail, center with folder cards + recent chips + selectable table, and the right Files panel — all wired to one filter state.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — three panes, one state",
+				render: () => <ProjectFilesMock />,
+				code: `{/* the right Files panel is live: its folder tiles filter
+    the center table (and light the center cards); its recent
+    rows toggle table selection */}
+<FilesPanel onFolder={filter} onPick={toggleSelect} />
+
+{/* grid/list toggle, type tabs, search —
+    one pipeline, three panes */}`,
+			},
+		],
+	},
+	{
+		id: "communication",
+		group: "Showcase",
+		name: "Communication",
+		description:
+			"An autopilot thread: call recording with waveform player, expandable transcription, sent-mail bubble, AI suggestion that advances the task meter, Email/SMS composer, and a contact panel with history timeline.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — thread, composer, contact panel",
+				render: () => <CommunicationMock />,
+				code: `{/* waveform player (play/pause), transcription
+    disclosure, suggestion ✓ -> tasks 1/2,
+    Email/SMS tabs switch the composer */}`,
 			},
 		],
 	},

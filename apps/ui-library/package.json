@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@twodb/ui": "workspace:*",
+    "@xyflow/react": "^12.11.2",
     "lucide-react": "^1.29.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
