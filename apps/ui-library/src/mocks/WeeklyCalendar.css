@@ -430,7 +430,7 @@
 
 .mock-weekcal__times {
 	display: grid;
-	grid-template-rows: repeat(6, 96px);
+	grid-template-rows: repeat(6, 192px);
 	border-right: 1px solid var(--line);
 	background: var(--surface);
 }
@@ -447,12 +447,12 @@
 	position: relative;
 	display: grid;
 	grid-template-columns: repeat(7, minmax(118px, 1fr));
-	grid-template-rows: repeat(24, 24px);
-	min-height: 576px;
+	grid-template-rows: repeat(24, 48px);
+	min-height: 1152px;
 	background: repeating-linear-gradient(
 		to bottom,
 		var(--line) 0 1px,
-		transparent 1px 48px
+		transparent 1px 96px
 	);
 }
 
@@ -489,7 +489,7 @@
 	grid-column: 1 / -1;
 	grid-row: 3;
 	height: 1px;
-	margin-top: 9px;
+	margin-top: 32px;
 	background: var(--accent);
 }
 

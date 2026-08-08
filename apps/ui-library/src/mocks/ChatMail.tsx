@@ -69,7 +69,11 @@ const CONVERSATIONS: Conversation[] = [
 		category: "primary",
 		summary:
 			"Three lab reports came back overnight. Two are within range and already filed; Meera Iyer's lipid panel carries one flag and is attached below for review before her 9:40 appointment.",
-		quickAnswers: ["Forward to Dr. Rao", "Mark all reviewed", "Thanks, received"],
+		quickAnswers: [
+			"Forward to Dr. Rao",
+			"Mark all reviewed",
+			"Thanks, received",
+		],
 		messages: [
 			{
 				from: "City Diagnostics Lab",
@@ -101,7 +105,11 @@ const CONVERSATIONS: Conversation[] = [
 		category: "primary",
 		summary:
 			"Meera is asking why INV-1042 (₹850) is higher than the front-desk quote. The difference is the fasting panel added during her visit; a plain-language breakdown is ready to send.",
-		quickAnswers: ["Send the breakdown", "Apply concession", "Call her instead"],
+		quickAnswers: [
+			"Send the breakdown",
+			"Apply concession",
+			"Call her instead",
+		],
 		messages: [
 			{
 				from: "Meera Iyer",
@@ -200,12 +208,15 @@ export function ChatMailMock() {
 	const [smartReplies, setSmartReplies] = useState(true);
 	const [read, setRead] = useState<Record<string, boolean>>({ c1: true });
 	const [starred, setStarred] = useState<Record<string, boolean>>(
-		Object.fromEntries(CONVERSATIONS.filter((c) => c.starred).map((c) => [c.id, true])),
+		Object.fromEntries(
+			CONVERSATIONS.filter((c) => c.starred).map((c) => [c.id, true]),
+		),
 	);
 	const [sent, setSent] = useState<Record<string, MailMessage[]>>({});
 
 	const visible = useMemo(
-		() => CONVERSATIONS.filter((c) => filter === "all" || c.category === filter),
+		() =>
+			CONVERSATIONS.filter((c) => filter === "all" || c.category === filter),
 		[filter],
 	);
 
@@ -278,7 +289,12 @@ export function ChatMailMock() {
 			<section className="mock-cm__list">
 				<header className="mock-cm__listhead">
 					<h2>Inbox</h2>
-					<IconButton icon={<MailPlus />} label="New email" variant="ghost" size="sm" />
+					<IconButton
+						icon={<MailPlus />}
+						label="New email"
+						variant="ghost"
+						size="sm"
+					/>
 				</header>
 				<div className="mock-cm__chips" role="tablist" aria-label="Category">
 					{FILTERS.map((f) => (
@@ -326,7 +342,10 @@ export function ChatMailMock() {
 										<span className="mock-cm__tname">
 											{c.name}
 											{c.verified ? (
-												<BadgeCheck aria-hidden="true" className="mock-cm__verified" />
+												<BadgeCheck
+													aria-hidden="true"
+													className="mock-cm__verified"
+												/>
 											) : null}
 										</span>
 										<span className="mock-cm__tdate">{c.date}</span>
@@ -351,8 +370,18 @@ export function ChatMailMock() {
 			{/* ------- reading pane: the email as a chat ------- */}
 			<section className="mock-cm__read">
 				<header className="mock-cm__toolbar">
-					<IconButton icon={<Archive />} label="Archive" variant="ghost" size="sm" />
-					<IconButton icon={<Trash2 />} label="Delete" variant="ghost" size="sm" />
+					<IconButton
+						icon={<Archive />}
+						label="Archive"
+						variant="ghost"
+						size="sm"
+					/>
+					<IconButton
+						icon={<Trash2 />}
+						label="Delete"
+						variant="ghost"
+						size="sm"
+					/>
 					<IconButton
 						icon={<Star />}
 						label={isStarred ? "Unstar" : "Star"}
@@ -365,7 +394,12 @@ export function ChatMailMock() {
 					/>
 					<IconButton icon={<Pin />} label="Pin" variant="ghost" size="sm" />
 					<span className="mock-cm__pager">2 of 12</span>
-					<IconButton icon={<MoreHorizontal />} label="More" variant="ghost" size="sm" />
+					<IconButton
+						icon={<MoreHorizontal />}
+						label="More"
+						variant="ghost"
+						size="sm"
+					/>
 				</header>
 
 				<div className="mock-cm__scroll">
@@ -380,11 +414,7 @@ export function ChatMailMock() {
 
 					<ChatList>
 						{messages.map((m, i) => (
-							<MessageGroup
-								key={i}
-								author={m.from}
-								time={m.time}
-							>
+							<MessageGroup key={i} author={m.from} time={m.time}>
 								<ChatMessage>
 									<TextMessage>{m.text}</TextMessage>
 								</ChatMessage>
