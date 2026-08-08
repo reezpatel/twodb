@@ -89,6 +89,7 @@ import { ColorPicker, CURATED_COLORS } from "@twodb/ui";
 import { ComposeEmailMock } from "./mocks/ComposeEmail";
 import { IntegrationsMock } from "./mocks/Integrations";
 import { ProdexDashboardMock } from "./mocks/ProdexDashboard";
+import { WeeklyCalendarMock } from "./mocks/WeeklyCalendar";
 import { ShareSettingsMock } from "./mocks/ShareSettings";
 import { SettingsMock } from "./mocks/Settings";
 import { TwoFactorMock } from "./mocks/TwoFactor";
@@ -98,6 +99,7 @@ import { TablePlanMock } from "./mocks/TablePlan";
 import { TodoFlowMock } from "./mocks/TodoFlow";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
 import { InboxMock } from "./mocks/Inbox";
+import { MonthlyCalendarMock } from "./mocks/MonthlyCalendar";
 
 export interface Story {
 	title: string;
@@ -2388,6 +2390,28 @@ export const registry: ComponentEntry[] = [
 			},
 		],
 	},
+
+	{
+		id: "weekly-calendar",
+		group: "Showcase",
+		name: "Weekly Calendar",
+		description:
+			"A weekly calendar workspace inspired by the supplied reference: slim app rail, mini month picker, schedule filters, week/month controls, and a time-grid with realistic event blocks.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — week schedule with filters",
+				render: () => <WeeklyCalendarMock />,
+				code: `<WeeklyCalendarMock />
+
+{/* Calendar workspace:
+    app rail + mini month,
+    schedule and category filters,
+    week view with time slots,
+    color-coded events and attendee stacks. */}`,
+			},
+		],
+	},
 	{
 		id: "share-settings",
 		group: "Showcase",
@@ -2614,6 +2638,29 @@ export const registry: ComponentEntry[] = [
 <ThreadRow active unread time snippet />
 {/* AI summary = rose-soft panel (the AI's light) */}
 <Composer via Dialog — To / Subject / Message />`,
+			},
+		],
+	},
+	{
+		id: "monthly-calendar",
+		group: "Showcase",
+		name: "Monthly Calendar",
+		description:
+			"A full month page on the new MonthCalendar: tabs per calendar, live search, month/list views, and an Add-event dialog using DatePicker + TimePicker.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — month grid, tabs, add event",
+				render: () => <MonthlyCalendarMock />,
+				code: `<MonthCalendar
+  month={month}
+  events={events}   // { date, title, time, tone, cal }
+  today={demoToday}
+  onSelectDay={(d) => openAdd(d)}
+/>
+
+{/* chips: cobalt / rose / warning / neutral / danger;
+    "+N more…" overflow; click a day to prefill the dialog */}`,
 			},
 		],
 	},

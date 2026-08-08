@@ -1,13 +1,13 @@
-/* Compose email showcase — large calm composer with attachments */
+/* Compose email showcase — compact composer with attachments */
 
 .mock-compose {
 	display: grid;
 	place-items: center;
-	width: min(1080px, 100%);
-	min-height: 720px;
-	padding: var(--space-7);
+	width: min(860px, 100%);
+	min-height: 560px;
+	padding: var(--space-5);
 	border: 1px solid var(--line);
-	border-radius: 24px;
+	border-radius: 22px;
 	background:
 		radial-gradient(circle at 18% 8%, rgb(10 43 255 / 0.05), transparent 34%),
 		linear-gradient(180deg, #f7f7f8 0%, #f1f1f3 100%);
@@ -16,10 +16,10 @@
 
 .mock-compose__window {
 	position: relative;
-	width: min(820px, 100%);
-	padding: 24px;
+	width: min(680px, 100%);
+	padding: 18px;
 	border: 1px solid var(--line-strong);
-	border-radius: 24px;
+	border-radius: 20px;
 	background: #f7f7f8;
 	box-shadow: var(--shadow-overlay);
 }
@@ -39,17 +39,17 @@
 
 .mock-compose__top {
 	justify-content: space-between;
-	gap: var(--space-4);
-	padding: 0 8px 22px;
+	gap: var(--space-3);
+	padding: 0 6px 16px;
 }
 
 .mock-compose__top > div:first-child {
-	gap: var(--space-3);
+	gap: var(--space-2);
 }
 
 .mock-compose__top h2 {
 	margin: 0;
-	font-size: var(--text-xl);
+	font-size: var(--text-lg);
 	font-weight: 700;
 	line-height: 1.2;
 }
@@ -57,21 +57,21 @@
 .mock-compose__mail-icon {
 	display: grid;
 	place-items: center;
-	width: 28px;
-	height: 28px;
+	width: 24px;
+	height: 24px;
 	color: var(--ink-2);
 }
 
 .mock-compose__window-actions,
 .mock-compose__tools {
-	gap: var(--space-3);
+	gap: var(--space-2);
 }
 
 .mock-compose__round {
 	display: grid;
 	place-items: center;
-	width: 48px;
-	height: 48px;
+	width: 38px;
+	height: 38px;
 	padding: 0;
 	border: 1px solid var(--line-strong);
 	border-radius: var(--r-pill);
@@ -93,47 +93,53 @@
 .mock-compose__small-chevron svg,
 .mock-compose__pill button svg,
 .mock-compose__assist svg {
-	width: 18px;
-	height: 18px;
+	width: 16px;
+	height: 16px;
 	stroke-width: 1.85;
 }
 
 .mock-compose__paper {
-	padding: 34px;
+	padding: 24px;
 	border: 1px solid var(--line-strong);
-	border-radius: 22px;
+	border-radius: 18px;
 	background: var(--surface);
 }
 
 .mock-compose__address {
 	position: relative;
 	gap: var(--space-2);
-	min-height: 42px;
-	padding: 3px 0;
+	min-height: 36px;
+	padding: 2px 0;
 }
 
 .mock-compose__field-label {
-	width: 48px;
+	width: 42px;
 	flex: 0 0 auto;
-	font-size: var(--text-lg);
+	font-size: var(--text-md);
 	font-weight: 650;
 	color: var(--ink);
 }
 
 .mock-compose__pill {
-	gap: 8px;
+	gap: 7px;
 	min-width: 0;
-	max-width: 260px;
-	height: 38px;
-	padding: 4px 5px 4px 7px;
+	max-width: 220px;
+	height: 32px;
+	padding: 3px 4px 3px 6px;
 	border: 1px solid var(--line);
 	border-radius: var(--r-pill);
 	background: var(--bg-band);
 }
 
+.mock-compose__pill .tw-avatar {
+	width: 24px;
+	height: 24px;
+	font-size: 10px;
+}
+
 .mock-compose__pill strong {
 	overflow: hidden;
-	font-size: var(--text-lg);
+	font-size: var(--text-md);
 	font-weight: 600;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -143,8 +149,8 @@
 .mock-compose__small-chevron {
 	display: grid;
 	place-items: center;
-	width: 30px;
-	height: 30px;
+	width: 24px;
+	height: 24px;
 	padding: 0;
 	border: 1px solid var(--line);
 	border-radius: var(--r-pill);
@@ -166,42 +172,42 @@
 
 .mock-compose__divider {
 	height: 1px;
-	margin: var(--space-3) 0 var(--space-5);
+	margin: var(--space-2) 0 var(--space-4);
 	background: var(--line);
 }
 
 .mock-compose__body {
-	max-width: 720px;
+	max-width: 600px;
 }
 
 .mock-compose__body h3 {
-	margin: 0 0 var(--space-5);
-	font-size: var(--text-xl);
+	margin: 0 0 var(--space-4);
+	font-size: var(--text-lg);
 	font-weight: 750;
 	line-height: 1.25;
 	color: #202a36;
 }
 
 .mock-compose__body p {
-	margin: 0 0 var(--space-4);
-	font-size: 16px;
-	line-height: 1.55;
+	margin: 0 0 var(--space-3);
+	font-size: var(--text-md);
+	line-height: 1.52;
 	color: #0d0f13;
 }
 
 .mock-compose__attachments {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: var(--space-3);
-	margin-top: var(--space-6);
+	gap: var(--space-2);
+	margin-top: var(--space-5);
 }
 
 .mock-compose__attachment {
-	gap: var(--space-3);
+	gap: var(--space-2);
 	min-width: 0;
-	padding: 12px;
+	padding: 10px;
 	border: 1px solid var(--line);
-	border-radius: var(--r-lg);
+	border-radius: var(--r-md);
 	background: var(--bg-band);
 }
 
@@ -218,7 +224,7 @@
 }
 
 .mock-compose__attachment strong {
-	font-size: var(--text-md);
+	font-size: var(--text-sm);
 	font-weight: 650;
 }
 
@@ -233,8 +239,8 @@
 	position: relative;
 	display: grid;
 	place-items: center;
-	width: 48px;
-	height: 52px;
+	width: 38px;
+	height: 42px;
 	flex: 0 0 auto;
 	border: 1px solid var(--line-strong);
 	border-radius: var(--r-md);
@@ -242,19 +248,19 @@
 }
 
 .mock-compose__filemark svg {
-	width: 22px;
-	height: 22px;
+	width: 18px;
+	height: 18px;
 }
 
 .mock-compose__filemark--figma {
-	grid-template-columns: repeat(2, 9px);
-	grid-template-rows: repeat(2, 9px);
-	gap: 3px;
+	grid-template-columns: repeat(2, 8px);
+	grid-template-rows: repeat(2, 8px);
+	gap: 2px;
 }
 
 .mock-compose__filemark--figma i {
-	width: 9px;
-	height: 9px;
+	width: 8px;
+	height: 8px;
 	border-radius: 999px;
 }
 
@@ -278,8 +284,8 @@
 }
 
 .mock-compose__footer {
-	gap: var(--space-3);
-	padding: 22px 0 6px;
+	gap: var(--space-2);
+	padding: 16px 0 4px;
 }
 
 .mock-compose__tools {
@@ -288,13 +294,13 @@
 
 .mock-compose__tools .mock-compose__round,
 .mock-compose__footer > .mock-compose__round {
-	width: 50px;
-	height: 50px;
+	width: 40px;
+	height: 40px;
 }
 
 .mock-compose__send {
-	min-width: 138px;
-	height: 50px;
+	min-width: 120px;
+	height: 40px;
 	border-radius: var(--r-pill);
 	background: #111923;
 	color: #fff;
@@ -302,10 +308,10 @@
 
 .mock-compose__assist {
 	position: absolute;
-	right: 30px;
-	bottom: 82px;
+	right: 24px;
+	bottom: 64px;
 	gap: 7px;
-	padding: 6px 10px;
+	padding: 5px 9px;
 	border: 1px solid var(--line);
 	border-radius: var(--r-pill);
 	background: var(--surface);
@@ -315,11 +321,11 @@
 
 @media (max-width: 900px) {
 	.mock-compose {
-		padding: var(--space-5);
+		padding: var(--space-4);
 	}
 
 	.mock-compose__paper {
-		padding: var(--space-5);
+		padding: var(--space-4);
 	}
 
 	.mock-compose__address {
@@ -346,7 +352,7 @@
 
 @media (max-width: 620px) {
 	.mock-compose__window {
-		padding: var(--space-4);
+		padding: var(--space-3);
 	}
 
 	.mock-compose__top,
