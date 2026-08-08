@@ -51,6 +51,7 @@ import {
 	Zap,
 } from "lucide-react";
 import {
+	DayTimeline,
 	DataGantt,
 	DataTable,
 	Table,
@@ -92,6 +93,7 @@ import { TwoFactorMock } from "./mocks/TwoFactor";
 import { InvestorDashboardMock } from "./mocks/InvestorDashboard";
 import { MorningBriefMock } from "./mocks/MorningBrief";
 import { TablePlanMock } from "./mocks/TablePlan";
+import { EmployeePanelMock } from "./mocks/EmployeePanel";
 
 export interface Story {
 	title: string;
@@ -2126,6 +2128,43 @@ export const registry: ComponentEntry[] = [
 		],
 	},
 	{
+		id: "day-timeline",
+		group: "Data",
+		name: "Day Timeline",
+		description:
+			"A tracked day as segments of light: proportional bands, hour axis, and a legend with shares — tones cycle the horizon palette.",
+		stories: [
+			{
+				title: "Default",
+				render: () => (
+					<div style={{ width: "100%", maxWidth: 560 }}>
+						<DayTimeline
+							title="Timeline"
+							dateLabel="Today, Apr 05 2026"
+							tracking
+							segments={[
+								{ label: "Nexora Web", start: 10 * 60, end: 14 * 60 + 15 },
+								{ label: "Bluemint App", start: 14 * 60 + 15, end: 18 * 60 + 20 },
+								{ label: "Klaro", start: 18 * 60 + 20, end: 20 * 60 + 30 },
+								{ label: "FEST", start: 20 * 60 + 30, end: 21 * 60 },
+							]}
+						/>
+					</div>
+				),
+				code: `<DayTimeline
+  title="Timeline"
+  dateLabel="Today, Apr 05 2026"
+  tracking
+  segments={[
+    { label: "Nexora Web", start: 600, end: 855 },
+    { label: "Bluemint App", start: 855, end: 1100 },
+    // minutes from midnight; tones cycle automatically
+  ]}
+/>`,
+			},
+		],
+	},
+	{
 		id: "data-table",
 		group: "Data",
 		name: "Data Table",
@@ -2469,6 +2508,25 @@ export const registry: ComponentEntry[] = [
 
 {/* click a reservation → its table lights up;
     click a table → its card selects */}`,
+			},
+		],
+	},
+	{
+		id: "employee-panel",
+		group: "Showcase",
+		name: "Employee Panel",
+		description:
+			"A profile side panel: identity row, contact info, a tracked DayTimeline, notes with scope badges, file cards, and effective-dated compensation rows.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — profile drawer",
+				render: () => <EmployeePanelMock />,
+				code: `<DayTimeline title="Timeline" tracking
+  dateLabel="Today, Apr 05 2026"
+  segments={[{ label, start, end }, …]} />
+
+{/* + notes (Private/Public), files, compensation history */}`,
 			},
 		],
 	},

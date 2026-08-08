@@ -71,16 +71,72 @@ const FLOORS: Record<Zone, FloorTable[]> = {
 };
 
 const RESERVATIONS: Reservation[] = [
-	{ id: "r1", name: "Uthman ibn Hunaif", time: "7:30 pm", tableId: "T6", party: 6, phone: "+91 84678 90000", state: "dinner" },
-	{ id: "r2", name: "Bashir ibn Sa'ad", time: "On dine", tableId: "T2", party: 2, state: "on-dine" },
-	{ id: "r3", name: "Ali", time: "8:00 pm", tableId: "T11", party: 2, phone: "+91 84342 56555", state: "dinner" },
-	{ id: "r4", name: "Khunais ibn Hudhafa", time: "On dine", tableId: "T9", party: 4, state: "on-dine" },
-	{ id: "r5", name: "Walk-in waitlist", time: "Free", tableId: null, party: 0, state: "free" },
-	{ id: "r6", name: "Mus'ab ibn Umayr", time: "8:25 pm", tableId: "T13", party: 4, phone: "+91 84800 63554", state: "unpaid" },
-	{ id: "r7", name: "Shuja ibn Wahb", time: "9:00 pm", tableId: "T17", party: 4, phone: "+91 84901 22310", state: "dinner" },
+	{
+		id: "r1",
+		name: "Uthman ibn Hunaif",
+		time: "7:30 pm",
+		tableId: "T6",
+		party: 6,
+		phone: "+91 84678 90000",
+		state: "dinner",
+	},
+	{
+		id: "r2",
+		name: "Bashir ibn Sa'ad",
+		time: "On dine",
+		tableId: "T2",
+		party: 2,
+		state: "on-dine",
+	},
+	{
+		id: "r3",
+		name: "Ali",
+		time: "8:00 pm",
+		tableId: "T11",
+		party: 2,
+		phone: "+91 84342 56555",
+		state: "dinner",
+	},
+	{
+		id: "r4",
+		name: "Khunais ibn Hudhafa",
+		time: "On dine",
+		tableId: "T9",
+		party: 4,
+		state: "on-dine",
+	},
+	{
+		id: "r5",
+		name: "Walk-in waitlist",
+		time: "Free",
+		tableId: null,
+		party: 0,
+		state: "free",
+	},
+	{
+		id: "r6",
+		name: "Mus'ab ibn Umayr",
+		time: "8:25 pm",
+		tableId: "T13",
+		party: 4,
+		phone: "+91 84800 63554",
+		state: "unpaid",
+	},
+	{
+		id: "r7",
+		name: "Shuja ibn Wahb",
+		time: "9:00 pm",
+		tableId: "T17",
+		party: 4,
+		phone: "+91 84901 22310",
+		state: "dinner",
+	},
 ];
 
-const STATE_BADGE: Record<Reservation["state"], { label: string; tone: "go" | "rose" | "warning" | "neutral" }> = {
+const STATE_BADGE: Record<
+	Reservation["state"],
+	{ label: string; tone: "go" | "rose" | "warning" | "neutral" }
+> = {
 	dinner: { label: "Payment", tone: "go" },
 	"on-dine": { label: "On Dine", tone: "rose" },
 	unpaid: { label: "Unpaid", tone: "warning" },
@@ -124,16 +180,23 @@ export function TablePlanMock() {
 
 	const visible = useMemo(() => {
 		return RESERVATIONS.filter((r) => {
-			if (filter === "reserved" && !(r.state === "dinner" || r.state === "unpaid")) return false;
+			if (
+				filter === "reserved" &&
+				!(r.state === "dinner" || r.state === "unpaid")
+			)
+				return false;
 			if (filter === "dine" && r.state !== "on-dine") return false;
-			if (query && !r.name.toLowerCase().includes(query.toLowerCase())) return false;
+			if (query && !r.name.toLowerCase().includes(query.toLowerCase()))
+				return false;
 			return true;
 		});
 	}, [filter, query]);
 
 	const counts = {
 		all: RESERVATIONS.length,
-		reserved: RESERVATIONS.filter((r) => r.state === "dinner" || r.state === "unpaid").length,
+		reserved: RESERVATIONS.filter(
+			(r) => r.state === "dinner" || r.state === "unpaid",
+		).length,
 		dine: RESERVATIONS.filter((r) => r.state === "on-dine").length,
 	};
 
@@ -141,7 +204,11 @@ export function TablePlanMock() {
 		<div className="mock-tp">
 			{/* reservations column */}
 			<aside className="mock-tp__side">
-				<div className="mock-tp__filters" role="tablist" aria-label="Reservation filter">
+				<div
+					className="mock-tp__filters"
+					role="tablist"
+					aria-label="Reservation filter"
+				>
 					{(
 						[
 							{ id: "all", label: "All", n: counts.all },
@@ -167,9 +234,19 @@ export function TablePlanMock() {
 				</div>
 
 				<div className="mock-tp__date">
-					<IconButton icon={<ChevronLeft />} label="Previous day" variant="ghost" size="sm" />
+					<IconButton
+						icon={<ChevronLeft />}
+						label="Previous day"
+						variant="ghost"
+						size="sm"
+					/>
 					<span>Thu, 8 August 2026</span>
-					<IconButton icon={<ChevronRight />} label="Next day" variant="ghost" size="sm" />
+					<IconButton
+						icon={<ChevronRight />}
+						label="Next day"
+						variant="ghost"
+						size="sm"
+					/>
 				</div>
 
 				<div className="mock-tp__search">
@@ -179,7 +256,11 @@ export function TablePlanMock() {
 						onChange={(e) => setQuery(e.target.value)}
 						aria-label="Search guests"
 					/>
-					<IconButton icon={<SlidersHorizontal />} label="Filter" variant="ghost" />
+					<IconButton
+						icon={<SlidersHorizontal />}
+						label="Filter"
+						variant="ghost"
+					/>
 				</div>
 
 				<div className="mock-tp__list">
@@ -226,7 +307,11 @@ export function TablePlanMock() {
 			<section className="mock-tp__main">
 				<header className="mock-tp__mainhead">
 					<h2>Manage Tables</h2>
-					<div className="mock-tp__zones" role="tablist" aria-label="Floor zone">
+					<div
+						className="mock-tp__zones"
+						role="tablist"
+						aria-label="Floor zone"
+					>
 						{ZONES.map((z) => (
 							<button
 								key={z.id}
@@ -266,12 +351,22 @@ export function TablePlanMock() {
 							<button
 								key={t.id}
 								className={`mock-tp__table mock-tp__table--${t.status}${isSel ? " is-selected" : ""}`}
-								style={{ left: `${t.x}%`, top: `${t.y}%`, width: `${t.w}%`, height: `${t.h}%` }}
+								style={{
+									left: `${t.x}%`,
+									top: `${t.y}%`,
+									width: `${t.w}%`,
+									height: `${t.h}%`,
+								}}
 								onClick={() => linked && setSelected(isSel ? null : linked.id)}
 								aria-label={`Table ${t.id.slice(1)}, ${t.seats} seats, ${t.status}`}
 							>
 								{chairLayout(t).map((c, i) => (
-									<span key={i} className="mock-tp__chair" style={c} aria-hidden="true" />
+									<span
+										key={i}
+										className="mock-tp__chair"
+										style={c}
+										aria-hidden="true"
+									/>
 								))}
 								<span className="mock-tp__tlabel">Table #{t.id.slice(1)}</span>
 								<span className="mock-tp__tseats">
