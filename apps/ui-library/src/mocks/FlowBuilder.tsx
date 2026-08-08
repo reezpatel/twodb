@@ -34,7 +34,10 @@ import "./FlowBuilder.css";
 
 /* --- node library --- */
 
-const LIBRARY: { label: string; items: { icon: typeof Globe; label: string }[] }[] = [
+const LIBRARY: {
+	label: string;
+	items: { icon: typeof Globe; label: string }[];
+}[] = [
 	{
 		label: "Input",
 		items: [
@@ -111,9 +114,9 @@ const NODES: FlowNode[] = [
 		title: "Start",
 		desc: "Entry point for this automation",
 		kind: "Trigger",
-		x: 70,
+		x: 40,
 		y: 20,
-		w: 240,
+		w: 210,
 		rows: [
 			["Schedule", "Weekdays 08:00"],
 			["Output", "run_date"],
@@ -125,9 +128,9 @@ const NODES: FlowNode[] = [
 		title: "Fetch Appointments",
 		desc: "Reads today's list from the clinic",
 		kind: "Input",
-		x: 70,
-		y: 180,
-		w: 240,
+		x: 40,
+		y: 160,
+		w: 210,
 		rows: [
 			["Source", "clinic_db"],
 			["Query", "today, confirmed only"],
@@ -141,11 +144,15 @@ const NODES: FlowNode[] = [
 		title: "Validate List",
 		desc: "Skips the run when nothing is due",
 		kind: "Logic",
-		x: 70,
-		y: 360,
-		w: 250,
+		x: 40,
+		y: 350,
+		w: 220,
 		rows: [["Input", "rows (from Fetch)"]],
-		code: ["IF (rows.length > 0)", "  → remind each patient", "ELSE → skip quietly"],
+		code: [
+			"IF (rows.length > 0)",
+			"  → remind each patient",
+			"ELSE → skip quietly",
+		],
 		output: [
 			["valid_list", "(REMIND branch)"],
 			["skip_reason", "(EMPTY branch)"],
@@ -157,11 +164,15 @@ const NODES: FlowNode[] = [
 		title: "Format Message",
 		desc: "Builds the reminder in plain words",
 		kind: "Transform",
-		x: 430,
-		y: 370,
-		w: 250,
+		x: 350,
+		y: 360,
+		w: 230,
 		rows: [["Input", "valid_list.patient"]],
-		code: ['text = "Namaste {name},"', '+ "your visit is {time}"', '+ " at City Clinic."'],
+		code: [
+			'text = "Namaste {name},"',
+			'+ "your visit is {time}"',
+			'+ " at City Clinic."',
+		],
 		output: [["message", "ready to send"]],
 	},
 	{
@@ -170,9 +181,9 @@ const NODES: FlowNode[] = [
 		title: "Send Reminders",
 		desc: "SMS first, email as backup",
 		kind: "Output",
-		x: 250,
-		y: 590,
-		w: 250,
+		x: 190,
+		y: 600,
+		w: 230,
 		rows: [
 			["Channel", "SMS → Email"],
 			["Template", "reminder_v2"],
@@ -183,26 +194,37 @@ const NODES: FlowNode[] = [
 ];
 
 /* explicit edge coordinates — matches the layout above */
-const EDGES: { x1: number; y1: number; x2: number; y2: number; label?: string }[] = [
-	{ x1: 190, y1: 134, x2: 190, y2: 180 },
-	{ x1: 190, y1: 334, x2: 190, y2: 360 },
-	{ x1: 320, y1: 440, x2: 430, y2: 440, label: "Ready" },
-	{ x1: 555, y1: 550, x2: 375, y2: 590 },
+const EDGES: {
+	x1: number;
+	y1: number;
+	x2: number;
+	y2: number;
+	label?: string;
+}[] = [
+	{ x1: 145, y1: 122, x2: 145, y2: 160 },
+	{ x1: 145, y1: 310, x2: 145, y2: 350 },
+	{ x1: 260, y1: 445, x2: 350, y2: 445, label: "Ready" },
+	{ x1: 465, y1: 552, x2: 305, y2: 600 },
 ];
 
 const ZOOMS = [0.75, 1, 1.25];
 
 export function FlowBuilderMock() {
 	const [query, setQuery] = useState("");
-	const [open, setOpen] = useState<Record<string, boolean>>(() => Object.fromEntries(LIBRARY.map((s) => [s.label, true])));
+	const [open, setOpen] = useState<Record<string, boolean>>(() =>
+		Object.fromEntries(LIBRARY.map((s) => [s.label, true])),
+	);
 	const [selected, setSelected] = useState<string | null>(null);
 	const [zoom, setZoom] = useState(1);
 	const [run, setRun] = useState<"idle" | "running" | "done">("idle");
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	useEffect(() => () => {
-		if (timer.current) clearTimeout(timer.current);
-	}, []);
+	useEffect(
+		() => () => {
+			if (timer.current) clearTimeout(timer.current);
+		},
+		[],
+	);
 
 	const startRun = () => {
 		if (run === "running") return;
@@ -241,7 +263,9 @@ export function FlowBuilderMock() {
 							<div className="mock-fb__section" key={s.label}>
 								<button
 									className="mock-fb__sectoggle"
-									onClick={() => setOpen((m) => ({ ...m, [s.label]: !m[s.label] }))}
+									onClick={() =>
+										setOpen((m) => ({ ...m, [s.label]: !m[s.label] }))
+									}
 									aria-expanded={isOpen}
 								>
 									{s.label}
@@ -260,7 +284,9 @@ export function FlowBuilderMock() {
 							</div>
 						);
 					})}
-					{!visibleLibrary.length ? <p className="mock-fb__libempty">No nodes match that search.</p> : null}
+					{!visibleLibrary.length ? (
+						<p className="mock-fb__libempty">No nodes match that search.</p>
+					) : null}
 				</div>
 			</aside>
 
@@ -272,14 +298,33 @@ export function FlowBuilderMock() {
 						<span>Overview workflow</span>
 					</div>
 					<div className="mock-fb__barctl">
-						<IconButton icon={<Play />} label="Run flow" variant={run === "running" ? "secondary" : "ghost"} size="sm" onClick={startRun} />
-						<IconButton icon={<Settings2 />} label="Flow settings" variant="ghost" size="sm" />
+						<IconButton
+							icon={<Play />}
+							label="Run flow"
+							variant={run === "running" ? "secondary" : "ghost"}
+							size="sm"
+							onClick={startRun}
+						/>
+						<IconButton
+							icon={<Settings2 />}
+							label="Flow settings"
+							variant="ghost"
+							size="sm"
+						/>
 					</div>
 				</header>
 
-				<div className="mock-fb__stage">
-					<div className="mock-fb__zoomer" style={{ transform: `scale(${ZOOMS[zoom]})` }}>
-						<svg className="mock-fb__edges" width="760" height="780" aria-hidden="true">
+				<div className="mock-fb__stage" ref={stageRef}>
+					<div
+						className="mock-fb__zoomer"
+						style={{ transform: `scale(${ZOOMS[zoom]})` }}
+					>
+						<svg
+							className="mock-fb__edges"
+							width="620"
+							height="800"
+							aria-hidden="true"
+						>
 							{EDGES.map((e, i) => (
 								<g key={i} className={run === "running" ? "is-live" : ""}>
 									<line x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} />
@@ -287,7 +332,13 @@ export function FlowBuilderMock() {
 									<circle cx={e.x2} cy={e.y2} r="3.5" />
 									{e.label ? (
 										<>
-											<rect x={(e.x1 + e.x2) / 2 - 24} y={(e.y1 + e.y2) / 2 - 10} width="48" height="20" rx="10" />
+											<rect
+												x={(e.x1 + e.x2) / 2 - 24}
+												y={(e.y1 + e.y2) / 2 - 10}
+												width="48"
+												height="20"
+												rx="10"
+											/>
 											<text x={(e.x1 + e.x2) / 2} y={(e.y1 + e.y2) / 2 + 3.5}>
 												{e.label}
 											</text>
@@ -314,7 +365,11 @@ export function FlowBuilderMock() {
 										<strong>{n.title}</strong>
 										<em>{n.desc}</em>
 									</span>
-									<span className={`mock-fb__nkind mock-fb__nkind--${n.kind.toLowerCase()}`}>{n.kind}</span>
+									<span
+										className={`mock-fb__nkind mock-fb__nkind--${n.kind.toLowerCase()}`}
+									>
+										{n.kind}
+									</span>
 								</span>
 								{n.rows.map((r) => (
 									<span className="mock-fb__nrow" key={r[0]}>
@@ -331,7 +386,10 @@ export function FlowBuilderMock() {
 								) : null}
 								{n.output
 									? n.output.map((r) => (
-											<span className="mock-fb__nrow mock-fb__nrow--out" key={r[0]}>
+											<span
+												className="mock-fb__nrow mock-fb__nrow--out"
+												key={r[0]}
+											>
 												<span>{r[0]}</span>
 												<span>{r[1]}</span>
 											</span>
@@ -343,9 +401,23 @@ export function FlowBuilderMock() {
 
 					{/* zoom bar */}
 					<div className="mock-fb__zoom">
-						<IconButton icon={<Minus />} label="Zoom out" variant="ghost" size="sm" onClick={() => setZoom((z) => Math.max(0, z - 1))} disabled={zoom === 0} />
+						<IconButton
+							icon={<Minus />}
+							label="Zoom out"
+							variant="ghost"
+							size="sm"
+							onClick={() => setZoom((z) => Math.max(0, z - 1))}
+							disabled={zoom === 0}
+						/>
 						<span>{Math.round(ZOOMS[zoom] * 100)}%</span>
-						<IconButton icon={<Plus />} label="Zoom in" variant="ghost" size="sm" onClick={() => setZoom((z) => Math.min(ZOOMS.length - 1, z + 1))} disabled={zoom === ZOOMS.length - 1} />
+						<IconButton
+							icon={<Plus />}
+							label="Zoom in"
+							variant="ghost"
+							size="sm"
+							onClick={() => setZoom((z) => Math.min(ZOOMS.length - 1, z + 1))}
+							disabled={zoom === ZOOMS.length - 1}
+						/>
 					</div>
 				</div>
 			</main>
@@ -354,7 +426,13 @@ export function FlowBuilderMock() {
 			<aside className="mock-fb__insp">
 				<header className="mock-fb__insphead">
 					<h3>{selNode ? "Node" : "Flow"}</h3>
-					<span className={run === "running" ? "mock-fb__status is-running" : "mock-fb__status"}>
+					<span
+						className={
+							run === "running"
+								? "mock-fb__status is-running"
+								: "mock-fb__status"
+						}
+					>
 						{run === "running" ? "Running…" : "Active"}
 					</span>
 				</header>
@@ -365,7 +443,11 @@ export function FlowBuilderMock() {
 						<div className="mock-fb__selnode">
 							<selNode.icon aria-hidden="true" />
 							<strong>{selNode.title}</strong>
-							<span className={`mock-fb__nkind mock-fb__nkind--${selNode.kind.toLowerCase()}`}>{selNode.kind}</span>
+							<span
+								className={`mock-fb__nkind mock-fb__nkind--${selNode.kind.toLowerCase()}`}
+							>
+								{selNode.kind}
+							</span>
 						</div>
 						<dl className="mock-fb__props">
 							{selNode.rows.slice(0, 3).map((r) => (
@@ -381,36 +463,82 @@ export function FlowBuilderMock() {
 				<section className="mock-fb__panel">
 					<h4>Properties</h4>
 					<dl className="mock-fb__props">
-						<div><dt>Type</dt><dd>Workflow</dd></div>
-						<div><dt>Status</dt><dd>{run === "done" ? "Last run · success" : "Enabled"}</dd></div>
-						<div><dt>Created</dt><dd>Nov 4, 2024</dd></div>
-						<div><dt>Updated</dt><dd>Mar 10, 2025</dd></div>
-						<div><dt>Version</dt><dd>v1.2.0</dd></div>
+						<div>
+							<dt>Type</dt>
+							<dd>Workflow</dd>
+						</div>
+						<div>
+							<dt>Status</dt>
+							<dd>{run === "done" ? "Last run · success" : "Enabled"}</dd>
+						</div>
+						<div>
+							<dt>Created</dt>
+							<dd>Nov 4, 2024</dd>
+						</div>
+						<div>
+							<dt>Updated</dt>
+							<dd>Mar 10, 2025</dd>
+						</div>
+						<div>
+							<dt>Version</dt>
+							<dd>v1.2.0</dd>
+						</div>
 					</dl>
 				</section>
 
 				<section className="mock-fb__panel">
 					<h4>Runtime settings</h4>
 					<dl className="mock-fb__props">
-						<div><dt>Auto-run on schedule</dt><dd><span className="mock-fb__on">On</span></dd></div>
-						<div><dt>Timeout</dt><dd>30 s</dd></div>
-						<div><dt>Retry attempts</dt><dd>2</dd></div>
-						<div><dt>Stop on error</dt><dd><span className="mock-fb__on">On</span></dd></div>
+						<div>
+							<dt>Auto-run on schedule</dt>
+							<dd>
+								<span className="mock-fb__on">On</span>
+							</dd>
+						</div>
+						<div>
+							<dt>Timeout</dt>
+							<dd>30 s</dd>
+						</div>
+						<div>
+							<dt>Retry attempts</dt>
+							<dd>2</dd>
+						</div>
+						<div>
+							<dt>Stop on error</dt>
+							<dd>
+								<span className="mock-fb__on">On</span>
+							</dd>
+						</div>
 					</dl>
 				</section>
 
 				<section className="mock-fb__panel">
 					<h4>Variables</h4>
 					<dl className="mock-fb__props mock-fb__props--mono">
-						<div><dt>clinic_phone</dt><dd>"+91 98…"</dd></div>
-						<div><dt>sms_sender</dt><dd>"CITYCLN"</dd></div>
+						<div>
+							<dt>clinic_phone</dt>
+							<dd>"+91 98…"</dd>
+						</div>
+						<div>
+							<dt>sms_sender</dt>
+							<dd>"CITYCLN"</dd>
+						</div>
 					</dl>
 				</section>
 
 				<div className="mock-fb__actions">
-					<Button variant="primary" size="sm" onClick={() => setRun("done")}>Save change</Button>
-					<Button variant="secondary" size="sm">Duplicate flow</Button>
-					<IconButton icon={<Trash2 />} label="Delete flow" variant="ghost" size="sm" />
+					<Button variant="primary" size="sm" onClick={() => setRun("done")}>
+						Save change
+					</Button>
+					<Button variant="secondary" size="sm">
+						Duplicate flow
+					</Button>
+					<IconButton
+						icon={<Trash2 />}
+						label="Delete flow"
+						variant="ghost"
+						size="sm"
+					/>
 				</div>
 			</aside>
 		</div>

@@ -151,13 +151,13 @@
 	flex: 1;
 	overflow: auto;
 	background:
-		radial-gradient(circle, var(--line-strong) 1px, transparent 1px) 0 0 / 18px 18px;
+		radial-gradient(circle, var(--line) 1px, transparent 1px) 0 0 / 18px 18px;
 }
 
 .mock-fb__zoomer {
 	position: relative;
-	width: 760px;
-	height: 780px;
+	width: 620px;
+	height: 800px;
 	margin: 0 auto;
 	transform-origin: top center;
 	transition: transform var(--dur-2) var(--ease-out);
@@ -294,11 +294,26 @@
 	flex-shrink: 0;
 }
 
-.mock-fb__nkind--trigger { background: var(--accent-soft-bg); color: var(--accent); }
-.mock-fb__nkind--input { background: rgb(15 157 143 / 0.10); color: #0f9d8f; }
-.mock-fb__nkind--logic { background: rgb(124 58 237 / 0.10); color: #7c3aed; }
-.mock-fb__nkind--transform { background: rgb(217 160 63 / 0.14); color: #a57723; }
-.mock-fb__nkind--output { background: rgb(192 76 110 / 0.12); color: #c04c6e; }
+.mock-fb__nkind--trigger {
+	background: var(--accent-soft-bg);
+	color: var(--accent);
+}
+.mock-fb__nkind--input {
+	background: rgb(15 157 143 / 0.1);
+	color: #0f9d8f;
+}
+.mock-fb__nkind--logic {
+	background: rgb(124 58 237 / 0.1);
+	color: #7c3aed;
+}
+.mock-fb__nkind--transform {
+	background: rgb(217 160 63 / 0.14);
+	color: #a57723;
+}
+.mock-fb__nkind--output {
+	background: rgb(192 76 110 / 0.12);
+	color: #c04c6e;
+}
 
 .mock-fb__nrow {
 	display: flex;
@@ -387,7 +402,7 @@
 .mock-fb__status {
 	padding: 3px 10px;
 	border-radius: 999px;
-	background: rgb(12 92 67 / 0.10);
+	background: rgb(12 92 67 / 0.1);
 	font-size: 10px;
 	font-weight: 600;
 	color: var(--go-ink, #0c5c43);

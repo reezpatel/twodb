@@ -214,11 +214,11 @@
 }
 
 .mock-no__delta.is-up {
-	color: var(--go, #0f9d58);
+	color: var(--go);
 }
 
 .mock-no__delta.is-down {
-	color: var(--danger, #e02d3c);
+	color: var(--danger-ink);
 }
 
 .mock-no__bars {
@@ -239,7 +239,7 @@
 }
 
 .mock-no__bars span.is-danger {
-	background: var(--danger, #e02d3c);
+	background: var(--danger-ink);
 }
 
 .mock-no__statcap {
@@ -589,11 +589,11 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	color: var(--go, #0f9d58);
+	color: var(--go);
 }
 
 .mock-no__warn {
-	color: var(--warning-ink, #b07503);
+	color: var(--warning-ink);
 }
 
 .mock-no__track {
@@ -607,9 +607,12 @@
 .mock-no__fill {
 	display: block;
 	height: 100%;
+	width: 100%;
 	border-radius: inherit;
 	background: var(--accent);
-	transition: width 2.4s var(--ease-out);
+	transform-origin: left;
+	transform: scaleX(var(--fill, 0));
+	transition: transform 2.4s var(--ease-out);
 }
 
 .mock-no__tags {

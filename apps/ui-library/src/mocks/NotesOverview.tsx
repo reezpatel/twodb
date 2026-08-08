@@ -2,7 +2,7 @@
    document grid/list with sort + search, and a complete detail sidebar.
    Reference anatomy, Cyclorama grammar (hairlines, flat cobalt, Oswald cues). */
 
-import { useMemo, useState } from "react";
+import { type CSSProperties, useMemo, useState } from "react";
 import {
 	Badge,
 	Button,
@@ -42,7 +42,10 @@ import "./NotesOverview.css";
 /* --- data --- */
 
 type DocSource = "notion" | "pdf" | "link";
-type DocStatus = { kind: "chunks"; n: number } | { kind: "pending" } | { kind: "reindex" };
+type DocStatus =
+	| { kind: "chunks"; n: number }
+	| { kind: "pending" }
+	| { kind: "reindex" };
 
 interface DocDetail {
 	category: string;
@@ -153,7 +156,8 @@ const DOCS: Doc[] = [
 			tags: ["Refunds", "SOP"],
 			chunkId: "chunk #—",
 			chunkTime: "—",
-			chunkText: "Pending first index — chunks will appear here once vectorisation completes.",
+			chunkText:
+				"Pending first index — chunks will appear here once vectorisation completes.",
 		}),
 	},
 	{
@@ -347,7 +351,8 @@ const ARCHIVED: Doc[] = [
 			sim: "0.77",
 			lastHit: "2 d ago",
 			tags: ["Operations"],
-			chunkText: "Last guaranteed pickup before Dec 24 is Dec 20 14:00 for EU destinations…",
+			chunkText:
+				"Last guaranteed pickup before Dec 24 is Dec 20 14:00 for EU destinations…",
 		}),
 	},
 	{
@@ -367,7 +372,8 @@ const ARCHIVED: Doc[] = [
 			sim: "0.74",
 			lastHit: "4 d ago",
 			tags: ["Returns", "Legacy"],
-			chunkText: "The previous 14-day window applies to all orders confirmed before March 1…",
+			chunkText:
+				"The previous 14-day window applies to all orders confirmed before March 1…",
 		}),
 	},
 	{
@@ -388,7 +394,8 @@ const ARCHIVED: Doc[] = [
 			lastHit: "3 d ago",
 			tags: ["Internal", "Onboarding"],
 			chunkId: "chunk #9",
-			chunkText: "Shadow two live chats on day one, then answer with a buddy reviewing before send…",
+			chunkText:
+				"Shadow two live chats on day one, then answer with a buddy reviewing before send…",
 		}),
 	},
 	{
@@ -409,7 +416,8 @@ const ARCHIVED: Doc[] = [
 			sim: "0.72",
 			lastHit: "1 w ago",
 			tags: ["API", "Deprecation"],
-			chunkText: "v1 endpoints stop responding on Oct 1; migrate webhook receivers before Sep 15…",
+			chunkText:
+				"v1 endpoints stop responding on Oct 1; migrate webhook receivers before Sep 15…",
 		}),
 	},
 ];
@@ -487,9 +495,7 @@ function StatCard({ stat }: { stat: (typeof STATS)[number] }) {
 			<div className="mock-no__statmid">
 				<div className="mock-no__statvalue">
 					<strong className="tw-tnum">{stat.value}</strong>
-					<span
-						className={`mock-no__delta ${stat.up ? "is-up" : "is-down"}`}
-					>
+					<span className={`mock-no__delta ${stat.up ? "is-up" : "is-down"}`}>
 						{stat.up ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
 						{stat.delta}
 					</span>
@@ -517,7 +523,13 @@ function StatCard({ stat }: { stat: (typeof STATS)[number] }) {
 
 /* --- detail sidebar --- */
 
-function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
+function InfoRow({
+	label,
+	children,
+}: {
+	label: string;
+	children: React.ReactNode;
+}) {
 	return (
 		<div className="mock-no__row">
 			<span>{label}</span>
@@ -544,7 +556,13 @@ function DetailPanel({
 		<aside className="mock-no__panel">
 			<header className="mock-no__panelhead">
 				<h3>{doc.title}</h3>
-				<IconButton label="Close panel" icon={<X />} size="sm" variant="ghost" onClick={onClose} />
+				<IconButton
+					label="Close panel"
+					icon={<X />}
+					size="sm"
+					variant="ghost"
+					onClick={onClose}
+				/>
 			</header>
 
 			<div className="mock-no__panelbody">
@@ -553,12 +571,21 @@ function DetailPanel({
 					<InfoRow label="Source">
 						<span className="mock-no__sourceval">
 							<SourceTile source={doc.source} />
-							{doc.source === "notion" ? "Notions" : doc.source === "pdf" ? "Upload" : "Web link"}
+							{doc.source === "notion"
+								? "Notions"
+								: doc.source === "pdf"
+									? "Upload"
+									: "Web link"}
 						</span>
 					</InfoRow>
 					<InfoRow label="Category">{d.category}</InfoRow>
 					<InfoRow label="Type">{d.type}</InfoRow>
-					<InfoRow label="Updated">{doc.ago.replace("m ago", " min ago").replace("h ago", " hours ago").replace("d ago", " days ago")}</InfoRow>
+					<InfoRow label="Updated">
+						{doc.ago
+							.replace("m ago", " min ago")
+							.replace("h ago", " hours ago")
+							.replace("d ago", " days ago")}
+					</InfoRow>
 					<InfoRow label="Size">{d.size}</InfoRow>
 				</section>
 
@@ -576,15 +603,19 @@ function DetailPanel({
 						)}
 					</InfoRow>
 					<InfoRow label="Chunks">
-						{doc.status.kind === "chunks" ? `${doc.status.n}/${doc.status.n}` : "0/0"}
+						{doc.status.kind === "chunks"
+							? `${doc.status.n}/${doc.status.n}`
+							: "0/0"}
 					</InfoRow>
 					<InfoRow label="Model">{d.model}</InfoRow>
 					<InfoRow label="Coverage">{d.coverage}</InfoRow>
-					<InfoRow label="Size">{reindexing ? `${Math.round(progress)}%` : `${d.pct}%`}</InfoRow>
+					<InfoRow label="Size">
+						{reindexing ? `${Math.round(progress)}%` : `${d.pct}%`}
+					</InfoRow>
 					<div className="mock-no__track">
 						<span
 							className="mock-no__fill"
-							style={{ width: `${reindexing ? progress : d.pct}%` }}
+							style={{ "--fill": (reindexing ? progress : d.pct) / 100 } as CSSProperties}
 						/>
 					</div>
 				</section>
@@ -624,7 +655,10 @@ function DetailPanel({
 					disabled={reindexing}
 					style={{ width: "100%", justifyContent: "center" }}
 				>
-					<RefreshCw size={15} className={reindexing ? "mock-no__spin" : undefined} />
+					<RefreshCw
+						size={15}
+						className={reindexing ? "mock-no__spin" : undefined}
+					/>
 					{reindexing ? "Indexing…" : "Re-index Document"}
 				</Button>
 			</footer>
@@ -709,7 +743,8 @@ export function NotesOverviewMock() {
 				tags: ["New"],
 				chunkId: "chunk #—",
 				chunkTime: "—",
-				chunkText: "Pending first index — chunks will appear here once vectorisation completes.",
+				chunkText:
+					"Pending first index — chunks will appear here once vectorisation completes.",
 			}),
 		};
 		setDocs((cur) => [doc, ...cur]);
@@ -760,7 +795,12 @@ export function NotesOverviewMock() {
 					</button>
 				))}
 				<span className="mock-no__railspacer" />
-				<button type="button" title="Settings" aria-label="Settings" className="mock-no__railitem">
+				<button
+					type="button"
+					title="Settings"
+					aria-label="Settings"
+					className="mock-no__railitem"
+				>
 					<Settings size={18} />
 				</button>
 			</nav>
@@ -794,13 +834,26 @@ export function NotesOverviewMock() {
 							</Button>
 						}
 					>
-						<MenuItem icon={<span className="mock-no__tile mock-no__tile--notion mock-no__tile--xs">N</span>} onClick={() => addSource("notion")}>
+						<MenuItem
+							icon={
+								<span className="mock-no__tile mock-no__tile--notion mock-no__tile--xs">
+									N
+								</span>
+							}
+							onClick={() => addSource("notion")}
+						>
 							Notion page
 						</MenuItem>
-						<MenuItem icon={<Upload size={15} />} onClick={() => addSource("pdf")}>
+						<MenuItem
+							icon={<Upload size={15} />}
+							onClick={() => addSource("pdf")}
+						>
 							Upload PDF
 						</MenuItem>
-						<MenuItem icon={<Globe size={15} />} onClick={() => addSource("link")}>
+						<MenuItem
+							icon={<Globe size={15} />}
+							onClick={() => addSource("link")}
+						>
 							Web link
 						</MenuItem>
 					</Menu>
@@ -818,7 +871,11 @@ export function NotesOverviewMock() {
 
 						{/* toolbar */}
 						<div className="mock-no__toolbar">
-							<div className="mock-no__seg" role="tablist" aria-label="Document sets">
+							<div
+								className="mock-no__seg"
+								role="tablist"
+								aria-label="Document sets"
+							>
 								<button
 									type="button"
 									role="tab"
@@ -850,14 +907,24 @@ export function NotesOverviewMock() {
 									{SORTS.map((s) => (
 										<MenuItem
 											key={s.id}
-											icon={sort === s.id ? <Check size={14} /> : <span style={{ width: 14 }} />}
+											icon={
+												sort === s.id ? (
+													<Check size={14} />
+												) : (
+													<span style={{ width: 14 }} />
+												)
+											}
 											onClick={() => setSort(s.id)}
 										>
 											{s.label}
 										</MenuItem>
 									))}
 								</Menu>
-								<div className="mock-no__seg mock-no__seg--icons" role="group" aria-label="View">
+								<div
+									className="mock-no__seg mock-no__seg--icons"
+									role="group"
+									aria-label="View"
+								>
 									<button
 										type="button"
 										aria-label="Grid view"
@@ -894,13 +961,21 @@ export function NotesOverviewMock() {
 									>
 										<div className="mock-no__cardhead">
 											<SourceTile source={doc.source} />
-											<DocMenu doc={doc} onReindex={() => reindex(doc.id)} onRemove={() => removeDoc(doc.id)} />
+											<DocMenu
+												doc={doc}
+												onReindex={() => reindex(doc.id)}
+												onRemove={() => removeDoc(doc.id)}
+											/>
 										</div>
 										<strong>{doc.title}</strong>
 										<p>{doc.desc}</p>
 										<div className="mock-no__cardfoot">
 											<span>{doc.ago}</span>
-											{busyId === doc.id ? <Badge tone="rose">Re-indexing…</Badge> : <StatusChip status={doc.status} />}
+											{busyId === doc.id ? (
+												<Badge tone="rose">Re-indexing…</Badge>
+											) : (
+												<StatusChip status={doc.status} />
+											)}
 										</div>
 									</article>
 								))}
@@ -919,8 +994,16 @@ export function NotesOverviewMock() {
 											<em>{doc.desc}</em>
 										</span>
 										<span className="mock-no__liago">{doc.ago}</span>
-										{busyId === doc.id ? <Badge tone="rose">Re-indexing…</Badge> : <StatusChip status={doc.status} />}
-										<DocMenu doc={doc} onReindex={() => reindex(doc.id)} onRemove={() => removeDoc(doc.id)} />
+										{busyId === doc.id ? (
+											<Badge tone="rose">Re-indexing…</Badge>
+										) : (
+											<StatusChip status={doc.status} />
+										)}
+										<DocMenu
+											doc={doc}
+											onReindex={() => reindex(doc.id)}
+											onRemove={() => removeDoc(doc.id)}
+										/>
 									</div>
 								))}
 							</div>
