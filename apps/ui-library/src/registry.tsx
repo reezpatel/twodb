@@ -90,6 +90,7 @@ import { ComposeEmailMock } from "./mocks/ComposeEmail";
 import { DetectedAccountsMock } from "./mocks/DetectedAccounts";
 import { IntegrationsMock } from "./mocks/Integrations";
 import { ProdexDashboardMock } from "./mocks/ProdexDashboard";
+import { SalesMateProMock } from "./mocks/SalesMatePro";
 import { WeeklyCalendarMock } from "./mocks/WeeklyCalendar";
 import { ShareSettingsMock } from "./mocks/ShareSettings";
 import { SettingsMock } from "./mocks/Settings";
@@ -101,10 +102,12 @@ import { TodoFlowMock } from "./mocks/TodoFlow";
 import { ChatMailMock } from "./mocks/ChatMail";
 import { LiveScribeMock } from "./mocks/LiveScribe";
 import { WeeklyCalMock } from "./mocks/WeeklyCal";
+import { FileManagerMock } from "./mocks/FileManager";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
 import { InboxMock } from "./mocks/Inbox";
 import { MonthlyCalendarMock } from "./mocks/MonthlyCalendar";
 import { DesignDiscussionMock } from "./mocks/DesignDiscussion";
+import { CompanyProfileMock } from "./mocks/CompanyProfile";
 
 export interface Story {
 	title: string;
@@ -2638,6 +2641,30 @@ export const registry: ComponentEntry[] = [
 		],
 	},
 	{
+		id: "salesmate-pro",
+		group: "Showcase",
+		name: "SalesMate Pro",
+		description:
+			"A CRM sales dashboard in warm earth tones — espresso top bar, cream sidebar, and a five-card Sales Overview with revenue and pipeline trend bars, action items list, a six-month performance line chart, and quota attainment.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — Sales Overview dashboard",
+				render: () => <SalesMateProMock />,
+				code: `<SalesMateProMock />
+
+{/* Espresso top bar + cream sidebar + 5-card overview grid:
+    Revenue (Closed Won vs Pending bars),
+    Deals Pipeline (In Progress vs At Risk bars),
+    Action Items (5-row task list),
+    Sales Performance (smooth Won/Lost line + area),
+    Quota Attainment (3-bar Target / Achieved / Remaining).
+    Self-contained earth-tone palette so the dashboard keeps
+    its identity when the canvas flips to night. */}`,
+			},
+		],
+	},
+	{
 		id: "integrations",
 		group: "Showcase",
 		name: "Integrations",
@@ -2925,6 +2952,44 @@ export const registry: ComponentEntry[] = [
 
 {/* Day tab collapses the grid to the anchor day;
     Month tab jumps back to week on pick */}`,
+			},
+		],
+	},
+	{
+		id: "company-profile",
+		group: "Showcase",
+		name: "Company Profile",
+		description:
+			"A Notion-style company page: identity hero, about + certifications + details column, and a files table on DataTable with expiration status pills and file chips.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — profile and files",
+				render: () => <CompanyProfileMock />,
+				code: `{/* DataTable does search / filters / pagination;
+    expiration pill: danger expired · warning ≤30d · go valid;
+    filter enums: has-file, expiration state */}`,
+			},
+		],
+	},
+	{
+		id: "file-manager",
+		group: "Showcase",
+		name: "File Manager",
+		description:
+			"The clinic's documents, organized: folder cards and a rail sub-nav that filter the same list, recent chips, type tabs + search, row selection with a live count, and a grid/list toggle.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — project files",
+				render: () => <FileManagerMock />,
+				code: `{/* one filter pipeline: folder cards, rail sub-nav,
+    type tabs and search all narrow the same rows */}
+<FolderCard onClick={filterFolder} />
+<Table rows={visible} selectable />
+
+{/* grid/list toggle switches the All files section;
+    selection count lives in the table footer */}`,
 			},
 		],
 	},
