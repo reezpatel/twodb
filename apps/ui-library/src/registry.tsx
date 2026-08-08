@@ -104,6 +104,7 @@ import { ChatMailMock } from "./mocks/ChatMail";
 import { LiveScribeMock } from "./mocks/LiveScribe";
 import { WeeklyCalMock } from "./mocks/WeeklyCal";
 import { FileManagerMock } from "./mocks/FileManager";
+import { FileDriveMock } from "./mocks/FileDrive";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
 import { InboxMock } from "./mocks/Inbox";
 import { MonthlyCalendarMock } from "./mocks/MonthlyCalendar";
@@ -3029,6 +3030,27 @@ export const registry: ComponentEntry[] = [
 
 {/* create-new = night button + Menu
     (New folder / New document / Upload) */}`,
+			},
+		],
+	},
+	{
+		id: "file-drive",
+		group: "Showcase",
+		name: "File Drive",
+		description:
+			"The clinic's documents, organized: folder cards and a rail sub-nav that filter the same list, recent chips, type tabs + search, row selection with a live count, and a grid/list toggle.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — project files",
+				render: () => <FileDriveMock />,
+				code: `{/* one filter pipeline: folder cards, rail sub-nav,
+    type tabs and search all narrow the same rows */}
+<FolderCard onClick={filterFolder} />
+<Table rows={visible} selectable />
+
+{/* grid/list toggle switches the All files section;
+    selection count lives in the table footer */}`,
 			},
 		],
 	},
