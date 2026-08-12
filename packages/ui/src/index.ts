@@ -28,6 +28,13 @@ export type { SelectProps } from "./components/Select";
 export { Checkbox } from "./components/Checkbox";
 export type { CheckboxProps } from "./components/Checkbox";
 
+export { Checklist, CheckItem } from "./components/Checklist";
+export type {
+	ChecklistProps,
+	CheckItemProps,
+	ChecklistPriority,
+} from "./components/Checklist";
+
 export { Radio } from "./components/Radio";
 export type { RadioProps } from "./components/Radio";
 

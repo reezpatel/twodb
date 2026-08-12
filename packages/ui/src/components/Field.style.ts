@@ -191,9 +191,6 @@ export const fieldStyles = css`
 	font-weight: 600;
 }
 
-/* Checkbox — the native input stays invisible but real; the box lights cobalt,
-   the check draws itself in, indeterminate gets the dash */
-
 .tw-choice {
 	display: inline-flex;
 	align-items: center;
@@ -204,11 +201,20 @@ export const fieldStyles = css`
 	user-select: none;
 }
 
+.tw-checkbox-choice {
+	align-items: flex-start;
+	gap: 8px;
+	font-size: var(--text-sm);
+	line-height: 1.35;
+	color: var(--ink-2);
+}
+
 .tw-checkbox {
 	position: relative;
 	display: inline-flex;
-	width: 17px;
-	height: 17px;
+	width: 16px;
+	height: 16px;
+	margin-top: 1px;
 	flex-shrink: 0;
 }
 
@@ -221,41 +227,53 @@ export const fieldStyles = css`
 }
 
 .tw-checkbox__box {
-	width: 17px;
-	height: 17px;
-	border-radius: 5px;
-	background: var(--surface);
-	border: 1px solid var(--line-strong);
 	display: grid;
 	place-items: center;
-	color: #ffffff;
+	width: 16px;
+	height: 16px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-sm);
+	background: var(--surface);
+	box-sizing: border-box;
+	color: var(--accent-ink);
 	pointer-events: none;
 	transition:
 		background var(--dur-1) var(--ease-out),
 		border-color var(--dur-1) var(--ease-out),
-		box-shadow var(--dur-1) var(--ease-out);
+		box-shadow var(--dur-1) var(--ease-out),
+		transform var(--dur-1) var(--ease-out);
 }
 
+.tw-checkbox-choice:hover .tw-checkbox__box,
 .tw-choice:hover .tw-checkbox__box {
 	border-color: var(--ink-3);
 }
 
 .tw-checkbox input:checked + .tw-checkbox__box,
 .tw-checkbox input:indeterminate + .tw-checkbox__box {
-	background: var(--action);
-	border-color: var(--action);
+	background: var(--go);
+	border-color: var(--go);
 }
 
 .tw-checkbox input:focus-visible + .tw-checkbox__box {
 	box-shadow: 0 0 0 3px var(--ring);
 }
 
-.tw-checkbox input:disabled + .tw-checkbox__box {
+.tw-checkbox input:active + .tw-checkbox__box {
+	transform: scale(0.94);
+}
+
+.tw-checkbox input:disabled + .tw-checkbox__box,
+.tw-checkbox input:disabled ~ .tw-checkbox__label {
 	opacity: 0.45;
 }
 
 .tw-checkbox input:disabled {
 	cursor: not-allowed;
+}
+
+.tw-checkbox__label {
+	min-width: 0;
 }
 
 .tw-checkbox__mark,

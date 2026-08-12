@@ -13,7 +13,6 @@ import {
 	FileImage,
 	FileSpreadsheet,
 	FileText,
-	Files,
 	Folder,
 	FolderOpen,
 	LayoutGrid,
@@ -22,6 +21,7 @@ import {
 	Upload,
 } from "lucide-react";
 import { filesSceneStyles } from "./FilesScene.style.jsx";
+import { formatFileSize, UploadDialog } from "./UploadDialog";
 
 /* ---------- data ---------- */
 
@@ -138,6 +138,14 @@ const FILES: FileRow[] = [
 
 const RECENT = FILES.slice(0, 4);
 
+function typeFromName(name: string): FileType {
+	const ext = name.split(".").pop()?.toLowerCase() ?? "";
+	if (ext === "pdf") return "pdf";
+	if (["xls", "xlsx", "csv"].includes(ext)) return "sheet";
+	if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "image";
+	return "doc";
+}
+
 function FileIcon({ type, size }: { type: FileType; size?: "sm" }) {
 	const meta = TYPE_META[type];
 	const Icon = meta.icon;
@@ -149,7 +157,7 @@ function FileIcon({ type, size }: { type: FileType; size?: "sm" }) {
 					: `mock-pf__ficon is-${meta.cls}`
 			}
 		>
-			<Icon aria-hidden="true" />
+			<Icon size={size === "sm" ? 13 : 16} aria-hidden="true" />
 		</span>
 	);
 }
@@ -161,10 +169,12 @@ export function FilesScene() {
 	const [view, setView] = useState<"list" | "grid">("list");
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const [sideType, setSideType] = useState("all");
+	const [files, setFiles] = useState<FileRow[]>(FILES);
+	const [uploadOpen, setUploadOpen] = useState(false);
 
 	const rows = useMemo(
 		() =>
-			FILES.filter((f) => {
+			files.filter((f) => {
 				if (folder && f.folder !== folder) return false;
 				if (typeTab !== "all" && TYPE_META[f.type].label !== typeTab)
 					return false;
@@ -172,7 +182,7 @@ export function FilesScene() {
 					return false;
 				return true;
 			}),
-		[folder, typeTab, query],
+		[files, folder, typeTab, query],
 	);
 
 	const toggle = (name: string) =>
@@ -184,279 +194,290 @@ export function FilesScene() {
 		});
 
 	return (
-		<>
+		<div className="mock-pf">
 			<style jsx>{filesSceneStyles}</style>
-			<div className="shell__chrome files__chrome">
-				<Files size={15} />
-				<strong>Files</strong>
-			</div>
-			<main className="files__body" aria-label="Files">
-				<div className="mock-pf">
-					{/* center */}
-					<main className="mock-pf__main">
-						<header className="mock-pf__head">
+			{/* center */}
+			<main className="mock-pf__main">
+				<header className="mock-pf__head">
+					<div>
+						<span className="mock-pf__crumb">Dashboard / Project Files</span>
+						<h2>Project Files</h2>
+					</div>
+					<Button
+						variant="primary"
+						size="sm"
+						onClick={() => setUploadOpen(true)}
+					>
+						<Upload size={14} aria-hidden="true" /> Upload file
+					</Button>
+				</header>
+
+				{/* folder cards */}
+				<div className="mock-pf__folders">
+					{FOLDERS.map((f) => (
+						<button
+							className={
+								folder === f.name
+									? "mock-pf__folder is-active"
+									: "mock-pf__folder"
+							}
+							key={f.name}
+							onClick={() => setFolder(folder === f.name ? null : f.name)}
+							aria-pressed={folder === f.name}
+						>
+							<FolderOpen size={18} aria-hidden="true" />
+							<strong>{f.name}</strong>
+							<span>
+								{f.files} files · {f.size}
+							</span>
+						</button>
+					))}
+				</div>
+
+				{/* recent */}
+				<h3 className="mock-pf__sect">Recent files</h3>
+				<div className="mock-pf__recent">
+					{RECENT.map((f) => (
+						<div className="mock-pf__chip" key={f.name}>
+							<FileIcon type={f.type} size="sm" />
 							<div>
-								<span className="mock-pf__crumb">
-									Dashboard / Project Files
-								</span>
-								<h2>Project Files</h2>
-							</div>
-							<Button variant="primary" size="sm">
-								<Upload aria-hidden="true" /> Upload file
-							</Button>
-						</header>
-
-						{/* folder cards */}
-						<div className="mock-pf__folders">
-							{FOLDERS.map((f) => (
-								<button
-									className={
-										folder === f.name
-											? "mock-pf__folder is-active"
-											: "mock-pf__folder"
-									}
-									key={f.name}
-									onClick={() => setFolder(folder === f.name ? null : f.name)}
-									aria-pressed={folder === f.name}
-								>
-									<FolderOpen aria-hidden="true" />
-									<strong>{f.name}</strong>
-									<span>
-										{f.files} files · {f.size}
-									</span>
-								</button>
-							))}
-						</div>
-
-						{/* recent */}
-						<h3 className="mock-pf__sect">Recent files</h3>
-						<div className="mock-pf__recent">
-							{RECENT.map((f) => (
-								<div className="mock-pf__chip" key={f.name}>
-									<FileIcon type={f.type} size="sm" />
-									<div>
-										<strong>{f.name}</strong>
-										<span>{f.opened}</span>
-									</div>
-								</div>
-							))}
-						</div>
-
-						{/* all files */}
-						<div className="mock-pf__allhead">
-							<h3 className="mock-pf__sect">All files</h3>
-							<Tabs
-								aria-label="Filter by type"
-								items={[
-									{ id: "all", label: "View all" },
-									{ id: "Document", label: "Documents" },
-									{ id: "Spreadsheet", label: "Spreadsheets" },
-									{ id: "PDF", label: "PDFs" },
-									{ id: "Image", label: "Images" },
-								]}
-								value={typeTab}
-								onValueChange={setTypeTab}
-							/>
-							<SearchInput
-								value={query}
-								onChange={(e) => setQuery(e.target.value)}
-								placeholder="Search files…"
-								aria-label="Search files"
-							/>
-							<div className="mock-pf__viewtoggle">
-								<IconButton
-									icon={<LayoutGrid />}
-									label="Grid view"
-									variant={view === "grid" ? "secondary" : "ghost"}
-									size="sm"
-									onClick={() => setView("grid")}
-								/>
-								<IconButton
-									icon={<List />}
-									label="List view"
-									variant={view === "list" ? "secondary" : "ghost"}
-									size="sm"
-									onClick={() => setView("list")}
-								/>
+								<strong>{f.name}</strong>
+								<span>{f.opened}</span>
 							</div>
 						</div>
+					))}
+				</div>
 
-						{view === "list" ? (
-							<div className="mock-pf__tablewrap">
-								<table className="mock-pf__table">
-									<thead>
-										<tr>
-											<th className="mock-pf__check" />
-											<th>Filename</th>
-											<th>Last opened</th>
-											<th>Owner</th>
-											<th>Location</th>
-											<th />
-										</tr>
-									</thead>
-									<tbody>
-										{rows.map((f) => (
-											<tr
-												key={f.name}
-												className={selected.has(f.name) ? "is-selected" : ""}
-											>
-												<td className="mock-pf__check">
-													<Checkbox
-														checked={selected.has(f.name)}
-														onChange={() => toggle(f.name)}
-														aria-label={`Select ${f.name}`}
-													/>
-												</td>
-												<td>
-													<span className="mock-pf__fname">
-														<FileIcon type={f.type} size="sm" />
-														{f.name}
-													</span>
-												</td>
-												<td className="mock-pf__muted">{f.opened}</td>
-												<td>
-													<span className="mock-pf__owner">
-														<Avatar name={f.owner} size="sm" />
-														{f.owner}
-													</span>
-												</td>
-												<td>
-													<code className="mock-pf__loc">
-														/{f.folder.toLowerCase().replace(/ & | /g, "-")}
-													</code>
-												</td>
-												<td className="mock-pf__rowact">
-													<IconButton
-														icon={<MoreHorizontal />}
-														label={`Actions for ${f.name}`}
-														variant="ghost"
-														size="sm"
-													/>
-												</td>
-											</tr>
-										))}
-										{!rows.length ? (
-											<tr>
-												<td colSpan={6} className="mock-pf__empty">
-													No files match these filters.
-												</td>
-											</tr>
-										) : null}
-									</tbody>
-								</table>
-								<div className="mock-pf__foot">
-									<span>
-										{selected.size} of {rows.length} row(s) selected.
-									</span>
-									<span className="mock-pf__page">Page 1 of 1</span>
-								</div>
-							</div>
-						) : (
-							<div className="mock-pf__grid">
+				{/* all files */}
+				<div className="mock-pf__allhead">
+					<h3 className="mock-pf__sect">All files</h3>
+					<Tabs
+						aria-label="Filter by type"
+						items={[
+							{ id: "all", label: "View all" },
+							{ id: "Document", label: "Documents" },
+							{ id: "Spreadsheet", label: "Spreadsheets" },
+							{ id: "PDF", label: "PDFs" },
+							{ id: "Image", label: "Images" },
+						]}
+						value={typeTab}
+						onValueChange={setTypeTab}
+					/>
+					<SearchInput
+						value={query}
+						onChange={(e) => setQuery(e.target.value)}
+						placeholder="Search files…"
+						aria-label="Search files"
+					/>
+					<div className="mock-pf__viewtoggle">
+						<IconButton
+							icon={<LayoutGrid />}
+							label="Grid view"
+							variant={view === "grid" ? "secondary" : "ghost"}
+							size="sm"
+							onClick={() => setView("grid")}
+						/>
+						<IconButton
+							icon={<List />}
+							label="List view"
+							variant={view === "list" ? "secondary" : "ghost"}
+							size="sm"
+							onClick={() => setView("list")}
+						/>
+					</div>
+				</div>
+
+				{view === "list" ? (
+					<div className="mock-pf__tablewrap">
+						<table className="mock-pf__table">
+							<thead>
+								<tr>
+									<th className="mock-pf__check" />
+									<th>Filename</th>
+									<th>Last opened</th>
+									<th>Owner</th>
+									<th>Location</th>
+									<th />
+								</tr>
+							</thead>
+							<tbody>
 								{rows.map((f) => (
-									<button
-										className={
-											selected.has(f.name)
-												? "mock-pf__card is-selected"
-												: "mock-pf__card"
-										}
+									<tr
 										key={f.name}
-										onClick={() => toggle(f.name)}
+										className={selected.has(f.name) ? "is-selected" : ""}
 									>
-										<FileIcon type={f.type} />
-										<strong>{f.name}</strong>
-										<span>
-											{f.opened} · {f.owner}
-										</span>
-									</button>
+										<td className="mock-pf__check">
+											<Checkbox
+												checked={selected.has(f.name)}
+												onChange={() => toggle(f.name)}
+												aria-label={`Select ${f.name}`}
+											/>
+										</td>
+										<td>
+											<span className="mock-pf__fname">
+												<FileIcon type={f.type} size="sm" />
+												{f.name}
+											</span>
+										</td>
+										<td className="mock-pf__muted">{f.opened}</td>
+										<td>
+											<span className="mock-pf__owner">
+												<Avatar name={f.owner} size="sm" />
+												{f.owner}
+											</span>
+										</td>
+										<td>
+											<code className="mock-pf__loc">
+												/{f.folder.toLowerCase().replace(/ & | /g, "-")}
+											</code>
+										</td>
+										<td className="mock-pf__rowact">
+											<IconButton
+												icon={<MoreHorizontal />}
+												label={`Actions for ${f.name}`}
+												variant="ghost"
+												size="sm"
+											/>
+										</td>
+									</tr>
 								))}
 								{!rows.length ? (
-									<p className="mock-pf__empty">
-										No files match these filters.
-									</p>
+									<tr>
+										<td colSpan={6} className="mock-pf__empty">
+											No files match these filters.
+										</td>
+									</tr>
 								) : null}
-							</div>
-						)}
-					</main>
-
-					{/* right panel — the reference's Files sidebar */}
-					<aside className="mock-pf__side">
-						<div className="mock-pf__sidehead">
-							<h3>Files</h3>
-							<IconButton
-								icon={<MoreHorizontal />}
-								label="Panel options"
-								variant="ghost"
-								size="sm"
-							/>
+							</tbody>
+						</table>
+						<div className="mock-pf__foot">
+							<span>
+								{selected.size} of {rows.length} row(s) selected.
+							</span>
+							<span className="mock-pf__page">Page 1 of 1</span>
 						</div>
-						<Select
-							aria-label="Filter panel by type"
-							options={[
-								{ value: "all", label: "All types" },
-								{ value: "PDF", label: "PDFs" },
-								{ value: "Document", label: "Documents" },
-								{ value: "Spreadsheet", label: "Spreadsheets" },
-								{ value: "Image", label: "Images" },
-							]}
-							value={sideType}
-							onValueChange={setSideType}
-						/>
-
-						<div className="mock-pf__sidefolders">
-							{FOLDERS.map((f) => (
-								<button
-									className={
-										folder === f.name
-											? "mock-pf__tile is-active"
-											: "mock-pf__tile"
-									}
-									key={f.name}
-									onClick={() => setFolder(folder === f.name ? null : f.name)}
-									aria-pressed={folder === f.name}
-								>
-									<Folder aria-hidden="true" />
-									<strong>{f.name}</strong>
-									<span>{f.files} files</span>
-								</button>
-							))}
-						</div>
-
-						<h4 className="mock-pf__sidesect">Recent files</h4>
-						<div className="mock-pf__sidelist">
-							{FILES.filter(
-								(f) =>
-									sideType === "all" || TYPE_META[f.type].label === sideType,
-							)
-								.slice(0, 5)
-								.map((f) => (
-									<button
-										className={
-											selected.has(f.name)
-												? "mock-pf__siderow is-selected"
-												: "mock-pf__siderow"
-										}
-										key={f.name}
-										onClick={() => toggle(f.name)}
-										title={
-											selected.has(f.name)
-												? "Selected — click to deselect"
-												: "Click to select in the list"
-										}
-									>
-										<FileIcon type={f.type} />
-										<div>
-											<strong>{f.name}</strong>
-											<span>
-												{f.size} · {f.opened}
-											</span>
-										</div>
-									</button>
-								))}
-						</div>
-					</aside>
-				</div>
+					</div>
+				) : (
+					<div className="mock-pf__grid">
+						{rows.map((f) => (
+							<button
+								className={
+									selected.has(f.name)
+										? "mock-pf__card is-selected"
+										: "mock-pf__card"
+								}
+								key={f.name}
+								onClick={() => toggle(f.name)}
+							>
+								<FileIcon type={f.type} />
+								<strong>{f.name}</strong>
+								<span>
+									{f.opened} · {f.owner}
+								</span>
+							</button>
+						))}
+						{!rows.length ? (
+							<p className="mock-pf__empty">No files match these filters.</p>
+						) : null}
+					</div>
+				)}
 			</main>
-		</>
+
+			{/* right panel — the reference's Files sidebar */}
+			<aside className="mock-pf__side">
+				<div className="mock-pf__sidehead">
+					<h3>Files</h3>
+					<IconButton
+						icon={<MoreHorizontal />}
+						label="Panel options"
+						variant="ghost"
+						size="sm"
+					/>
+				</div>
+				<Select
+					aria-label="Filter panel by type"
+					options={[
+						{ value: "all", label: "All types" },
+						{ value: "PDF", label: "PDFs" },
+						{ value: "Document", label: "Documents" },
+						{ value: "Spreadsheet", label: "Spreadsheets" },
+						{ value: "Image", label: "Images" },
+					]}
+					value={sideType}
+					onValueChange={setSideType}
+				/>
+
+				<div className="mock-pf__sidefolders">
+					{FOLDERS.map((f) => (
+						<button
+							className={
+								folder === f.name ? "mock-pf__tile is-active" : "mock-pf__tile"
+							}
+							key={f.name}
+							onClick={() => setFolder(folder === f.name ? null : f.name)}
+							aria-pressed={folder === f.name}
+						>
+							<Folder size={15} aria-hidden="true" />
+							<strong>{f.name}</strong>
+							<span>{f.files} files</span>
+						</button>
+					))}
+				</div>
+
+				<h4 className="mock-pf__sidesect">Recent files</h4>
+				<div className="mock-pf__sidelist">
+					{files
+						.filter(
+							(f) => sideType === "all" || TYPE_META[f.type].label === sideType,
+						)
+						.slice(0, 5)
+						.map((f) => (
+							<button
+								className={
+									selected.has(f.name)
+										? "mock-pf__siderow is-selected"
+										: "mock-pf__siderow"
+								}
+								key={f.name}
+								onClick={() => toggle(f.name)}
+								title={
+									selected.has(f.name)
+										? "Selected — click to deselect"
+										: "Click to select in the list"
+								}
+							>
+								<FileIcon type={f.type} />
+								<div>
+									<strong>{f.name}</strong>
+									<span>
+										{f.size} · {f.opened}
+									</span>
+								</div>
+							</button>
+						))}
+				</div>
+			</aside>
+
+			{uploadOpen ? (
+				<UploadDialog
+					onClose={() => setUploadOpen(false)}
+					onDone={(added) => {
+						const target = folder ?? FOLDERS[0].name;
+						setFiles((cur) => [
+							...added.map((f) => ({
+								name: f.name,
+								type: typeFromName(f.name),
+								size: formatFileSize(f.size),
+								opened: "just now",
+								owner: "Asha Verma",
+								folder: target,
+							})),
+							...cur,
+						]);
+						setUploadOpen(false);
+					}}
+				/>
+			) : null}
+		</div>
 	);
 }

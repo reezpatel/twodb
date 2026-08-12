@@ -12,6 +12,7 @@ import { RecordingScene } from "../scenes/recording/RecordingScene";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { appShellStyles } from "./AppShell.style";
+import { CommandPalette } from "./CommandPalette";
 import { ShellStateProvider, useShellState } from "./state";
 
 function ShellFrame() {
@@ -47,6 +48,7 @@ function ShellFrame() {
 				<Route path="*" element={<Navigate to="/inbox" replace />} />
 			</Routes>
 			<StatusBar />
+			<CommandPalette />
 		</div>
 	);
 }

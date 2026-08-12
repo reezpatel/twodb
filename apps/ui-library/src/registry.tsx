@@ -5,6 +5,8 @@ import {
 	Badge,
 	Button,
 	Card,
+	CheckItem,
+	Checklist,
 	Checkbox,
 	Dialog,
 	Divider,
@@ -95,37 +97,23 @@ import {
 } from "@twodb/ui";
 import type { DateRange } from "@twodb/ui";
 import { ColorPicker, CURATED_COLORS } from "@twodb/ui";
-import { ComposeEmailMock } from "./mocks/ComposeEmail";
 import { DetectedAccountsMock } from "./mocks/DetectedAccounts";
 import { IntegrationsMock } from "./mocks/Integrations";
 import { ProdexDashboardMock } from "./mocks/ProdexDashboard";
 import { SalesMateProMock } from "./mocks/SalesMatePro";
-import { WeeklyCalendarMock } from "./mocks/WeeklyCalendar";
 import { ShareSettingsMock } from "./mocks/ShareSettings";
 import { SettingsMock } from "./mocks/Settings";
 import { TwoFactorMock } from "./mocks/TwoFactor";
-import { InvestorDashboardMock } from "./mocks/InvestorDashboard";
 import { MorningBriefMock } from "./mocks/MorningBrief";
 import { TablePlanMock } from "./mocks/TablePlan";
 import { TodoFlowMock } from "./mocks/TodoFlow";
-import { ChatMailMock } from "./mocks/ChatMail";
-import { LiveScribeMock } from "./mocks/LiveScribe";
-import { WeeklyCalMock } from "./mocks/WeeklyCal";
-import { FileManagerMock } from "./mocks/FileManager";
-import { CommunicationMock } from "./mocks/Communication";
 import { AutomationMock } from "./mocks/Automation";
-import { FileDriveMock } from "./mocks/FileDrive";
-import { DailyCalMock } from "./mocks/DailyCal";
 import { FlowBuilderMock } from "./mocks/FlowBuilder";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
-import { InboxMock } from "./mocks/Inbox";
-import { MonthlyCalendarMock } from "./mocks/MonthlyCalendar";
-import { DesignDiscussionMock } from "./mocks/DesignDiscussion";
 import { CompanyProfileMock } from "./mocks/CompanyProfile";
 import { AutomationBuilderMock } from "./mocks/AutomationBuilder";
 import { NotesOverviewMock } from "./mocks/NotesOverview";
 import { TicketCreatorMock } from "./mocks/TicketCreator";
-import { IssueTrackerMock } from "./mocks/IssueTracker";
 import { ClockPlannerMock } from "./mocks/ClockPlanner";
 import { FinanceDashboardMock } from "./mocks/FinanceDashboard";
 import { AIEditorMock } from "./mocks/AIEditor";
@@ -139,15 +127,10 @@ import { PublishProjectMock } from "./mocks/PublishProject";
 import { NotificationDialogMock } from "./mocks/NotificationDialog";
 import { CommandSearchMock } from "./mocks/CommandSearch";
 import { AiSaasDashboardMock } from "./mocks/AiSaasDashboard";
-import { DragDropUploadMock } from "./mocks/DragDropUpload";
-import { CmdKDialogMock } from "./mocks/CmdKDialog";
 import { VirtualCardMock } from "./mocks/VirtualCard";
 import { PlansBillingMock } from "./mocks/PlansBilling";
-import { AgendaCalendarMock } from "./mocks/AgendaCalendar";
 import { PermissionModelMock } from "./mocks/PermissionModel";
-import { QuickLauncherMock } from "./mocks/QuickLauncher";
 import { SearchMenuMock } from "./mocks/SearchMenu";
-import { MinimalNotesMock } from "./mocks/MinimalNotes";
 import { KnowledgeGraphMock } from "./mocks/KnowledgeGraph";
 
 export interface Story {
@@ -1679,7 +1662,7 @@ body      { letter-spacing: 0.02em; /* default tracking */ }
 		group: "Primitives",
 		name: "Checkbox",
 		description:
-			"The native input stays invisible but real — forms and keyboard keep working. The check draws itself in; a mixed group gets the dash.",
+			"The native input stays invisible but real — forms and keyboard keep working. Use Checklist for task rows and subtasks.",
 		stories: [
 			{
 				title: "States",
@@ -1695,6 +1678,34 @@ body      { letter-spacing: 0.02em; /* default tracking */ }
 <Checkbox label="Share with assistant" />
 <Checkbox label="2 of 4 selected" indeterminate />
 <Checkbox label="Unavailable" disabled />`,
+			},
+		],
+	},
+	{
+		id: "checklist",
+		group: "Primitives",
+		name: "Checklist",
+		description:
+			"Task-list check rows inspired by Todo Flow: compact priority squares, checked strike-through, native checkbox semantics, and optional descriptions.",
+		stories: [
+			{
+				title: "Task priorities",
+				render: () => (
+					<div style={{ width: 320 }}>
+						<Checklist aria-label="Tasks">
+							<CheckItem label="Meeting with PM" priority={1} />
+							<CheckItem label="Website redesign" priority={2} />
+							<CheckItem label="Dark theme for iOS" priority={3} />
+							<CheckItem label="Buy groceries" defaultChecked />
+						</Checklist>
+					</div>
+				),
+				code: `<Checklist aria-label="Tasks">
+  <CheckItem label="Meeting with PM" priority={1} />
+  <CheckItem label="Website redesign" priority={2} />
+  <CheckItem label="Dark theme for iOS" priority={3} />
+  <CheckItem label="Buy groceries" defaultChecked />
+</Checklist>`,
 			},
 		],
 	},
@@ -2817,27 +2828,6 @@ body      { letter-spacing: 0.02em; /* default tracking */ }
 	},
 
 	{
-		id: "compose-email",
-		group: "Showcase",
-		name: "Compose Email",
-		description:
-			"A large compose window inspired by the supplied reference: sender and recipient chips, subject/body, attachment cards, round compose tools, and a primary send action.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — composed email with attachments",
-				render: () => <ComposeEmailMock />,
-				code: `<ComposeEmailMock />
-
-{/* Full compose state:
-    from/to chips, cc/bcc controls,
-    message body, attachment cards,
-    formatting/attach/link/emoji/schedule tools. */}`,
-			},
-		],
-	},
-
-	{
 		id: "detected-accounts",
 		group: "Showcase",
 		name: "Detected Accounts",
@@ -2855,27 +2845,6 @@ body      { letter-spacing: 0.02em; /* default tracking */ }
     match confidence and evidence,
     link / ignore actions,
     and linked connections table. */}`,
-			},
-		],
-	},
-	{
-		id: "weekly-calendar",
-		group: "Showcase",
-		name: "Weekly Calendar",
-		description:
-			"A weekly calendar workspace inspired by the supplied reference: slim app rail, mini month picker, schedule filters, week/month controls, and a time-grid with realistic event blocks.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — week schedule with filters",
-				render: () => <WeeklyCalendarMock />,
-				code: `<WeeklyCalendarMock />
-
-{/* Calendar workspace:
-    app rail + mini month,
-    schedule and category filters,
-    week view with time slots,
-    color-coded events and attendee stacks. */}`,
 			},
 		],
 	},
@@ -2917,51 +2886,6 @@ body      { letter-spacing: 0.02em; /* default tracking */ }
     - Team member search and management
     - Member toggle switches
     - Schedule and Publish now actions */}`,
-			},
-		],
-	},
-	{
-		id: "drag-drop-upload",
-		group: "Showcase",
-		name: "Drag Drop Upload",
-		description:
-			"A dark-themed drag-and-drop file upload dialog with three interactive states: empty state, upload in progress with animated progress indicators, and error state. Features file size validation, drag overlay preview, and simulated upload progression.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — three-state upload dialog",
-				render: () => <DragDropUploadMock />,
-				code: `<DragDropUploadMock />
-
-{/* Upload dialog with three screens:
-    - Empty state with drag-drop zone
-    - Upload in progress with file list and progress spinners
-    - Error state with validation feedback
-
-    Interactive: drag files over the dropzone to see the overlay effect */}`,
-			},
-		],
-	},
-	{
-		id: "cmdk-dialog",
-		group: "Showcase",
-		name: "Cmd K Dialog",
-		description:
-			"A Cmd+K command palette dialog showing the no-results state. Features a clean search input with keyboard shortcut badge, decorative floating app icons in the background, concentric ripple effects, and helpful action links.",
-		fullWidth: false,
-		stories: [
-			{
-				title: "Mock — no results state",
-				render: () => <CmdKDialogMock />,
-				code: `<CmdKDialogMock />
-
-{/* Command palette with no search results:
-    - Search input with ⌘K shortcut indicator
-    - Decorative floating app icons background
-    - Concentric ripple effects
-    - "Sorry, no results!" message
-    - Clear search button
-    - "Browse all apps" and "Let us know" links */}`,
 			},
 		],
 	},
@@ -3197,24 +3121,6 @@ body      { letter-spacing: 0.02em; /* default tracking */ }
 		],
 	},
 	{
-		id: "investor-dashboard",
-		group: "Showcase",
-		name: "Investor Dashboard",
-		description:
-			"Portfolio SaaS: company list with score rings, metric donuts, a customer-concentration table with expandable rows, KPI strip, and revenue split bar.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — companies and concentration",
-				render: () => <InvestorDashboardMock />,
-				code: `<ScoreRing value={company.score} size={26} />
-
-{/* list → detail: pick a company, expand a customer
-    row for KPIs, revenue split, company details */}`,
-			},
-		],
-	},
-	{
 		id: "table-plan",
 		group: "Showcase",
 		name: "Table Management",
@@ -3272,127 +3178,6 @@ body      { letter-spacing: 0.02em; /* default tracking */ }
 		],
 	},
 	{
-		id: "inbox",
-		group: "Showcase",
-		name: "Inbox",
-		description:
-			"A three-pane mail inbox: folders and labels, pinned + primary thread list with live search, and a reading pane with an AI summary card, recipient chips, and attachments.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — folders, threads, reading pane",
-				render: () => <InboxMock />,
-				code: `{/* folders rail + thread list + reading pane */}
-<NavSection items={folders} />  {/* counts as tabular badges */}
-<ThreadRow active unread time snippet />
-{/* AI summary = rose-soft panel (the AI's light) */}
-<Composer via Dialog — To / Subject / Message />`,
-			},
-		],
-	},
-	{
-		id: "monthly-calendar",
-		group: "Showcase",
-		name: "Monthly Calendar",
-		description:
-			"A full month page on the new MonthCalendar: tabs per calendar, live search, month/list views, and an Add-event dialog using DatePicker + TimePicker.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — month grid, tabs, add event",
-				render: () => <MonthlyCalendarMock />,
-				code: `<MonthCalendar
-  month={month}
-  events={events}   // { date, title, time, tone, cal }
-  today={demoToday}
-  onSelectDay={(d) => openAdd(d)}
-/>
-
-{/* chips: cobalt / rose / warning / neutral / danger;
-    "+N more…" overflow; click a day to prefill the dialog */}`,
-			},
-		],
-	},
-	{
-		id: "design-discussion",
-		group: "Showcase",
-		name: "Design Discussion",
-		description:
-			"A threaded discussion space: channel tree, posts with @mentions and toggleable reactions, a link card, a composer with working @-autocomplete, and an info panel with activity and members.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — thread, mentions, info panel",
-				render: () => <DesignDiscussionMock />,
-				code: `{/* @mentions light up cobalt; reactions toggle;
-    composer: type @ for member autocomplete;
-    Send appends your post to the thread */}`,
-			},
-		],
-	},
-	{
-		id: "chat-mail",
-		group: "Showcase",
-		name: "Chat Mail",
-		description:
-			"Email that reads like a conversation: folders rail, thread list with categories and a smart-replies toggle, and a reading pane built on the chat suite — summary card, quick answers, composer.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — the inbox as a chat",
-				render: () => <ChatMailMock />,
-				code: `{/* reading pane = ChatList + MessageGroup */}
-<MessageGroup author time><TextMessage /></MessageGroup>
-<ChatComposer onSend={reply} />
-
-{/* quick answers send instantly; star toggles;
-    opening a thread clears its unread badge */}`,
-			},
-		],
-	},
-	{
-		id: "live-scribe",
-		group: "Showcase",
-		name: "Live Transcription",
-		description:
-			"A meeting that types itself: video stage with real call controls, an AI scribe card with a live waveform and lines that arrive while you watch, participant tiles, and a summary with key points.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — Ward 4 morning rounds",
-				render: () => <LiveScribeMock />,
-				code: `{/* the transcript is actually live:
-    lines append on an interval while Listening */}
-<Scribe listening onPause />
-<Stage controls=[mic, cam, end, share] />
-
-{/* Pause freezes the waveform; Transcript tab
-    mirrors every arrived line */}`,
-			},
-		],
-	},
-	{
-		id: "week-planner",
-		group: "Showcase",
-		name: "Week Planner",
-		description:
-			"The week as a planner: mini month and category filters on the left, a time-grid with tinted event cards on the right. Day / Week / Month tabs, week navigation, and filters that hide whole categories.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — the clinic week",
-				render: () => <WeeklyCalMock />,
-				code: `{/* the mini month and the grid share one anchor date;
-    unchecking a category removes its cards */}
-<Calendar selected={anchor} onSelect={setAnchor} />
-<WeekGrid events={visible} />
-
-{/* Day tab collapses the grid to the anchor day;
-    Month tab jumps back to week on pick */}`,
-			},
-		],
-	},
-	{
 		id: "company-profile",
 		group: "Showcase",
 		name: "Company Profile",
@@ -3406,83 +3191,6 @@ body      { letter-spacing: 0.02em; /* default tracking */ }
 				code: `{/* DataTable does search / filters / pagination;
     expiration pill: danger expired · warning ≤30d · go valid;
     filter enums: has-file, expiration state */}`,
-			},
-		],
-	},
-	{
-		id: "file-manager",
-		group: "Showcase",
-		name: "File Manager",
-		description:
-			"The file sidebar: night Create-new button with a menu, the FileTree folder browser, and a content grid that follows the selected folder.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — sidebar and content",
-				render: () => <FileManagerMock />,
-				code: `<FileTree nodes={tree} selected={sel} onSelect={setSel} />
-
-{/* create-new = night button + Menu
-    (New folder / New document / Upload) */}`,
-			},
-		],
-	},
-	{
-		id: "file-drive",
-		group: "Showcase",
-		name: "File Drive",
-		description:
-			"The clinic's documents, organized: folder cards and a rail sub-nav that filter the same list, recent chips, type tabs + search, row selection with a live count, and a grid/list toggle.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — project files",
-				render: () => <FileDriveMock />,
-				code: `{/* one filter pipeline: folder cards, rail sub-nav,
-    type tabs and search all narrow the same rows */}
-<FolderCard onClick={filterFolder} />
-<Table rows={visible} selectable />
-
-{/* grid/list toggle switches the All files section;
-    selection count lives in the table footer */}`,
-			},
-		],
-	},
-	{
-		id: "communication",
-		group: "Showcase",
-		name: "Communication",
-		description:
-			"An autopilot thread: call recording with waveform player, expandable transcription, sent-mail bubble, AI suggestion that advances the task meter, Email/SMS composer, and a contact panel with history timeline.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — thread, composer, contact panel",
-				render: () => <CommunicationMock />,
-				code: `{/* waveform player (play/pause), transcription
-    disclosure, suggestion ✓ -> tasks 1/2,
-    Email/SMS tabs switch the composer */}`,
-			},
-		],
-	},
-	{
-		id: "daily-calendar",
-		group: "Showcase",
-		name: "Daily Calendar",
-		description:
-			"One day, hour by hour: a timeline with a now-line at 14:00, spanning and overlapping event cards, category chips that filter, and an agenda checklist that strikes through as you finish the day.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — the clinic day",
-				render: () => <DailyCalMock />,
-				code: `{/* three navigable days share one shape;
-    overlapped events split the lane (col/cols) */}
-<Timeline events={day.events} now={14} />
-<Agenda onToggle={strikeThrough} />
-
-{/* category chips dim AND filter; the mini month
-    jumps between the three days */}`,
 			},
 		],
 	},
@@ -3587,29 +3295,6 @@ const [sort, setSort] = useState("updated");
     due date, status, project, tags,
     work type, description, subitems,
     and cancel/create actions. */}`,
-			},
-		],
-	},
-	{
-		id: "issue-tracker",
-		group: "Showcase",
-		name: "Issue Tracker",
-		description:
-			"A full project management interface: left sidebar with brand, navigation, workspace sections, and expandable channels; top bar with tabs, search, and new feature button; main task table with checkboxes, task IDs, progress badges, urgency levels, and assignee stacks; right properties panel with task details, tags, attachments, and discussion thread.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — Q3 Plan task list",
-				render: () => <IssueTrackerMock />,
-				code: `<IssueTrackerMock />
-
-{/* Three-column layout:
-    - Sidebar: brand, nav, workspace, channels, trial banner
-    - Main: top bar tabs, search, task table with
-      checkbox, ID, title, progress, urgency, assignees
-    - Panel: properties, tags, attachments, discussion
-
-    Click rows to select; check tasks to complete */}`,
 			},
 		],
 	},
@@ -3873,55 +3558,6 @@ const [sort, setSort] = useState("updated");
 		],
 	},
 	{
-		id: "agenda-calendar",
-		group: "Showcase",
-		name: "Agenda Calendar",
-		description:
-			"A three-pane personal calendar (Cron / Notion Calendar in spirit): an account dropdown, a mini month, and colored-dot calendar filters on the left; a multi-day time-grid in the middle with tinted event cards, attendee stacks, a today circle, and a red now-line; and an Upcoming agenda panel on the right.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — 4-day view with upcoming panel",
-				render: () => <AgendaCalendarMock />,
-				code: `<AgendaCalendarMock />
-
-{/* Three panes, one filter pipeline:
-    - Account dropdown + mini month + colored-dot
-      calendar filters (Work / Personal / Family / Health)
-    - Multi-day time-grid (Day / 4 Days / Week):
-      tinted cards with a solid left border, attendee
-      avatar stacks, today's date wears the accent circle,
-      and a red now-line rides 11:15.
-    - Upcoming panel lists today's still-open events as
-      accent-bar cards with time, location pin, avatars.
-    Toggling a calendar dot hides its events everywhere;
-    the view menu, nav arrows, Today and mini month all
-    move the visible window. */}`,
-			},
-		],
-	},
-	{
-		id: "minimal-notes",
-		group: "Showcase",
-		name: "Minimal Notes",
-		description:
-			"A distraction-free notes editor in a macOS window: traffic-light chrome, a sidebar library (Notes / Tasks / Files, smart views, and collapsible Folders), a borderless live editor, and a floating words · Saved status pill. Built on the MarkdownEditor primitive in a new focus mode (editable, no toolbar).",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — focus-mode editor with status pill",
-				render: () => <MinimalNotesMock />,
-				code: `<MinimalNotesMock />
-
-{/* macOS window: traffic-light dots, sidebar library
-    (Notes/Tasks/Files, All/Recents/Starred/Deleted,
-    collapsible Folders), and a borderless editor using
-    MarkdownEditor hideToolbar — type and the word
-    count in the floating pill updates live. */}`,
-			},
-		],
-	},
-	{
 		id: "permission-model",
 		group: "Showcase",
 		name: "Permission Model",
@@ -3941,31 +3577,6 @@ const [sort, setSort] = useState("updated");
     - Permissions: checkmark list of access requests
     - URL field: integration URL with copy button
     - Footer: Documentation and Connect buttons */}`,
-			},
-		],
-	},
-	{
-		id: "quick-launcher",
-		group: "Showcase",
-		name: "Quick Launcher",
-		description:
-			"A command palette (⌘K style) for quick navigation and actions: search input with keyboard shortcut badge, recent searches section with project items showing avatar stacks and jump buttons, command items with icons and keyboard shortcuts, action links for integrations, and a footer with keyboard navigation hints.",
-		fullWidth: false,
-		stories: [
-			{
-				title: "Mock — command palette",
-				render: () => <QuickLauncherMock />,
-				code: `<QuickLauncherMock />
-
-{/* Command palette (⌘K):
-    - Search: input with placeholder and ⌘/ shortcut
-    - Recent searches: project items with avatars,
-      "Jump to..." buttons, Customize link
-    - Commands: icon + label + keyboard shortcut,
-      action links for external integrations
-    - Footer: keyboard hints (# tags, ↑↓ navigate,
-      ↵ open, esc close, ← parent)
-    - Arrow key navigation highlights items */}`,
 			},
 		],
 	},
