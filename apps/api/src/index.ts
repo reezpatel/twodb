@@ -12,6 +12,7 @@ import { envSchema, dotenvPath } from "./config.js";
 import postgresPlugin from "./db/postgres.js";
 import memgraphPlugin from "./db/memgraph.js";
 import { servicePlugins } from "./plugins.js";
+import { registerStaticApp } from "./static.js";
 
 const app = Fastify({ logger: true });
 
@@ -91,6 +92,8 @@ app.get("/health/ready", async (_request, reply) => {
 	reply.code(allOk ? 200 : 503);
 	return { status: allOk ? "ready" : "degraded", checks };
 });
+
+await registerStaticApp(app);
 
 const port = app.config.PORT;
 

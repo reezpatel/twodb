@@ -5,10 +5,10 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "db:up": "docker compose -f docker-compose.db.yml up -d",
-    "db:down": "docker compose -f docker-compose.db.yml down",
-    "db:logs": "docker compose -f docker-compose.db.yml logs -f",
-    "db:ps": "docker compose -f docker-compose.db.yml ps"
+    "db:up": "docker compose -f docker-compose.db.yaml up -d",
+    "db:down": "docker compose -f docker-compose.db.yaml down",
+    "db:logs": "docker compose -f docker-compose.db.yaml logs -f",
+    "db:ps": "docker compose -f docker-compose.db.yaml ps"
   },
   "devDependencies": {
     "turbo": "^2.5.0"

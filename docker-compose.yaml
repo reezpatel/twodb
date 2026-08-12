@@ -1,0 +1,39 @@
+name: twodb
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: twodb:local
+    container_name: twodb-server
+    restart: unless-stopped
+    environment:
+      PORT: ${PORT:-3001}
+      DATABASE_URL: ${DATABASE_URL:-postgres://twodb:twodb@host.docker.internal:5432/twodb}
+      POSTGRES_POOL_SIZE: ${POSTGRES_POOL_SIZE:-10}
+      MEMGRAPH_URL: ${MEMGRAPH_URL:-bolt://host.docker.internal:7687}
+      MEMGRAPH_USER: ${MEMGRAPH_USER:-}
+      MEMGRAPH_PASSWORD: ${MEMGRAPH_PASSWORD:-}
+      MEMGRAPH_DATABASE: ${MEMGRAPH_DATABASE:-memgraph}
+      MEMGRAPH_POOL_SIZE: ${MEMGRAPH_POOL_SIZE:-50}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://host.docker.internal:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-twodb}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-twodb}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-twodb-secret}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+    ports:
+      - "${PORT:-3001}:3001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://127.0.0.1:3001/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s

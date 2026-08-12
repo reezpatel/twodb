@@ -19,6 +19,7 @@ declare module "fastify" {
 	interface FastifyInstance {
 		config: {
 			PORT: number;
+			STATIC_DIR: string;
 			DATABASE_URL: string;
 			POSTGRES_POOL_SIZE: number;
 			MEMGRAPH_URL: string;
@@ -26,6 +27,12 @@ declare module "fastify" {
 			MEMGRAPH_PASSWORD: string;
 			MEMGRAPH_DATABASE: string;
 			MEMGRAPH_POOL_SIZE: number;
+			S3_ENDPOINT: string;
+			S3_REGION: string;
+			S3_BUCKET: string;
+			S3_ACCESS_KEY_ID: string;
+			S3_SECRET_ACCESS_KEY: string;
+			S3_FORCE_PATH_STYLE: boolean;
 		};
 		memgraph: MemgraphDecorator;
 	}

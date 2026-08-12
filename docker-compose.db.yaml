@@ -1,8 +1,6 @@
-# Local-only data services for twodb (Postgres + Memgraph).
-# Run with:  docker compose -f docker-compose.db.yml up -d
-# Tear down: docker compose -f docker-compose.db.yml down
-#
-# Note: this file does NOT run the api/UI - just the two databases.
+# Local-only data services for twodb (Postgres + Memgraph + S3-compatible MinIO).
+# Run with:  docker compose -f docker-compose.db.yaml up -d
+# Tear down: docker compose -f docker-compose.db.yaml down
 
 name: twodb-db
 
@@ -15,7 +13,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-twodb}
       POSTGRES_USER: ${POSTGRES_USER:-twodb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-twodb}
-      # Faster, dev-friendly defaults - DO NOT use these in production.
       POSTGRES_INITDB_ARGS: "--encoding=UTF8"
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -24,7 +21,6 @@ services:
     networks:
       - twodb-net
     healthcheck:
-      # pg_isready exits 0 when the server is accepting connections.
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
@@ -35,14 +31,8 @@ services:
     image: memgraph/memgraph:latest
     container_name: twodb-memgraph
     restart: unless-stopped
-    # Memgraph stores data in-memory by default. Mount the volume at the
-    # parent (/var/lib/memgraph) so the image's entrypoint can create the
-    # `data` subdirectory as the `memgraph` user. Mounting directly at
-    # /var/lib/memgraph/data makes Docker create it as root, which Memgraph
-    # v3 rejects.
     command: ["--data-directory=/var/lib/memgraph/data"]
     environment:
-      # ID allocator config - harmless defaults, tweak if you hit collisions.
       MEMGRAPH_FLAGS: "--also-log-to-stderr"
     ports:
       - "${MEMGRAPH_BOLT_PORT:-7687}:7687"
@@ -51,18 +41,60 @@ services:
     networks:
       - twodb-net
     healthcheck:
-      # A simple TCP-open check is the most portable signal that Bolt is up.
       test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/7687 || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 20
       start_period: 10s
 
+  s3:
+    image: minio/minio:latest
+    container_name: twodb-s3
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-twodb}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-twodb-secret}
+    ports:
+      - "${S3_PORT:-9000}:9000"
+      - "${S3_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - s3-data:/data
+    networks:
+      - twodb-net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  s3-init:
+    image: minio/mc:latest
+    container_name: twodb-s3-init
+    depends_on:
+      s3:
+        condition: service_healthy
+    environment:
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-twodb}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-twodb-secret}
+      S3_BUCKET: ${S3_BUCKET:-twodb}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://s3:9000 $${S3_ACCESS_KEY_ID} $${S3_SECRET_ACCESS_KEY};
+      mc mb --ignore-existing local/$${S3_BUCKET};
+      "
+    networks:
+      - twodb-net
+    restart: "no"
+
 volumes:
   postgres-data:
     name: twodb-postgres-data
   memgraph-data:
     name: twodb-memgraph-data
+  s3-data:
+    name: twodb-s3-data
 
 networks:
   twodb-net:

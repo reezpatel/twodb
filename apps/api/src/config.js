@@ -12,7 +12,7 @@
 //   3. (Optional) Add it to /<repo-root>/.env.example so humans know it
 //      exists.
 //
-// Defaults are dev-friendly and match the docker-compose.db.yml service
+// Defaults are dev-friendly and match the docker-compose.db.yaml service
 // defaults so the api runs out of the box against `pnpm db:up`.
 
 export const envSchema = {
@@ -23,6 +23,12 @@ export const envSchema = {
 			type: "number",
 			default: 3001,
 			description: "HTTP port the api listens on",
+		},
+		STATIC_DIR: {
+			type: "string",
+			default: "../../../apps/web/dist",
+			description:
+				"Directory of built React static assets, resolved from apps/api/src",
 		},
 
 		// --- Postgres (consumed by @fastify/postgres) ---
@@ -63,6 +69,38 @@ export const envSchema = {
 			type: "number",
 			default: 50,
 			description: "Max connections in the neo4j-driver pool",
+		},
+
+		// --- S3-compatible object storage (MinIO in local compose) ---
+		S3_ENDPOINT: {
+			type: "string",
+			default: "http://localhost:9000",
+			description: "S3-compatible endpoint URL",
+		},
+		S3_REGION: {
+			type: "string",
+			default: "us-east-1",
+			description: "S3 signing region",
+		},
+		S3_BUCKET: {
+			type: "string",
+			default: "twodb",
+			description: "Default S3 bucket name",
+		},
+		S3_ACCESS_KEY_ID: {
+			type: "string",
+			default: "twodb",
+			description: "S3 access key id",
+		},
+		S3_SECRET_ACCESS_KEY: {
+			type: "string",
+			default: "twodb-secret",
+			description: "S3 secret access key",
+		},
+		S3_FORCE_PATH_STYLE: {
+			type: "boolean",
+			default: true,
+			description: "Use path-style S3 URLs, required by MinIO",
 		},
 	},
 };

@@ -1,0 +1,142 @@
+name: twodb-all
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: twodb:local
+    container_name: twodb-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      memgraph:
+        condition: service_healthy
+      s3-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: ${PORT:-3001}
+      DATABASE_URL: postgres://${POSTGRES_USER:-twodb}:${POSTGRES_PASSWORD:-twodb}@postgres:5432/${POSTGRES_DB:-twodb}
+      POSTGRES_POOL_SIZE: ${POSTGRES_POOL_SIZE:-10}
+      MEMGRAPH_URL: bolt://memgraph:7687
+      MEMGRAPH_USER: ${MEMGRAPH_USER:-}
+      MEMGRAPH_PASSWORD: ${MEMGRAPH_PASSWORD:-}
+      MEMGRAPH_DATABASE: ${MEMGRAPH_DATABASE:-memgraph}
+      MEMGRAPH_POOL_SIZE: ${MEMGRAPH_POOL_SIZE:-50}
+      S3_ENDPOINT: http://s3:9000
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-twodb}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-twodb}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-twodb-secret}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+    ports:
+      - "${PORT:-3001}:3001"
+    networks:
+      - twodb-net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://127.0.0.1:3001/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: twodb-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-twodb}
+      POSTGRES_USER: ${POSTGRES_USER:-twodb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-twodb}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - twodb-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  memgraph:
+    image: memgraph/memgraph:latest
+    container_name: twodb-memgraph
+    restart: unless-stopped
+    command: ["--data-directory=/var/lib/memgraph/data"]
+    environment:
+      MEMGRAPH_FLAGS: "--also-log-to-stderr"
+    ports:
+      - "${MEMGRAPH_BOLT_PORT:-7687}:7687"
+    volumes:
+      - memgraph-data:/var/lib/memgraph
+    networks:
+      - twodb-net
+    healthcheck:
+      test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/7687 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  s3:
+    image: minio/minio:latest
+    container_name: twodb-s3
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-twodb}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-twodb-secret}
+    ports:
+      - "${S3_PORT:-9000}:9000"
+      - "${S3_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - s3-data:/data
+    networks:
+      - twodb-net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  s3-init:
+    image: minio/mc:latest
+    container_name: twodb-s3-init
+    depends_on:
+      s3:
+        condition: service_healthy
+    environment:
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-twodb}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-twodb-secret}
+      S3_BUCKET: ${S3_BUCKET:-twodb}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://s3:9000 $${S3_ACCESS_KEY_ID} $${S3_SECRET_ACCESS_KEY};
+      mc mb --ignore-existing local/$${S3_BUCKET};
+      "
+    networks:
+      - twodb-net
+    restart: "no"
+
+volumes:
+  postgres-data:
+    name: twodb-postgres-data
+  memgraph-data:
+    name: twodb-memgraph-data
+  s3-data:
+    name: twodb-s3-data
+
+networks:
+  twodb-net:
+    name: twodb-net
+    driver: bridge
