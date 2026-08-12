@@ -2,7 +2,7 @@
 name: twodb
 description: "Cyclorama Dawn — light is the only chrome; state arrives as light, never as glow, shadow, or ornament."
 colors:
-  night: "#050506"
+  night: "#18181B"
   cobalt: "#0A2BFF"
   cobalt-deep: "#0A22D6"
   cobalt-soft: "#6D80FF"
@@ -131,7 +131,7 @@ components:
 
 twodb's interface is a stage at first light. Surfaces are a horizon — quiet matte bands bounded by hairline rules — and every state change arrives as light rising: cobalt for structure and action, rose for the AI's presence. Light is the only chrome. The system refuses the category's gray-cards-and-drop-shadows default: no gradient fills on controls, no glow, no colored shadows, no ornamental decoration. Depth is tonal, not dimensional.
 
-The world runs in two phases. **Day** is the default working surface: a light gray ground (`#F5F5F7`, user-pinned 2026-08-08) with white surfaces floating on it, near-black ink, hairline rules. **Night** is depthless black (`#050506`), switched by setting `[data-phase="night"]` on any subtree — the same token names resolve to night values, so components are written once against semantic tokens (`--bg`, `--ink`, `--line`, `--accent`, `--action`) and never against raw palette values. The palette itself is a single sweep of light: night → cobalt → rose → rose-light → dawn → day. Color is never decoration; it is the phase a surface is in.
+The world runs in two phases. **Day** is the default working surface: a light gray ground (`#F5F5F7`, user-pinned 2026-08-08) with white surfaces floating on it, near-black ink, hairline rules. **Night** is editor zinc (`#18181B` stage, `#1A1A1E` panels, `#131316` recessed rail — from the AI Editor showcase, user-pinned 2026-08-12), switched by setting `[data-phase="night"]` on any subtree — the same token names resolve to night values, so components are written once against semantic tokens (`--bg`, `--ink`, `--line`, `--accent`, `--action`) and never against raw palette values. The palette itself is a single sweep of light: night → cobalt → rose → rose-light → dawn → day. Color is never decoration; it is the phase a surface is in.
 
 Density is calm and slightly condensed, with deliberate negative space — a PRODUCT.md brand commitment. Type pairs Outfit (UI text) with IBM Plex Sans tracked caps (the "cue register": labels, section markers, wordmark). Motion is a single exponential ease-out — light rises, never bounces — with one authored "cue-up" entrance (bands rise in sequence, 45ms stagger) and `prefers-reduced-motion` honored everywhere. A fine fractal-noise grain sits over large fields at low opacity for a matte tooth, never glossy.
 
@@ -152,7 +152,7 @@ The palette is one sweep of light along a horizon, from depthless night to full 
 
 ### Primary
 
-- **Cobalt Horizon** (#0A2BFF): the structural and action light. Solid fill of primary buttons and switches (day), focus rings, active tab rules, links/accents. On night it softens to **Cobalt Soft** (#6D80FF) for legibility, and the solid action fill brightens to #3A55FF.
+- **Cobalt Horizon** (#0A2BFF): the structural and action light. Solid fill of primary buttons and switches (day), focus rings, active tab rules, links/accents. On night the working light shifts to **Editor Blue** (#60A5FA accent, #3B82F6 solid action fill) for legibility on zinc.
 - **Cobalt Deep** (#0A22D6): hover state of the solid action (day).
 
 ### Secondary
@@ -167,12 +167,12 @@ The palette is one sweep of light along a horizon, from depthless night to full 
 
 ### Neutral
 
-- **Depthless Night** (#050506): night-phase ground; also tooltips and code surfaces in day phase.
+- **Depthless Night** (#050506): tooltips and code surfaces in day phase. The night-phase ground itself is editor zinc (#18181B).
 - **Soft Gray Ground** (#F5F5F7): day-phase backdrop; surfaces stay white above it.
 - **Full Day** (#FFFFFF): day-phase surfaces and cards.
-- **Tonal bands** (#FAF9FC, #F2F0F7): quiet banding for secondary surfaces, hover fills, skeletons (night: #0B0B11, #13131C).
-- **Ink** (#121218 / #40404E / #626274): three-step text ramp — primary, secondary, muted (night: #F4F3F8 / #C4C3D1 / #9291A3).
-- **Hairlines** (#E6E4EC, #CFCDD9): borders and rules; night phases to 13%/24% white.
+- **Tonal bands** (#FAF9FC, #F2F0F7): quiet banding for secondary surfaces, hover fills, skeletons (night: #1A1A1E, #27272A).
+- **Ink** (#121218 / #40404E / #626274): three-step text ramp — primary, secondary, muted (night: #E4E4E7 / #A1A1AA / #71717A).
+- **Hairlines** (#E6E4EC, #CFCDD9): borders and rules; night phases to solid zinc steps (#27272A, #3F3F46).
 
 ### Named Rules
 

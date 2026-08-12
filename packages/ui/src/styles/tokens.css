@@ -125,51 +125,50 @@
 }
 
 /* --- Night phase ---
-   Three shades of black for the shell's three surfaces,
-   rail is the lifted accent — the icons float on a band
-   visibly above the sidebar and stage. Each tier is a
-   quiet step so the eye can read the layout without ever
-   seeing a hard border. */
+   Editor zinc (from the AI Editor showcase): the stage sits at
+   zinc-900, panels a half-step up, the rail recessed darkest.
+   Hairlines are solid zinc steps; the working light shifts from
+   cobalt to editor blue. */
 [data-phase="night"] {
 	color-scheme: dark;
 
-	--bg: #050506; /* stage: deepest, the focused work surface */
-	--bg-band: #0c0c12; /* sidebar: a band sitting just above the stage */
-	--bg-rail: #181821; /* rail: lifted accent strip, brightest of the three */
-	--bg-band-strong: #1f1f2a;
-	--surface: #0d0d14;
+	--bg: #18181b; /* stage: zinc-900, the focused work surface */
+	--bg-band: #1a1a1e; /* sidebar: a half-step above the stage */
+	--bg-rail: #131316; /* rail: recessed, darkest of the three */
+	--bg-band-strong: #27272a;
+	--surface: #1a1a1e;
 
 	/* fields: muted fill, no resting hairline */
 	--bg-field: var(--bg-band-strong);
-	--bg-field-hover: #2a2a36;
+	--bg-field-hover: #3f3f46;
 
-	--ink: #f4f3f8;
-	--ink-2: #c4c3d1;
-	--ink-3: #9291a3;
+	--ink: #e4e4e7;
+	--ink-2: #a1a1aa;
+	--ink-3: #71717a;
 
-	--line: rgb(244 243 248 / 0.13);
-	--line-strong: rgb(244 243 248 / 0.24);
+	--line: #27272a;
+	--line-strong: #3f3f46;
 
-	--accent: var(--twdb-cobalt-soft);
-	--accent-strong: #8b9aff;
+	--accent: #60a5fa;
+	--accent-strong: #93c5fd;
 	--accent-ink: #ffffff;
-	--accent-soft-bg: rgb(109 128 255 / 0.14);
+	--accent-soft-bg: rgb(59 130 246 / 0.15);
 
 	/* solid action fill — the one lit control */
-	--action: #3a55ff;
-	--action-strong: #5a73ff;
+	--action: #3b82f6;
+	--action-strong: #2563eb;
 
 	--rose-accent: var(--twdb-rose-light);
 	--rose-soft-bg: rgb(255 123 174 / 0.14);
 
-	--go: var(--twdb-cobalt-soft);
-	--go-bg: rgb(109 128 255 / 0.14);
-	--warning-ink: #e8c47a;
-	--warning-bg: rgb(232 196 122 / 0.12);
-	--danger-ink: #ff9ec0;
-	--danger-bg: rgb(255 158 192 / 0.12);
+	--go: #22c55e;
+	--go-bg: rgb(34 197 94 / 0.15);
+	--warning-ink: #f59e0b;
+	--warning-bg: rgb(245 158 11 / 0.12);
+	--danger-ink: #f87171;
+	--danger-bg: rgb(239 68 68 / 0.15);
 
-	--ring: rgb(109 128 255 / 0.35);
+	--ring: rgb(59 130 246 / 0.35);
 	--shadow-overlay: 0 14px 32px -10px rgb(0 0 0 / 0.6);
 
 	--grain-opacity: 0.08;
