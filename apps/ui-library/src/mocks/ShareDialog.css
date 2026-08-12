@@ -1,0 +1,399 @@
+/* Share Dialog mock — share project dialog with segmented Share/Publish/Export
+   toggle, direct link card, invite to collaborate card, and a footer with
+   Copy link / Embed / Done. Cyclorama grammar: hairlines, flat cobalt,
+   purple Done action, IBM Plex Sans cues. */
+
+.mock-sd {
+	/* Reference purple for the Done button — a balanced violet
+	   that sits between cobalt and rose in the brand spectrum. */
+	--sd-done: #5e47ec;
+	--sd-done-strong: #4a37cf;
+	--sd-done-ink: #ffffff;
+
+	--sd-avatar-rose: var(--twdb-rose);
+	--sd-avatar-rose-bg: rgb(210 75 255 / 0.16);
+	--sd-avatar-cobalt: var(--twdb-cobalt);
+	--sd-avatar-cobalt-bg: rgb(10 43 255 / 0.12);
+	--sd-avatar-amber: #d9930d;
+	--sd-avatar-amber-bg: #f8eed7;
+	--sd-avatar-green: #1e7d46;
+	--sd-avatar-green-bg: rgb(30 125 46 / 0.12);
+
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: min(720px, 100%);
+	min-height: 880px;
+	overflow: hidden;
+	padding: 60px 44px;
+	border: 1px solid var(--line);
+	border-radius: 22px;
+	background: #f4f7ff;
+	color: var(--ink);
+	font-family: var(--font-ui);
+}
+
+.mock-sd__wash {
+	position: absolute;
+	border-radius: 999px;
+	background: #e3ebff;
+	pointer-events: none;
+}
+
+.mock-sd__wash--a {
+	top: -260px;
+	left: -180px;
+	width: 620px;
+	height: 620px;
+}
+
+.mock-sd__wash--b {
+	right: -160px;
+	bottom: -240px;
+	width: 520px;
+	height: 520px;
+}
+
+/* ---------- dialog ---------- */
+
+.mock-sd__dialog {
+	position: relative;
+	z-index: 2;
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	max-width: 460px;
+	gap: 18px;
+	padding: 24px 24px 18px;
+	border: 1px solid var(--line-strong);
+	border-radius: 18px;
+	background: var(--surface);
+	box-shadow: var(--shadow-overlay);
+}
+
+/* ---------- header ---------- */
+
+.mock-sd__header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.mock-sd__head-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.mock-sd__head-text h2 {
+	margin: 0;
+	font-size: var(--text-lg);
+	font-weight: 700;
+	line-height: 1.3;
+	color: var(--ink);
+}
+
+.mock-sd__head-text p {
+	margin: 4px 0 0;
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+	line-height: 1.5;
+}
+
+.mock-sd__close {
+	display: grid;
+	place-items: center;
+	width: 30px;
+	height: 30px;
+	flex-shrink: 0;
+	padding: 0;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--ink-3);
+	cursor: pointer;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-sd__close:hover {
+	background: var(--bg-band-strong);
+	color: var(--ink);
+}
+
+/* ---------- tabs ---------- */
+
+.mock-sd__tabs {
+	padding: 0 2px;
+}
+
+/* ---------- cards ---------- */
+
+.mock-sd__cards {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.mock-sd__card {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 16px 18px 18px;
+	border: 1px solid var(--line-strong);
+	border-radius: 14px;
+	background: var(--surface);
+}
+
+.mock-sd__card-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	min-height: 28px;
+}
+
+.mock-sd__card-head h3 {
+	margin: 0;
+	font-size: var(--text-md);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-sd__card-sub {
+	margin: 0 0 10px;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+}
+
+/* ---------- permission dropdown ---------- */
+
+.mock-sd__perm {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 28px;
+	padding: 0 9px 0 11px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-sm);
+	background: var(--surface);
+	color: var(--ink);
+	font: inherit;
+	font-size: var(--text-sm);
+	font-weight: 500;
+	cursor: pointer;
+	white-space: nowrap;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		border-color var(--dur-1) var(--ease-out),
+		box-shadow var(--dur-1) var(--ease-out);
+}
+
+.mock-sd__perm:hover {
+	border-color: var(--ink-3);
+}
+
+.mock-sd__perm:focus-visible {
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--ring);
+}
+
+.mock-sd__perm svg {
+	color: var(--ink-3);
+}
+
+/* ---------- direct link row ---------- */
+
+.mock-sd__linkrow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	height: 36px;
+	padding: 0 4px 0 10px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-md);
+	background: var(--surface);
+	transition: border-color var(--dur-1) var(--ease-out);
+}
+
+.mock-sd__linkrow:focus-within {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--ring);
+}
+
+.mock-sd__linkicon {
+	display: grid;
+	place-items: center;
+	color: var(--ink-3);
+	flex-shrink: 0;
+}
+
+.mock-sd__linkurl {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--text-sm);
+	color: var(--ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mock-sd__linkrow .tw-btn {
+	flex-shrink: 0;
+}
+
+/* ---------- invite row ---------- */
+
+.mock-sd__inviterow {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.mock-sd__inviterow .tw-field {
+	min-width: 0;
+}
+
+.mock-sd__inviterow .tw-btn {
+	align-self: stretch;
+}
+
+/* ---------- members list ---------- */
+
+.mock-sd__members {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.mock-sd__member {
+	display: grid;
+	grid-template-columns: 28px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 10px;
+	min-height: 42px;
+	padding: 4px 0;
+	border-radius: var(--r-sm);
+	transition: background var(--dur-1) var(--ease-out);
+}
+
+.mock-sd__member:hover {
+	background: var(--bg-band);
+}
+
+.mock-sd__member-email {
+	font-size: var(--text-sm);
+	color: var(--ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* ---------- avatar ---------- */
+
+.mock-sd__avatar {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	flex-shrink: 0;
+	overflow: hidden;
+	border-radius: var(--r-pill);
+	background: var(--bg-band-strong);
+	color: var(--ink-2);
+	font-size: var(--text-sm);
+	font-weight: 650;
+}
+
+.mock-sd__avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.mock-sd__avatar--cobalt {
+	background: var(--sd-avatar-cobalt-bg);
+	color: var(--sd-avatar-cobalt);
+}
+
+.mock-sd__avatar--rose {
+	background: var(--sd-avatar-rose-bg);
+	color: var(--sd-avatar-rose);
+}
+
+.mock-sd__avatar--amber {
+	background: var(--sd-avatar-amber-bg);
+	color: var(--sd-avatar-amber);
+}
+
+.mock-sd__avatar--green {
+	background: var(--sd-avatar-green-bg);
+	color: var(--sd-avatar-green);
+}
+
+/* ---------- footer ---------- */
+
+.mock-sd__footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding-top: 6px;
+}
+
+.mock-sd__footer-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+/* ---------- Done button (purple) ---------- */
+
+.mock-sd__done {
+	background: var(--sd-done);
+	border-color: var(--sd-done);
+	color: var(--sd-done-ink);
+}
+
+.mock-sd__done:hover {
+	background: var(--sd-done-strong);
+	border-color: var(--sd-done-strong);
+}
+
+.mock-sd__done:focus-visible {
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--sd-done) 30%, transparent);
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 560px) {
+	.mock-sd {
+		padding: 40px 18px;
+	}
+
+	.mock-sd__dialog {
+		padding: 20px 18px 16px;
+	}
+
+	.mock-sd__inviterow {
+		grid-template-columns: 1fr;
+	}
+
+	.mock-sd__footer {
+		flex-wrap: wrap;
+	}
+
+	.mock-sd__footer-left {
+		flex: 1;
+	}
+
+	.mock-sd__done {
+		width: 100%;
+	}
+}

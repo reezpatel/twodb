@@ -2,8 +2,11 @@ import { useState } from "react";
 import { Badge, Button, CodeInput, IconButton, QRCode } from "@twodb/ui";
 import { Check, Copy, RefreshCw, ShieldCheck, X } from "lucide-react";
 
-const SECRET = "ZPFIY52GITG7WOWJ44";
-const QR_URI = `otpauth://totp/twodb:asha%40vermaclinic.in?secret=${SECRET}&issuer=twodb&digits=6`;
+// No real credential anywhere in this mock: the QR encodes a demo URL and
+// the manual-entry key is a placeholder string, so secret scanners have
+// nothing to find here.
+const QR_URI = "https://twodb.app/demo/two-factor-setup";
+const DEMO_MANUAL_KEY = "DEMOKEY2FA000000";
 
 function makeCodes(seed: number) {
 	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -148,10 +151,10 @@ export function TwoFactorMock() {
 								Enter this secret instead:
 							</span>
 							<code className="mock-2fa__secret tw-tnum">
-								ZPFI Y52G ITG7 WOWJ 44
+								{DEMO_MANUAL_KEY.match(/.{1,4}/g)?.join(" ")}
 							</code>
 							<div>
-								<CopyButton text={SECRET} label="Copy code" />
+								<CopyButton text={DEMO_MANUAL_KEY} label="Copy code" />
 							</div>
 						</div>
 					</div>

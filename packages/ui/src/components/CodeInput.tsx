@@ -4,6 +4,7 @@ import {
 	type ClipboardEvent,
 	type KeyboardEvent,
 } from "react";
+import { fieldStyles } from "./Field.style";
 
 export interface CodeInputProps {
 	/** Number of boxes. */
@@ -77,6 +78,7 @@ export function CodeInput({
 			role="group"
 			aria-label={ariaLabel}
 		>
+			<style jsx>{fieldStyles}</style>
 			{Array.from({ length }, (_, i) => (
 				<input
 					key={i}

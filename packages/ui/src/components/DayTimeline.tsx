@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { chartStyles } from "./Chart.style";
 
 export interface TimelineSegment {
 	label: string;
@@ -58,6 +59,7 @@ export function DayTimeline({
 
 	return (
 		<div className="tw-dayline">
+			<style jsx>{chartStyles}</style>
 			{title || dateLabel || tracking !== undefined ? (
 				<div className="tw-dayline__head">
 					<span className="tw-dayline__title">

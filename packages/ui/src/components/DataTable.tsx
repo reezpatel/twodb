@@ -28,6 +28,7 @@ import { SearchInput } from "./SearchInput";
 import { Select } from "./Select";
 import { CellEditor, CellView, type CellOption, type CellType } from "./cells";
 import { ColumnConfig } from "./ColumnConfig";
+import { tableStyles } from "./Table.style";
 
 export type FilterSpec =
   | { kind: "text" }
@@ -366,6 +367,7 @@ export function DataTable<T>({
 
   return (
     <div className="tw-table-wrap">
+      <style jsx>{tableStyles}</style>
       {searchText || filterable.length > 0 ? (
         <div className="tw-datatable__toolbar">
           {searchText ? (

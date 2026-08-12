@@ -1,3 +1,4 @@
+import { tabsStyles } from "./Tabs.style";
 export interface TabItem {
   id: string;
   label: string;
@@ -13,6 +14,7 @@ export interface TabsProps {
 export function Tabs({ items, value, onValueChange, "aria-label": ariaLabel }: TabsProps) {
   return (
     <div className="tw-tabs" role="tablist" aria-label={ariaLabel}>
+      <style jsx>{tabsStyles}</style>
       {items.map((item) => (
         <button
           key={item.id}

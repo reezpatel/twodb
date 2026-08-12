@@ -1,0 +1,596 @@
+/* AI SaaS Dashboard mock — a macOS browser window on a gradient desktop:
+   workspace sidebar, "Hello David" home with meetings / tasks / documents
+   cards, and an AI prompt bar. The window rides the design system's own
+   day/night tokens, so the sidebar Dark Mode switch flips the phase. */
+
+.mock-ad {
+	display: grid;
+	place-items: center;
+	width: 100%;
+	min-height: 920px;
+	padding: 44px 36px;
+	border: 1px solid var(--line);
+	border-radius: 22px;
+	background:
+		radial-gradient(55% 60% at 18% 0%, #ff9e45 0%, transparent 70%),
+		radial-gradient(45% 55% at 58% 0%, #ff8f6b 0%, transparent 70%),
+		radial-gradient(50% 60% at 95% 8%, #c084fc 0%, transparent 70%),
+		radial-gradient(60% 65% at 98% 88%, #1d4ed8 0%, transparent 75%),
+		radial-gradient(55% 60% at 4% 92%, #38bdf8 0%, transparent 70%),
+		linear-gradient(120deg, #ffb25e, #f472b6 45%, #7c3aed);
+	color: var(--ink);
+	font-family: var(--font-ui);
+}
+
+/* ---------- browser window ---------- */
+
+.mock-ad__window {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	max-width: 1180px;
+	overflow: hidden;
+	border: 1px solid rgb(5 5 6 / 0.14);
+	border-radius: 14px;
+	background: var(--surface);
+	box-shadow: 0 34px 90px -24px rgb(5 5 6 / 0.5);
+}
+
+.mock-ad__chrome {
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	padding: 10px 16px;
+	border-bottom: 1px solid var(--line);
+	background: var(--surface);
+}
+
+.mock-ad__lights {
+	display: inline-flex;
+	gap: 7px;
+}
+
+.mock-ad__light {
+	width: 11px;
+	height: 11px;
+	border-radius: var(--r-pill);
+}
+
+.mock-ad__light--red {
+	background: #ff5f57;
+}
+.mock-ad__light--yellow {
+	background: #febc2e;
+}
+.mock-ad__light--green {
+	background: #28c840;
+}
+
+.mock-ad__navbtns {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--ink-2);
+}
+
+.mock-ad__navbtns .is-dim {
+	color: var(--ink-3);
+	opacity: 0.55;
+}
+
+.mock-ad__url {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	flex: 1;
+	max-width: 440px;
+	margin: 0 auto;
+	padding: 5px 14px;
+	border-radius: var(--r-sm);
+	background: var(--bg-band-strong);
+	color: var(--ink-2);
+	font-size: var(--text-sm);
+}
+
+.mock-ad__reload {
+	margin-left: auto;
+	color: var(--ink-3);
+}
+
+/* ---------- app frame ---------- */
+
+.mock-ad__app {
+	display: grid;
+	grid-template-columns: 236px minmax(0, 1fr);
+	min-height: 780px;
+}
+
+/* ---------- sidebar ---------- */
+
+.mock-ad__side {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+	padding: 16px 12px 12px;
+	border-right: 1px solid var(--line);
+	background: var(--surface);
+}
+
+.mock-ad__workspace {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	padding: 0 4px;
+}
+
+.mock-ad__workspace strong {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--text-md);
+	font-weight: 650;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mock-ad__logo {
+	display: grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	flex-shrink: 0;
+	border-radius: 8px;
+	background: var(--twdb-cobalt);
+	color: #fff;
+}
+
+.mock-ad__nav {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.mock-ad__navitem {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	height: 32px;
+	padding: 0 10px;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--ink-2);
+	font: inherit;
+	font-size: var(--text-md);
+	font-weight: 500;
+	cursor: pointer;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-ad__navitem:hover {
+	background: var(--bg-band);
+	color: var(--ink);
+}
+
+.mock-ad__navitem--active,
+.mock-ad__navitem--active:hover {
+	background: var(--bg-band-strong);
+	color: var(--ink);
+	font-weight: 600;
+}
+
+.mock-ad__navitem svg {
+	color: var(--ink-3);
+}
+
+.mock-ad__navitem--active svg {
+	color: var(--ink);
+}
+
+.mock-ad__navitem--static {
+	cursor: default;
+}
+
+.mock-ad__navitem--static:hover {
+	background: transparent;
+	color: var(--ink-2);
+}
+
+.mock-ad__darksw {
+	margin-left: auto;
+}
+
+.mock-ad__section {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.mock-ad__section-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0 10px 0 10px;
+	margin-bottom: 4px;
+}
+
+.mock-ad__section-head h3 {
+	margin: 0;
+	font-size: var(--text-md);
+	font-weight: 700;
+	color: var(--ink);
+}
+
+.mock-ad__link {
+	display: block;
+	width: 100%;
+	height: 28px;
+	padding: 0 10px;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--ink-2);
+	font: inherit;
+	font-size: var(--text-md);
+	text-align: left;
+	cursor: pointer;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-ad__link:hover {
+	background: var(--bg-band);
+	color: var(--ink);
+}
+
+.mock-ad__side-foot {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin-top: auto;
+}
+
+/* usage card */
+.mock-ad__usage {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-md);
+	background: var(--surface);
+}
+
+.mock-ad__usage strong {
+	font-size: var(--text-sm);
+	font-weight: 650;
+}
+
+.mock-ad__usage .tw-progress__fill {
+	background: var(--ink);
+}
+
+.mock-ad__usage-sub {
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+}
+
+.mock-ad__update {
+	width: 100%;
+	justify-content: center;
+	background: var(--ink);
+	border-color: var(--ink);
+	color: var(--surface);
+}
+
+.mock-ad__update:hover {
+	background: var(--ink-2);
+	border-color: var(--ink-2);
+}
+
+/* ---------- main ---------- */
+
+.mock-ad__main {
+	display: flex;
+	flex-direction: column;
+	padding: 18px 28px 26px;
+	background: var(--surface);
+	min-width: 0;
+}
+
+.mock-ad__page {
+	margin: 0;
+	font-size: 17px;
+	font-weight: 700;
+	color: var(--ink);
+}
+
+.mock-ad__hero {
+	margin: 36px 0 30px;
+	text-align: center;
+}
+
+.mock-ad__hero h2 {
+	margin: 0;
+	font-size: var(--text-2xl);
+	font-weight: 700;
+	color: var(--ink);
+}
+
+.mock-ad__hero p {
+	margin: 10px 0 0;
+	font-size: var(--text-md);
+	color: var(--ink-3);
+}
+
+/* ---------- cards grid ---------- */
+
+.mock-ad__grid {
+	display: grid;
+	grid-template-columns: 1.08fr 1fr 0.92fr;
+	gap: 18px;
+	align-items: start;
+}
+
+.mock-ad__card {
+	display: flex;
+	flex-direction: column;
+	padding: 14px 16px 10px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-lg);
+	background: var(--surface);
+	min-width: 0;
+}
+
+.mock-ad__card-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 6px;
+}
+
+.mock-ad__card-head h3 {
+	margin: 0;
+	font-size: var(--text-md);
+	font-weight: 650;
+	color: var(--ink-2);
+}
+
+.mock-ad__textbtn {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--ink-3);
+	font: inherit;
+	font-size: var(--text-sm);
+	cursor: pointer;
+	transition: color var(--dur-1) var(--ease-out);
+}
+
+.mock-ad__textbtn:hover {
+	color: var(--ink);
+}
+
+/* meetings */
+.mock-ad__meeting {
+	display: grid;
+	grid-template-columns: 48px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 12px;
+	padding: 9px 0;
+}
+
+.mock-ad__date {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 1px;
+	width: 48px;
+	height: 48px;
+	border-radius: var(--r-md);
+	background: var(--bg-band-strong);
+}
+
+.mock-ad__date em {
+	font-style: normal;
+	font-size: 8.5px;
+	font-weight: 650;
+	letter-spacing: 0.06em;
+	color: var(--ink-3);
+}
+
+.mock-ad__date strong {
+	font-size: var(--text-md);
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	color: var(--ink);
+}
+
+.mock-ad__meeting-meta {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.mock-ad__meeting-meta strong {
+	font-size: var(--text-md);
+	font-weight: 650;
+	color: var(--ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mock-ad__meeting-meta em {
+	font-style: normal;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+}
+
+/* tasks */
+.mock-ad__task {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 9px 0;
+}
+
+.mock-ad__task strong {
+	font-size: var(--text-md);
+	font-weight: 650;
+	color: var(--ink);
+}
+
+.mock-ad__task em {
+	font-style: normal;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+}
+
+/* documents */
+.mock-ad__doc {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 7px 0;
+	min-width: 0;
+}
+
+.mock-ad__doc svg {
+	flex-shrink: 0;
+}
+
+.mock-ad__doc span {
+	font-size: var(--text-md);
+	font-weight: 500;
+	color: var(--ink-2);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* ---------- AI prompt bar ---------- */
+
+.mock-ad__composer {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	width: 100%;
+	max-width: 600px;
+	margin: auto auto 0;
+	padding: 14px 14px 10px;
+	border: 1px solid var(--line-strong);
+	border-radius: 16px;
+	background: var(--surface);
+	box-shadow: 0 10px 30px -14px rgb(5 5 6 / 0.18);
+}
+
+.mock-ad__composer input {
+	padding: 0 4px;
+	border: 0;
+	outline: none;
+	background: transparent;
+	color: var(--ink);
+	font-family: inherit;
+	font-size: var(--text-md);
+	line-height: 1.5;
+	caret-color: var(--accent);
+}
+
+.mock-ad__composer input::placeholder {
+	color: var(--ink-3);
+}
+
+.mock-ad__composer-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.mock-ad__model {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	height: 28px;
+	padding: 0 10px;
+	border: 0;
+	border-radius: var(--r-pill);
+	background: var(--bg-band-strong);
+	color: var(--ink);
+	font: inherit;
+	font-size: var(--text-sm);
+	font-weight: 600;
+	cursor: pointer;
+	transition: background var(--dur-1) var(--ease-out);
+}
+
+.mock-ad__model:hover {
+	background: var(--line);
+}
+
+.mock-ad__model svg {
+	color: var(--ink-3);
+}
+
+.mock-ad__composer-div {
+	width: 1px;
+	height: 18px;
+	margin: 0 6px;
+	background: var(--line-strong);
+}
+
+.mock-ad__composer-row .tw-icon-btn {
+	color: var(--ink-3);
+}
+
+.mock-ad__send {
+	display: grid;
+	place-items: center;
+	width: 32px;
+	height: 32px;
+	margin-left: auto;
+	padding: 0;
+	border: 0;
+	border-radius: 10px;
+	background: var(--ink);
+	color: var(--surface);
+	cursor: pointer;
+	transition: background var(--dur-1) var(--ease-out);
+}
+
+.mock-ad__send:hover {
+	background: var(--ink-2);
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 980px) {
+	.mock-ad {
+		padding: 24px 14px;
+		min-height: 0;
+	}
+
+	.mock-ad__app {
+		grid-template-columns: 200px minmax(0, 1fr);
+	}
+
+	.mock-ad__grid {
+		grid-template-columns: 1fr;
+	}
+
+	.mock-ad__main {
+		padding: 16px 18px 20px;
+	}
+
+	.mock-ad__composer {
+		margin-top: 24px;
+	}
+}

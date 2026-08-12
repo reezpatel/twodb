@@ -9,7 +9,8 @@ import {
 	Menu,
 	MenuDivider,
 	MenuItem,
-	NavSection,
+	NavPanelGroup,
+	NavPanelItem,
 	SearchInput,
 	Textarea,
 	Tooltip,
@@ -335,18 +336,22 @@ export function InboxMock() {
 					<Pencil size={14} aria-hidden="true" />
 					Compose
 				</Button>
-				<NavSection
-					items={FOLDERS.map((f) => ({
-						id: f.id,
-						label: f.label,
-						icon: f.icon,
-						badge: f.count ? (
-							<span className="tw-tnum mock-in__count">{f.count}</span>
-						) : undefined,
-					}))}
-					value={folder}
-					onValueChange={setFolder}
-				/>
+				<NavPanelGroup>
+					{FOLDERS.map((f) => (
+						<NavPanelItem
+							key={f.id}
+							icon={f.icon}
+							label={f.label}
+							active={f.id === folder}
+							onClick={() => setFolder(f.id)}
+							meta={
+								f.count ? (
+									<span className="tw-tnum mock-in__count">{f.count}</span>
+								) : undefined
+							}
+						/>
+					))}
+				</NavPanelGroup>
 				<div className="mock-in__labels">
 					<div className="mock-in__labels-head">
 						<span className="tw-cue">Labels</span>
@@ -360,12 +365,10 @@ export function InboxMock() {
 					))}
 				</div>
 				<div className="mock-in__folders-foot">
-					<NavSection
-						items={[
-							{ id: "settings", label: "Settings", icon: <Sparkles /> },
-							{ id: "help", label: "Help Center", icon: <Bell /> },
-						]}
-					/>
+					<NavPanelGroup>
+						<NavPanelItem icon={<Sparkles />} label="Settings" />
+						<NavPanelItem icon={<Bell />} label="Help Center" />
+					</NavPanelGroup>
 				</div>
 			</aside>
 

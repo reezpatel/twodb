@@ -1,8 +1,10 @@
 import type { HTMLAttributes, ReactNode, TableHTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from "react";
+import { tableStyles } from "./Table.style";
 
 export function Table({ children, className = "", ...rest }: TableHTMLAttributes<HTMLTableElement>) {
   return (
     <div className="tw-table-wrap">
+      <style jsx>{tableStyles}</style>
       <div className="tw-table-scroll">
         <table className={["tw-table", className].filter(Boolean).join(" ")} {...rest}>
           {children}

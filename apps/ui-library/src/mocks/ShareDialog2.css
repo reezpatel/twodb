@@ -1,0 +1,510 @@
+/* Share Dialog 2 mock — workspace members dialog.
+   The same panel is rendered in both phases (night / day) side by side
+   so the grammar is read in two lights at once. Each panel pins its
+   own phase via data-phase on the panel root, so flipping the canvas
+   phase doesn't move the night panel.
+
+   Anatomy: header, Allow email domains (with + Domain, per-domain rows
+   with link icon / "Added by X" pill / kebab), Invite to collaborate
+   (invite row, member rows with avatars + role dropdown, "View N more"
+   reveal), settings switches, footer with Copy link / Embed / Done.
+
+   Purple is reserved for the Done action — the rest of the accent work
+   stays in cobalt. Dotted dividers between sections, hairline borders. */
+
+.mock-sd2 {
+	/* Reference purple for the Done button. */
+	--sd2-done: #5e47ec;
+	--sd2-done-strong: #4a37cf;
+	--sd2-done-ink: #ffffff;
+
+	--sd2-switch-on: #5e47ec;
+	--sd2-switch-on-bg: rgb(94 71 236 / 0.18);
+
+	position: relative;
+	width: 100%;
+	max-width: 1280px;
+	padding: 56px 32px;
+	border: 1px solid var(--line);
+	border-radius: 22px;
+	background: #f4f7ff;
+	color: var(--ink);
+	font-family: var(--font-ui);
+}
+
+.mock-sd2__stage {
+	position: relative;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 56px;
+	align-items: start;
+	justify-items: center;
+}
+
+.mock-sd2__stage-note {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 1;
+	font-family: var(--font-cue);
+	font-size: 10.5px;
+	font-weight: 500;
+	letter-spacing: var(--tracking-cue);
+	text-transform: uppercase;
+	color: var(--ink-3);
+}
+
+.mock-sd2__stage-note--left {
+	left: calc(25% - 22px);
+}
+
+.mock-sd2__stage-note--right {
+	right: calc(25% - 18px);
+}
+
+.mock-sd2__panel {
+	width: 100%;
+	max-width: 430px;
+}
+
+/* ---------- dialog surface ---------- */
+
+.mock-sd2__dialog {
+	display: flex;
+	flex-direction: column;
+	gap: 22px;
+	padding: 22px 22px 18px;
+	border: 1px solid var(--line-strong);
+	border-radius: 16px;
+	background: var(--surface);
+	box-shadow: var(--shadow-overlay);
+}
+
+/* ---------- header ---------- */
+
+.mock-sd2__header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.mock-sd2__head-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.mock-sd2__head-text h2 {
+	margin: 0;
+	font-size: var(--text-lg);
+	font-weight: 700;
+	line-height: 1.3;
+	color: var(--ink);
+}
+
+.mock-sd2__head-text p {
+	margin: 4px 0 0;
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+	line-height: 1.5;
+}
+
+.mock-sd2__close {
+	display: grid;
+	place-items: center;
+	width: 30px;
+	height: 30px;
+	flex-shrink: 0;
+	padding: 0;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--ink-3);
+	cursor: pointer;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-sd2__close:hover {
+	background: var(--bg-band-strong);
+	color: var(--ink);
+}
+
+/* ---------- sections ---------- */
+
+.mock-sd2__section {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.mock-sd2__section-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	min-height: 28px;
+}
+
+.mock-sd2__section-head h3 {
+	margin: 0;
+	font-size: var(--text-md);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-sd2__section-sub {
+	margin: 0 0 6px;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+	line-height: 1.5;
+}
+
+/* ---------- allow email domains ---------- */
+
+.mock-sd2__domains {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-top: 4px;
+}
+
+.mock-sd2__domain {
+	display: grid;
+	grid-template-columns: 18px minmax(0, 1fr) auto auto;
+	align-items: center;
+	gap: 10px;
+	min-height: 42px;
+	padding: 4px 6px 4px 4px;
+	border-radius: var(--r-sm);
+	transition: background var(--dur-1) var(--ease-out);
+}
+
+.mock-sd2__domain:hover {
+	background: var(--bg-band);
+}
+
+.mock-sd2__domain-link {
+	display: grid;
+	place-items: center;
+	color: var(--ink-3);
+}
+
+.mock-sd2__domain-name {
+	font-size: var(--text-sm);
+	color: var(--ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mock-sd2__addedby {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 9px 2px 2px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-pill);
+	font-size: 11.5px;
+	font-weight: 500;
+	color: var(--ink-2);
+	background: var(--bg-band);
+	white-space: nowrap;
+}
+
+.mock-sd2__addedby-avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	flex-shrink: 0;
+	overflow: hidden;
+	border-radius: var(--r-pill);
+	border: 1px solid var(--line);
+	background: var(--bg-band-strong);
+	color: var(--ink-2);
+	font-size: 7.5px;
+	font-weight: 700;
+}
+
+.mock-sd2__addedby-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.mock-sd2__kebab {
+	display: grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--ink-3);
+	cursor: pointer;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-sd2__kebab:hover {
+	background: var(--bg-band-strong);
+	color: var(--ink);
+}
+
+/* ---------- invite to collaborate ---------- */
+
+.mock-sd2__inviterow {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.mock-sd2__inviterow .tw-field {
+	min-width: 0;
+}
+
+.mock-sd2__inviterow .tw-btn {
+	align-self: stretch;
+}
+
+.mock-sd2__members {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.mock-sd2__member {
+	display: grid;
+	grid-template-columns: 26px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 10px;
+	min-height: 40px;
+	padding: 4px 0;
+	border-radius: var(--r-sm);
+	transition: background var(--dur-1) var(--ease-out);
+}
+
+.mock-sd2__member:hover {
+	background: var(--bg-band);
+}
+
+.mock-sd2__member-avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	flex-shrink: 0;
+	overflow: hidden;
+	border-radius: var(--r-pill);
+	border: 1px solid var(--line);
+	background: var(--bg-band-strong);
+	color: var(--ink-2);
+	font-size: 9px;
+	font-weight: 700;
+}
+
+.mock-sd2__member-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.mock-sd2__member-email {
+	font-size: var(--text-sm);
+	color: var(--ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* ---------- permission dropdown ---------- */
+
+.mock-sd2__perm {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 28px;
+	padding: 0 9px 0 11px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-sm);
+	background: var(--surface);
+	color: var(--ink);
+	font: inherit;
+	font-size: var(--text-sm);
+	font-weight: 500;
+	cursor: pointer;
+	white-space: nowrap;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		border-color var(--dur-1) var(--ease-out),
+		box-shadow var(--dur-1) var(--ease-out);
+}
+
+.mock-sd2__perm:hover {
+	border-color: var(--ink-3);
+}
+
+.mock-sd2__perm:focus-visible {
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--ring);
+}
+
+.mock-sd2__perm svg {
+	color: var(--ink-3);
+}
+
+/* ---------- view more ---------- */
+
+.mock-sd2__reveal {
+	display: flex;
+	justify-content: center;
+	margin-top: 4px;
+}
+
+/* ---------- dotted divider ---------- */
+
+.mock-sd2__divider {
+	height: 0;
+	border-top: 1px dashed var(--line-strong);
+}
+
+/* ---------- settings switches ---------- */
+
+.mock-sd2__settings {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.mock-sd2__setting {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 4px 0;
+}
+
+.mock-sd2__setting-label {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--text-sm);
+	font-weight: 500;
+	color: var(--ink);
+	cursor: pointer;
+}
+
+/* ---------- footer ---------- */
+
+.mock-sd2__footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding-top: 4px;
+}
+
+.mock-sd2__footer-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+/* ---------- Done button (purple) ---------- */
+
+.mock-sd2__done {
+	background: var(--sd2-done);
+	border-color: var(--sd2-done);
+	color: var(--sd2-done-ink);
+}
+
+.mock-sd2__done:hover {
+	background: var(--sd2-done-strong);
+	border-color: var(--sd2-done-strong);
+}
+
+.mock-sd2__done:focus-visible {
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--sd2-done) 30%, transparent);
+}
+
+/* ---------- night panel overrides ----------
+   The panel pins its own phase so the surface, ink, lines, and
+   switch colors all flip with the panel — independent of the
+   canvas phase toggle. */
+
+.mock-sd2__panel[data-phase="night"] {
+	color-scheme: dark;
+
+	--bg: #050506;
+	--bg-band: #0c0c12;
+	--bg-band-strong: #1f1f2a;
+	--surface: #0d0d14;
+
+	--ink: #f4f3f8;
+	--ink-2: #c4c3d1;
+	--ink-3: #9291a3;
+
+	--line: rgb(244 243 248 / 0.13);
+	--line-strong: rgb(244 243 248 / 0.24);
+
+	--accent: #8b9aff;
+	--accent-ink: #ffffff;
+	--accent-soft-bg: rgb(109 128 255 / 0.14);
+
+	--shadow-overlay: 0 14px 32px -10px rgb(0 0 0 / 0.6);
+
+	--sd2-done: #6b54ff;
+}
+
+.mock-sd2__panel[data-phase="night"] .mock-sd2__dialog {
+	box-shadow: var(--shadow-overlay);
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 1100px) {
+	.mock-sd2__stage {
+		grid-template-columns: 1fr;
+		gap: 40px;
+	}
+
+	.mock-sd2__stage-note--left,
+	.mock-sd2__stage-note--right {
+		display: none;
+	}
+}
+
+@media (max-width: 560px) {
+	.mock-sd2 {
+		padding: 36px 16px;
+	}
+
+	.mock-sd2__dialog {
+		padding: 18px 16px 14px;
+	}
+
+	.mock-sd2__inviterow {
+		grid-template-columns: 1fr;
+	}
+
+	.mock-sd2__footer {
+		flex-wrap: wrap;
+	}
+
+	.mock-sd2__footer-left {
+		flex: 1;
+	}
+
+	.mock-sd2__done {
+		width: 100%;
+	}
+}

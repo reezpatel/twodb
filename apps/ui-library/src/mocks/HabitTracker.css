@@ -1,0 +1,649 @@
+/* Habit Tracker mock — weekly / monthly / yearly views, kintsugi days */
+
+.mock-habit {
+	/* kintsugi gold — repaired days, from the curated Amber */
+	--mk-gold: #d9a03f;
+
+	display: flex;
+	width: 100%;
+	height: 780px;
+	overflow: hidden;
+	border: 1px solid var(--line);
+	border-radius: 16px;
+	background: var(--bg);
+	color: var(--ink);
+}
+
+[data-phase="night"] .mock-habit {
+	--mk-gold: #e8c47a;
+}
+
+/* ==================== RAIL ==================== */
+
+.mock-habit__brand {
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	margin-bottom: 8px;
+	border-radius: var(--r-md);
+	background: var(--action);
+	color: #fff;
+}
+
+.mock-habit__brand svg {
+	width: 17px;
+	height: 17px;
+	stroke-width: 2;
+}
+
+/* ==================== HEADER ==================== */
+
+.mock-habit__main {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.mock-habit__head {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: var(--space-3) var(--space-4);
+	padding: var(--space-5) var(--space-6) var(--space-4);
+}
+
+.mock-habit__head h1 {
+	margin: 0;
+	font-size: var(--text-2xl);
+	font-weight: 650;
+	letter-spacing: -0.01em;
+}
+
+.mock-habit__head p {
+	margin: 2px 0 0;
+	font-size: var(--text-md);
+	color: var(--ink-3);
+}
+
+.mock-habit__head-side {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.mock-habit__today-summary {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+	font-variant-numeric: tabular-nums;
+}
+
+.mock-habit__today-summary svg {
+	width: 14px;
+	height: 14px;
+	color: var(--mk-gold);
+}
+
+/* ==================== VIEW FRAME ==================== */
+
+.mock-habit__view {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 0 var(--space-6) var(--space-5);
+}
+
+/* ==================== SHARED BITS ==================== */
+
+.mock-habit__chip {
+	width: 10px;
+	height: 10px;
+	border-radius: var(--r-pill);
+	flex-shrink: 0;
+}
+
+.mock-habit__week-idtext {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.mock-habit__week-idtext strong {
+	font-size: var(--text-sm);
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mock-habit__week-idtext em {
+	font-style: normal;
+	font-size: var(--text-xs);
+	color: var(--ink-3);
+	font-variant-numeric: tabular-nums;
+}
+
+.mock-habit__streak {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	height: 30px;
+	padding: 0 12px;
+	border-radius: var(--r-pill);
+	font-size: var(--text-sm);
+	font-weight: 650;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.mock-habit__streak svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* round check button (weekly cells + card today toggle) */
+.mock-habit__check {
+	display: grid;
+	place-items: center;
+	border: 1.5px solid var(--line-strong);
+	border-radius: var(--r-pill);
+	background: transparent;
+	color: var(--ink-3);
+	cursor: pointer;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		border-color var(--dur-1) var(--ease-out),
+		transform var(--dur-1) var(--ease-out);
+}
+
+.mock-habit__check--md {
+	width: 30px;
+	height: 30px;
+}
+
+.mock-habit__check--lg {
+	width: 44px;
+	height: 44px;
+	flex-shrink: 0;
+}
+
+.mock-habit__check svg {
+	width: 55%;
+	height: 55%;
+	stroke-width: 2.4;
+	opacity: 0;
+}
+
+.mock-habit__check:hover:not(:disabled) {
+	border-color: var(--habit);
+}
+
+.mock-habit__check:hover:not(:disabled) svg {
+	opacity: 0.4;
+}
+
+.mock-habit__check[data-state="done"] {
+	background: var(--habit);
+	border-color: var(--habit);
+	color: #050506;
+}
+
+.mock-habit__check[data-state="done"] svg {
+	opacity: 1;
+}
+
+.mock-habit__check[data-state="kintsugi"] {
+	position: relative;
+	background: var(--mk-gold);
+	border-color: var(--mk-gold);
+}
+
+.mock-habit__check[data-state="kintsugi"]::after {
+	content: "";
+	position: absolute;
+	width: 2px;
+	height: 60%;
+	border-radius: 1px;
+	background: #050506;
+	transform: rotate(45deg);
+	opacity: 0.55;
+}
+
+.mock-habit__check:disabled {
+	opacity: 0.3;
+	cursor: default;
+}
+
+/* contribution dot */
+.mock-habit__dot {
+	width: 100%;
+	height: 100%;
+	padding: 0;
+	border: 0;
+	border-radius: var(--r-pill);
+	background: var(--bg-band-strong);
+	box-shadow: inset 0 0 0 1px var(--line);
+	cursor: pointer;
+	transition:
+		transform var(--dur-1) var(--ease-out),
+		box-shadow var(--dur-1) var(--ease-out);
+}
+
+.mock-habit__dot:hover:not(:disabled) {
+	transform: scale(1.25);
+	box-shadow: inset 0 0 0 1px var(--habit);
+}
+
+.mock-habit__dot[data-state="done"] {
+	background: var(--habit);
+	box-shadow: none;
+}
+
+.mock-habit__dot[data-state="kintsugi"] {
+	position: relative;
+	background: var(--mk-gold);
+	box-shadow: none;
+}
+
+.mock-habit__dot[data-state="kintsugi"]::after {
+	content: "";
+	position: absolute;
+	left: calc(50% - 1px);
+	top: 15%;
+	width: 2px;
+	height: 70%;
+	border-radius: 1px;
+	background: #050506;
+	transform: rotate(45deg);
+	opacity: 0.5;
+}
+
+.mock-habit__dot[data-state="future"] {
+	opacity: 0.35;
+	cursor: default;
+}
+
+.mock-habit__dot.is-today {
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--habit);
+}
+
+.mock-habit__dot.is-today[data-state="empty"] {
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
+}
+
+/* ==================== WEEKLY ==================== */
+
+.mock-habit__week {
+	overflow-x: auto;
+}
+
+.mock-habit__week-grid {
+	display: grid;
+	grid-template-columns: minmax(210px, 260px) repeat(7, minmax(56px, 1fr));
+	min-width: 720px;
+}
+
+.mock-habit__week-corner {
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-habit__week-day {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	padding: 6px 4px 10px;
+	border-bottom: 1px solid var(--line);
+	color: var(--ink-3);
+}
+
+.mock-habit__week-dow {
+	font-family: var(--font-cue);
+	font-size: 10.5px;
+	font-weight: 500;
+	letter-spacing: var(--tracking-cue);
+}
+
+.mock-habit__week-num {
+	font-size: var(--text-sm);
+	font-variant-numeric: tabular-nums;
+}
+
+.mock-habit__week-day.is-today {
+	color: var(--accent);
+}
+
+.mock-habit__week-day.is-today .mock-habit__week-num {
+	font-weight: 700;
+}
+
+.mock-habit__week-name {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 6px;
+	padding: 10px 14px 10px 4px;
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-habit__week-id {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.mock-habit__week-progress {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.mock-habit__week-bar {
+	flex: 1;
+	height: 3px;
+	border-radius: 2px;
+	background: var(--bg-band-strong);
+	overflow: hidden;
+}
+
+.mock-habit__week-bar i {
+	display: block;
+	height: 100%;
+	border-radius: 2px;
+	transition: width var(--dur-3) var(--ease-out);
+}
+
+.mock-habit__week-count {
+	font-size: var(--text-xs);
+	color: var(--ink-3);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.mock-habit__week-cell {
+	display: grid;
+	place-items: center;
+	padding: 10px 4px;
+	border-bottom: 1px solid var(--line);
+}
+
+/* ==================== MONTHLY ==================== */
+
+.mock-habit__month-nav {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding-bottom: var(--space-3);
+}
+
+.mock-habit__month-title {
+	font-size: var(--text-md);
+	font-weight: 650;
+	min-width: 130px;
+	text-align: center;
+}
+
+.mock-habit__month-scroll {
+	overflow-x: auto;
+}
+
+.mock-habit__month-grid {
+	display: grid;
+	align-items: center;
+	min-width: min-content;
+}
+
+.mock-habit__month-corner {
+	position: sticky;
+	left: 0;
+	z-index: 2;
+	height: 100%;
+	background: var(--bg);
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-habit__month-day {
+	display: grid;
+	place-items: center;
+	height: 34px;
+	font-size: var(--text-xs);
+	color: var(--ink-3);
+	font-variant-numeric: tabular-nums;
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-habit__month-day.is-today {
+	color: var(--accent);
+	font-weight: 700;
+	background: var(--accent-soft-bg);
+}
+
+.mock-habit__month-name {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	height: 100%;
+	padding: 8px 14px 8px 4px;
+	background: var(--bg);
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-habit__month-cell {
+	display: grid;
+	place-items: center;
+	height: 44px;
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-habit__month-cell.is-today {
+	background: var(--accent-soft-bg);
+}
+
+.mock-habit__month-cell .mock-habit__dot {
+	width: 16px;
+	height: 16px;
+}
+
+/* ==================== YEARLY ==================== */
+
+.mock-habit__year {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.mock-habit__card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+	padding: var(--space-5);
+	border: 1px solid var(--line);
+	border-radius: var(--r-lg);
+	background: var(--surface);
+}
+
+.mock-habit__card-head {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+
+.mock-habit__card-id {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	margin-right: auto;
+}
+
+.mock-habit__card-id h3 {
+	margin: 0;
+	font-size: var(--text-lg);
+	font-weight: 650;
+}
+
+.mock-habit__freq {
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+	font-variant-numeric: tabular-nums;
+}
+
+/* contribution grid */
+.mock-habit__yeargrid {
+	--dot: 15px;
+	--gap: 5px;
+	--dow: 22px;
+
+	overflow-x: auto;
+	padding-bottom: 2px;
+}
+
+.mock-habit__months {
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: var(--dot);
+	gap: var(--gap);
+	margin-left: calc(var(--dow) + var(--gap));
+	margin-bottom: 6px;
+}
+
+.mock-habit__months span {
+	font-size: 10.5px;
+	color: var(--ink-3);
+	white-space: nowrap;
+}
+
+.mock-habit__yearbody {
+	display: grid;
+	grid-template-columns: var(--dow) max-content;
+	gap: var(--gap);
+}
+
+.mock-habit__dow {
+	display: grid;
+	grid-template-rows: repeat(7, var(--dot));
+	gap: var(--gap);
+}
+
+.mock-habit__dow span {
+	display: flex;
+	align-items: center;
+	font-size: 9.5px;
+	color: var(--ink-3);
+}
+
+.mock-habit__dots {
+	display: grid;
+	grid-auto-flow: column;
+	grid-template-rows: repeat(7, var(--dot));
+	grid-auto-columns: var(--dot);
+	gap: var(--gap);
+}
+
+/* legend */
+.mock-habit__legend {
+	display: flex;
+	justify-content: center;
+	gap: var(--space-5);
+	font-size: var(--text-xs);
+	color: var(--ink-3);
+}
+
+.mock-habit__legend span {
+	display: inline-flex;
+	align-items: center;
+}
+
+.mock-habit__legend i {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	margin-right: 6px;
+	border-radius: var(--r-pill);
+}
+
+.mock-habit__legend-gold {
+	background: var(--mk-gold);
+}
+
+.mock-habit__legend-empty {
+	background: var(--bg-band-strong);
+	box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* ==================== NEW HABIT FORM ==================== */
+
+.mock-habit__form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+	min-width: 300px;
+}
+
+.mock-habit__form-label {
+	display: block;
+	margin-bottom: 6px;
+	font-family: var(--font-cue);
+	font-size: 10.5px;
+	font-weight: 500;
+	letter-spacing: var(--tracking-cue);
+	text-transform: uppercase;
+	color: var(--ink-3);
+}
+
+.mock-habit__swatches {
+	display: flex;
+	gap: 8px;
+}
+
+.mock-habit__swatch {
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--r-pill);
+	cursor: pointer;
+	transition:
+		transform var(--dur-1) var(--ease-out),
+		box-shadow var(--dur-1) var(--ease-out);
+}
+
+.mock-habit__swatch:hover {
+	transform: scale(1.12);
+}
+
+.mock-habit__swatch.is-active {
+	box-shadow:
+		0 0 0 2px var(--surface),
+		0 0 0 4px var(--ink);
+}
+
+/* ==================== RESPONSIVE ==================== */
+
+@media (max-width: 720px) {
+	.mock-habit__head {
+		padding: var(--space-4);
+	}
+
+	.mock-habit__view {
+		padding: 0 var(--space-4) var(--space-4);
+	}
+
+	.mock-habit__today-summary {
+		display: none;
+	}
+}

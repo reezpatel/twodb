@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { calendarStyles } from "./Calendar.style";
 
 export type CalTone = "cobalt" | "rose" | "warning" | "danger" | "neutral";
 
@@ -69,6 +70,7 @@ export function MonthCalendar({
 
 	return (
 		<div className="tw-mcal">
+			<style jsx>{calendarStyles}</style>
 			<div className="tw-mcal__weekdays">
 				{weekdays.map((d) => (
 					<span key={d} className="tw-cue">

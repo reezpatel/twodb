@@ -25,31 +25,31 @@ colors:
   danger-bg: "#FCE3EC"
 typography:
   display:
-    fontFamily: "Oswald, Public Sans, system-ui, sans-serif"
+    fontFamily: "IBM Plex Sans, Outfit, system-ui, sans-serif"
     fontSize: "26px"
     fontWeight: 500
     lineHeight: 1.2
     letterSpacing: "0.14em"
   headline:
-    fontFamily: "Public Sans, system-ui, -apple-system, Segoe UI, sans-serif"
+    fontFamily: "Outfit, system-ui, -apple-system, Segoe UI, sans-serif"
     fontSize: "20px"
     fontWeight: 650
     lineHeight: 1.2
     letterSpacing: "normal"
   title:
-    fontFamily: "Public Sans, system-ui, -apple-system, Segoe UI, sans-serif"
+    fontFamily: "Outfit, system-ui, -apple-system, Segoe UI, sans-serif"
     fontSize: "16.5px"
     fontWeight: 650
     lineHeight: 1.2
     letterSpacing: "normal"
   body:
-    fontFamily: "Public Sans, system-ui, -apple-system, Segoe UI, sans-serif"
+    fontFamily: "Outfit, system-ui, -apple-system, Segoe UI, sans-serif"
     fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.55
-    letterSpacing: "normal"
+    letterSpacing: "0.02em"
   label:
-    fontFamily: "Oswald, Public Sans, system-ui, sans-serif"
+    fontFamily: "IBM Plex Sans, Outfit, system-ui, sans-serif"
     fontSize: "11.5px"
     fontWeight: 500
     lineHeight: 1.2
@@ -104,7 +104,7 @@ components:
     height: "34px"
     padding: "0 14px"
   input:
-    backgroundColor: "{colors.day}"
+    backgroundColor: "{colors.band-strong}"
     textColor: "{colors.ink}"
     typography: "{typography.body}"
     rounded: "{rounded.md}"
@@ -133,16 +133,16 @@ twodb's interface is a stage at first light. Surfaces are a horizon — quiet ma
 
 The world runs in two phases. **Day** is the default working surface: a light gray ground (`#F5F5F7`, user-pinned 2026-08-08) with white surfaces floating on it, near-black ink, hairline rules. **Night** is depthless black (`#050506`), switched by setting `[data-phase="night"]` on any subtree — the same token names resolve to night values, so components are written once against semantic tokens (`--bg`, `--ink`, `--line`, `--accent`, `--action`) and never against raw palette values. The palette itself is a single sweep of light: night → cobalt → rose → rose-light → dawn → day. Color is never decoration; it is the phase a surface is in.
 
-Density is calm and slightly condensed, with deliberate negative space — a PRODUCT.md brand commitment. Type pairs Public Sans (UI text) with Oswald tracked caps (the "cue register": labels, section markers, wordmark). Motion is a single exponential ease-out — light rises, never bounces — with one authored "cue-up" entrance (bands rise in sequence, 45ms stagger) and `prefers-reduced-motion` honored everywhere. A fine fractal-noise grain sits over large fields at low opacity for a matte tooth, never glossy.
+Density is calm and slightly condensed, with deliberate negative space — a PRODUCT.md brand commitment. Type pairs Outfit (UI text) with IBM Plex Sans tracked caps (the "cue register": labels, section markers, wordmark). Motion is a single exponential ease-out — light rises, never bounces — with one authored "cue-up" entrance (bands rise in sequence, 45ms stagger) and `prefers-reduced-motion` honored everywhere. A fine fractal-noise grain sits over large fields at low opacity for a matte tooth, never glossy.
 
-**Tech decision (durable):** tokens are pure CSS custom properties plus plain component CSS — no Tailwind, no CSS-in-JS. `packages/ui` is consumed as source by multiple Vite apps, and derived component packages need a stable, framework-free token contract (`--tw-*` semantic custom properties, day/night resolved via `[data-phase]`). Fonts are self-hosted via `@fontsource` (Public Sans 400/500/600/700, Oswald 500/600).
+**Tech decision (durable):** tokens are pure CSS custom properties plus plain component CSS — no Tailwind, no CSS-in-JS. `packages/ui` is consumed as source by multiple Vite apps, and derived component packages need a stable, framework-free token contract (`--tw-*` semantic custom properties, day/night resolved via `[data-phase]`). Fonts are self-hosted via `@fontsource` (Outfit 400/500/600/700, IBM Plex Sans 500/600).
 
 **Key Characteristics:**
 
 - Two phases (day default / night via `[data-phase="night"]`), one semantic token set.
 - One lit control per view: only the primary action carries solid color (flat cobalt).
 - Elevation = hairline borders + tonal bands; the dialog overlay carries the only real shadow.
-- Cue register: Oswald tracked caps for labels; tabular numerals for data.
+- Cue register: IBM Plex Sans tracked caps for labels; tabular numerals for data.
 - Fine grain (0.06 day multiply / 0.08 night screen) over large fields — matte, never glossy.
 - The cobalt→rose sweep (`--wash`) is identity material only: the Horizon foundation piece and future brand moments.
 
@@ -184,24 +184,24 @@ The palette is one sweep of light along a horizon, from depthless night to full 
 
 ## Typography
 
-**Display / Cue Font:** Oswald (self-hosted via @fontsource, weights 500–600)
-**Body Font:** Public Sans (self-hosted, weights 400–700)
+**Display / Cue Font:** IBM Plex Sans (self-hosted via @fontsource, weights 500–600)
+**Body Font:** Outfit (self-hosted, weights 400–700)
 **Mono Font:** system mono stack (ui-monospace, SF Mono, Cascadia Mono, Menlo) — code readouts only.
 
-**Character:** Public Sans is the calm working voice; Oswald tracked caps are the stage manager's cue register — terse instrument labels that mark, never speak. The pairing reads technical but warm: an operations console that has learned manners.
+**Character:** Outfit is the calm working voice — geometric, round, and approachable without turning playful, set with a light +0.02em default tracking; IBM Plex Sans tracked caps are the stage manager's cue register — terse instrument labels that mark, never speak. The pairing reads technical but warm: an operations console that has learned manners.
 
 ### Hierarchy
 
-- **Display / Cue** (Oswald 500, 26px, uppercase, +0.14em tracking): wordmark, hero statements, foundation piece. Always uppercase.
-- **Headline** (Public Sans 650, 20px, 1.2): page titles (`--text-2xl` at 26px for section heads).
-- **Title** (Public Sans 650, 16.5px, 1.2): card and dialog titles.
-- **Body** (Public Sans 400, 14px, 1.55): default reading text; measure capped at 68ch (`--measure`).
-- **Label / Cue small** (Oswald 500, 11.5px, uppercase, +0.14em, muted ink): field-adjacent section markers (`.tw-cue`), rail group labels, divider labels. Field labels themselves are Public Sans 600 at 11.5px with +0.08em tracking.
-- **Data** (Public Sans, `font-variant-numeric: tabular-nums` via `.tw-tnum`): times, counts, hex values, any number that updates.
+- **Display / Cue** (IBM Plex Sans 500, 26px, uppercase, +0.14em tracking): wordmark, hero statements, foundation piece. Always uppercase.
+- **Headline** (Outfit 650, 20px, 1.2): page titles (`--text-2xl` at 26px for section heads).
+- **Title** (Outfit 650, 16.5px, 1.2): card and dialog titles.
+- **Body** (Outfit 400, 14px, 1.55, +0.02em tracking): default reading text; measure capped at 68ch (`--measure`). The +0.02em default tracking is set once on `body` and inherited everywhere the UI font runs.
+- **Label / Cue small** (IBM Plex Sans 500, 11.5px, uppercase, +0.14em, muted ink): field-adjacent section markers (`.tw-cue`), rail group labels, divider labels. Field labels themselves are Outfit 600 at 11.5px with +0.08em tracking.
+- **Data** (Outfit, `font-variant-numeric: tabular-nums` via `.tw-tnum`): times, counts, hex values, any number that updates.
 
 ### Named Rules
 
-**The Cue Register Rule.** Oswald is caps-and-tracked or nothing. It labels and marks; it never sets sentences, body copy, or button text. If a cue label needs lowercase, it isn't a cue — demote it to Public Sans.
+**The Cue Register Rule.** IBM Plex Sans is caps-and-tracked or nothing. It labels and marks; it never sets sentences, body copy, or button text. If a cue label needs lowercase, it isn't a cue — demote it to Outfit.
 
 **The Tabular Rule.** Any numeral that can change value (times, counts, live data) sets `tabular-nums`. Proportional figures are for prose only.
 
@@ -230,7 +230,7 @@ The single exception is the dialog overlay, which carries one small, soft shadow
 
 **The One Shadow Rule.** The dialog overlay owns the only real shadow in the system. Everywhere else, elevation is a hairline plus a tonal band. A new shadow anywhere is a finding, not a feature.
 
-**The Focus Is Light Rule.** Focus and validation states arrive as rings of light (`box-shadow: 0 0 0 3px var(--ring)`, cobalt at 22%/35% opacity) plus a border shift — never as elevation.
+**The Focus Is Light Rule.** Focus and validation states arrive as rings of light (`box-shadow: 0 0 0 3px var(--ring)`, cobalt at 22%/35% opacity) — never as elevation. Validation adds a deepened-rose hairline.
 
 ## Shapes
 
@@ -258,8 +258,8 @@ All primitives ship as React wrappers (`tw-*` classes) over the shared CSS in `p
 
 ### Fields (input, textarea, select, checkbox, radio, switch)
 
-- **Style:** hairline instruments — white surface, 1px strong hairline, 10px radius, 34px height. Placeholders in muted ink.
-- **Focus:** border shifts to cobalt plus a 3px cobalt ring at 22% opacity — focus is a ring of light, not elevation.
+- **Style:** muted tonal wells — resting fill is the strong tonal band (`--bg-field`), no resting border, 10px radius, 32px height. Hover deepens the fill one step (`--bg-field-hover`). Placeholders in muted ink.
+- **Focus:** a 3px cobalt ring at 22% opacity over the resting fill — focus is a ring of light, not elevation, and never a border swap.
 - **Invalid:** deepened-rose border; the ring tints rose (20% danger ink).
 - **Checkbox/radio:** a small box that lights up — checked fills solid cobalt (check glyph) or a 5.5px cobalt ring (radio).
 - **Switch:** the track itself lights flat cobalt when on; knob slides 17px on the shared ease over 200ms.
@@ -284,7 +284,7 @@ All primitives ship as React wrappers (`tw-*` classes) over the shared CSS in `p
 
 ### Navigation (showcase rail)
 
-- Night cue-sheet rail: Oswald tracked-caps group labels, numbered cues, Public Sans items. Active item is the "lit band": cobalt 8–14% tonal fill plus an inset cobalt 45% hairline — never a solid fill.
+- Night cue-sheet rail: IBM Plex Sans tracked-caps group labels, numbered cues, Outfit items. Active item is the "lit band": a cobalt 8–14% tonal fill with cobalt ink — borderless, never a solid fill.
 
 ### Overlays (dialog, tooltip)
 
@@ -297,7 +297,7 @@ All primitives ship as React wrappers (`tw-*` classes) over the shared CSS in `p
 
 ### Signature: The Horizon
 
-The foundation piece (showcase "The Horizon"): the full palette as six stacked bands — night, cobalt horizon, rose gather, rose light, dawn wash, day — each carrying its Oswald cue number, name, and tabular hex. This is the only surface where the cobalt→rose sweep (`--wash`) may appear at product scale.
+The foundation piece (showcase "The Horizon"): the full palette as six stacked bands — night, cobalt horizon, rose gather, rose light, dawn wash, day — each carrying its IBM Plex Sans cue number, name, and tabular hex. This is the only surface where the cobalt→rose sweep (`--wash`) may appear at product scale.
 
 ## Do's and Don'ts
 
@@ -315,7 +315,7 @@ The foundation piece (showcase "The Horizon"): the full palette as six stacked b
 
 - **Don't** put gradient fills on any control — primary actions are solid cobalt; `--wash` is identity material for the Horizon piece and brand moments only (The Flat Calm Rule, user-pinned).
 - **Don't** add glow, colored shadows, or drop shadows; the dialog overlay owns the only real shadow (The One Shadow Rule, user-pinned).
-- **Don't** set Oswald in sentence case or for body/button text (The Cue Register Rule).
+- **Don't** set IBM Plex Sans in sentence case or for body/button text (The Cue Register Rule).
 - **Don't** use rose for ordinary actions or cobalt for AI output.
 - **Don't** compress spacing to fit more; remove content before removing air (The Air Is Load-Bearing Rule).
 - **Don't** introduce new easing curves or bouncy motion — one exponential ease-out (`cubic-bezier(0.16, 1, 0.3, 1)`); light rises, never bounces.

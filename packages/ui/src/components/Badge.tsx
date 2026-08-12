@@ -1,4 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
+import { badgeStyles } from "./Badge.style";
 
 export type BadgeTone = "neutral" | "go" | "rose" | "warning" | "danger";
 
@@ -17,6 +18,7 @@ export function Badge({ tone = "neutral", size = "md", className = "", children,
 
   return (
     <span className={classes} {...rest}>
+      <style jsx>{badgeStyles}</style>
       {children}
     </span>
   );

@@ -1,0 +1,508 @@
+/* Plans & Billing mock */
+
+.mock-pb {
+	display: grid;
+	grid-template-columns: 260px minmax(0, 1fr);
+	width: 100%;
+	min-height: 780px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-lg);
+	background: var(--bg);
+	overflow: hidden;
+}
+
+/* --- Sidebar --- */
+
+.mock-pb__sidebar {
+	display: flex;
+	flex-direction: column;
+	border-right: 1px solid var(--line);
+	background: var(--surface);
+}
+
+/* Brand */
+.mock-pb__brand {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: var(--space-4);
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-pb__brand-icon {
+	font-weight: 700;
+	font-size: 16px;
+	color: var(--ink);
+	letter-spacing: -0.05em;
+}
+
+.mock-pb__brand-name {
+	font-size: var(--text-md);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+/* Navigation */
+.mock-pb__nav {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: var(--space-3) var(--space-2);
+}
+
+.mock-pb__nav-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px var(--space-2);
+	border: 0;
+	border-radius: var(--r-sm);
+	background: none;
+	font: inherit;
+	font-size: var(--text-md);
+	color: var(--ink-2);
+	cursor: pointer;
+	text-align: left;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-pb__nav-item svg {
+	width: 18px;
+	height: 18px;
+	color: var(--ink-3);
+	flex-shrink: 0;
+}
+
+.mock-pb__nav-item:hover {
+	background: var(--wash-hover, var(--accent-soft-bg));
+	color: var(--ink);
+}
+
+.mock-pb__nav-item.is-active {
+	background: var(--accent-soft-bg);
+	color: var(--ink);
+	font-weight: 500;
+}
+
+.mock-pb__nav-item.is-active svg {
+	color: var(--accent);
+}
+
+/* Browser Section */
+.mock-pb__browser {
+	flex: 1;
+	padding: 0 var(--space-2) var(--space-3);
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.mock-pb__browser-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--space-3) var(--space-2) var(--space-2);
+}
+
+.mock-pb__browser-label {
+	font-family: var(--font-cue);
+	font-size: var(--text-cue);
+	font-weight: 500;
+	letter-spacing: var(--tracking-cue);
+	text-transform: uppercase;
+	color: var(--ink-3);
+}
+
+.mock-pb__browser-more {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: none;
+	color: var(--ink-3);
+	cursor: pointer;
+}
+
+.mock-pb__browser-more:hover {
+	background: var(--line);
+	color: var(--ink-2);
+}
+
+.mock-pb__folder-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px var(--space-2);
+	border: 0;
+	border-radius: var(--r-sm);
+	background: none;
+	font: inherit;
+	font-size: var(--text-md);
+	color: var(--ink-2);
+	cursor: pointer;
+	text-align: left;
+}
+
+.mock-pb__folder-row:hover {
+	background: var(--wash-hover, var(--accent-soft-bg));
+	color: var(--ink);
+}
+
+.mock-pb__folder-row svg {
+	width: 14px;
+	height: 14px;
+	color: var(--ink-3);
+	transition: transform var(--dur-1) var(--ease-out);
+}
+
+.mock-pb__folder-row svg.is-expanded {
+	transform: rotate(90deg);
+}
+
+.mock-pb__folder-children {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	margin-left: 14px;
+	padding-left: 12px;
+	border-left: 1px solid var(--line);
+}
+
+.mock-pb__folder-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 8px;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: none;
+	font: inherit;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+	cursor: pointer;
+	text-align: left;
+}
+
+.mock-pb__folder-item:hover {
+	background: var(--wash-hover, var(--accent-soft-bg));
+	color: var(--ink-2);
+}
+
+.mock-pb__folder-item svg {
+	width: 14px;
+	height: 14px;
+	color: var(--ink-3);
+	flex-shrink: 0;
+}
+
+/* Sidebar Footer */
+.mock-pb__sidebar-footer {
+	margin-top: auto;
+	padding: var(--space-3);
+	border-top: 1px solid var(--line);
+}
+
+.mock-pb__docs-btn {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 10px var(--space-3);
+	border: 1px solid var(--line);
+	border-radius: var(--r-md);
+	background: var(--bg);
+	font: inherit;
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+	cursor: pointer;
+	transition:
+		border-color var(--dur-1) var(--ease-out),
+		background var(--dur-1) var(--ease-out);
+}
+
+.mock-pb__docs-btn:hover {
+	border-color: var(--line-strong);
+	background: var(--surface);
+}
+
+.mock-pb__docs-btn svg {
+	width: 16px;
+	height: 16px;
+	color: var(--ink-3);
+}
+
+/* --- Main Content --- */
+
+.mock-pb__main {
+	display: flex;
+	flex-direction: column;
+	padding: var(--space-4) var(--space-5);
+	gap: var(--space-4);
+	min-width: 0;
+}
+
+/* Header */
+.mock-pb__header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--space-4);
+}
+
+.mock-pb__header-left h1 {
+	margin: 0;
+	font-size: var(--text-xl);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-pb__header-left p {
+	margin: 4px 0 0;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+}
+
+.mock-pb__header-right {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.mock-pb__upgrade-btn {
+	gap: 6px;
+}
+
+.mock-pb__upgrade-btn svg {
+	color: #f59e0b;
+}
+
+/* Plans Section */
+.mock-pb__plans {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--space-3);
+}
+
+.mock-pb__plan {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	padding: var(--space-4);
+	border: 1px solid var(--line);
+	border-radius: var(--r-md);
+	background: var(--surface);
+	transition: border-color var(--dur-1) var(--ease-out);
+}
+
+.mock-pb__plan:hover {
+	border-color: var(--line-strong);
+}
+
+.mock-pb__plan--current {
+	border-color: var(--accent);
+	background: var(--accent-soft-bg);
+}
+
+.mock-pb__plan-header {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.mock-pb__plan-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.mock-pb__slashes {
+	font-weight: 700;
+	font-size: 14px;
+	color: var(--accent);
+	letter-spacing: -0.08em;
+}
+
+.mock-pb__plan-title h4 {
+	margin: 0;
+	font-size: var(--text-md);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-pb__plan-price {
+	margin-left: auto;
+	font-family: var(--font-cue);
+	font-size: var(--text-sm);
+	font-weight: 500;
+	color: var(--ink-2);
+}
+
+.mock-pb__plan-features {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.mock-pb__plan-features li {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+	line-height: 1.4;
+}
+
+.mock-pb__plan-features li svg {
+	flex-shrink: 0;
+	margin-top: 2px;
+	color: var(--accent);
+}
+
+.mock-pb__plan-btn {
+	margin-top: auto;
+	width: 100%;
+}
+
+/* Invoices Section */
+.mock-pb__invoices {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+}
+
+.mock-pb__invoices h3 {
+	margin: 0;
+	font-size: var(--text-md);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-pb__invoices-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-3);
+	flex-wrap: wrap;
+}
+
+.mock-pb__invoices-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.mock-pb__search {
+	width: 180px;
+}
+
+.mock-pb__invoices-table {
+	border: 1px solid var(--line);
+	border-radius: var(--r-md);
+	background: var(--surface);
+	overflow: hidden;
+}
+
+.mock-pb__invoices-table table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.mock-pb__invoices-table tr {
+	border-bottom: 1px solid var(--line);
+	transition: background var(--dur-1) var(--ease-out);
+}
+
+.mock-pb__invoices-table tr:last-child {
+	border-bottom: 0;
+}
+
+.mock-pb__invoices-table tr:hover {
+	background: var(--wash-hover, rgba(0, 0, 0, 0.02));
+}
+
+.mock-pb__invoices-table tr.is-selected {
+	background: var(--accent-soft-bg);
+}
+
+.mock-pb__invoices-table td {
+	padding: 12px 14px;
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+	vertical-align: middle;
+}
+
+.mock-pb__check-col {
+	width: 44px;
+}
+
+.mock-pb__invoice-num {
+	font-weight: 500;
+	color: var(--ink);
+}
+
+.mock-pb__invoice-date {
+	color: var(--ink-3);
+	width: 120px;
+}
+
+.mock-pb__invoice-plan {
+	color: var(--ink-3);
+	width: 100px;
+}
+
+.mock-pb__invoice-amount {
+	font-family: var(--font-ui);
+	font-variant-numeric: tabular-nums;
+	color: var(--ink-2);
+	width: 100px;
+}
+
+.mock-pb__invoice-action {
+	width: 44px;
+	text-align: right;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+	.mock-pb {
+		grid-template-columns: 1fr;
+	}
+
+	.mock-pb__sidebar {
+		border-right: 0;
+		border-bottom: 1px solid var(--line);
+		max-height: 320px;
+		overflow-y: auto;
+	}
+
+	.mock-pb__plans {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 768px) {
+	.mock-pb__header {
+		flex-direction: column;
+	}
+
+	.mock-pb__invoices-toolbar {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.mock-pb__invoices-actions {
+		flex-wrap: wrap;
+	}
+
+	.mock-pb__search {
+		width: 100%;
+	}
+}

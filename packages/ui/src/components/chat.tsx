@@ -16,6 +16,7 @@ import { Avatar } from "./Avatar";
 import { Badge } from "./Badge";
 import { Button } from "./Button";
 import { IconButton } from "./IconButton";
+import { chatStyles } from "./Chat.style";
 
 /* ---------------- Shell ---------------- */
 
@@ -29,6 +30,7 @@ export function ChatPanel({
 }) {
 	return (
 		<div className={active ? "tw-chat tw-chat--active" : "tw-chat"}>
+			<style jsx>{chatStyles}</style>
 			{children}
 		</div>
 	);

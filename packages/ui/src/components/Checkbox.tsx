@@ -1,4 +1,5 @@
 import { useEffect, useRef, type InputHTMLAttributes } from "react";
+import { fieldStyles } from "./Field.style";
 
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label?: string;
@@ -15,6 +16,7 @@ export function Checkbox({ label, indeterminate, className = "", ...rest }: Chec
 
   const control = (
     <span className="tw-checkbox">
+      <style jsx>{fieldStyles}</style>
       <input ref={ref} type="checkbox" className={className} {...rest} />
       <span className="tw-checkbox__box" aria-hidden="true">
         <svg viewBox="0 0 12 12" className="tw-checkbox__mark">
@@ -44,6 +46,7 @@ export function Checkbox({ label, indeterminate, className = "", ...rest }: Chec
 
   return (
     <label className="tw-choice">
+      <style jsx>{fieldStyles}</style>
       {control}
       <span>{label}</span>
     </label>

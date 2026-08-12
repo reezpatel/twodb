@@ -1,5 +1,6 @@
 import type { InputHTMLAttributes } from "react";
 import { useId } from "react";
+import { fieldStyles } from "./Field.style";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -16,10 +17,18 @@ export function Input({ label, hint, error, id, className = "", ...rest }: Input
     <input id={inputId} className={classes} aria-invalid={error ? true : undefined} {...rest} />
   );
 
-  if (!label && !hint && !error) return input;
+  if (!label && !hint && !error) {
+    return (
+      <>
+        {input}
+        <style jsx>{fieldStyles}</style>
+      </>
+    );
+  }
 
   return (
     <div className="tw-field">
+      <style jsx>{fieldStyles}</style>
       {label ? (
         <label className="tw-field__label" htmlFor={inputId}>
           {label}

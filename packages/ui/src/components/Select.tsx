@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { Check, ChevronDown } from "lucide-react";
+import { fieldStyles } from "./Field.style";
 
 export interface SelectOption {
   value: string;
@@ -121,6 +122,7 @@ export function Select({
 
   const trigger = (
     <div className="tw-select" ref={rootRef}>
+      <style jsx>{fieldStyles}</style>
       <button
         type="button"
         id={baseId}
@@ -180,6 +182,7 @@ export function Select({
 
   return (
     <div className="tw-field">
+      <style jsx>{fieldStyles}</style>
       {label ? (
         <span className="tw-field__label" id={labelId}>
           {label}

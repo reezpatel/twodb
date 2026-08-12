@@ -6,7 +6,8 @@ import {
 	Dialog,
 	IconButton,
 	Input,
-	NavSection,
+	NavPanelGroup,
+	NavPanelItem,
 	PasswordInput,
 	Radio,
 	Select,
@@ -865,11 +866,17 @@ export function SettingsMock() {
 			</header>
 			<div className="mock-set__layout">
 				<nav className="mock-set__nav" aria-label="Settings sections">
-					<NavSection
-						items={SECTIONS}
-						value={section}
-						onValueChange={(id) => setSection(id as SectionId)}
-					/>
+					<NavPanelGroup>
+						{SECTIONS.map((s) => (
+							<NavPanelItem
+								key={s.id}
+								icon={s.icon}
+								label={s.label}
+								active={s.id === section}
+								onClick={() => setSection(s.id as SectionId)}
+							/>
+						))}
+					</NavPanelGroup>
 				</nav>
 				<div className="mock-set__body">
 					<h3 className="mock-set__title">{active.label}</h3>

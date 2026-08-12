@@ -218,6 +218,7 @@ export function FlowBuilderMock() {
 	const [zoom, setZoom] = useState(1);
 	const [run, setRun] = useState<"idle" | "running" | "done">("idle");
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const stageRef = useRef<HTMLDivElement>(null);
 
 	useEffect(
 		() => () => {

@@ -1,0 +1,358 @@
+/* Search Menu - Integrations Launcher (exact match) */
+
+.mock-sm {
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding: 40px 20px;
+	min-height: 520px;
+	background: linear-gradient(145deg, #f8f7f4 0%, #f0efec 100%);
+	border-radius: var(--r-lg);
+}
+
+.mock-sm__dialog {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	max-width: 580px;
+	background: linear-gradient(180deg, #fefefe 0%, #fafaf8 100%);
+	border: 1px solid rgba(0, 0, 0, 0.08);
+	border-radius: 16px;
+	box-shadow:
+		0 0 0 1px rgba(0, 0, 0, 0.03),
+		0 2px 4px rgba(0, 0, 0, 0.02),
+		0 12px 24px rgba(0, 0, 0, 0.06);
+	overflow: hidden;
+}
+
+/* Header */
+.mock-sm__header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 12px 16px;
+}
+
+.mock-sm__back {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: #6b7280;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.mock-sm__back:hover {
+	background: rgba(0, 0, 0, 0.05);
+	color: #374151;
+}
+
+.mock-sm__title {
+	font-size: 14px;
+	font-weight: 500;
+	color: #374151;
+}
+
+/* Search */
+.mock-sm__search {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0 12px;
+	padding: 10px 12px;
+	background: #ffffff;
+	border: 1px solid rgba(0, 0, 0, 0.08);
+	border-radius: 10px;
+}
+
+.mock-sm__search-icon {
+	flex-shrink: 0;
+	color: #9ca3af;
+}
+
+.mock-sm__search input {
+	flex: 1;
+	border: 0;
+	background: none;
+	font-size: 14px;
+	color: #111827;
+	outline: none;
+}
+
+.mock-sm__search input::placeholder {
+	color: #9ca3af;
+}
+
+.mock-sm__shortcut {
+	flex-shrink: 0;
+	font-size: 12px;
+	font-weight: 500;
+	color: #9ca3af;
+}
+
+/* Content - two columns */
+.mock-sm__content {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	min-height: 320px;
+}
+
+/* List */
+.mock-sm__list {
+	display: flex;
+	flex-direction: column;
+	padding: 8px 0;
+	border-right: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.mock-sm__item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 10px 16px;
+	border: 0;
+	background: none;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	transition: background 0.1s ease;
+}
+
+.mock-sm__item:hover {
+	background: rgba(0, 0, 0, 0.03);
+}
+
+.mock-sm__item.is-selected {
+	background: rgba(99, 102, 241, 0.08);
+}
+
+.mock-sm__item-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 24px;
+	height: 24px;
+}
+
+.mock-sm__svg {
+	width: 20px;
+	height: 20px;
+}
+
+.mock-sm__item-name {
+	font-size: 14px;
+	font-weight: 600;
+	color: #111827;
+}
+
+.mock-sm__item-domain {
+	font-size: 14px;
+	color: #9ca3af;
+}
+
+/* Detail Panel */
+.mock-sm__detail {
+	display: flex;
+	flex-direction: column;
+	padding: 24px 20px 20px;
+}
+
+.mock-sm__detail-icons {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	margin-bottom: 20px;
+}
+
+.mock-sm__app-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 48px;
+	height: 48px;
+	background: #1f2937;
+	border-radius: 12px;
+	flex-shrink: 0;
+}
+
+.mock-sm__app-icon--light {
+	background: #f3f4f6;
+	border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.mock-sm__arrows {
+	color: #9ca3af;
+}
+
+/* Detail Info */
+.mock-sm__detail-info {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-bottom: auto;
+}
+
+.mock-sm__detail-title-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.mock-sm__detail-title-row h3 {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 600;
+	color: #111827;
+}
+
+.mock-sm__detail-date {
+	margin: 0;
+	font-size: 13px;
+	color: #6b7280;
+}
+
+.mock-sm__detail-author {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 4px;
+	font-size: 13px;
+	color: #6b7280;
+}
+
+.mock-sm__detail-author strong {
+	font-weight: 500;
+	color: #374151;
+}
+
+.mock-sm__more {
+	margin-left: auto;
+	padding: 4px 8px;
+	border: 0;
+	background: none;
+	font-size: 14px;
+	letter-spacing: 1px;
+	color: #9ca3af;
+	cursor: pointer;
+	border-radius: 4px;
+	transition: all 0.15s ease;
+}
+
+.mock-sm__more:hover {
+	background: rgba(0, 0, 0, 0.05);
+	color: #6b7280;
+}
+
+/* Explore Button */
+.mock-sm__explore {
+	margin-top: 20px;
+	padding: 10px 16px;
+	background: #ffffff;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	border-radius: 8px;
+	font-size: 14px;
+	font-weight: 500;
+	color: #374151;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.mock-sm__explore:hover {
+	background: #f9fafb;
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+/* Footer */
+.mock-sm__footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 10px 16px;
+	background: rgba(0, 0, 0, 0.02);
+	border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.mock-sm__hints {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	color: #9ca3af;
+}
+
+.mock-sm__hints kbd {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 20px;
+	height: 20px;
+	padding: 0 5px;
+	background: #ffffff;
+	border: 1px solid rgba(0, 0, 0, 0.1);
+	border-radius: 4px;
+	font-family: inherit;
+	font-size: 11px;
+	font-weight: 500;
+	color: #6b7280;
+}
+
+.mock-sm__hints span {
+	margin-right: 8px;
+}
+
+.mock-sm__footer-icons {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.mock-sm__footer-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: #6b7280;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.mock-sm__footer-btn:hover {
+	background: rgba(0, 0, 0, 0.05);
+	color: #374151;
+}
+
+/* Responsive */
+@media (max-width: 560px) {
+	.mock-sm__content {
+		grid-template-columns: 1fr;
+	}
+
+	.mock-sm__list {
+		border-right: 0;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+		max-height: 200px;
+		overflow-y: auto;
+	}
+
+	.mock-sm__hints {
+		flex-wrap: wrap;
+		gap: 4px;
+	}
+
+	.mock-sm__hints span {
+		margin-right: 4px;
+	}
+}

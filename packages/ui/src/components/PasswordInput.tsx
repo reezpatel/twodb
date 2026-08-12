@@ -1,6 +1,7 @@
 import { useId, useState, type InputHTMLAttributes } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { IconButton } from "./IconButton";
+import { fieldStyles } from "./Field.style";
 
 export interface PasswordInputProps
 	extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
@@ -23,6 +24,7 @@ export function PasswordInput({
 
 	const input = (
 		<span className="tw-pass">
+			<style jsx>{fieldStyles}</style>
 			<input
 				id={inputId}
 				type={show ? "text" : "password"}
@@ -44,6 +46,7 @@ export function PasswordInput({
 
 	return (
 		<div className="tw-field">
+			<style jsx>{fieldStyles}</style>
 			{label ? (
 				<label className="tw-field__label" htmlFor={inputId}>
 					{label}

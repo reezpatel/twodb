@@ -1,6 +1,6 @@
 /* NotesOverview mock — knowledge base management: stat cards, tabbed
    document grid/list with sort + search, and a complete detail sidebar.
-   Reference anatomy, Cyclorama grammar (hairlines, flat cobalt, Oswald cues). */
+   Reference anatomy, Cyclorama grammar (hairlines, flat cobalt, IBM Plex Sans cues). */
 
 import { type CSSProperties, useMemo, useState } from "react";
 import {
@@ -615,7 +615,11 @@ function DetailPanel({
 					<div className="mock-no__track">
 						<span
 							className="mock-no__fill"
-							style={{ "--fill": (reindexing ? progress : d.pct) / 100 } as CSSProperties}
+							style={
+								{
+									"--fill": (reindexing ? progress : d.pct) / 100,
+								} as CSSProperties
+							}
 						/>
 					</div>
 				</section>

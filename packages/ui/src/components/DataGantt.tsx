@@ -6,6 +6,7 @@ import {
 	type ReactNode,
 } from "react";
 import { Badge, type BadgeTone } from "./Badge";
+import { dataGanttStyles } from "./DataGantt.style";
 
 export interface DataGanttMeta {
 	label: string;
@@ -449,6 +450,7 @@ export function DataGantt({
 	if (items.length === 0) {
 		return (
 			<div className={classes} aria-label={ariaLabel}>
+				<style jsx>{dataGanttStyles}</style>
 				<div className="tw-gantt__empty">{emptyMessage}</div>
 			</div>
 		);
@@ -456,6 +458,7 @@ export function DataGantt({
 
 	return (
 		<section className={classes} aria-label={ariaLabel}>
+			<style jsx>{dataGanttStyles}</style>
 			<DataGanttToolbar window={window} />
 
 			<div className="tw-gantt__grid">

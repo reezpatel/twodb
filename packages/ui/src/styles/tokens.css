@@ -17,18 +17,19 @@
 	--twdb-day: #ffffff;
 
 	/* --- Type --- */
-	--font-ui: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-	--font-cue: "Oswald", "Public Sans", system-ui, sans-serif;
+	--font-ui: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+	--font-cue: "IBM Plex Sans", "Outfit", system-ui, sans-serif;
 	--font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
 
 	--text-xs: 11.5px;
 	--text-sm: 12.5px;
-	--text-md: 14px;
-	--text-lg: 16.5px;
+	--text-md: 13px;
+	--text-lg: 14.5px;
 	--text-xl: 20px;
 	--text-2xl: 26px;
 	--text-3xl: 34px;
 
+	--tracking-narrow: 0.1em;
 	--tracking-cue: 0.14em;
 	--measure: 68ch;
 
@@ -79,10 +80,15 @@
 [data-phase="day"] {
 	color-scheme: light;
 
-	--bg: #f5f5f7; /* light gray ground — white surfaces float on it (user-pinned) */
-	--bg-band: #faf9fc;
+	--bg: #f5f5f7; /* stage: light gray ground — surfaces float on it */
+	--bg-band: #faf9fc; /* sidebar: a band sitting just above the stage */
+	--bg-rail: #ffffff; /* rail: lifted accent strip, brightest of the three */
 	--bg-band-strong: #f2f0f7;
 	--surface: #ffffff;
+
+	/* fields: muted fill, no resting hairline */
+	--bg-field: var(--bg-band-strong);
+	--bg-field-hover: #e9e7f0;
 
 	--ink: #121218;
 	--ink-2: #40404e;
@@ -118,14 +124,24 @@
 	--grain-blend: multiply;
 }
 
-/* --- Night phase --- */
+/* --- Night phase ---
+   Three shades of black for the shell's three surfaces,
+   rail is the lifted accent — the icons float on a band
+   visibly above the sidebar and stage. Each tier is a
+   quiet step so the eye can read the layout without ever
+   seeing a hard border. */
 [data-phase="night"] {
 	color-scheme: dark;
 
-	--bg: var(--twdb-night);
-	--bg-band: #0b0b11;
-	--bg-band-strong: #13131c;
+	--bg: #050506; /* stage: deepest, the focused work surface */
+	--bg-band: #0c0c12; /* sidebar: a band sitting just above the stage */
+	--bg-rail: #181821; /* rail: lifted accent strip, brightest of the three */
+	--bg-band-strong: #1f1f2a;
 	--surface: #0d0d14;
+
+	/* fields: muted fill, no resting hairline */
+	--bg-field: var(--bg-band-strong);
+	--bg-field-hover: #2a2a36;
 
 	--ink: #f4f3f8;
 	--ink-2: #c4c3d1;

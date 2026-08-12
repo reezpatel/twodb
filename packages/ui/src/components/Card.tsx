@@ -1,4 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
+import { cardStyles } from "./Card.style";
 
 export type CardTone = "default" | "band" | "rose" | "warning" | "danger";
 export type CardDensity = "normal" | "compact";
@@ -31,6 +32,7 @@ export function Card({
 
 	return (
 		<div className={classes} {...rest}>
+			<style jsx>{cardStyles}</style>
 			{title || actions ? (
 				<div className="tw-card__header">
 					{title ? <h3 className="tw-card__title">{title}</h3> : <span />}

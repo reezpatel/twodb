@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { overlayStyles } from "./Overlay.style";
 
 export type TooltipSide = "top" | "right";
 
@@ -11,6 +12,7 @@ export interface TooltipProps {
 export function Tooltip({ tip, side = "top", children }: TooltipProps) {
   return (
     <span className={`tw-tip tw-tip--${side}`} data-tip={tip}>
+      <style jsx>{overlayStyles}</style>
       {children}
     </span>
   );

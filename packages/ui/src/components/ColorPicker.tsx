@@ -9,6 +9,8 @@ import {
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { HexColorPicker, HexColorInput } from "react-colorful";
+import { colorPickerStyles } from "./ColorPicker.style";
+import { fieldStyles } from "./Field.style";
 
 export interface ColorSwatchOption {
 	value: string;
@@ -146,6 +148,7 @@ export function ColorPicker({
 
 	const trigger = (
 		<div className="tw-colorpick">
+			<style jsx>{colorPickerStyles}</style>
 			<button
 				type="button"
 				id={baseId}
@@ -275,6 +278,7 @@ export function ColorPicker({
 
 	return (
 		<div className="tw-field">
+			<style jsx>{fieldStyles}</style>
 			{label ? (
 				<span className="tw-field__label" id={labelId}>
 					{label}

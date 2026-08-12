@@ -1,43 +1,8 @@
-* {
-  box-sizing: border-box;
-}
+/* App-level base — region styles live beside their components as
+   styled-jsx: shell/<Region>.style.jsx (see /AGENTS.md). */
 
-body {
-  margin: 0;
-  font-family: var(--font-ui);
-  background: var(--bg-band);
-  color: var(--ink);
-}
-
-.page {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 48px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.page__header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.page__header h1 {
-  margin: 0;
-  font-size: 28px;
-}
-
-.row {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: flex-end;
-}
-
-.api-result {
-  margin: 16px 0 0;
-  font-size: 14px;
-  color: var(--go);
+html,
+body,
+#root {
+	height: 100%;
 }

@@ -4,15 +4,21 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@twodb/contracts": "workspace:*",
+    "@twodb/plugin-notes": "workspace:*",
+    "@twodb/shared-frontend": "workspace:*",
     "@twodb/ui": "workspace:*",
     "lucide-react": "^1.29.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "react-pluggable": "^0.4.3",
+    "react-router-dom": "^7.18.2",
+    "styled-jsx": "^5.1.7"
   },
   "devDependencies": {
     "@types/react": "^19.1.0",

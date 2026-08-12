@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { buttonStyles } from "./Button.style";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type ButtonSize = "sm" | "md" | "lg";
@@ -22,6 +23,7 @@ export function Button({
 
   return (
     <button className={classes} {...rest}>
+      <style jsx>{buttonStyles}</style>
       {children}
     </button>
   );

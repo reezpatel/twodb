@@ -1,0 +1,815 @@
+/* Finance Dashboard mock — personal finance overview */
+
+.mock-finance {
+	display: grid;
+	grid-template-columns: 260px minmax(0, 1fr);
+	width: 100%;
+	min-height: 820px;
+	border: 1px solid var(--line);
+	border-radius: 16px;
+	background: #f8f9fa;
+	color: var(--ink);
+	overflow: hidden;
+}
+
+/* ==================== SIDEBAR ==================== */
+
+.mock-finance__sidebar {
+	display: flex;
+	flex-direction: column;
+	background: var(--surface);
+	border-right: 1px solid var(--line);
+}
+
+/* Brand */
+.mock-finance__brand {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 20px 20px 16px;
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-finance__logo {
+	width: 36px;
+	height: 36px;
+	border-radius: var(--r-md);
+	background: linear-gradient(135deg, #0d9488, #14b8a6);
+	display: grid;
+	place-items: center;
+	color: #fff;
+	font-weight: 700;
+	font-size: 16px;
+}
+
+.mock-finance__brand-name {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--text-lg);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-finance__brand-name svg {
+	width: 14px;
+	height: 14px;
+	color: var(--ink-3);
+}
+
+.mock-finance__brand-icon {
+	margin-left: auto;
+	width: 32px;
+	height: 32px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-sm);
+	display: grid;
+	place-items: center;
+	color: var(--ink-3);
+}
+
+.mock-finance__brand-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+/* Search */
+.mock-finance__search {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 16px 16px 8px;
+	padding: 0 12px;
+	height: 40px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-md);
+	background: var(--surface);
+	color: var(--ink-3);
+}
+
+.mock-finance__search svg {
+	width: 16px;
+	height: 16px;
+}
+
+.mock-finance__search span {
+	flex: 1;
+	font-size: var(--text-sm);
+}
+
+.mock-finance__search kbd {
+	padding: 2px 6px;
+	border-radius: var(--r-sm);
+	background: var(--bg-band);
+	font-family: inherit;
+	font-size: 11px;
+	color: var(--ink-3);
+}
+
+/* Nav sections */
+.mock-finance__nav-section {
+	padding: 16px 16px 8px;
+}
+
+.mock-finance__nav-label {
+	padding: 0 8px 8px;
+	font-family: var(--font-cue);
+	font-size: 10px;
+	font-weight: 500;
+	letter-spacing: var(--tracking-cue);
+	text-transform: uppercase;
+	color: var(--ink-3);
+}
+
+.mock-finance__nav-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	height: 40px;
+	padding: 0 12px;
+	border: 0;
+	border-radius: var(--r-md);
+	background: transparent;
+	color: var(--ink-2);
+	font: inherit;
+	font-size: var(--text-sm);
+	text-align: left;
+	cursor: pointer;
+}
+
+.mock-finance__nav-item:hover {
+	background: var(--bg-band);
+	color: var(--ink);
+}
+
+.mock-finance__nav-item.is-active {
+	background: linear-gradient(
+		135deg,
+		rgb(13 148 136 / 0.1),
+		rgb(20 184 166 / 0.08)
+	);
+	color: #0d9488;
+	font-weight: 500;
+}
+
+.mock-finance__nav-item svg {
+	width: 18px;
+	height: 18px;
+	stroke-width: 1.8;
+}
+
+.mock-finance__nav-badge {
+	margin-left: auto;
+	padding: 2px 8px;
+	border-radius: var(--r-sm);
+	background: #0d9488;
+	color: #fff;
+	font-size: 10px;
+	font-weight: 600;
+}
+
+/* Support card */
+.mock-finance__support {
+	margin: auto 16px 16px;
+	padding: 16px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-md);
+	background: var(--surface);
+}
+
+.mock-finance__support-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+
+.mock-finance__support-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-finance__support-title svg {
+	width: 18px;
+	height: 18px;
+}
+
+.mock-finance__support-close {
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--ink-3);
+	cursor: pointer;
+}
+
+.mock-finance__support-close svg {
+	width: 14px;
+	height: 14px;
+}
+
+.mock-finance__support-text {
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+	line-height: 1.5;
+	margin-bottom: 12px;
+}
+
+.mock-finance__support-btn {
+	width: 100%;
+	padding: 10px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-md);
+	background: var(--surface);
+	color: var(--ink);
+	font: inherit;
+	font-size: var(--text-sm);
+	font-weight: 500;
+	cursor: pointer;
+}
+
+.mock-finance__support-btn:hover {
+	background: var(--bg-band);
+}
+
+/* Footer nav */
+.mock-finance__sidebar-foot {
+	padding: 8px 16px 16px;
+	border-top: 1px solid var(--line);
+}
+
+/* ==================== MAIN CONTENT ==================== */
+
+.mock-finance__main {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	overflow-y: auto;
+}
+
+/* Top bar */
+.mock-finance__topbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 16px 24px;
+	background: var(--surface);
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-finance__breadcrumb {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+}
+
+.mock-finance__breadcrumb strong {
+	color: var(--ink);
+	font-weight: 500;
+}
+
+.mock-finance__user {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.mock-finance__user-avatar {
+	width: 36px;
+	height: 36px;
+	border-radius: 999px;
+	background: linear-gradient(135deg, #f97316, #ea580c);
+	display: grid;
+	place-items: center;
+	font-size: 14px;
+	font-weight: 600;
+	color: #fff;
+}
+
+.mock-finance__user-name {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--text-sm);
+	font-weight: 500;
+	color: var(--ink);
+}
+
+.mock-finance__user-name svg {
+	width: 14px;
+	height: 14px;
+	color: var(--ink-3);
+}
+
+/* Content area */
+.mock-finance__content {
+	padding: 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+/* Stat cards row */
+.mock-finance__stats {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 16px;
+}
+
+.mock-finance__stat-card {
+	padding: 20px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-lg);
+	background: var(--surface);
+}
+
+.mock-finance__stat-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+
+.mock-finance__stat-label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+}
+
+.mock-finance__stat-label svg {
+	width: 16px;
+	height: 16px;
+}
+
+.mock-finance__stat-more {
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--ink-3);
+	cursor: pointer;
+}
+
+.mock-finance__stat-more:hover {
+	background: var(--bg-band);
+}
+
+.mock-finance__stat-more svg {
+	width: 16px;
+	height: 16px;
+}
+
+.mock-finance__stat-value {
+	font-size: 28px;
+	font-weight: 700;
+	color: var(--ink);
+	font-variant-numeric: tabular-nums;
+}
+
+.mock-finance__stat-value--negative {
+	color: var(--danger);
+}
+
+/* Cards grid */
+.mock-finance__grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 16px;
+}
+
+/* Card base */
+.mock-finance__card {
+	padding: 20px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-lg);
+	background: var(--surface);
+}
+
+.mock-finance__card-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 16px;
+}
+
+.mock-finance__card-title {
+	font-size: var(--text-md);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-finance__card-badge {
+	padding: 4px 10px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-sm);
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+}
+
+.mock-finance__card-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.mock-finance__card-btn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	height: 32px;
+	padding: 0 12px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-sm);
+	background: var(--surface);
+	color: var(--ink-2);
+	font: inherit;
+	font-size: var(--text-sm);
+	cursor: pointer;
+}
+
+.mock-finance__card-btn:hover {
+	background: var(--bg-band);
+	color: var(--ink);
+}
+
+.mock-finance__card-btn svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* Recurring transactions */
+.mock-finance__recurring {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+
+.mock-finance__subscription {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 0;
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-finance__subscription:last-child {
+	border-bottom: 0;
+	padding-bottom: 0;
+}
+
+.mock-finance__subscription:first-child {
+	padding-top: 0;
+}
+
+.mock-finance__sub-icon {
+	width: 40px;
+	height: 40px;
+	border-radius: var(--r-md);
+	display: grid;
+	place-items: center;
+	font-size: 18px;
+	font-weight: 700;
+	color: #fff;
+}
+
+.mock-finance__sub-icon--netflix {
+	background: #e50914;
+}
+
+.mock-finance__sub-icon--apple {
+	background: #333;
+}
+
+.mock-finance__sub-icon--microsoft {
+	background: #00a4ef;
+}
+
+.mock-finance__sub-icon--spotify {
+	background: #1db954;
+}
+
+.mock-finance__sub-icon--adobe {
+	background: #ff0000;
+}
+
+.mock-finance__sub-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.mock-finance__sub-name {
+	font-size: var(--text-sm);
+	font-weight: 500;
+	color: var(--ink);
+}
+
+.mock-finance__sub-date {
+	font-size: 12px;
+	color: var(--ink-3);
+	margin-top: 2px;
+}
+
+.mock-finance__sub-amount {
+	text-align: right;
+}
+
+.mock-finance__sub-price {
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-finance__sub-freq {
+	font-size: 12px;
+	color: var(--ink-3);
+	margin-top: 2px;
+}
+
+/* Weekly spending chart */
+.mock-finance__chart {
+	height: 200px;
+	display: flex;
+	flex-direction: column;
+}
+
+.mock-finance__chart-container {
+	flex: 1;
+	display: flex;
+	align-items: flex-end;
+	gap: 0;
+	position: relative;
+	padding-left: 36px;
+}
+
+.mock-finance__chart-yaxis {
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 24px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	width: 32px;
+	text-align: right;
+	font-size: 11px;
+	color: var(--ink-3);
+	padding-right: 4px;
+}
+
+.mock-finance__chart-bars {
+	flex: 1;
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-around;
+	height: 100%;
+	padding-bottom: 24px;
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-finance__bar-wrapper {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+}
+
+.mock-finance__bar {
+	width: 32px;
+	border-radius: 4px 4px 0 0;
+	background: var(--line);
+	transition: background 0.15s ease;
+}
+
+.mock-finance__bar--active {
+	background: #0d9488;
+}
+
+.mock-finance__bar-label {
+	position: absolute;
+	bottom: 0;
+	font-size: 12px;
+	color: var(--ink-3);
+}
+
+.mock-finance__chart-xaxis {
+	display: flex;
+	justify-content: space-around;
+	padding-left: 36px;
+	padding-top: 8px;
+}
+
+.mock-finance__chart-xaxis span {
+	font-size: 12px;
+	color: var(--ink-3);
+	text-transform: capitalize;
+}
+
+.mock-finance__chart-xaxis span.is-active {
+	color: #0d9488;
+	font-weight: 500;
+}
+
+/* Cashflow gauge */
+.mock-finance__gauge {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 20px 0;
+}
+
+.mock-finance__gauge-svg {
+	width: 200px;
+	height: 120px;
+}
+
+.mock-finance__gauge-bg {
+	fill: none;
+	stroke: var(--line);
+	stroke-width: 16;
+	stroke-linecap: round;
+}
+
+.mock-finance__gauge-value {
+	fill: none;
+	stroke: #0d9488;
+	stroke-width: 16;
+	stroke-linecap: round;
+	transition: stroke-dashoffset 0.5s ease;
+}
+
+.mock-finance__gauge-ticks {
+	fill: none;
+	stroke: #0d9488;
+	stroke-width: 3;
+}
+
+.mock-finance__gauge-center {
+	text-anchor: middle;
+}
+
+.mock-finance__gauge-percent {
+	font-size: 32px;
+	font-weight: 700;
+	fill: var(--ink);
+}
+
+.mock-finance__gauge-compare {
+	font-size: 12px;
+	fill: var(--ink-3);
+}
+
+.mock-finance__gauge-scale {
+	display: flex;
+	justify-content: space-between;
+	width: 180px;
+	margin-top: 8px;
+	font-size: 12px;
+	color: var(--ink-3);
+}
+
+.mock-finance__gauge-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 16px;
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+}
+
+.mock-finance__gauge-label-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 999px;
+	background: #0d9488;
+}
+
+/* Transactions table */
+.mock-finance__table {
+	width: 100%;
+}
+
+.mock-finance__table-head {
+	display: grid;
+	grid-template-columns: 100px 1fr 100px 80px 70px;
+	gap: 12px;
+	padding: 10px 0;
+	border-bottom: 1px solid var(--line);
+	font-family: var(--font-cue);
+	font-size: 10px;
+	font-weight: 500;
+	letter-spacing: var(--tracking-cue);
+	text-transform: uppercase;
+	color: var(--ink-3);
+}
+
+.mock-finance__table-row {
+	display: grid;
+	grid-template-columns: 100px 1fr 100px 80px 70px;
+	gap: 12px;
+	padding: 14px 0;
+	border-bottom: 1px solid var(--line);
+	align-items: center;
+	font-size: var(--text-sm);
+}
+
+.mock-finance__table-row:last-child {
+	border-bottom: 0;
+}
+
+.mock-finance__table-date {
+	color: var(--ink);
+}
+
+.mock-finance__table-desc {
+	color: var(--ink);
+}
+
+.mock-finance__table-amount {
+	color: var(--ink);
+	font-weight: 500;
+}
+
+.mock-finance__table-status {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 8px;
+	border-radius: var(--r-sm);
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.mock-finance__table-status--pending {
+	background: rgb(245 158 11 / 0.1);
+	color: #d97706;
+}
+
+.mock-finance__table-status--completed {
+	background: rgb(34 197 94 / 0.1);
+	color: var(--go);
+}
+
+.mock-finance__table-receipt {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.mock-finance__table-receipt svg {
+	width: 16px;
+	height: 16px;
+	color: var(--ink-3);
+}
+
+.mock-finance__table-more {
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--ink-3);
+	cursor: pointer;
+}
+
+.mock-finance__table-more:hover {
+	background: var(--bg-band);
+}
+
+/* ==================== RESPONSIVE ==================== */
+
+@media (max-width: 1100px) {
+	.mock-finance__grid {
+		grid-template-columns: 1fr;
+	}
+
+	.mock-finance__stats {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+@media (max-width: 900px) {
+	.mock-finance {
+		grid-template-columns: 1fr;
+	}
+
+	.mock-finance__sidebar {
+		display: none;
+	}
+
+	.mock-finance__stats {
+		grid-template-columns: 1fr;
+	}
+}

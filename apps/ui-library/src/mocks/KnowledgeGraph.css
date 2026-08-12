@@ -1,0 +1,291 @@
+/* KnowledgeGraph mock — a Zenmori-style knowledge graph:
+   custom D3 force layout + zoom on plain SVG, filter pills,
+   search highlight, and a detail dialog. Token-themed so it
+   rides the day/night phase like every other mock. */
+
+.mock-kg {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+	width: 100%;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-lg);
+	background: var(--surface);
+	overflow: hidden;
+	box-shadow: var(--shadow-overlay);
+	padding: var(--space-4) var(--space-4) 0;
+}
+
+/* ── header ───────────────────────────────────────────────── */
+
+.mock-kg__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-4);
+	flex-wrap: wrap;
+}
+
+.mock-kg__title {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	min-width: 0;
+}
+
+.mock-kg__mark {
+	display: grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	flex: none;
+	border-radius: var(--r-md);
+	background: var(--accent-soft-bg);
+	color: var(--accent);
+}
+
+.mock-kg__mark svg {
+	width: 19px;
+	height: 19px;
+}
+
+.mock-kg__title h3 {
+	margin: 0;
+	font-size: var(--text-lg);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.mock-kg__title p {
+	margin: 1px 0 0;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+}
+
+.mock-kg__counts {
+	display: inline-flex;
+	gap: var(--space-2);
+	flex: none;
+}
+
+/* ── toolbar ──────────────────────────────────────────────── */
+
+.mock-kg__toolbar {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	flex-wrap: wrap;
+}
+
+.mock-kg__search {
+	flex: 1 1 220px;
+	max-width: 300px;
+}
+
+.mock-kg__pills {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+	padding-left: var(--space-3);
+	border-left: 1px solid var(--line);
+}
+
+.mock-kg__pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 5px 11px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-pill);
+	background: transparent;
+	font: inherit;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+	cursor: pointer;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		border-color var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-kg__pill:hover {
+	border-color: var(--pill);
+	color: var(--ink-2);
+}
+
+.mock-kg__pill.is-on {
+	border-color: var(--pill);
+	background: color-mix(in srgb, var(--pill) 14%, transparent);
+	color: var(--ink);
+	font-weight: 500;
+}
+
+.mock-kg__dot {
+	width: 8px;
+	height: 8px;
+	flex: none;
+	border-radius: 50%;
+	background: var(--pill, currentcolor);
+}
+
+/* ── graph viewport ───────────────────────────────────────── */
+
+.mock-kg__canvas {
+	position: relative;
+	margin: 0 calc(var(--space-4) * -1);
+	border-top: 1px solid var(--line);
+	background: var(--bg);
+	background-image: radial-gradient(
+		circle,
+		var(--line-strong) 1px,
+		transparent 1px
+	);
+	background-size: 22px 22px;
+	background-position: center;
+	overflow: hidden;
+}
+
+.mock-kg__svg {
+	display: block;
+	width: 100%;
+	cursor: grab;
+	touch-action: none;
+}
+
+.mock-kg__svg:active {
+	cursor: grabbing;
+}
+
+.mock-kg__hint {
+	position: absolute;
+	left: 14px;
+	bottom: 12px;
+	padding: 5px 11px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-pill);
+	background: var(--surface);
+	box-shadow: 0 4px 12px -6px rgb(5 5 6 / 0.25);
+	font-size: var(--text-xs);
+	color: var(--ink-3);
+	pointer-events: none;
+}
+
+/* ── svg elements ─────────────────────────────────────────── */
+
+.mock-kg__edge {
+	stroke: var(--ink-3);
+	transition: stroke-opacity var(--dur-2) var(--ease-out);
+}
+
+.mock-kg__edge--blocked {
+	stroke: #ef4444;
+}
+
+.mock-kg__arrow {
+	fill: var(--ink-3);
+}
+
+.mock-kg__edge-label {
+	font-family: var(--font-cue);
+	font-size: 9px;
+	font-weight: 500;
+	letter-spacing: var(--tracking-cue);
+	text-transform: uppercase;
+	fill: #ef4444;
+}
+
+.mock-kg__node {
+	cursor: pointer;
+	transition: opacity var(--dur-2) var(--ease-out);
+}
+
+.mock-kg__node-circle {
+	stroke: var(--surface);
+}
+
+.mock-kg__node-label {
+	fill: var(--ink-2);
+	font-size: 10px;
+	pointer-events: none;
+	user-select: none;
+}
+
+.mock-kg__node-label.is-match {
+	fill: var(--ink);
+	font-weight: 600;
+}
+
+/* ── detail dialog ────────────────────────────────────────── */
+
+.mock-kg__meta {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+	min-width: 260px;
+}
+
+.mock-kg__type {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	font-family: var(--font-cue);
+	font-size: var(--text-cue, var(--text-xs));
+	font-weight: 500;
+	letter-spacing: var(--tracking-cue);
+	text-transform: uppercase;
+}
+
+.mock-kg__fields {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	margin: 0;
+}
+
+.mock-kg__field {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-5);
+	padding-bottom: var(--space-2);
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-kg__field:last-child {
+	border-bottom: 0;
+	padding-bottom: 0;
+}
+
+.mock-kg__field dt {
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+	text-transform: capitalize;
+}
+
+.mock-kg__field dd {
+	margin: 0;
+	font-size: var(--text-sm);
+	font-weight: 500;
+	color: var(--ink);
+	text-transform: capitalize;
+}
+
+/* ── responsive ───────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+	.mock-kg__head {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.mock-kg__pills {
+		padding-left: 0;
+		border-left: 0;
+	}
+
+	.mock-kg__hint {
+		display: none;
+	}
+}

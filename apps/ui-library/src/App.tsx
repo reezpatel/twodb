@@ -4,8 +4,11 @@ import {
 	MenuDivider,
 	MenuItem,
 	NavPanel,
+	NavPanelFooter,
+	NavPanelGroup,
+	NavPanelItem,
+	NavPanelSection,
 	NavRail,
-	NavSection,
 	SearchInput,
 	Tabs,
 } from "@twodb/ui";
@@ -83,31 +86,32 @@ export default function App() {
 						aria-label="Search components"
 					/>
 				}
-				footer={
-					<>
-						<NavSection
-							items={[
-								{ id: "settings", label: "Settings", icon: <Settings /> },
-								{ id: "help", label: "Help & shortcuts", icon: <CircleHelp /> },
-							]}
-						/>
-						<AccountMenu name="Asha Verma" sub="Design workspace">
-							<MenuItem icon={<User />}>Profile</MenuItem>
-							<MenuItem icon={<SlidersHorizontal />}>Preferences</MenuItem>
-							<MenuDivider />
-							<MenuItem icon={<LogOut />} danger>
-								Log out
-							</MenuItem>
-						</AccountMenu>
-					</>
-				}
 			>
-				<NavSection
-					label={q ? "Results" : group}
-					items={visible.map((c) => ({ id: c.id, label: c.name }))}
-					value={selected}
-					onValueChange={setSelected}
-				/>
+				<NavPanelSection label={q ? "Results" : group} />
+				<NavPanelGroup>
+					{visible.map((c) => (
+						<NavPanelItem
+							key={c.id}
+							label={c.name}
+							active={c.id === selected}
+							onClick={() => setSelected(c.id)}
+						/>
+					))}
+				</NavPanelGroup>
+				<NavPanelFooter>
+					<NavPanelGroup>
+						<NavPanelItem icon={<Settings />} label="Settings" />
+						<NavPanelItem icon={<CircleHelp />} label="Help & shortcuts" />
+					</NavPanelGroup>
+					<AccountMenu name="Asha Verma" sub="Design workspace">
+						<MenuItem icon={<User />}>Profile</MenuItem>
+						<MenuItem icon={<SlidersHorizontal />}>Preferences</MenuItem>
+						<MenuDivider />
+						<MenuItem icon={<LogOut />} danger>
+							Log out
+						</MenuItem>
+					</AccountMenu>
+				</NavPanelFooter>
 			</NavPanel>
 
 			<main className="canvas">

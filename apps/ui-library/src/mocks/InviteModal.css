@@ -1,0 +1,618 @@
+/* Invite Modal mock — dashboard sharing view with two panels:
+   left "Your dashboard is live" (share link, SMS row, QR code, app store
+   buttons), right "Invite team members" (email input, member list,
+   Enterprise license panel with seat gauge and Upgrade link).
+
+   Cyclorama grammar: hairlines, flat cobalt, purple Send invite, IBM Plex Sans
+   cues. The QR code sits in a white mount with purple corner marks. */
+
+.mock-im {
+	--im-purple: #5e47ec;
+	--im-purple-strong: #4a37cf;
+
+	position: relative;
+	width: 100%;
+	max-width: 1280px;
+	padding: 52px 32px;
+	border: 1px solid var(--line);
+	border-radius: 22px;
+	background: #f4f7ff;
+	color: var(--ink);
+	font-family: var(--font-ui);
+	overflow: hidden;
+}
+
+.mock-im__wrap {
+	display: grid;
+	grid-template-columns: minmax(300px, 0.85fr) minmax(0, 1.15fr);
+	gap: 16px;
+	width: 100%;
+	align-items: stretch;
+}
+
+.mock-im__live,
+.mock-im__invite {
+	display: flex;
+	flex-direction: column;
+	gap: 22px;
+	padding: 22px 24px 26px;
+	border: 1px solid var(--line-strong);
+	border-radius: 16px;
+	background: var(--surface);
+	box-shadow: var(--shadow-overlay);
+}
+
+/* ---------- left: dashboard live ---------- */
+
+.mock-im__live-head h3,
+.mock-im__live-block h3 {
+	margin: 0 0 4px;
+	font-size: var(--text-md);
+	font-weight: 650;
+	color: var(--ink);
+}
+
+.mock-im__live-head p,
+.mock-im__live-block p {
+	margin: 0 0 14px;
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+	line-height: 1.5;
+}
+
+.mock-im__live-label {
+	display: block;
+	font-size: var(--text-sm);
+	font-weight: 550;
+	color: var(--ink);
+	margin-bottom: 8px;
+}
+
+.mock-im__linkrow {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	height: 38px;
+	padding: 0 4px 0 12px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-md);
+	background: var(--surface);
+	transition: border-color var(--dur-1) var(--ease-out);
+}
+
+.mock-im__linkrow:focus-within {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--ring);
+}
+
+.mock-im__linkurl {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--text-sm);
+	color: var(--ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mock-im__copybtn {
+	display: grid;
+	place-items: center;
+	width: 30px;
+	height: 30px;
+	flex-shrink: 0;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--ink-3);
+	cursor: pointer;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-im__copybtn:hover {
+	background: var(--bg-band-strong);
+	color: var(--ink);
+}
+
+.mock-im__live-block {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+/* ---------- SMS row ---------- */
+
+.mock-im__sms {
+	display: flex;
+	flex-direction: column;
+	margin-top: 6px;
+}
+
+.mock-im__sms-row {
+	display: grid;
+	grid-template-columns: 76px 1fr 30px;
+	align-items: center;
+	gap: 6px;
+	height: 38px;
+}
+
+.mock-im__sms-row .tw-field {
+	margin: 0;
+}
+
+.mock-im__sms-row .tw-select {
+	width: 100%;
+}
+
+.mock-im__sms-row .tw-input {
+	width: 100%;
+}
+
+.mock-im__sms-send {
+	display: grid;
+	place-items: center;
+	width: 30px;
+	height: 30px;
+	flex-shrink: 0;
+	justify-self: end;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--im-purple);
+	cursor: pointer;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-im__sms-send:hover {
+	background: var(--bg-band-strong);
+	color: var(--im-purple-strong);
+}
+
+/* ---------- scan / QR ---------- */
+
+.mock-im__scan {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 14px 0 12px;
+}
+
+.mock-im__scan-divider {
+	flex: 1;
+	height: 1px;
+	background: var(--line);
+}
+
+.mock-im__scan-label {
+	font-size: var(--text-xs);
+	color: var(--ink-3);
+}
+
+.mock-im__qrwrap {
+	position: relative;
+	display: grid;
+	place-items: center;
+	padding: 4px;
+	margin: 0 auto;
+}
+
+.mock-im__qr {
+	display: grid;
+	place-items: center;
+	padding: 12px;
+	background: #ffffff;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+}
+
+.mock-im__qr svg {
+	display: block;
+}
+
+.mock-im__qr-corner {
+	position: absolute;
+	width: 14px;
+	height: 14px;
+	border: 1.5px solid var(--im-purple);
+}
+
+.mock-im__qr-corner--tl {
+	top: -2px;
+	left: -2px;
+	border-right: 0;
+	border-bottom: 0;
+}
+
+.mock-im__qr-corner--tr {
+	top: -2px;
+	right: -2px;
+	border-left: 0;
+	border-bottom: 0;
+}
+
+.mock-im__qr-corner--bl {
+	bottom: -2px;
+	left: -2px;
+	border-right: 0;
+	border-top: 0;
+}
+
+.mock-im__qr-corner--br {
+	bottom: -2px;
+	right: -2px;
+	border-left: 0;
+	border-top: 0;
+}
+
+/* ---------- app store badges ---------- */
+
+.mock-im__stores {
+	display: flex;
+	gap: 10px;
+	justify-content: center;
+	margin-top: 14px;
+}
+
+.mock-im__store {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	height: 42px;
+	padding: 0 14px;
+	border: 1px solid var(--line-strong);
+	border-radius: 8px;
+	background: var(--bg);
+	color: var(--ink);
+	cursor: pointer;
+}
+
+.mock-im__store-icon {
+	flex: none;
+	color: var(--ink);
+}
+
+.mock-im__store-text {
+	display: flex;
+	flex-direction: column;
+	line-height: 1.05;
+}
+
+.mock-im__store-text small {
+	font-size: 9px;
+	font-weight: 500;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--ink-3);
+}
+
+.mock-im__store-text strong {
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--ink);
+}
+
+/* ---------- right: invite team members ---------- */
+
+.mock-im__invite-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.mock-im__invite-head-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.mock-im__invite-head-text h3 {
+	margin: 0;
+	font-size: var(--text-md);
+	font-weight: 650;
+	color: var(--ink);
+}
+
+.mock-im__invite-head-text p {
+	margin: 4px 0 0;
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+	line-height: 1.5;
+}
+
+.mock-im__close {
+	display: grid;
+	place-items: center;
+	width: 30px;
+	height: 30px;
+	flex-shrink: 0;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--ink-3);
+	cursor: pointer;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		color var(--dur-1) var(--ease-out);
+}
+
+.mock-im__close:hover {
+	background: var(--bg-band-strong);
+	color: var(--ink);
+}
+
+/* ---------- invite form ---------- */
+
+.mock-im__invite-form {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 8px;
+	align-items: end;
+}
+
+.mock-im__invite-field {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.mock-im__invite-field .tw-field {
+	margin: 0;
+}
+
+.mock-im__invite-form .tw-btn {
+	height: 38px;
+	align-self: stretch;
+}
+
+/* Send invite (purple) */
+.mock-im__send {
+	background: var(--im-purple);
+	border-color: var(--im-purple);
+	color: #ffffff;
+}
+
+.mock-im__send:hover {
+	background: var(--im-purple-strong);
+	border-color: var(--im-purple-strong);
+}
+
+.mock-im__send:focus-visible {
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--im-purple) 30%, transparent);
+}
+
+/* ---------- member rows ---------- */
+
+.mock-im__members {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+
+.mock-im__member {
+	display: grid;
+	grid-template-columns: 28px minmax(0, 1fr) auto auto;
+	align-items: center;
+	gap: 12px;
+	min-height: 42px;
+	padding: 4px 0;
+}
+
+.mock-im__member-photo {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	flex-shrink: 0;
+	overflow: hidden;
+	border-radius: var(--r-pill);
+	border: 1px solid var(--line);
+	background: var(--bg-band-strong);
+}
+
+.mock-im__member-photo img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* Initial avatar — the Avatar component is rendered above; the
+   wrapper positions it and centers the letter on the band. */
+.mock-im__member-initial {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	flex-shrink: 0;
+	border-radius: var(--r-pill);
+	background: var(--bg-band-strong);
+	color: var(--ink-2);
+	font-size: 11px;
+	font-weight: 650;
+}
+
+.mock-im__member-initial .tw-avatar {
+	background: transparent;
+	border: 0;
+	color: inherit;
+}
+
+.mock-im__member-meta {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.mock-im__member-meta strong {
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--ink);
+	line-height: 1.2;
+}
+
+.mock-im__member-email {
+	font-size: var(--text-sm);
+	color: var(--ink-2);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mock-im__member-meta .mock-im__member-email {
+	color: var(--ink-3);
+}
+
+/* permission dropdown */
+.mock-im__perm {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 28px;
+	padding: 0 9px 0 11px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-sm);
+	background: var(--surface);
+	color: var(--ink);
+	font: inherit;
+	font-size: var(--text-sm);
+	font-weight: 500;
+	cursor: pointer;
+	white-space: nowrap;
+	transition:
+		background var(--dur-1) var(--ease-out),
+		border-color var(--dur-1) var(--ease-out),
+		box-shadow var(--dur-1) var(--ease-out);
+}
+
+.mock-im__perm:hover {
+	border-color: var(--ink-3);
+}
+
+.mock-im__perm:focus-visible {
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--ring);
+}
+
+.mock-im__perm svg {
+	color: var(--ink-3);
+}
+
+/* ---------- Enterprise license ---------- */
+
+.mock-im__enterprise {
+	display: grid;
+	grid-template-columns: 34px 1fr auto;
+	grid-template-rows: auto auto;
+	column-gap: 12px;
+	row-gap: 8px;
+	align-items: center;
+	padding: 14px 16px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-md);
+	background: var(--surface);
+}
+
+.mock-im__enterprise-icon {
+	grid-row: 1 / 3;
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	border-radius: var(--r-sm);
+	background: var(--bg-band-strong);
+	color: var(--ink-2);
+}
+
+.mock-im__enterprise-text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.mock-im__enterprise-text strong {
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--ink);
+	line-height: 1.2;
+}
+
+.mock-im__enterprise-text span {
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+	line-height: 1.4;
+}
+
+.mock-im__enterprise-meter {
+	grid-column: 2;
+	grid-row: 2;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.mock-im__enterprise-meter .tw-progress {
+	flex: 1;
+}
+
+.mock-im__enterprise-count {
+	font-size: var(--text-xs);
+	color: var(--ink-3);
+	white-space: nowrap;
+}
+
+.mock-im__upgrade {
+	grid-column: 3;
+	grid-row: 1 / 3;
+	align-self: center;
+	font-size: var(--text-sm);
+	font-weight: 550;
+	color: var(--im-purple);
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.mock-im__upgrade:hover {
+	color: var(--im-purple-strong);
+	text-decoration: underline;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 1000px) {
+	.mock-im__wrap {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 560px) {
+	.mock-im {
+		padding: 36px 16px;
+	}
+
+	.mock-im__live,
+	.mock-im__invite {
+		padding: 18px 18px 20px;
+	}
+
+	.mock-im__invite-form {
+		grid-template-columns: 1fr;
+	}
+
+	.mock-im__member {
+		grid-template-columns: 26px minmax(0, 1fr) auto;
+		row-gap: 4px;
+	}
+
+	.mock-im__member-meta {
+		grid-column: 1 / -1;
+		grid-row: 2;
+		padding-left: 38px;
+	}
+}

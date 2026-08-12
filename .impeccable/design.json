@@ -84,11 +84,11 @@
       }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display / Cue", "purpose": "Oswald tracked caps; wordmark, hero statements, the Horizon piece. Always uppercase." },
+      "display": { "displayName": "Display / Cue", "purpose": "IBM Plex Sans tracked caps; wordmark, hero statements, the Horizon piece. Always uppercase." },
       "headline": { "displayName": "Headline", "purpose": "Page and section titles (20-26px, weight 650)." },
       "title": { "displayName": "Title", "purpose": "Card and dialog titles (16.5px, weight 650)." },
       "body": { "displayName": "Body", "purpose": "Default reading text, 14px/1.55, measure capped at 68ch." },
-      "label": { "displayName": "Label / Cue small", "purpose": "Instrument labels, rail group labels, divider labels. Oswald caps or Public Sans tracked caps for field labels." }
+      "label": { "displayName": "Label / Cue small", "purpose": "Instrument labels, rail group labels, divider labels. IBM Plex Sans caps or Outfit tracked caps for field labels." }
     },
     "shadows": [
       { "name": "overlay-day", "value": "0 12px 28px -10px rgb(5 5 6 / 0.18)", "purpose": "Dialog panels only — the system's single real shadow (day phase)." },
@@ -113,7 +113,7 @@
       "refersTo": "button-primary",
       "description": "The one lit control: solid flat cobalt, no gradient, no glow. One per view.",
       "html": "<button class=\"ds-btn-primary\">Save note</button>",
-      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 14px; font-family: var(--font-ui, 'Public Sans', system-ui, sans-serif); font-size: 14px; font-weight: 600; letter-spacing: 0.01em; color: #ffffff; background: var(--action, #0a2bff); border: 1px solid transparent; border-radius: 10px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16); cursor: pointer; transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1), filter 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary:hover { background: var(--action-strong, #0a22d6); } .ds-btn-primary:active { filter: brightness(0.94); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent, #0a2bff); outline-offset: 2px; }"
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 14px; font-family: var(--font-ui, 'Outfit', system-ui, sans-serif); font-size: 14px; font-weight: 600; letter-spacing: 0.01em; color: #ffffff; background: var(--action, #0a2bff); border: 1px solid transparent; border-radius: 10px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16); cursor: pointer; transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1), filter 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary:hover { background: var(--action-strong, #0a22d6); } .ds-btn-primary:active { filter: brightness(0.94); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent, #0a2bff); outline-offset: 2px; }"
     },
     {
       "name": "Secondary Button",
@@ -121,7 +121,7 @@
       "refersTo": "button-secondary",
       "description": "Hairline-outline action; hover lights the outline cobalt instead of filling.",
       "html": "<button class=\"ds-btn-secondary\">Duplicate</button>",
-      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 14px; font-family: var(--font-ui, 'Public Sans', system-ui, sans-serif); font-size: 14px; font-weight: 600; letter-spacing: 0.01em; color: var(--ink, #121218); background: var(--surface, #ffffff); border: 1px solid var(--line-strong, #cfcdd9); border-radius: 10px; cursor: pointer; transition: border-color 120ms cubic-bezier(0.16, 1, 0.3, 1), color 120ms cubic-bezier(0.16, 1, 0.3, 1), background 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-secondary:hover { border-color: var(--accent, #0a2bff); color: var(--accent, #0a2bff); } .ds-btn-secondary:active { background: var(--bg-band, #faf9fc); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--accent, #0a2bff); outline-offset: 2px; }"
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 14px; font-family: var(--font-ui, 'Outfit', system-ui, sans-serif); font-size: 14px; font-weight: 600; letter-spacing: 0.01em; color: var(--ink, #121218); background: var(--surface, #ffffff); border: 1px solid var(--line-strong, #cfcdd9); border-radius: 10px; cursor: pointer; transition: border-color 120ms cubic-bezier(0.16, 1, 0.3, 1), color 120ms cubic-bezier(0.16, 1, 0.3, 1), background 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-secondary:hover { border-color: var(--accent, #0a2bff); color: var(--accent, #0a2bff); } .ds-btn-secondary:active { background: var(--bg-band, #faf9fc); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--accent, #0a2bff); outline-offset: 2px; }"
     },
     {
       "name": "Ghost Button",
@@ -129,7 +129,7 @@
       "refersTo": "button-ghost",
       "description": "Borderless cobalt text; hover lays a quiet cobalt tonal band behind.",
       "html": "<button class=\"ds-btn-ghost\">Remind me</button>",
-      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 14px; font-family: var(--font-ui, 'Public Sans', system-ui, sans-serif); font-size: 14px; font-weight: 600; letter-spacing: 0.01em; color: var(--accent, #0a2bff); background: transparent; border: 1px solid transparent; border-radius: 10px; cursor: pointer; transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-ghost:hover { background: var(--accent-soft-bg, rgb(10 43 255 / 0.08)); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--accent, #0a2bff); outline-offset: 2px; }"
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 14px; font-family: var(--font-ui, 'Outfit', system-ui, sans-serif); font-size: 14px; font-weight: 600; letter-spacing: 0.01em; color: var(--accent, #0a2bff); background: transparent; border: 1px solid transparent; border-radius: 10px; cursor: pointer; transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-ghost:hover { background: var(--accent-soft-bg, rgb(10 43 255 / 0.08)); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--accent, #0a2bff); outline-offset: 2px; }"
     },
     {
       "name": "Text Input",
@@ -137,7 +137,7 @@
       "refersTo": "input",
       "description": "Hairline instrument; focus arrives as a cobalt ring of light, never elevation.",
       "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search your notes\" />",
-      "css": ".ds-input { height: 34px; width: 260px; padding: 0 12px; font-family: var(--font-ui, 'Public Sans', system-ui, sans-serif); font-size: 14px; color: var(--ink, #121218); background: var(--surface, #ffffff); border: 1px solid var(--line-strong, #cfcdd9); border-radius: 10px; transition: border-color 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-input::placeholder { color: var(--ink-3, #626274); } .ds-input:hover { border-color: var(--ink-3, #626274); } .ds-input:focus { outline: none; border-color: var(--accent, #0a2bff); box-shadow: 0 0 0 3px var(--ring, rgb(10 43 255 / 0.22)); }"
+      "css": ".ds-input { height: 34px; width: 260px; padding: 0 12px; font-family: var(--font-ui, 'Outfit', system-ui, sans-serif); font-size: 14px; color: var(--ink, #121218); background: var(--surface, #ffffff); border: 1px solid var(--line-strong, #cfcdd9); border-radius: 10px; transition: border-color 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-input::placeholder { color: var(--ink-3, #626274); } .ds-input:hover { border-color: var(--ink-3, #626274); } .ds-input:focus { outline: none; border-color: var(--accent, #0a2bff); box-shadow: 0 0 0 3px var(--ring, rgb(10 43 255 / 0.22)); }"
     },
     {
       "name": "Go Badge",
@@ -145,7 +145,7 @@
       "refersTo": "badge-go",
       "description": "Small lit pill for status; tracked caps with tabular numerals. Rose variant signals AI presence.",
       "html": "<span class=\"ds-badge-go\">Active · 3</span>",
-      "css": ".ds-badge-go { display: inline-flex; align-items: center; gap: 6px; padding: 2.5px 10px; border-radius: 999px; font-family: var(--font-ui, 'Public Sans', system-ui, sans-serif); font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-variant-numeric: tabular-nums; white-space: nowrap; background: var(--go-bg, rgb(10 43 255 / 0.08)); color: var(--go, #0a2bff); }"
+      "css": ".ds-badge-go { display: inline-flex; align-items: center; gap: 6px; padding: 2.5px 10px; border-radius: 999px; font-family: var(--font-ui, 'Outfit', system-ui, sans-serif); font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-variant-numeric: tabular-nums; white-space: nowrap; background: var(--go-bg, rgb(10 43 255 / 0.08)); color: var(--go, #0a2bff); }"
     },
     {
       "name": "Card",
@@ -153,7 +153,7 @@
       "refersTo": "card",
       "description": "A matte band bounded by hairlines, never shadow; hover strengthens the hairline.",
       "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Morning rounds</div><p class=\"ds-card-body\">Three follow-ups captured. The light carries the state — never shadow, never noise.</p></div>",
-      "css": ".ds-card { max-width: 360px; background: var(--surface, #ffffff); border: 1px solid var(--line, #e6e4ec); border-radius: 14px; padding: 24px; font-family: var(--font-ui, 'Public Sans', system-ui, sans-serif); transition: border-color 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-card:hover { border-color: var(--line-strong, #cfcdd9); } .ds-card-title { margin: 0 0 12px; font-size: 16.5px; font-weight: 650; line-height: 1.2; color: var(--ink, #121218); } .ds-card-body { margin: 0; max-width: 68ch; font-size: 14px; line-height: 1.55; color: var(--ink, #121218); }"
+      "css": ".ds-card { max-width: 360px; background: var(--surface, #ffffff); border: 1px solid var(--line, #e6e4ec); border-radius: 14px; padding: 24px; font-family: var(--font-ui, 'Outfit', system-ui, sans-serif); transition: border-color 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-card:hover { border-color: var(--line-strong, #cfcdd9); } .ds-card-title { margin: 0 0 12px; font-size: 16.5px; font-weight: 650; line-height: 1.2; color: var(--ink, #121218); } .ds-card-body { margin: 0; max-width: 68ch; font-size: 14px; line-height: 1.55; color: var(--ink, #121218); }"
     },
     {
       "name": "Tabs",
@@ -161,7 +161,7 @@
       "refersTo": "card",
       "description": "Quiet text row over a hairline; the active tab's horizon lights in cobalt.",
       "html": "<div class=\"ds-tabs\" role=\"tablist\"><button class=\"ds-tab ds-tab--active\" role=\"tab\" aria-selected=\"true\">Notes</button><button class=\"ds-tab\" role=\"tab\">Automations</button><button class=\"ds-tab\" role=\"tab\">Apps</button></div>",
-      "css": ".ds-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line, #e6e4ec); } .ds-tab { appearance: none; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 8px 12px; font-family: var(--font-ui, 'Public Sans', system-ui, sans-serif); font-size: 14px; font-weight: 600; color: var(--ink-3, #626274); cursor: pointer; white-space: nowrap; transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-tab:hover { color: var(--ink, #121218); } .ds-tab--active { color: var(--ink, #121218); border-bottom: 2px solid var(--accent, #0a2bff); } .ds-tab:focus-visible { outline: 2px solid var(--accent, #0a2bff); outline-offset: 2px; }"
+      "css": ".ds-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line, #e6e4ec); } .ds-tab { appearance: none; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 8px 12px; font-family: var(--font-ui, 'Outfit', system-ui, sans-serif); font-size: 14px; font-weight: 600; color: var(--ink-3, #626274); cursor: pointer; white-space: nowrap; transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-tab:hover { color: var(--ink, #121218); } .ds-tab--active { color: var(--ink, #121218); border-bottom: 2px solid var(--accent, #0a2bff); } .ds-tab:focus-visible { outline: 2px solid var(--accent, #0a2bff); outline-offset: 2px; }"
     },
     {
       "name": "Dialog",
@@ -169,17 +169,17 @@
       "refersTo": "card",
       "description": "One lit panel over a dimmed stage; carries the system's only real shadow and the cue-up entrance.",
       "html": "<div class=\"ds-dialog\"><div class=\"ds-dialog-title\">Delete this note?</div><p class=\"ds-dialog-body\">This removes the note and its links. The automation that reads it will pause.</p><div class=\"ds-dialog-footer\"><button class=\"ds-dialog-ghost\">Keep</button><button class=\"ds-dialog-primary\">Delete</button></div></div>",
-      "css": ".ds-dialog { width: min(440px, 100%); background: var(--surface, #ffffff); color: var(--ink, #121218); border: 1px solid var(--line-strong, #cfcdd9); border-radius: 14px; padding: 16px 24px; box-shadow: 0 12px 28px -10px rgb(5 5 6 / 0.18); font-family: var(--font-ui, 'Public Sans', system-ui, sans-serif); animation: ds-dialog-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both; } @keyframes ds-dialog-in { from { opacity: 0; transform: translateY(10px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } } .ds-dialog-title { margin: 0; font-size: 16.5px; font-weight: 650; line-height: 1.2; } .ds-dialog-body { margin: 12px 0; font-size: 14px; line-height: 1.55; color: var(--ink-2, #40404e); } .ds-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; } .ds-dialog-primary { height: 34px; padding: 0 14px; font: inherit; font-weight: 600; color: #ffffff; background: var(--action, #0a2bff); border: 1px solid transparent; border-radius: 10px; cursor: pointer; } .ds-dialog-primary:hover { background: var(--action-strong, #0a22d6); } .ds-dialog-ghost { height: 34px; padding: 0 14px; font: inherit; font-weight: 600; color: var(--accent, #0a2bff); background: transparent; border: 1px solid transparent; border-radius: 10px; cursor: pointer; } .ds-dialog-ghost:hover { background: var(--accent-soft-bg, rgb(10 43 255 / 0.08)); }"
+      "css": ".ds-dialog { width: min(440px, 100%); background: var(--surface, #ffffff); color: var(--ink, #121218); border: 1px solid var(--line-strong, #cfcdd9); border-radius: 14px; padding: 16px 24px; box-shadow: 0 12px 28px -10px rgb(5 5 6 / 0.18); font-family: var(--font-ui, 'Outfit', system-ui, sans-serif); animation: ds-dialog-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both; } @keyframes ds-dialog-in { from { opacity: 0; transform: translateY(10px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } } .ds-dialog-title { margin: 0; font-size: 16.5px; font-weight: 650; line-height: 1.2; } .ds-dialog-body { margin: 12px 0; font-size: 14px; line-height: 1.55; color: var(--ink-2, #40404e); } .ds-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; } .ds-dialog-primary { height: 34px; padding: 0 14px; font: inherit; font-weight: 600; color: #ffffff; background: var(--action, #0a2bff); border: 1px solid transparent; border-radius: 10px; cursor: pointer; } .ds-dialog-primary:hover { background: var(--action-strong, #0a22d6); } .ds-dialog-ghost { height: 34px; padding: 0 14px; font: inherit; font-weight: 600; color: var(--accent, #0a2bff); background: transparent; border: 1px solid transparent; border-radius: 10px; cursor: pointer; } .ds-dialog-ghost:hover { background: var(--accent-soft-bg, rgb(10 43 255 / 0.08)); }"
     }
   ],
   "narrative": {
     "northStar": "Cyclorama Dawn",
-    "overview": "twodb's interface is a stage at first light. Surfaces are a horizon — quiet matte bands bounded by hairline rules — and every state change arrives as light rising: cobalt for structure and action, rose for the AI's presence. Light is the only chrome. The system refuses the category's gray-cards-and-drop-shadows default: no gradient fills on controls, no glow, no colored shadows, no ornamental decoration. Depth is tonal, not dimensional. The world runs in two phases: day (default working surface) and night (depthless black, via [data-phase=\"night\"]), one semantic token set resolving both. Density is calm and slightly condensed with protected negative space; type pairs Public Sans with Oswald tracked caps (the cue register); motion is a single exponential ease-out with one authored cue-up entrance; fine fractal-noise grain at low opacity gives large fields a matte tooth.",
+    "overview": "twodb's interface is a stage at first light. Surfaces are a horizon — quiet matte bands bounded by hairline rules — and every state change arrives as light rising: cobalt for structure and action, rose for the AI's presence. Light is the only chrome. The system refuses the category's gray-cards-and-drop-shadows default: no gradient fills on controls, no glow, no colored shadows, no ornamental decoration. Depth is tonal, not dimensional. The world runs in two phases: day (default working surface) and night (depthless black, via [data-phase=\"night\"]), one semantic token set resolving both. Density is calm and slightly condensed with protected negative space; type pairs Outfit with IBM Plex Sans tracked caps (the cue register); motion is a single exponential ease-out with one authored cue-up entrance; fine fractal-noise grain at low opacity gives large fields a matte tooth.",
     "keyCharacteristics": [
       "Two phases (day default / night via [data-phase=\"night\"]), one semantic token set.",
       "One lit control per view: only the primary action carries solid color (flat cobalt).",
       "Elevation = hairline borders + tonal bands; the dialog overlay carries the only real shadow.",
-      "Cue register: Oswald tracked caps for labels; tabular numerals for data.",
+      "Cue register: IBM Plex Sans tracked caps for labels; tabular numerals for data.",
       "Fine grain (0.06 day multiply / 0.08 night screen) over large fields — matte, never glossy.",
       "The cobalt→rose sweep (--wash) is identity material only: the Horizon foundation piece and future brand moments."
     ],
@@ -187,7 +187,7 @@
       { "name": "The Flat Calm Rule", "body": "No gradient fills on any control. Primary actions are solid cobalt (--action). The cobalt→rose sweep (--wash) survives only as identity material in the Horizon foundation piece and future brand moments — never on buttons, fields, cards, or badges. (User-pinned, dial B.)", "section": "colors" },
       { "name": "The One Lit Control Rule", "body": "Only the primary action carries solid color. Everything else is hairline, tonal, or text. If two controls on a screen are solid-filled, one of them is wrong.", "section": "colors" },
       { "name": "The Two Lights Rule", "body": "Cobalt means go/act; rose means the AI is present. Never trade them.", "section": "colors" },
-      { "name": "The Cue Register Rule", "body": "Oswald is caps-and-tracked or nothing. It labels and marks; it never sets sentences, body copy, or button text.", "section": "typography" },
+      { "name": "The Cue Register Rule", "body": "IBM Plex Sans is caps-and-tracked or nothing. It labels and marks; it never sets sentences, body copy, or button text.", "section": "typography" },
       { "name": "The Tabular Rule", "body": "Any numeral that can change value (times, counts, live data) sets tabular-nums. Proportional figures are for prose only.", "section": "typography" },
       { "name": "The One Shadow Rule", "body": "The dialog overlay owns the only real shadow in the system. Everywhere else, elevation is a hairline plus a tonal band. A new shadow anywhere is a finding, not a feature.", "section": "elevation" },
       { "name": "The Focus Is Light Rule", "body": "Focus and validation states arrive as rings of light (3px ring at 22%/35% accent opacity) plus a border shift — never as elevation.", "section": "elevation" },
@@ -206,7 +206,7 @@
     "donts": [
       "Don't put gradient fills on any control — primary actions are solid cobalt; --wash is identity material for the Horizon piece and brand moments only (The Flat Calm Rule, user-pinned).",
       "Don't add glow, colored shadows, or drop shadows; the dialog overlay owns the only real shadow (The One Shadow Rule, user-pinned).",
-      "Don't set Oswald in sentence case or for body/button text (The Cue Register Rule).",
+      "Don't set IBM Plex Sans in sentence case or for body/button text (The Cue Register Rule).",
       "Don't use rose for ordinary actions or cobalt for AI output.",
       "Don't compress spacing to fit more; remove content before removing air (The Air Is Load-Bearing Rule).",
       "Don't introduce new easing curves or bouncy motion — one exponential ease-out (cubic-bezier(0.16, 1, 0.3, 1)); light rises, never bounces.",

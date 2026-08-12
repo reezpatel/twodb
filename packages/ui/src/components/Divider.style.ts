@@ -1,0 +1,45 @@
+import css from "styled-jsx/css";
+
+export const dividerStyles = css`
+/* Divider — the horizon rule: a hairline that fades at the edges */
+
+.tw-divider {
+  border: 0;
+  height: 1px;
+  margin: 0;
+  background: linear-gradient(90deg, transparent, var(--line-strong), transparent);
+}
+
+.tw-divider--labeled {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: auto;
+  background: none;
+}
+
+.tw-divider--labeled::before,
+.tw-divider--labeled::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+}
+
+.tw-divider--labeled::before {
+  background: linear-gradient(90deg, transparent, var(--line-strong));
+}
+
+.tw-divider--labeled::after {
+  background: linear-gradient(90deg, var(--line-strong), transparent);
+}
+
+.tw-divider__label {
+  font-family: var(--font-cue);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-cue);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+`;

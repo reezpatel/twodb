@@ -28,6 +28,7 @@ import {
 	Undo2,
 } from "lucide-react";
 import { IconButton } from "./IconButton";
+import { markdownEditorStyles } from "./MarkdownEditor.style";
 
 export interface MarkdownEditorProps {
 	/** Controlled markdown value. */
@@ -41,6 +42,8 @@ export interface MarkdownEditorProps {
 	error?: string;
 	minHeight?: number;
 	readOnly?: boolean;
+	/** Focus mode: stay editable but hide the formatting toolbar. */
+	hideToolbar?: boolean;
 	id?: string;
 }
 
@@ -54,6 +57,7 @@ export function MarkdownEditor({
 	error,
 	minHeight = 140,
 	readOnly = false,
+	hideToolbar = false,
 	id,
 }: MarkdownEditorProps) {
 	const autoId = useId();
@@ -222,7 +226,8 @@ export function MarkdownEditor({
 				.filter(Boolean)
 				.join(" ")}
 		>
-			{editor && !readOnly ? (
+			<style jsx>{markdownEditorStyles}</style>
+			{editor && !readOnly && !hideToolbar ? (
 				<div
 					className="tw-editor__toolbar"
 					role="toolbar"
@@ -259,6 +264,7 @@ export function MarkdownEditor({
 
 	return (
 		<div className="tw-field">
+			<style jsx>{markdownEditorStyles}</style>
 			{label ? (
 				<span className="tw-field__label" id={labelId}>
 					{label}

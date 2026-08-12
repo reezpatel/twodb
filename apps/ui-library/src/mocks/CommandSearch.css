@@ -1,0 +1,206 @@
+/* Command Search mock — cmd+K palette empty state: borderless search
+   row, centered empty state with folder illustration, and a keyboard
+   hint footer. Cyclorama grammar: hairlines, quiet inks, one lit
+   action (the reference's violet). */
+
+.mock-cs {
+	/* Reference violet for the Create action — the same balanced
+	   violet the Share dialog reference used. */
+	--cs-action: #5e47ec;
+	--cs-action-strong: #4a37cf;
+
+	display: grid;
+	place-items: center;
+	width: min(860px, 100%);
+	min-height: 560px;
+	padding: 56px 44px;
+	border: 1px solid var(--line);
+	border-radius: 22px;
+	background: var(--bg);
+	color: var(--ink);
+	font-family: var(--font-ui);
+}
+
+/* ---------- dialog ---------- */
+
+.mock-cs__dialog {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	max-width: 640px;
+	overflow: hidden;
+	border: 1px solid var(--line);
+	border-radius: 16px;
+	background: var(--surface);
+	box-shadow: var(--shadow-overlay);
+}
+
+/* ---------- search row ---------- */
+
+.mock-cs__searchrow {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 15px 18px;
+	border-bottom: 1px solid var(--line);
+}
+
+.mock-cs__searchrow > svg {
+	flex-shrink: 0;
+	color: var(--ink-3);
+}
+
+.mock-cs__searchrow input {
+	flex: 1;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	outline: none;
+	background: transparent;
+	color: var(--ink);
+	font-family: inherit;
+	font-size: 15px;
+	line-height: 1.4;
+	caret-color: var(--cs-action);
+}
+
+.mock-cs__searchrow input::placeholder {
+	color: var(--ink-3);
+}
+
+.mock-cs__clear {
+	flex-shrink: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--ink-3);
+	font: inherit;
+	font-size: var(--text-md);
+	white-space: nowrap;
+	cursor: pointer;
+	transition: color var(--dur-1) var(--ease-out);
+}
+
+.mock-cs__clear:hover {
+	color: var(--ink);
+}
+
+/* ---------- empty state ---------- */
+
+.mock-cs__body {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 58px 24px 52px;
+	text-align: center;
+}
+
+.mock-cs__art {
+	margin-bottom: 20px;
+}
+
+.mock-cs__body h2 {
+	margin: 0;
+	font-size: var(--text-lg);
+	font-weight: 700;
+	line-height: 1.3;
+	color: var(--ink);
+}
+
+.mock-cs__sub {
+	margin: 10px 0 0;
+	max-width: 460px;
+	font-size: var(--text-md);
+	line-height: 1.6;
+	color: var(--ink-3);
+}
+
+.mock-cs__link {
+	display: inline;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--ink);
+	font: inherit;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	cursor: pointer;
+	transition: color var(--dur-1) var(--ease-out);
+}
+
+.mock-cs__link:hover {
+	color: var(--cs-action);
+}
+
+.mock-cs__actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 26px;
+}
+
+/* Create — the reference's violet primary action. */
+.mock-cs__create {
+	background: var(--cs-action);
+	border-color: var(--cs-action);
+	color: #ffffff;
+}
+
+.mock-cs__create:hover {
+	background: var(--cs-action-strong);
+	border-color: var(--cs-action-strong);
+}
+
+.mock-cs__create:focus-visible {
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--cs-action) 30%, transparent);
+}
+
+/* ---------- keyboard hint footer ---------- */
+
+.mock-cs__footer {
+	display: flex;
+	align-items: center;
+	gap: 20px;
+	padding: 12px 18px;
+	border-top: 1px solid var(--line);
+	background: var(--bg-band);
+}
+
+.mock-cs__hint {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--text-sm);
+	color: var(--ink-3);
+	white-space: nowrap;
+}
+
+.mock-cs__hint .tw-kbd + .tw-kbd {
+	margin-left: -2px;
+}
+
+.mock-cs__hint--end {
+	margin-left: auto;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 640px) {
+	.mock-cs {
+		padding: 32px 16px;
+		min-height: 0;
+	}
+
+	.mock-cs__body {
+		padding: 44px 18px 40px;
+	}
+
+	.mock-cs__footer {
+		flex-wrap: wrap;
+		gap: 12px 16px;
+	}
+
+	.mock-cs__hint--end {
+		margin-left: 0;
+	}
+}

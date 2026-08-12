@@ -1,3 +1,4 @@
+import { skeletonStyles } from "./Skeleton.style";
 export interface SkeletonProps {
   lines?: number;
   width?: number | string;
@@ -21,5 +22,9 @@ export function Skeleton({ lines, width, height = 14 }: SkeletonProps) {
     );
   }
 
-  return <div className="tw-skeleton" style={{ height, width: width ?? "100%" }} />;
+  return (
+    <div className="tw-skeleton" style={{ height, width: width ?? "100%" }}>
+      <style jsx>{skeletonStyles}</style>
+    </div>
+  );
 }

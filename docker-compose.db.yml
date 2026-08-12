@@ -1,0 +1,70 @@
+# Local-only data services for twodb (Postgres + Memgraph).
+# Run with:  docker compose -f docker-compose.db.yml up -d
+# Tear down: docker compose -f docker-compose.db.yml down
+#
+# Note: this file does NOT run the api/UI - just the two databases.
+
+name: twodb-db
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: twodb-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-twodb}
+      POSTGRES_USER: ${POSTGRES_USER:-twodb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-twodb}
+      # Faster, dev-friendly defaults - DO NOT use these in production.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - twodb-net
+    healthcheck:
+      # pg_isready exits 0 when the server is accepting connections.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  memgraph:
+    image: memgraph/memgraph:latest
+    container_name: twodb-memgraph
+    restart: unless-stopped
+    # Memgraph stores data in-memory by default. Mount the volume at the
+    # parent (/var/lib/memgraph) so the image's entrypoint can create the
+    # `data` subdirectory as the `memgraph` user. Mounting directly at
+    # /var/lib/memgraph/data makes Docker create it as root, which Memgraph
+    # v3 rejects.
+    command: ["--data-directory=/var/lib/memgraph/data"]
+    environment:
+      # ID allocator config - harmless defaults, tweak if you hit collisions.
+      MEMGRAPH_FLAGS: "--also-log-to-stderr"
+    ports:
+      - "${MEMGRAPH_BOLT_PORT:-7687}:7687"
+    volumes:
+      - memgraph-data:/var/lib/memgraph
+    networks:
+      - twodb-net
+    healthcheck:
+      # A simple TCP-open check is the most portable signal that Bolt is up.
+      test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/7687 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  postgres-data:
+    name: twodb-postgres-data
+  memgraph-data:
+    name: twodb-memgraph-data
+
+networks:
+  twodb-net:
+    name: twodb-net
+    driver: bridge

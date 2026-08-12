@@ -1,3 +1,4 @@
+import { chartStyles } from "./Chart.style";
 export interface ScoreRingProps {
 	/** 0–100; negative values render in the danger tone. */
 	value: number;
@@ -27,6 +28,7 @@ export function ScoreRing({
 			role="img"
 			aria-label={label ?? `Score ${value} of 100`}
 		>
+			<style jsx>{chartStyles}</style>
 			<circle
 				className="tw-ring__track"
 				cx={size / 2}

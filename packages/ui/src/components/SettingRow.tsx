@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { settingRowStyles } from "./SettingRow.style";
 
 export interface SettingGroupProps {
 	/** Tracked-caps section label. */
@@ -15,6 +16,7 @@ export function SettingGroup({
 }: SettingGroupProps) {
 	return (
 		<section className="tw-sgroup">
+			<style jsx>{settingRowStyles}</style>
 			<div className="tw-sgroup__head">
 				<span className="tw-cue">{label}</span>
 				{description ? <p className="tw-sgroup__desc">{description}</p> : null}

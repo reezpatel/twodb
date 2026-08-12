@@ -1,3 +1,4 @@
+import type {} from "styled-jsx";
 import { useState, type ReactNode } from "react";
 import {
 	ChevronDown,
@@ -6,6 +7,7 @@ import {
 	Folder,
 	FolderOpen,
 } from "lucide-react";
+import { fileTreeNodeStyles, fileTreeStyles } from "./FileTree.style";
 
 export interface FileTreeNode {
 	id: string;
@@ -47,6 +49,7 @@ export function FileTree({
 
 	return (
 		<div className="tw-ftree" role="tree" aria-label={ariaLabel}>
+			<style jsx>{fileTreeStyles}</style>
 			{nodes.map((node) => (
 				<TreeNode
 					key={node.id}
@@ -82,6 +85,7 @@ function TreeNode({
 
 	return (
 		<div className="tw-ftree__node">
+			<style jsx>{fileTreeNodeStyles}</style>
 			<button
 				type="button"
 				role="treeitem"

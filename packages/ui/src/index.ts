@@ -1,10 +1,11 @@
-/* Fonts: Public Sans (UI/body) + Oswald (cue labels, display caps) */
-import "@fontsource/public-sans/400.css";
-import "@fontsource/public-sans/500.css";
-import "@fontsource/public-sans/600.css";
-import "@fontsource/public-sans/700.css";
-import "@fontsource/oswald/500.css";
-import "@fontsource/oswald/600.css";
+/* Fonts: Outfit (UI/body) + IBM Plex Sans (cue labels, display caps) */
+import "@fontsource/outfit/300.css";
+import "@fontsource/outfit/400.css";
+import "@fontsource/outfit/500.css";
+import "@fontsource/outfit/600.css";
+import "@fontsource/outfit/700.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
 
 import "./styles.css";
 
@@ -36,17 +37,27 @@ export type { SwitchProps } from "./components/Switch";
 export { Badge } from "./components/Badge";
 export type { BadgeProps, BadgeTone, BadgeSize } from "./components/Badge";
 
+export { TagChip } from "./components/TagChip";
+export type { TagChipIcon, TagChipProps } from "./components/TagChip";
+
 export { Card } from "./components/Card";
 export type { CardDensity, CardProps, CardTone } from "./components/Card";
 
 export { Tabs } from "./components/Tabs";
 export type { TabsProps, TabItem } from "./components/Tabs";
 
+export { Segmented } from "./components/Segmented";
+export type { SegmentedProps, SegmentedItem } from "./components/Segmented";
+
 export { Dialog } from "./components/Dialog";
 export type { DialogProps } from "./components/Dialog";
 
 export { Avatar } from "./components/Avatar";
-export type { AvatarProps, AvatarSize } from "./components/Avatar";
+export type {
+	AvatarProps,
+	AvatarSize,
+	AvatarPresence,
+} from "./components/Avatar";
 
 export { Divider } from "./components/Divider";
 export type { DividerProps } from "./components/Divider";
@@ -56,6 +67,9 @@ export type { SkeletonProps } from "./components/Skeleton";
 
 export { Tooltip } from "./components/Tooltip";
 export type { TooltipProps, TooltipSide } from "./components/Tooltip";
+
+export { Kbd } from "./components/Kbd";
+export type { KbdProps } from "./components/Kbd";
 
 export { IconButton } from "./components/IconButton";
 export type {
@@ -77,12 +91,25 @@ export type { SearchInputProps } from "./components/SearchInput";
 export { NavRail } from "./components/NavRail";
 export type { NavRailProps, NavRailItem } from "./components/NavRail";
 
-export { NavPanel, NavSection } from "./components/NavPanel";
+export {
+	NavPanel,
+	NavPanelSection,
+	NavPanelGroup,
+	NavPanelItem,
+	NavPanelCount,
+	NavPanelBadge,
+	NavPanelFooter,
+	NavPanelTree,
+} from "./components/nav-panel";
 export type {
 	NavPanelProps,
-	NavSectionProps,
-	NavSectionItem,
-} from "./components/NavPanel";
+	NavPanelSectionProps,
+	NavPanelGroupProps,
+	NavPanelItemProps,
+	NavPanelFooterProps,
+	NavPanelTreeNode,
+	NavPanelTreeProps,
+} from "./components/nav-panel";
 
 export { AccountMenu } from "./components/AccountMenu";
 export type { AccountMenuProps } from "./components/AccountMenu";
@@ -176,6 +203,9 @@ export type { CodeInputProps } from "./components/CodeInput";
 
 export { ScoreRing } from "./components/ScoreRing";
 export type { ScoreRingProps } from "./components/ScoreRing";
+
+export { Progress } from "./components/Progress";
+export type { ProgressProps } from "./components/Progress";
 
 export { DayTimeline } from "./components/DayTimeline";
 export type {

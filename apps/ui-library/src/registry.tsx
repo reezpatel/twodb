@@ -11,15 +11,21 @@ import {
 	FileTree,
 	IconButton,
 	Input,
+	Kbd,
 	Menu,
 	MenuDivider,
 	MenuItem,
 	MarkdownEditor,
 	NavPanel,
+	NavPanelFooter,
+	NavPanelGroup,
+	NavPanelItem,
+	NavPanelSection,
 	NavRail,
-	NavSection,
+	Progress,
 	Radio,
 	SearchInput,
+	Segmented,
 	Select,
 	Skeleton,
 	Switch,
@@ -31,7 +37,9 @@ import {
 	Bell,
 	Bookmark,
 	CalendarDays,
+	Command,
 	Copy,
+	CornerDownLeft,
 	Heart,
 	Home,
 	LogOut,
@@ -107,7 +115,6 @@ import { FileManagerMock } from "./mocks/FileManager";
 import { CommunicationMock } from "./mocks/Communication";
 import { AutomationMock } from "./mocks/Automation";
 import { FileDriveMock } from "./mocks/FileDrive";
-import { ProjectFilesMock } from "./mocks/ProjectFiles";
 import { DailyCalMock } from "./mocks/DailyCal";
 import { FlowBuilderMock } from "./mocks/FlowBuilder";
 import { EmployeePanelMock } from "./mocks/EmployeePanel";
@@ -117,6 +124,31 @@ import { DesignDiscussionMock } from "./mocks/DesignDiscussion";
 import { CompanyProfileMock } from "./mocks/CompanyProfile";
 import { AutomationBuilderMock } from "./mocks/AutomationBuilder";
 import { NotesOverviewMock } from "./mocks/NotesOverview";
+import { TicketCreatorMock } from "./mocks/TicketCreator";
+import { IssueTrackerMock } from "./mocks/IssueTracker";
+import { ClockPlannerMock } from "./mocks/ClockPlanner";
+import { FinanceDashboardMock } from "./mocks/FinanceDashboard";
+import { AIEditorMock } from "./mocks/AIEditor";
+import { IssueKanbanMock } from "./mocks/IssueKanban";
+import { HabitTrackerMock } from "./mocks/HabitTracker";
+import { TolariaNotesMock } from "./mocks/TolariaNotes";
+import { ShareDialogMock } from "./mocks/ShareDialog";
+import { ShareDialog2Mock } from "./mocks/ShareDialog2";
+import { InviteModalMock } from "./mocks/InviteModal";
+import { PublishProjectMock } from "./mocks/PublishProject";
+import { NotificationDialogMock } from "./mocks/NotificationDialog";
+import { CommandSearchMock } from "./mocks/CommandSearch";
+import { AiSaasDashboardMock } from "./mocks/AiSaasDashboard";
+import { DragDropUploadMock } from "./mocks/DragDropUpload";
+import { CmdKDialogMock } from "./mocks/CmdKDialog";
+import { VirtualCardMock } from "./mocks/VirtualCard";
+import { PlansBillingMock } from "./mocks/PlansBilling";
+import { AgendaCalendarMock } from "./mocks/AgendaCalendar";
+import { PermissionModelMock } from "./mocks/PermissionModel";
+import { QuickLauncherMock } from "./mocks/QuickLauncher";
+import { SearchMenuMock } from "./mocks/SearchMenu";
+import { MinimalNotesMock } from "./mocks/MinimalNotes";
+import { KnowledgeGraphMock } from "./mocks/KnowledgeGraph";
 
 export interface Story {
 	title: string;
@@ -242,6 +274,60 @@ function TabsDemo() {
 				{tab === "apps" && "Apps the AI built for you, ready to use."}
 			</p>
 		</div>
+	);
+}
+
+function SegmentedDemo({ full }: { full?: boolean }) {
+	const [view, setView] = useState("notes");
+	return (
+		<div style={{ width: full ? 360 : undefined }}>
+			<Segmented
+				aria-label="Workspace view"
+				full={full}
+				items={[
+					{ id: "notes", label: "Notes" },
+					{ id: "board", label: "Board" },
+					{ id: "timeline", label: "Timeline" },
+				]}
+				value={view}
+				onValueChange={setView}
+			/>
+		</div>
+	);
+}
+
+function ProgressDemo() {
+	return (
+		<div
+			style={{
+				width: 360,
+				display: "flex",
+				flexDirection: "column",
+				gap: 14,
+			}}
+		>
+			<Progress value={28} aria-label="Onboarding" />
+			<Progress value={68} tone="rose" aria-label="AI draft" />
+			<Progress value={80} tone="purple" aria-label="Seats used" />
+			<Progress value={100} tone="go" aria-label="Complete" />
+		</div>
+	);
+}
+
+function SegmentedCountsDemo() {
+	const [filter, setFilter] = useState("all");
+	return (
+		<Segmented
+			aria-label="Filter notifications"
+			items={[
+				{ id: "all", label: "View all", count: 10 },
+				{ id: "files", label: "Files" },
+				{ id: "jobs", label: "Jobs" },
+				{ id: "invites", label: "Invites", count: 12 },
+			]}
+			value={filter}
+			onValueChange={setFilter}
+		/>
 	);
 }
 
@@ -657,7 +743,44 @@ function NavPanelDemo() {
 				search={
 					<SearchInput placeholder="Search notes…" aria-label="Search notes" />
 				}
-				footer={
+			>
+				<NavPanelSection label="Workspace" />
+				<NavPanelGroup>
+					<NavPanelItem
+						icon={<Home />}
+						label="Inbox"
+						active={page === "inbox"}
+						onClick={() => setPage("inbox")}
+						meta={<Badge tone="go">3</Badge>}
+					/>
+					<NavPanelItem
+						icon={<StickyNote />}
+						label="All notes"
+						active={page === "notes"}
+						onClick={() => setPage("notes")}
+					/>
+					<NavPanelItem
+						icon={<Zap />}
+						label="Automations"
+						active={page === "automations"}
+						onClick={() => setPage("automations")}
+					/>
+				</NavPanelGroup>
+				<NavPanelSection label="Recent" />
+				<NavPanelGroup>
+					<NavPanelItem
+						label="Morning rounds"
+						active={page === "rounds"}
+						onClick={() => setPage("rounds")}
+						meta={<Badge tone="rose">AI</Badge>}
+					/>
+					<NavPanelItem
+						label="Unpaid invoices"
+						active={page === "invoices"}
+						onClick={() => setPage("invoices")}
+					/>
+				</NavPanelGroup>
+				<NavPanelFooter>
 					<AccountMenu name="Asha Verma" sub="Clinic workspace">
 						<MenuItem icon={<User />}>Profile</MenuItem>
 						<MenuItem icon={<SlidersHorizontal />}>Preferences</MenuItem>
@@ -666,36 +789,7 @@ function NavPanelDemo() {
 							Log out
 						</MenuItem>
 					</AccountMenu>
-				}
-			>
-				<NavSection
-					label="Workspace"
-					value={page}
-					onValueChange={setPage}
-					items={[
-						{
-							id: "inbox",
-							label: "Inbox",
-							icon: <Home />,
-							badge: <Badge tone="go">3</Badge>,
-						},
-						{ id: "notes", label: "All notes", icon: <StickyNote /> },
-						{ id: "automations", label: "Automations", icon: <Zap /> },
-					]}
-				/>
-				<NavSection
-					label="Recent"
-					value={page}
-					onValueChange={setPage}
-					items={[
-						{
-							id: "rounds",
-							label: "Morning rounds",
-							badge: <Badge tone="rose">AI</Badge>,
-						},
-						{ id: "invoices", label: "Unpaid invoices" },
-					]}
-				/>
+				</NavPanelFooter>
 			</NavPanel>
 		</div>
 	);
@@ -1323,15 +1417,16 @@ export const registry: ComponentEntry[] = [
 		group: "Foundation",
 		name: "Typography",
 		description:
-			"Two voices: Public Sans carries the interface at reading sizes; Oswald speaks only in tracked caps — cue labels, the wordmark, instrument readouts. Numerals run tabular.",
+			"Two voices: Outfit carries the interface at reading sizes; IBM Plex Sans speaks only in tracked caps — cue labels, the wordmark, instrument readouts. Numerals run tabular.",
 		stories: [
 			{
 				title: "Scale",
 				render: () => <TypeScale />,
-				code: `--font-ui: "Public Sans", system-ui, sans-serif;
---font-cue: "Oswald", "Public Sans", sans-serif;
+				code: `--font-ui: "Outfit", system-ui, sans-serif;
+--font-cue: "IBM Plex Sans", "Outfit", sans-serif;
 --tracking-cue: 0.14em;
 
+body      { letter-spacing: 0.02em; /* default tracking */ }
 .tw-cue   { /* tracked caps, instrument labels */ }
 .tw-tnum  { /* tabular-nums for data */ }`,
 			},
@@ -1481,6 +1576,18 @@ export const registry: ComponentEntry[] = [
 
 // renders headings, images, lists, quote, code,
 // a pipe table, hr, links — no toolbar, just the page`,
+			},
+			{
+				title: "Focus mode — editable, no toolbar",
+				render: () => (
+					<div style={{ maxWidth: 560, width: "100%" }}>
+						<MarkdownEditor defaultValue={BLOG_MD} hideToolbar minHeight={0} />
+					</div>
+				),
+				code: `<MarkdownEditor defaultValue={blogMarkdown} hideToolbar />
+
+// hideToolbar keeps the surface editable but drops the
+// formatting bar — the calm, distraction-free writing mode`,
 			},
 		],
 	},
@@ -1748,6 +1855,63 @@ export const registry: ComponentEntry[] = [
 		],
 	},
 	{
+		id: "segmented",
+		group: "Primitives",
+		name: "Segmented",
+		description:
+			"A contained pill-on-band toggle for short, mutually exclusive choices — the active button lifts off the band as a white pill, the rest stay quiet.",
+		stories: [
+			{
+				title: "Default",
+				render: () => <SegmentedDemo />,
+				code: `const [view, setView] = useState("notes");
+
+<Segmented
+  aria-label="Workspace view"
+  items={[
+    { id: "notes", label: "Notes" },
+    { id: "board", label: "Board" },
+    { id: "timeline", label: "Timeline" },
+  ]}
+  value={view}
+  onValueChange={setView}
+/>`,
+			},
+			{
+				title: "With counts — quiet numerals after the label",
+				render: () => <SegmentedCountsDemo />,
+				code: `<Segmented
+  aria-label="Filter notifications"
+  items={[
+    { id: "all", label: "View all", count: 10 },
+    { id: "files", label: "Files" },
+    { id: "jobs", label: "Jobs" },
+    { id: "invites", label: "Invites", count: 12 },
+  ]}
+  value={filter}
+  onValueChange={setFilter}
+/>`,
+			},
+			{
+				title: "Full width — fills its container",
+				render: () => <SegmentedDemo full />,
+				code: `const [mode, setMode] = useState("day");
+
+<Segmented
+  aria-label="Density"
+  full
+  items={[
+    { id: "day", label: "Day" },
+    { id: "week", label: "Week" },
+    { id: "month", label: "Month" },
+  ]}
+  value={mode}
+  onValueChange={setMode}
+/>`,
+			},
+		],
+	},
+	{
 		id: "dialog",
 		group: "Primitives",
 		name: "Dialog",
@@ -1786,6 +1950,21 @@ export const registry: ComponentEntry[] = [
 				code: `<Avatar name="Asha Verma" size="sm" />
 <Avatar name="Asha Verma" size="md" />
 <Avatar name="Ravi Kumar" size="lg" />`,
+			},
+			{
+				title: "Presence — a state light on the edge",
+				render: () => (
+					<div className="row">
+						<Avatar name="Asha Verma" presence="online" />
+						<Avatar name="Ravi Kumar" presence="away" />
+						<Avatar name="Meera Iyer" presence="busy" />
+						<Avatar name="Dev Patel" size="lg" presence="offline" />
+					</div>
+				),
+				code: `<Avatar name="Asha Verma" presence="online" />
+<Avatar name="Ravi Kumar" presence="away" />
+<Avatar name="Meera Iyer" presence="busy" />
+<Avatar name="Dev Patel" size="lg" presence="offline" />`,
 			},
 		],
 	},
@@ -1830,6 +2009,23 @@ export const registry: ComponentEntry[] = [
 					</div>
 				),
 				code: `<Skeleton lines={3} />`,
+			},
+		],
+	},
+	{
+		id: "progress",
+		group: "Primitives",
+		name: "Progress",
+		description:
+			"A single horizontal bar that reads left to right. The rail is a hairline band; the fill takes the chosen tone. Use for seat counters, completion meters, and any step-along signal.",
+		stories: [
+			{
+				title: "Tones",
+				render: () => <ProgressDemo />,
+				code: `<Progress value={28} aria-label="Onboarding" />
+<Progress value={68} tone="rose" aria-label="AI draft" />
+<Progress value={80} tone="purple" aria-label="Seats used" />
+<Progress value={100} tone="go" aria-label="Complete" />`,
 			},
 		],
 	},
@@ -1923,6 +2119,34 @@ export const registry: ComponentEntry[] = [
 				code: `<Tooltip tip="Linked to 4 notes">
   <Button variant="secondary">Hover or focus me</Button>
 </Tooltip>`,
+			},
+		],
+	},
+	{
+		id: "kbd",
+		group: "Primitives",
+		name: "Kbd",
+		description:
+			"A keycap chip for keyboard hints — a hairline key with a deepened bottom edge, so it reads as a physical key resting on the surface.",
+		stories: [
+			{
+				title: "Default",
+				render: () => (
+					<div className="row">
+						<Kbd>
+							<Command />
+						</Kbd>
+						<Kbd>K</Kbd>
+						<Kbd>
+							<CornerDownLeft />
+						</Kbd>
+						<Kbd>esc</Kbd>
+					</div>
+				),
+				code: `<Kbd><Command /></Kbd>
+<Kbd>K</Kbd>
+<Kbd><CornerDownLeft /></Kbd>
+<Kbd>esc</Kbd>`,
 			},
 		],
 	},
@@ -2088,23 +2312,20 @@ export const registry: ComponentEntry[] = [
 		group: "Shell",
 		name: "Nav Panel",
 		description:
-			"The full second tier: search on top, sections of links, and a footer for secondary links and the account row.",
+			"The full second tier, composable: search on top, sections of items, hue-tinted markers, and a footer pinned to the end for the account row.",
 		stories: [
 			{
 				title: "Composed",
 				render: () => <NavPanelDemo />,
-				code: `<NavPanel
-  search={<SearchInput placeholder="Search notes…" />}
-  footer={
-    <AccountMenu name="Asha Verma" sub="Clinic workspace">
-      <MenuItem icon={<User />}>Profile</MenuItem>
-      <MenuDivider />
-      <MenuItem icon={<LogOut />} danger>Log out</MenuItem>
-    </AccountMenu>
-  }
->
-  <NavSection label="Workspace" items={…} value={page} onValueChange={setPage} />
-  <NavSection label="Recent" items={…} />
+				code: `<NavPanel search={<SearchInput placeholder="Search notes…" />}>
+  <NavPanelSection label="Workspace" />
+  <NavPanelGroup>
+    <NavPanelItem icon={<Home />} label="Inbox" active meta={<Badge tone="go">3</Badge>} />
+    <NavPanelItem icon={<StickyNote />} label="All notes" />
+  </NavPanelGroup>
+  <NavPanelFooter>
+    <AccountMenu name="Asha Verma" sub="Clinic workspace">…</AccountMenu>
+  </NavPanelFooter>
 </NavPanel>`,
 			},
 		],
@@ -2678,6 +2899,164 @@ export const registry: ComponentEntry[] = [
 		],
 	},
 	{
+		id: "publish-project",
+		group: "Showcase",
+		name: "Publish Project",
+		description:
+			"A publish project dialog with visibility toggles (public/team/private), team selection dropdown, team member management with search, and action buttons for scheduling or immediate publishing.",
+		fullWidth: false,
+		stories: [
+			{
+				title: "Mock — publish project dialog",
+				render: () => <PublishProjectMock />,
+				code: `<PublishProjectMock />
+
+{/* Publish dialog featuring:
+    - Three-state visibility toggle (public/team/private)
+    - Team selection dropdown
+    - Team member search and management
+    - Member toggle switches
+    - Schedule and Publish now actions */}`,
+			},
+		],
+	},
+	{
+		id: "drag-drop-upload",
+		group: "Showcase",
+		name: "Drag Drop Upload",
+		description:
+			"A dark-themed drag-and-drop file upload dialog with three interactive states: empty state, upload in progress with animated progress indicators, and error state. Features file size validation, drag overlay preview, and simulated upload progression.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — three-state upload dialog",
+				render: () => <DragDropUploadMock />,
+				code: `<DragDropUploadMock />
+
+{/* Upload dialog with three screens:
+    - Empty state with drag-drop zone
+    - Upload in progress with file list and progress spinners
+    - Error state with validation feedback
+
+    Interactive: drag files over the dropzone to see the overlay effect */}`,
+			},
+		],
+	},
+	{
+		id: "cmdk-dialog",
+		group: "Showcase",
+		name: "Cmd K Dialog",
+		description:
+			"A Cmd+K command palette dialog showing the no-results state. Features a clean search input with keyboard shortcut badge, decorative floating app icons in the background, concentric ripple effects, and helpful action links.",
+		fullWidth: false,
+		stories: [
+			{
+				title: "Mock — no results state",
+				render: () => <CmdKDialogMock />,
+				code: `<CmdKDialogMock />
+
+{/* Command palette with no search results:
+    - Search input with ⌘K shortcut indicator
+    - Decorative floating app icons background
+    - Concentric ripple effects
+    - "Sorry, no results!" message
+    - Clear search button
+    - "Browse all apps" and "Let us know" links */}`,
+			},
+		],
+	},
+	{
+		id: "virtual-card",
+		group: "Showcase",
+		name: "Virtual Card",
+		description:
+			"A virtual card dialog with card visualization, toggle switch, action buttons (card details, copy), tabbed navigation (View all, Transactions, Deposits, Transfers), and a scrollable transaction list with payment provider icons and amounts.",
+		fullWidth: false,
+		stories: [
+			{
+				title: "Mock — virtual card with deposits",
+				render: () => <VirtualCardMock />,
+				code: `<VirtualCardMock />
+
+{/* Virtual card modal:
+    - Dark gradient card with logo, number, expiry, toggle
+    - Card details & copy actions
+    - Tabbed transaction filtering
+    - Scrollable list with Visa, Mastercard, Stripe, PayPal, Apple Pay
+    - Footer with Lock card and New transfer actions */}`,
+			},
+		],
+	},
+	{
+		id: "notification-dialog",
+		group: "Showcase",
+		name: "Notification Dialog",
+		description:
+			"A notifications panel inspired by the supplied reference: header with mark-all-read and settings actions, a segmented View all / Files / Jobs / Invites filter with counts, and rows with presence avatars, inline project chips, invite actions, and downloadable file cards.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — notification list with filters",
+				render: () => <NotificationDialogMock />,
+				code: `<NotificationDialogMock />
+
+{/* Notifications panel:
+    header + mark-all-read / settings actions,
+    segmented filter with counts (View all 10, Invites 12),
+    presence avatars, unread light, relative times,
+    inline project chips, Accept / Decline invite,
+    and downloadable FIG / MP4 file cards. */}`,
+			},
+		],
+	},
+	{
+		id: "command-search",
+		group: "Showcase",
+		name: "Command Search",
+		description:
+			"A cmd+K palette empty state inspired by the supplied reference: borderless search row with a clear action, a centered 'No projects found' state with a folder illustration and clear/create actions, and a footer of keyboard hints built on the Kbd primitive.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — search with no matching projects",
+				render: () => <CommandSearchMock />,
+				code: `<CommandSearchMock />
+
+{/* Cmd+K empty state:
+    borderless search row + clear action,
+    folder illustration, "No projects found",
+    quoted query with 'create a new project' link,
+    Clear search / Create project actions,
+    keyboard hint footer on the Kbd primitive. */}`,
+			},
+		],
+	},
+	{
+		id: "ai-saas-dashboard",
+		group: "Showcase",
+		name: "AI SaaS Dashboard",
+		description:
+			"A macOS browser window on a gradient desktop, inspired by the supplied reference: workspace sidebar with collections, runs, and a usage card, a 'Hello David' home with Upcoming Meetings / Tasks / Documents cards, and an AI prompt bar — the sidebar Dark Mode switch flips the window between the design system's day and night phases.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — AI workspace home in a browser window",
+				render: () => <AiSaasDashboardMock />,
+				code: `<AiSaasDashboardMock />
+
+{/* AI SaaS dashboard:
+    macOS chrome (traffic lights, URL pill) on a gradient desktop,
+    sidebar: workspace, nav, Collections, Runs,
+    usage card with progress + Update,
+    Settings / Support / Dark Mode (working phase switch) / Logout,
+    Home: Hello David hero,
+    Upcoming Meetings (date badges + switches),
+    Tasks, Documents (Drive / Excel / Word icons),
+    AI prompt bar with GPT-5 chip, attach tools, send. */}`,
+			},
+		],
+	},
+	{
 		id: "prodex-dashboard",
 		group: "Showcase",
 		name: "Prodex Dashboard",
@@ -3070,27 +3449,6 @@ export const registry: ComponentEntry[] = [
 		],
 	},
 	{
-		id: "project-files",
-		group: "Showcase",
-		name: "Project Files",
-		description:
-			"The three-pane file manager from the reference: folder rail, center with folder cards + recent chips + selectable table, and the right Files panel — all wired to one filter state.",
-		fullWidth: true,
-		stories: [
-			{
-				title: "Mock — three panes, one state",
-				render: () => <ProjectFilesMock />,
-				code: `{/* the right Files panel is live: its folder tiles filter
-    the center table (and light the center cards); its recent
-    rows toggle table selection */}
-<FilesPanel onFolder={filter} onPick={toggleSelect} />
-
-{/* grid/list toggle, type tabs, search —
-    one pipeline, three panes */}`,
-			},
-		],
-	},
-	{
 		id: "communication",
 		group: "Showcase",
 		name: "Communication",
@@ -3208,6 +3566,461 @@ const [sort, setSort] = useState("updated");
 
 {/* library search filters all sections;
     zoom steps 75/100/125 around the flow */}`,
+			},
+		],
+	},
+	{
+		id: "ticket-creator",
+		group: "Showcase",
+		name: "Ticket Creator",
+		description:
+			"An issue creation dialog: title input with assignee button, field rows for assignee, stakeholders, due date, status, projects, tags, and work type, a description box, subitems section with add support, and cancel/create footer actions.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — create issue dialog",
+				render: () => <TicketCreatorMock />,
+				code: `<TicketCreatorMock />
+
+{/* Issue creation dialog:
+    title, assignees, stakeholders,
+    due date, status, project, tags,
+    work type, description, subitems,
+    and cancel/create actions. */}`,
+			},
+		],
+	},
+	{
+		id: "issue-tracker",
+		group: "Showcase",
+		name: "Issue Tracker",
+		description:
+			"A full project management interface: left sidebar with brand, navigation, workspace sections, and expandable channels; top bar with tabs, search, and new feature button; main task table with checkboxes, task IDs, progress badges, urgency levels, and assignee stacks; right properties panel with task details, tags, attachments, and discussion thread.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — Q3 Plan task list",
+				render: () => <IssueTrackerMock />,
+				code: `<IssueTrackerMock />
+
+{/* Three-column layout:
+    - Sidebar: brand, nav, workspace, channels, trial banner
+    - Main: top bar tabs, search, task table with
+      checkbox, ID, title, progress, urgency, assignees
+    - Panel: properties, tags, attachments, discussion
+
+    Click rows to select; check tasks to complete */}`,
+			},
+		],
+	},
+	{
+		id: "issue-kanban",
+		group: "Showcase",
+		name: "Issue Kanban",
+		description:
+			"A project issues board inspired by the supplied reference: the slim night rail, a breadcrumb header with the team stack, a working priority filter, and four columns — To Do, This Week, In Progress, Done — with dashed add zones and drag-and-drop cards carrying priority badges, category pills, assignee stacks, and attachment/subtask counts. One card stays open with live subtasks; Done groups by day.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — issues board with drag & drop",
+				render: () => <IssueKanbanMock />,
+				code: `<IssueKanbanMock />
+
+{/* Drag cards between columns — the cobalt line
+    marks the landing spot; the dragged card tilts.
+    "+" opens an inline composer; the column menu
+    adds / sorts by priority / clears; Filter
+    narrows by priority; subtasks check off live;
+    cards dropped into Done join a day group. */}`,
+			},
+		],
+	},
+	{
+		id: "clock-planner",
+		group: "Showcase",
+		name: "Clock Planner",
+		description:
+			"A circular clock-based daily planner: analog clock face with colored time block arcs representing scheduled tasks, positioned labels around the clock, a priority-based todo list with A/B/C levels and checkboxes, and a supplies section. Tasks appear as arcs on the clock perimeter with their labels positioned accordingly.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — daily clock schedule",
+				render: () => <ClockPlannerMock />,
+				code: `<ClockPlannerMock />
+
+{/* Clock-based daily planner:
+    - SVG clock face with hour markers
+    - Time blocks as colored arcs around the clock
+    - Task labels positioned around the perimeter
+    - Priority todo list (A/B/C) with checkboxes
+    - Supplies/notes section
+
+    Click checkboxes to complete tasks */}`,
+			},
+		],
+	},
+	{
+		id: "habit-tracker",
+		group: "Showcase",
+		name: "Habit Tracker",
+		description:
+			"A habit tracker inspired by the supplied mobile reference, rebuilt for desktop: three views on one date-keyed state — a Weekly check grid with per-habit progress bars, a Monthly habit × day dot matrix with month navigation, and Yearly cards with GitHub-style contribution grids, month labels, and streak flames. Each habit carries a curated-palette color; missed days can be repaired as gold Kintsugi days.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — weekly, monthly, and yearly views",
+				render: () => <HabitTrackerMock />,
+				code: `<HabitTrackerMock />
+
+{/* One Record<date, state> per habit drives all views.
+    Click any cell/dot: empty -> done -> kintsugi -> empty.
+    Weekly: 7-day grid + target progress bars.
+    Monthly: day matrix with prev/next month nav.
+    Yearly: 21-week dot grid per habit, streak pill,
+    card menu (mark/clear today, remove), and a
+    New habit dialog (name, frequency, curated color). */}`,
+			},
+		],
+	},
+	{
+		id: "finance-dashboard",
+		group: "Showcase",
+		name: "Finance Dashboard",
+		description:
+			"A personal finance dashboard: sidebar with search, main/management navigation, and support card; stat cards showing total balance, monthly recurring, and this month's spending; recurring transactions list with subscription icons; weekly spending bar chart; cashflow analytics semi-circular gauge with percentage; and recent transactions table with status badges and receipt actions.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — WealthWise dashboard",
+				render: () => <FinanceDashboardMock />,
+				code: `<FinanceDashboardMock />
+
+{/* Personal finance dashboard:
+    - Sidebar: search, nav sections, support card
+    - 3 stat cards: balance, recurring, this month
+    - Recurring transactions with service icons
+    - Weekly spending bar chart (SVG)
+    - Cashflow gauge with percentage (SVG arc)
+    - Recent transactions table with status */}`,
+			},
+		],
+	},
+	{
+		id: "ai-editor",
+		group: "Showcase",
+		name: "AI Editor",
+		description:
+			"An AI-powered coding editor interface: slim icon rail with file/chat/AI/git navigation; issue list sidebar with Backlog, Planning, and Done sections showing issue numbers, status icons (open/progress/done), and type badges (Feature/Bug); main content area with Issue/Session/History/Changes tabs, content header, and an empty state with 'Start in plan mode' CTA; right properties panel with collapsible Workflow, Session, Git Summary (branch + file changes with +/- stats), and Statistics sections.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — Lanes-style AI coding assistant",
+				render: () => <AIEditorMock />,
+				code: `<AIEditorMock />
+
+{/* AI coding editor interface:
+    - Icon rail: file, chat, AI, settings, git
+    - Sidebar: project issues by section
+      (Backlog, Planning, Done) with status icons
+    - Main: tabs, title, empty state with CTA
+    - Panel: Workflow, Session, Git Summary,
+      Statistics with token count
+
+    Click issues to select; sections collapsible */}`,
+			},
+		],
+	},
+	{
+		id: "tolaria-notes",
+		group: "Showcase",
+		name: "Tolaria Notes",
+		description:
+			"A networked notes workspace inspired by the supplied Tolaria reference: macOS traffic-light chrome, a sidebar with inbox counts, favorites, fourteen colorful note types and a folder tree; an inbox list with tag chips and created-vs-updated stamps; a serif long-form editor with live bold/italic/link formatting and a blue-bullet agenda; a properties panel with type, status, Notion id and belongs-to / has-notes relation chips; and a git-flavored status bar with changes, commit, sync and Claude.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — inbox, editor, and properties",
+				render: () => <TolariaNotesMock />,
+				code: `<TolariaNotesMock />
+
+{/* Four-pane notes workspace + status bar:
+    - Sidebar: Inbox/All Notes/Archive, favorites,
+      14 colorful types with counts, folder tree
+    - List: note rows with tag chips, sort toggle,
+      search filter, + adds a note, click to open
+    - Editor: serif doc — bold/italic/link marks,
+      blue-bullet agenda list, gutter + / grip
+    - Properties: type, status, date, Notion id,
+      relation chips; X collapses the panel,
+      + Add relationship appends a section
+    - Status bar: laputa, alpha tag, 3 changes,
+      commit, synced, history, Claude, contribute */}`,
+			},
+		],
+	},
+	{
+		id: "plans-billing",
+		group: "Showcase",
+		name: "Plans & Billing",
+		description:
+			"A plans and billing management page: left sidebar with brand, navigation, and folder browser; header with upgrade CTA and avatar; three pricing plan cards (Free, PRO Business, PRO Enterprise) with feature lists and action buttons; and a previous invoices section with tabs, search, sort, and a selectable invoice table with download actions.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — plans and billing management",
+				render: () => <PlansBillingMock />,
+				code: `<PlansBillingMock />
+
+{/* Plans & Billing page:
+    - Sidebar: brand logo, navigation items,
+      browser section with folders tree
+    - Header: title, upgrade badge, PRO button, avatar
+    - Plans: Free, PRO Business, PRO Enterprise cards
+      with feature lists and action buttons
+    - Invoices: tabs, search, sort dropdown,
+      selectable table with download actions */}`,
+			},
+		],
+	},
+	{
+		id: "share-dialog",
+		group: "Showcase",
+		name: "Share Dialog",
+		description:
+			"A project-sharing dialog inspired by the supplied reference: a header with title and subtitle, a Share/Publish/Export segmented toggle, a Direct link card with copy-to-clipboard row, an Invite to collaborate card with live invite input and per-member Can view controls, and a footer with Copy link, Embed, and a purple Done action.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — share project with live invite",
+				render: () => <ShareDialogMock />,
+				code: `<ShareDialogMock />
+
+{/* Project share dialog:
+    - Header: title, subtitle, close
+    - Segmented toggle: Share / Publish / Export
+      (the active button lifts off as a white pill)
+    - Direct link card: URL with link icon, Copy button,
+      "Can view" permission dropdown
+    - Invite to collaborate: email/username input,
+      Enter or Invite adds a new member row with
+      a generated initial avatar
+    - Members list: avatar + email + Can view (sienna
+      as an initial, two members via real photos)
+    - Footer: Copy link, Embed, purple Done */}`,
+			},
+		],
+	},
+	{
+		id: "share-dialog-2",
+		group: "Showcase",
+		name: "Share Dialog 2",
+		description:
+			"A workspace members dialog inspired by the supplied reference, shown in both night and day phases side by side. Anatomy: a Members header, an Allow email domains section with per-domain rows (link icon, domain, 'Added by X' avatar pill, kebab menu), an Invite to collaborate section with avatar+role rows and a 'View 2 more' reveal, three settings toggles, and a footer with Copy link / Embed / purple Done. Each panel pins its own phase so the canvas toggle does not move the night panel.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — members dialog in both phases",
+				render: () => <ShareDialog2Mock />,
+				code: `<ShareDialog2Mock />
+
+{/* Workspace members dialog, day + night side by side:
+    - Header: "Members" + "Manage who has access to this workspace."
+    - Allow email domains: + Domain adds a domain row;
+      each row has a link icon, the domain, an "Added by X"
+      pill with a small avatar, and a kebab menu
+    - Invite to collaborate: input + Send invite,
+      four members with real photos + role (Can view / Admin),
+      "View 2 more" reveals the remaining members
+    - Settings: three Switches — profile visibility,
+      member-can-invite, allow-export/duplicate
+    - Footer: Copy link, Embed, purple Done
+
+    Each panel pins its own phase via data-phase on the
+    panel root, so the canvas toggle only moves the
+    day panel. */}`,
+			},
+		],
+	},
+	{
+		id: "invite-modal",
+		group: "Showcase",
+		name: "Invite Modal",
+		description:
+			"A dashboard sharing view inspired by the supplied reference: two panels share one washed day stage. Left — 'Your dashboard is live' with a copy-link row, an SMS send row (country code + phone + send icon), a centered QR code with purple corner brackets, and App Store / Google Play buttons. Right — 'Invite team members' with an email input + purple Send invite, a list of pending and active members (mixed avatar styles, Pending badges, Can edit / Admin roles), and an Enterprise license panel with a cubic icon, a seat gauge (4/5 seats), and an Upgrade link.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — dashboard sharing flow",
+				render: () => <InviteModalMock />,
+				code: `<InviteModalMock />
+
+{/* Dashboard sharing view (two panels on one day stage):
+    - Left: dashboard live card
+      - Share link row with copy icon
+      - Send link via SMS: country code + phone + send arrow
+      - "OR scan to open" divider with the QR code
+        mounted in a white card with purple corner brackets
+      - Google Play and App Store badges
+
+    - Right: invite team members panel
+      - Email input + purple Send invite
+      - Members: avatar (initial or photo) + email +
+        Pending badge for unredeemed invites +
+        Can edit / Admin role dropdown
+      - Enterprise license: cube icon, title, sub
+        Progress gauge (4/5 seats), Upgrade link */}`,
+			},
+		],
+	},
+	{
+		id: "agenda-calendar",
+		group: "Showcase",
+		name: "Agenda Calendar",
+		description:
+			"A three-pane personal calendar (Cron / Notion Calendar in spirit): an account dropdown, a mini month, and colored-dot calendar filters on the left; a multi-day time-grid in the middle with tinted event cards, attendee stacks, a today circle, and a red now-line; and an Upcoming agenda panel on the right.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — 4-day view with upcoming panel",
+				render: () => <AgendaCalendarMock />,
+				code: `<AgendaCalendarMock />
+
+{/* Three panes, one filter pipeline:
+    - Account dropdown + mini month + colored-dot
+      calendar filters (Work / Personal / Family / Health)
+    - Multi-day time-grid (Day / 4 Days / Week):
+      tinted cards with a solid left border, attendee
+      avatar stacks, today's date wears the accent circle,
+      and a red now-line rides 11:15.
+    - Upcoming panel lists today's still-open events as
+      accent-bar cards with time, location pin, avatars.
+    Toggling a calendar dot hides its events everywhere;
+    the view menu, nav arrows, Today and mini month all
+    move the visible window. */}`,
+			},
+		],
+	},
+	{
+		id: "minimal-notes",
+		group: "Showcase",
+		name: "Minimal Notes",
+		description:
+			"A distraction-free notes editor in a macOS window: traffic-light chrome, a sidebar library (Notes / Tasks / Files, smart views, and collapsible Folders), a borderless live editor, and a floating words · Saved status pill. Built on the MarkdownEditor primitive in a new focus mode (editable, no toolbar).",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — focus-mode editor with status pill",
+				render: () => <MinimalNotesMock />,
+				code: `<MinimalNotesMock />
+
+{/* macOS window: traffic-light dots, sidebar library
+    (Notes/Tasks/Files, All/Recents/Starred/Deleted,
+    collapsible Folders), and a borderless editor using
+    MarkdownEditor hideToolbar — type and the word
+    count in the floating pill updates live. */}`,
+			},
+		],
+	},
+	{
+		id: "permission-model",
+		group: "Showcase",
+		name: "Permission Model",
+		description:
+			"An OAuth-style permission dialog for connecting two apps: header with two app icons and bidirectional arrows, title and description, a permission list showing what access is being requested with checkmarks, an integration URL field with copy button, and footer with Documentation and Connect actions.",
+		fullWidth: false,
+		stories: [
+			{
+				title: "Mock — connect integration dialog",
+				render: () => <PermissionModelMock />,
+				code: `<PermissionModelMock />
+
+{/* OAuth-style permission dialog:
+    - App icons: source and target with arrows
+    - Title: "Connect [App] to [App]"
+    - Description: integration benefits
+    - Permissions: checkmark list of access requests
+    - URL field: integration URL with copy button
+    - Footer: Documentation and Connect buttons */}`,
+			},
+		],
+	},
+	{
+		id: "quick-launcher",
+		group: "Showcase",
+		name: "Quick Launcher",
+		description:
+			"A command palette (⌘K style) for quick navigation and actions: search input with keyboard shortcut badge, recent searches section with project items showing avatar stacks and jump buttons, command items with icons and keyboard shortcuts, action links for integrations, and a footer with keyboard navigation hints.",
+		fullWidth: false,
+		stories: [
+			{
+				title: "Mock — command palette",
+				render: () => <QuickLauncherMock />,
+				code: `<QuickLauncherMock />
+
+{/* Command palette (⌘K):
+    - Search: input with placeholder and ⌘/ shortcut
+    - Recent searches: project items with avatars,
+      "Jump to..." buttons, Customize link
+    - Commands: icon + label + keyboard shortcut,
+      action links for external integrations
+    - Footer: keyboard hints (# tags, ↑↓ navigate,
+      ↵ open, esc close, ← parent)
+    - Arrow key navigation highlights items */}`,
+			},
+		],
+	},
+	{
+		id: "search-menu",
+		group: "Showcase",
+		name: "Search Menu",
+		description:
+			"An integrations search menu with two-panel layout: left panel with back navigation, search input, and integration list showing app icons and domains; right panel with selected integration detail including connected app icons, toggle switch, author info, and explore button; footer with keyboard navigation hints and settings/theme toggles.",
+		fullWidth: false,
+		stories: [
+			{
+				title: "Mock — integrations search",
+				render: () => <SearchMenuMock />,
+				code: `<SearchMenuMock />
+
+{/* Two-panel integrations menu:
+    - Left: back button, "Integrations" title,
+      search input with ⌘/ shortcut, list of
+      integrations (GitHub, Linear, Figma, etc.)
+      with icons and domains
+    - Right: connected app icons with arrows,
+      "Untitled + [App]" title, updated date,
+      author with avatar, enable/disable toggle,
+      "Explore integration" button
+					- Footer: keyboard hints, settings, theme toggle */}`,
+			},
+		],
+	},
+	{
+		id: "knowledge-graph",
+		group: "Showcase",
+		name: "Knowledge Graph",
+		description:
+			"A Zenmori-style knowledge graph as a custom D3 SVG — no graph framework. Force-directed layout (pre-ticked to stability), curved quadratic edges with two arrowhead styles, four node types, task-status filters, text search, hover/selection highlighting that fades the rest of the graph, d3-zoom pan & zoom, and a detail dialog.",
+		fullWidth: true,
+		stories: [
+			{
+				title: "Mock — force-directed graph",
+				render: () => <KnowledgeGraphMock />,
+				code: `<KnowledgeGraphMock />
+
+{/* Custom React + D3 SVG graph (no React Flow):
+    - d3-force: pre-ticked 300 steps, clamped to viewport
+      charge -240 · link 90/0.28 · collide 0.95
+    - d3-zoom on the svg, scale [0.25, 4], transform
+      string applied to <g class="graph-content">
+    - Curved edges: quadratic bend 0.14 of the
+      perpendicular, trimmed to node rims so the
+      arrowheads land on the circle edge
+    - Blocked edges: red, dashed, "blocked by" label
+    - Focus: hovered > search match > selected —
+      connected subgraph glows, the rest fades
+    - Type pills + task-status pills filter the graph;
+      clicking a node opens the detail Dialog */}`,
 			},
 		],
 	},
