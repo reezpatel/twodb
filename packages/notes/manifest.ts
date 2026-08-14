@@ -1,9 +1,5 @@
 import type { PluginManifest } from "@twodb/contracts";
 
-/**
- * The notes plugin's public surface: what it needs, what it offers, what it
- * says. Imported by both halves (view + service) and by host registries.
- */
 export default {
 	id: "twodb.notes",
 	name: "@twodb/plugin-notes",
@@ -19,5 +15,27 @@ export default {
 		"twodb.notes.note.selected",
 	],
 	consumes: [],
-	permissions: ["twodb.notes:read", "twodb.notes:write"],
+	permissions: [
+		"plugin.twodb.notes:note.read",
+		"plugin.twodb.notes:note.create",
+		"plugin.twodb.notes:note.edit",
+		"plugin.twodb.notes:note.delete",
+		"plugin.twodb.notes:note.share",
+	],
+	roleDefaults: {
+		manager: [
+			"plugin.twodb.notes:note.read",
+			"plugin.twodb.notes:note.create",
+			"plugin.twodb.notes:note.edit",
+			"plugin.twodb.notes:note.delete",
+			"plugin.twodb.notes:note.share",
+		],
+		editor: [
+			"plugin.twodb.notes:note.read",
+			"plugin.twodb.notes:note.create",
+			"plugin.twodb.notes:note.edit",
+			"plugin.twodb.notes:note.share",
+		],
+		reader: ["plugin.twodb.notes:note.read"],
+	},
 } as const satisfies PluginManifest;

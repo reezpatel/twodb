@@ -229,6 +229,11 @@ The superadmin administers the **deployment**, not the tenants:
 
 ## 8. Data model (Postgres)
 
+**Data layer (decided 2026-08-14):** Postgres is the store; **Kysely** is the
+query builder and migration runner for every service plugin — type-safe SQL,
+migrations as code, no ORM magic. Each plugin owns its tables and ships its
+own Kysely migrations; shared-backend provides the migration runner.
+
 ```text
 users                id, email, phone, name, created_at,
                      email_verified_at, phone_verified_at
@@ -312,7 +317,7 @@ App routes do the same against the app scope:
 `requireAppClaim("app.ledger:entry.create")` resolves the app from the route
 and evaluates app roles ∪ grants.
 
-**Frontend** gets `useClaims()` from the shell (principal + effective claims
+**Frontend** gets `useIdentity()` from the shell (principal + effective claims
 for the active workspace, pushed over the existing SSE bridge on change) and
 uses it to hide/disable UI. It is cosmetic and never trusted.
 
@@ -421,7 +426,7 @@ PUT     /api/v1/twodb.identity/admin/access-policy    # verified-only gate on/of
 ## 12. Frontend surfaces
 
 - **Workspace picker** in the shell sidebar (org → workspace), fed by
-  `me/memberships`; the active workspace drives `useClaims()`.
+  `me/memberships`; the active workspace drives `useIdentity()`.
 - **Members & roles** settings section (contributed by the identity view
   plugin through the existing `settings` slot): member list with role
   assignment, role editor = name + claims checklist from the catalog.
@@ -476,7 +481,7 @@ directly.
 7. **superadmin** — `platform_admins`, deployment-config surface (incl. the
    sign-in method catalogue and verified-only gate), org suspend/list.
    Audited assume-role only if demanded.
-8. **frontend wiring** — workspace picker, `useClaims()`, members & roles
+8. **frontend wiring** — workspace picker, `useIdentity()`, members & roles
    settings section.
 
 ## 14. Hard rules

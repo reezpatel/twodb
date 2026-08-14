@@ -1,4 +1,5 @@
 export { TypedBus, busPlugin, type BackendBus } from "./bus";
+export { newId } from "./ids";
 export {
 	defineService,
 	type ServiceDefinition,

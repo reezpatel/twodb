@@ -2,7 +2,7 @@
 
 Plan refs: plan.md §3 (claims), §8 (entity ids), §12 (provider slots)
 Depends on: nothing — first task
-Status: not started
+Status: done (2026-08-14)
 
 ## Goal
 
@@ -37,26 +37,51 @@ export type DefaultRoleKey = (typeof DEFAULT_ROLE_KEYS)[number];
 export type RoleDefaultKey = Exclude<DefaultRoleKey, "owner" | "guest">;
 ```
 
-### 1.3 DTOs + zod schemas — `packages/contracts/src/identity.ts`
+### 1.3 The identity contract — `packages/contracts/src/identity.ts`
 
-Mirror plan §8 exactly; ids are prefixed-id strings (1.5).
+Contracts carries only the **consumer-facing identity surface** — the shape
+of the `useIdentity()` hook — plus the backend swap contract. Authn/IdP
+mechanics (email vs phone, SSO, SAML, sessions) are implementation details
+owned by the identity plugin package itself (task-02), never shared types.
 
-- `User { id, email?, phone?, name, emailVerifiedAt?, phoneVerifiedAt?, createdAt }`
-- `Principal { user: User, isSuperadmin: boolean }`
-- `Organization { id, name, slug, createdBy, createdAt }`
-- `OrgMembership { orgId, userId, isAdmin }`
-- `Workspace { id, orgId, name, slug, createdAt }`
-- `Role { id, workspaceId, key, name, description, isSystem, claims: Claim[] }`
-- `RoleAssignment { workspaceId, userId, roleId }`
-- `EntityGrant { id, workspaceId, entityType, entityId, userId, claims: Claim[], grantedBy, createdAt }`
-- `AppRole { id, appId, key, name, isSystem, claims: AppClaim[] }`
-- `AuthMethodInfo { id, method, enabled, createdAt }` (user-level)
-- `DeploymentAuthMethod { method, enabled, config }` (superadmin-level)
-- Request/response DTOs for every endpoint listed in plan §11.
+```ts
+export type IdentityStatus = "loading" | "signed_out" | "unverified" | "ready";
 
-### 1.4 Event map entries — `packages/contracts/src/events.ts`
+export interface IdentitySnapshot {          // what refetch() fetches
+  user: { id: string; name: string } | null;
+  workspaces: IdentityWorkspace[];
+  activeWorkspaceId: string | null;
+  roles: string[];
+  claims: Claim[];
+}
 
-Append to `BackendEventMap` (facts, verb-past, payloads minimal):
+export interface Identity {                  // the useIdentity() shape
+  status: IdentityStatus;
+  userId: string | null;
+  userName: string | null;
+  accountId: string | null;                  // active org
+  workspaceId: string | null;
+  workspaces: IdentityWorkspace[];
+  activeWorkspace: IdentityWorkspace | null;
+  roles: string[];
+  claims: Claim[];
+  hasClaim(claim: Claim): boolean;
+  switchWorkspace(workspaceId: string): void;
+  refetch(): Promise<void>;
+  signOut(): Promise<void>;
+}
+
+export interface Principal {                 // backend swap contract (onRequest hook)
+  userId: string;
+  isSuperadmin: boolean;
+}
+```
+
+Endpoint request/response DTOs (plan §11) live in the identity plugin, not
+in contracts — a replacement identity provider only has to honor the two
+shapes above.
+
+### 1.4 Event map entries
 
 ```ts
 "twodb.identity.user.created":            { userId: string };
@@ -130,14 +155,18 @@ claim regex; every `roleDefaults` value is a subset of `permissions`;
 
 ## Acceptance criteria
 
-- [ ] `pnpm build` green in contracts + shared-frontend + shared-backend.
-- [ ] `isClaim` accepts `plugin.twodb.notes:note.read` / `app.ledger:entry.create`,
+- [x] `pnpm build` green in contracts + shared-frontend + shared-backend.
+- [x] `isClaim` accepts `plugin.twodb.notes:note.read` / `app.ledger:entry.create`,
       rejects `twodb.notes:read`, `plugin.:x`, uppercase ids.
-- [ ] `newId("usr")` matches `ID_RE`; v7 time-ordering holds for sequential ids.
-- [ ] A scratch view plugin can `registerProvider("footer", impl)` and the
+- [x] `newId("usr")` matches `ID_RE`; v7 time-ordering holds for sequential ids.
+- [x] A scratch view plugin can `registerProvider("footer", impl)` and the
       shell resolves it via `useProvider("footer")`; double registration throws.
-- [ ] `validateManifest` rejects a `roleDefaults` entry referencing an
+- [x] `validateManifest` rejects a `roleDefaults` entry referencing an
       undeclared claim or the keys `owner`/`guest`.
+
+Deviation from the spec as written: contracts stays **dependency-free** —
+validators are hand-rolled functions instead of zod schemas (zod would be the
+package's first runtime dependency, against its charter).
 
 ## Out of scope
 

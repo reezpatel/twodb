@@ -1,20 +1,46 @@
 /**
  * @twodb/contracts — the single source of truth for every cross-boundary
- * message in twodb: API DTOs, bus event maps, plugin identifiers, and the
- * plugin manifest shape. Pure types plus tiny runtime helpers — no runtime
+ * message in twodb. Pure types plus tiny runtime helpers — no runtime
  * dependencies, so both halves of every plugin (and both hosts) can import
  * it freely without bundle contamination.
  */
 
-/* ---------- Plugin identifiers ---------- */
+export {
+	PLUGIN_CLAIM_PATTERN,
+	APP_CLAIM_PATTERN,
+	isPluginClaim,
+	isAppClaim,
+	isClaim,
+	type PluginClaim,
+	type AppClaim,
+	type Claim,
+} from "./claims";
+export {
+	DEFAULT_ROLE_KEYS,
+	ROLE_DEFAULT_KEYS,
+	isDefaultRoleKey,
+	type DefaultRoleKey,
+	type RoleDefaultKey,
+} from "./roles";
+export {
+	ENTITY_ID_PATTERN,
+	ID_PREFIXES,
+	isEntityId,
+	type IdPrefix,
+} from "./ids";
+export {
+	PROVIDER_SLOTS,
+	REQUIRED_PROVIDER_SLOTS,
+	isProviderSlot,
+	type ProviderSlot,
+} from "./providers";
+export type * from "./identity";
+export type { EventsFor, MergeEventMaps } from "./events";
 
-/**
- * Unique dot-namespaced plugin identifier: lowercase alphanumeric segments
- * joined by dots (`twodb.notes`, `twodb.chat`, `acme.crm`). First-party
- * plugins live under the `twodb.*` namespace. The identifier is reused
- * verbatim for the API prefix, frontend route prefix, event names, exposed
- * function names, and fastify decorator keys.
- */
+import { isClaim, type Claim } from "./claims";
+import { ROLE_DEFAULT_KEYS, type RoleDefaultKey } from "./roles";
+import { isProviderSlot, type ProviderSlot } from "./providers";
+
 export type PluginId = string;
 
 export const PLUGIN_ID_PATTERN = /^[a-z][a-z0-9]*(\.[a-z0-9]+)*$/;
@@ -23,63 +49,120 @@ export function isPluginId(value: string): value is PluginId {
 	return PLUGIN_ID_PATTERN.test(value);
 }
 
-/** API mount prefix for a plugin's service routes. */
 export function apiPrefix(id: PluginId): string {
 	return `/api/v1/${id}`;
 }
 
-/** Frontend route prefix for a plugin's view routes. */
 export function viewPrefix(id: PluginId): string {
 	return `/${id}`;
 }
 
-/* ---------- Plugin manifest ---------- */
-
 export interface PluginManifest {
-	/** The unique plugin identifier, e.g. "twodb.notes". */
 	id: PluginId;
-	/** The package name, e.g. "@twodb/plugin-notes". */
 	name: string;
 	version: string;
 	provides: {
-		/** Function names other plugins may call, prefixed with this plugin's id. */
 		functions: string[];
-		/** API route prefixes this plugin serves. */
 		routes: string[];
 	};
-	/** Bus events this plugin emits. */
 	emits: string[];
-	/** Bus events this plugin subscribes to. */
 	consumes: string[];
-	permissions: string[];
+	permissions: Claim[];
+	roleDefaults?: Partial<Record<RoleDefaultKey, Claim[]>>;
+	provider?: ProviderSlot;
 }
 
-/* ---------- Bus event maps ---------- */
+/** Returns a list of problems; empty means valid. Hosts refuse to boot on any. */
+export function validateManifest(manifest: PluginManifest): string[] {
+	const problems: string[] = [];
+	if (!isPluginId(manifest.id)) {
+		problems.push(`id "${manifest.id}" is not a valid plugin identifier`);
+	}
+	const declared = new Set<string>(manifest.permissions);
+	for (const claim of manifest.permissions) {
+		if (!isClaim(claim)) {
+			problems.push(`permission "${claim}" is not a valid claim`);
+		}
+	}
+	for (const [role, claims] of Object.entries(manifest.roleDefaults ?? {})) {
+		if (!(ROLE_DEFAULT_KEYS as readonly string[]).includes(role)) {
+			problems.push(
+				`roleDefaults may not address "${role}" (owner is implicit, guest is always empty)`,
+			);
+			continue;
+		}
+		for (const claim of claims) {
+			if (!declared.has(claim)) {
+				problems.push(
+					`roleDefaults.${role} references undeclared claim "${claim}"`,
+				);
+			}
+		}
+	}
+	if (manifest.provider !== undefined && !isProviderSlot(manifest.provider)) {
+		problems.push(`provider "${manifest.provider}" is not a known slot`);
+	}
+	return problems;
+}
 
-/**
- * Events emitted by service plugins on the backend bus (`fastify.bus`).
- * Naming convention: `<plugin_id>.<noun>.<verb-past>` — events are facts.
- */
 export interface BackendEventMap {
 	"twodb.notes.note.created": { note: Note };
 	"twodb.notes.note.updated": { note: Note };
 	"twodb.notes.note.deleted": { noteId: string };
+	"twodb.identity.user.created": { userId: string };
+	"twodb.identity.session.started": { userId: string; authMethod: string };
+	"twodb.identity.org.created": { orgId: string; ownerId: string };
+	"twodb.identity.workspace.created": { workspaceId: string; orgId: string };
+	"twodb.identity.workspace.member.added": {
+		workspaceId: string;
+		userId: string;
+	};
+	"twodb.identity.workspace.member.removed": {
+		workspaceId: string;
+		userId: string;
+	};
+	"twodb.identity.role.created": { workspaceId: string; roleId: string };
+	"twodb.identity.role.assigned": {
+		workspaceId: string;
+		userId: string;
+		roleId: string;
+	};
+	"twodb.identity.role.revoked": {
+		workspaceId: string;
+		userId: string;
+		roleId: string;
+	};
+	"twodb.identity.entity.granted": {
+		workspaceId: string;
+		entityType: string;
+		entityId: string;
+		userId: string;
+	};
+	"twodb.identity.entity.revoked": {
+		workspaceId: string;
+		entityType: string;
+		entityId: string;
+		userId: string;
+	};
+	"twodb.identity.app.role.assigned": {
+		appId: string;
+		userId: string;
+		appRoleId: string;
+	};
+	"twodb.identity.app.role.revoked": {
+		appId: string;
+		userId: string;
+		appRoleId: string;
+	};
+	"twodb.identity.authmethod.configured": { method: string };
 }
 
-/**
- * Events emitted by view plugins (and core shell plugins) on the frontend
- * bus. Backend events are mirrored onto the frontend bus by the realtime
- * bridge, so the full `AppEventMap` is available to views.
- */
 export interface FrontendEventMap {
 	"twodb.notes.note.selected": { noteId: string };
 	"twodb.shell.phase.changed": { phase: "day" | "night" };
 }
 
-/** Everything a view plugin can emit or observe on the frontend bus. */
 export type AppEventMap = FrontendEventMap & BackendEventMap;
-
-/* ---------- Shared domain DTOs ---------- */
 
 export interface CurrentUser {
 	id: string;

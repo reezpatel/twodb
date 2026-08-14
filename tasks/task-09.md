@@ -10,7 +10,7 @@ Status: not started
 
 The `twodb.identity` view plugin (`plugins/identity/view/`) claims the
 `identity` provider slot and delivers the whole identity experience: login,
-verify holding screen, route guards, workspace picker, `useClaims()`,
+verify holding screen, route guards, workspace picker, `useIdentity()`,
 members & roles and sign-in & security settings, and the share dialog UI.
 It is the **reference implementation of the provider-slot pattern** — a
 replacement plugin must be able to fill the same slot without any shell
@@ -38,20 +38,30 @@ class IdentityView extends ViewPlugin {
 }
 ```
 
-`identityProviderImpl` is the **slot interface** — document it in
-`@twodb/shared-frontend` as `IdentityProvider` and treat it as the swap
-contract. A replacement plugin must implement exactly:
+`identityProviderImpl` is the **slot interface** — documented in
+`@twodb/shared-frontend` as `IdentityProvider` and treated as the swap
+contract. The data shape it feeds (`IdentitySnapshot`) and the hook shape
+consumers use (`Identity`) come from contracts (task-01); the provider only
+supplies screens + snapshot plumbing. A replacement plugin must implement
+exactly:
 
 ```ts
 interface IdentityProvider {
   LoginScreen: ComponentType;        // full-screen, rendered when signed out
   VerifyScreen: ComponentType;       // holding screen for verify_required
   WorkspacePicker: ComponentType;    // rendered in the shell sidebar
-  usePrincipal(): Principal | null;  // null = anonymous
-  useClaims(): EffectiveClaims;      // for the shell's active workspace
   ShareDialog: ComponentType<ShareDialogProps>; // entity grants UI
+  fetchSnapshot(): Promise<IdentitySnapshot>;   // user, workspaces, roles, claims
+  switchWorkspace(workspaceId: string): Promise<void>;
+  signOut(): Promise<void>;
 }
 ```
+
+`useIdentity()` itself lives in shared-frontend: it resolves the `identity`
+provider, keeps the snapshot fresh (SSE facts trigger refetch), and exposes
+the contracts `Identity` shape — `status`, `userId`, `accountId`,
+`workspaceId`, `workspaces`, `activeWorkspace`, `roles`, `claims`,
+`hasClaim`, `switchWorkspace`, `refetch`, `signOut`.
 
 The shell imports the interface from shared-frontend and resolves
 implementations only via `useProvider("identity")` — it never imports
@@ -87,10 +97,10 @@ workspace in shell state** (extend `state.tsx` with
 (plan §10). The picker shows display names only — ids never appear in the
 UI.
 
-### 9.4 `useClaims()` — cosmetic gating
+### 9.4 `useIdentity()` — cosmetic gating
 
 ```ts
-const { principal, claims } = useClaims();
+const { userId, workspaceId, claims, hasClaim } = useIdentity();
 // claims: effective Claim[] for the active workspace
 //         (role claims ∪ entity grants, computed server-side)
 ```
@@ -150,7 +160,7 @@ provider's `ShareDialog` with `{ entityType, entityId }`.
   internally) → `POST /grants`.
 - Revoke: per-row remove → `DELETE /grants/:id`, with a confirm step.
 - The dialog never offers claims the granter doesn't hold (hard rule 4) —
-  the checklist comes from `useClaims()` intersected with the entity's
+  the checklist comes from `useIdentity()` intersected with the entity's
   claim family.
 
 ### 9.7 Styling & copy
@@ -175,7 +185,7 @@ provider's `ShareDialog` with `{ entityType, entityId }`.
       `TWODB_IDENTIFIER` mode.
 - [ ] With the verified-only gate on, an unverified login lands on the
       verify screen and cannot reach any workspace route until verified.
-- [ ] Switching workspace in the picker changes `useClaims()` output
+- [ ] Switching workspace in the picker changes `useIdentity()` output
       without re-login; an SSE `twodb.identity.role.revoked` fact removes
       the corresponding UI affordance live.
 - [ ] The identity provider could be replaced without shell changes:

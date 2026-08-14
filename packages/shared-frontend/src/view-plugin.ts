@@ -1,7 +1,8 @@
 import type { IPlugin, PluginStore } from "react-pluggable";
-import type { PluginManifest } from "@twodb/contracts";
+import type { PluginManifest, ProviderSlot } from "@twodb/contracts";
 import { getBus, type FrontendBus } from "./bus";
 import { getApi, type PluginApi } from "./api";
+import { registerProvider, unregisterProvider } from "./providers";
 import type { ShellContribution } from "./shell";
 
 /**
@@ -51,5 +52,13 @@ export abstract class ViewPlugin implements IPlugin {
 	/** Navigate the shell to a full path (e.g. viewPrefix(this.manifest.id)). */
 	protected navigate(path: string): void {
 		this.pluginStore.executeFunction("twodb.shell.navigate", path);
+	}
+
+	protected provide<T>(slot: ProviderSlot, impl: T): void {
+		registerProvider(this.pluginStore, slot, impl, this.manifest.id);
+	}
+
+	protected deactivateProvider(slot: ProviderSlot): void {
+		unregisterProvider(this.pluginStore, slot, this.manifest.id);
 	}
 }

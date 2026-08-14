@@ -17,6 +17,10 @@ the skeleton everything else bolts onto.
 
 ### 2.1 Migrations (`plugins/identity/service/migrations/`)
 
+Data layer: **Postgres + Kysely** (query builder and migration runner —
+decided 2026-08-14). The identity plugin ships Kysely migrations for its own
+tables; shared-backend provides the runner.
+
 Per plan §8, with prefixed text PKs (task-01 `newId`) and the identifier
 mode enforced at the DB layer:
 
@@ -100,8 +104,9 @@ fastify.addHook("onRequest", async (req, reply) => {
 | `POST /workspaces` | in an org the caller admins; adds caller as member |
 | `GET /workspaces/:id/members` | membership-gated (caller must be a member) |
 
-DTOs from contracts (task-01); every mutation emits its bus fact from the
-task-01 event map. First superadmin: on boot, if `TWODB_SUPERADMIN_EMAIL`
+Wire DTOs are owned by this plugin package — contracts carries only the
+`IdentitySnapshot` / `Principal` shapes (task-01). Every mutation emits its
+bus fact from the task-01 event map. First superadmin: on boot, if `TWODB_SUPERADMIN_EMAIL`
 matches an existing user and `platform_admins` is empty, insert the row.
 
 ### 2.5 Shared-backend additions

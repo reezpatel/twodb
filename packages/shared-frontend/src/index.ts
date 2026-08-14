@@ -9,3 +9,10 @@ export {
 	type MountedRoute,
 } from "./shell";
 export { ViewPlugin } from "./view-plugin";
+export {
+	registerProvider,
+	unregisterProvider,
+	getProvider,
+	useProvider,
+	assertRequiredProviders,
+} from "./providers";

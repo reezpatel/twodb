@@ -25,7 +25,7 @@ Work top to bottom — each step assumes the ones above it are done.
 
 ## Steps
 
-### 1. Contracts, id registry & provider-slot plumbing → [task-01](tasks/task-01.md)
+### 1. Contracts, id registry & provider-slot plumbing → [task-01](tasks/task-01.md) ✅ done (2026-08-14)
 
 Foundation types everything else imports.
 
@@ -142,7 +142,7 @@ The identity view plugin claims the `identity` provider slot (plan §12).
 - Workspace picker (org → workspace) feeding the shell's active workspace.
 - Members & roles settings (role editor = claim checklist from the catalog),
   sign-in & security settings (method toggles, link SSO, resend verification).
-- `useClaims()` for cosmetic gating; SSE-driven refresh on access-change
+- `useIdentity()` for cosmetic gating; SSE-driven refresh on access-change
   facts.
 - **Done when:** the whole model is drivable from the UI, and swapping the
   identity provider plugin requires no shell changes.

@@ -155,7 +155,7 @@ Prove the plan §6 promise as a scripted integration test:
    `app.ledger:entry.read`.
 4. Assert: the guest can open the app and hit its read route (200); the same
    session gets 403 on the app's write route and on **every** workspace
-   content route; `/me/memberships` shows the workspace but `useClaims()`-
+   content route; `/me/memberships` shows the workspace but `useIdentity()`-
    equivalent effective claims for the workspace are empty.
 
 ## Key decisions to honor
