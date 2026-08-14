@@ -33,6 +33,8 @@ declare module "fastify" {
 			S3_ACCESS_KEY_ID: string;
 			S3_SECRET_ACCESS_KEY: string;
 			S3_FORCE_PATH_STYLE: boolean;
+			TWODB_IDENTIFIER: "email" | "phone" | "email+phone";
+			TWODB_SUPERADMIN_EMAIL: string;
 		};
 		memgraph: MemgraphDecorator;
 	}

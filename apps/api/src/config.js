@@ -43,6 +43,20 @@ export const envSchema = {
 			description: "Max connections in the pg pool",
 		},
 
+		// --- Identity (consumed by @twodb/plugin-identity) ---
+		TWODB_IDENTIFIER: {
+			type: "string",
+			default: "email",
+			description:
+				"User identifier mode: email | phone | email+phone (deployment invariant)",
+		},
+		TWODB_SUPERADMIN_EMAIL: {
+			type: "string",
+			default: "",
+			description:
+				"Email of the first superadmin, granted at register/boot when platform_admins is empty",
+		},
+
 		// --- Memgraph (Bolt) ---
 		MEMGRAPH_URL: {
 			type: "string",

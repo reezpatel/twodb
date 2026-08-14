@@ -14,6 +14,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@fastify/cookie':
+        specifier: ^11.1.2
+        version: 11.1.2
       '@fastify/cors':
         specifier: ^11.0.0
         version: 11.3.0
@@ -29,6 +32,9 @@ importers:
       '@twodb/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@twodb/plugin-identity':
+        specifier: workspace:*
+        version: link:../../packages/identity
       '@twodb/plugin-notes':
         specifier: workspace:*
         version: link:../../packages/notes
@@ -58,6 +64,37 @@ importers:
         specifier: ^5.8.0
         version: 5.9.3
 
+  apps/landing:
+    dependencies:
+      '@fontsource/ibm-plex-sans':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/outfit':
+        specifier: ^5.3.0
+        version: 5.3.0
+      react:
+        specifier: ^19.1.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.1.0
+        version: 19.2.8(react@19.2.8)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.1.0
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.1.0
+        version: 19.2.4(@types/react@19.2.18)
+      '@vitejs/plugin-react':
+        specifier: ^4.5.0
+        version: 4.7.0(vite@6.4.3(@types/node@24.13.3)(tsx@4.23.12))
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.3.0
+        version: 6.4.3(@types/node@24.13.3)(tsx@4.23.12)
+
   apps/ui-library:
     dependencies:
       '@twodb/ui':
@@ -86,7 +123,7 @@ importers:
         version: 19.2.8(react@19.2.8)
       styled-jsx:
         specifier: ^5.1.7
-        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+        version: 5.1.7(react@19.2.8)
     devDependencies:
       '@types/d3-force':
         specifier: ^3.0.10
@@ -144,7 +181,7 @@ importers:
         version: 7.18.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       styled-jsx:
         specifier: ^5.1.7
-        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+        version: 5.1.7(react@19.2.8)
     devDependencies:
       '@types/react':
         specifier: ^19.1.0
@@ -164,6 +201,34 @@ importers:
 
   packages/contracts:
     devDependencies:
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
+
+  packages/identity:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../shared-backend
+      fastify-plugin:
+        specifier: ^6.0.0
+        version: 6.0.0
+      kysely:
+        specifier: ^0.29.5
+        version: 0.29.5
+    devDependencies:
+      '@fastify/cookie':
+        specifier: ^11.1.2
+        version: 11.1.2
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+      fastify:
+        specifier: ^5.3.0
+        version: 5.11.2
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
@@ -216,10 +281,16 @@ importers:
       fastify-plugin:
         specifier: ^6.0.0
         version: 6.0.0
+      kysely:
+        specifier: ^0.29.5
+        version: 0.29.5
     devDependencies:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
+      '@types/pg':
+        specifier: ^8.21.0
+        version: 8.21.0
       fastify:
         specifier: ^5.3.0
         version: 5.11.2
@@ -307,7 +378,7 @@ importers:
         version: 19.2.8(react@19.2.8)
       styled-jsx:
         specifier: ^5.1.7
-        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+        version: 5.1.7(react@19.2.8)
     devDependencies:
       '@types/qrcode-generator':
         specifier: ^1.0.6
@@ -731,6 +802,9 @@ packages:
 
   '@fastify/ajv-compiler@4.0.5':
     resolution: {integrity: sha512-KoWKW+MhvfTRWL4qrhUwAAZoaChluo0m0vbiJlGMt2GXvL4LVPQEjt8kSpHI3IBq5Rez8fg+XeH3cneztq+C7A==}
+
+  '@fastify/cookie@11.1.2':
+    resolution: {integrity: sha512-Dtrpk/YOGUsbRMvP/8ZqPpwnMRv0qSqodFdoQ2B589Obc7jw4s4Qla+cV72Bsm7WsZJnqlYFX/i7uSBq0xzg6g==}
 
   '@fastify/cors@11.3.0':
     resolution: {integrity: sha512-ggQGua+xHv1MvePbPr0v//xLYEsCXbWspquXCJS9Ot5YoRXq8J8ZWzHnxDBVnbtXosvistXo6LtNzOJswf64Fw==}
@@ -1210,6 +1284,9 @@ packages:
   '@types/node@24.13.3':
     resolution: {integrity: sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==}
 
+  '@types/pg@8.21.0':
+    resolution: {integrity: sha512-AYdtudzabjLZgVgRZmAnU8bAnVUXzuJX2IYHeSIiIHm68olD+LgQYCGWdtcNYnP0uq9c4S4NibVG3Ni7VbKW7Q==}
+
   '@types/qrcode-generator@1.0.6':
     resolution: {integrity: sha512-XasuPjhHBC4hyOJ/pHaUNTj+tNxA1SyZpXaS/FOUxEVX03D1gFM8UmMKSIs+pPHLAmRZpU6j9KYxvo+lfsvhKw==}
     deprecated: This is a stub types definition for qrcode-generator (https://github.com/kazuhikoarase/qrcode-generator). qrcode-generator provides its own type definitions, so you don't need @types/qrcode-generator installed!
@@ -1311,6 +1388,10 @@ packages:
   cookie@1.1.1:
     resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
     engines: {node: '>=18'}
+
+  cookie@2.0.1:
+    resolution: {integrity: sha512-yuToqVvRrj6pfDXREyQAAv8SkAEk/8GS3jQRTiUMm66TVtBYmqQeoEjL2Lmq8Rpo6271vH76InTChTitEAm65w==}
+    engines: {node: '>=22'}
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
@@ -1505,6 +1586,10 @@ packages:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
     engines: {node: '>=6'}
     hasBin: true
+
+  kysely@0.29.5:
+    resolution: {integrity: sha512-ooa+eSbBNPTo3MycPEuW5jdrxQdQwdtB3LC3h43FiXQbIry5tR0C5lDG7eealK0E4D7XjrnOP5DIUg/LyjRMYQ==}
+    engines: {node: '>=22.0.0'}
 
   light-my-request@6.6.0:
     resolution: {integrity: sha512-CHYbu8RtboSIoVsHZ6Ye4cj4Aw/yg2oAFimlF7mNvfDV192LR7nDiKtSIfCuLT7KokPSTn/9kfVLm5OGN0A28A==}
@@ -2278,6 +2363,11 @@ snapshots:
       ajv-formats: 3.0.1(ajv@8.20.0)
       fast-uri: 3.1.5
 
+  '@fastify/cookie@11.1.2':
+    dependencies:
+      cookie: 2.0.1
+      fastify-plugin: 6.0.0
+
   '@fastify/cors@11.3.0':
     dependencies:
       fastify-plugin: 6.0.0
@@ -2721,6 +2811,12 @@ snapshots:
     dependencies:
       undici-types: 7.18.2
 
+  '@types/pg@8.21.0':
+    dependencies:
+      '@types/node': 24.13.3
+      pg-protocol: 1.16.0
+      pg-types: 2.2.0
+
   '@types/qrcode-generator@1.0.6':
     dependencies:
       qrcode-generator: 2.0.4
@@ -2826,6 +2922,8 @@ snapshots:
   convert-source-map@2.0.0: {}
 
   cookie@1.1.1: {}
+
+  cookie@2.0.1: {}
 
   csstype@3.2.3: {}
 
@@ -3058,6 +3156,8 @@ snapshots:
   json-schema-traverse@1.0.0: {}
 
   json5@2.2.3: {}
+
+  kysely@0.29.5: {}
 
   light-my-request@6.6.0:
     dependencies:
@@ -3445,12 +3545,10 @@ snapshots:
     dependencies:
       safe-buffer: 5.2.1
 
-  styled-jsx@5.1.7(@babel/core@7.29.7)(react@19.2.8):
+  styled-jsx@5.1.7(react@19.2.8):
     dependencies:
       client-only: 0.0.1
       react: 19.2.8
-    optionalDependencies:
-      '@babel/core': 7.29.7
 
   thread-stream@4.2.0:
     dependencies:

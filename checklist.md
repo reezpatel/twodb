@@ -38,7 +38,7 @@ Foundation types everything else imports.
 - **Done when:** contracts compiles with the new DTOs; a toy plugin can
   register and resolve a provider slot in the shell.
 
-### 2. Identity service plugin — core tenancy + password login → [task-02](tasks/task-02.md)
+### 2. Identity service plugin — core tenancy + password login → [task-02](tasks/task-02.md) ✅ done (2026-08-14)
 
 First real plugin under the new model; everything later hangs off it.
 

@@ -43,6 +43,8 @@ import { isProviderSlot, type ProviderSlot } from "./providers";
 
 export type PluginId = string;
 
+export const SESSION_COOKIE = "twodb_session";
+
 export const PLUGIN_ID_PATTERN = /^[a-z][a-z0-9]*(\.[a-z0-9]+)*$/;
 
 export function isPluginId(value: string): value is PluginId {

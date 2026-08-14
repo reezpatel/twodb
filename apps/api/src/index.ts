@@ -2,12 +2,15 @@ import path from "node:path";
 import Fastify from "fastify";
 import fastifyEnv from "@fastify/env";
 import cors from "@fastify/cors";
+import cookie from "@fastify/cookie";
 import {
 	busPlugin,
 	authPlugin,
+	dbPlugin,
 	realtimePlugin,
 	serviceRegistryPlugin,
 } from "@twodb/shared-backend";
+import { identityAuthPlugin } from "@twodb/plugin-identity/auth";
 import { envSchema, dotenvPath } from "./config.js";
 import postgresPlugin from "./db/postgres.js";
 import memgraphPlugin from "./db/memgraph.js";
@@ -36,11 +39,15 @@ await app.register(fastifyEnv, {
 // unreachable, so the api will not start in a half-broken state.
 await app.register(postgresPlugin);
 await app.register(memgraphPlugin);
+await app.register(dbPlugin);
 
-// Core services: the typed backend bus, the (stub) auth context, and the
-// realtime SSE fan-out at /api/v1/events.
+// Core services: the typed backend bus, cookies, the (stub) user context,
+// the identity session hook (401s /api/v1/* without a valid session), and
+// the realtime SSE fan-out at /api/v1/events.
 await app.register(busPlugin);
+await app.register(cookie);
 await app.register(authPlugin);
+await app.register(identityAuthPlugin);
 await app.register(serviceRegistryPlugin);
 await app.register(realtimePlugin, { prefix: "/api/v1" });
 
