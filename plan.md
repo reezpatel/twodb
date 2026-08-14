@@ -235,9 +235,10 @@ migrations as code, no ORM magic. Each plugin owns its tables and ships its
 own Kysely migrations; shared-backend provides the migration runner.
 
 ```text
-users                id, email, phone, name, created_at,
+users                id, identifier, email, phone, name, created_at,
                      email_verified_at, phone_verified_at
-                     -- exactly one row per identifier value (unique per mode)
+                     -- identifier = the login key (email or phone, per mode),
+                     -- unique, populated at runtime; the schema is mode-independent
 user_auth_methods    id, user_id, method, credential, enabled, created_at
                      -- password hash / sso subject link / otp target
 deployment_auth_methods  method, config, enabled    -- superadmin-managed

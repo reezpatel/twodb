@@ -3,7 +3,7 @@
 Plan refs: plan.md §2 (hierarchy), §8 (data model), §9 (principal hook),
 §10 (identifiers, sessions), §11 (API sketch)
 Depends on: task-01
-Status: not started
+Status: done (2026-08-14)
 
 ## Goal
 
@@ -21,11 +21,12 @@ Data layer: **Postgres + Kysely** (query builder and migration runner —
 decided 2026-08-14). The identity plugin ships Kysely migrations for its own
 tables; shared-backend provides the runner.
 
-Per plan §8, with prefixed text PKs (task-01 `newId`) and the identifier
-mode enforced at the DB layer:
+Per plan §8, with prefixed text PKs (task-01 `newId`) and the login key in a
+single mode-independent `identifier` column:
 
 ```text
-users              id 'usr-'…, email citext, phone text, name text,
+users              id 'usr-'…, identifier text unique, email citext,
+                   phone text, name text,
                    email_verified_at timestamptz, phone_verified_at timestamptz,
                    created_at timestamptz default now()
 sessions           id 'ses-'…, user_id → users, token_hash text unique,
@@ -40,12 +41,17 @@ workspace_members  workspace_id → workspaces, user_id → users, created_at,
                    primary key (workspace_id, user_id)
 ```
 
-Uniqueness by identifier mode (`TWODB_IDENTIFIER = email | phone | email+phone`,
-read at boot, fail-fast on invalid value):
+Uniqueness via one `identifier` column (`TWODB_IDENTIFIER = email | phone |
+email+phone`, read at boot, fail-fast on invalid value). The schema never bakes
+in the mode, so a deployment can switch modes without a migration:
 
-- `email` mode → `unique(email)`, phone nullable/non-unique.
-- `phone` mode → `unique(phone)`, vice versa.
-- `email+phone` → both unique, both required.
+- `users.identifier text not null unique` — always created, always unique.
+- Runtime populates it: `email` / `email+phone` modes → the email;
+  `phone` mode → the phone.
+- Login matches `identifier` (plus the `phone` column in `email+phone` mode,
+  so either address signs in).
+- `email+phone` also enforces phone uniqueness at runtime (one extra select
+  at register), so phone sign-in can never be ambiguous.
 
 ### 2.2 The service plugin skeleton
 
@@ -127,15 +133,32 @@ matches an existing user and `platform_admins` is empty, insert the row.
 
 ## Acceptance criteria
 
-- [ ] Boot fails loudly on an invalid `TWODB_IDENTIFIER`.
-- [ ] Register + login + `GET /auth/session` round-trip via curl with the
+- [x] Boot fails loudly on an invalid `TWODB_IDENTIFIER`.
+- [x] Register + login + `GET /auth/session` round-trip via curl with the
       cookie jar; logout kills the session (401 after).
-- [ ] Duplicate email registration → 409 in `email` mode.
-- [ ] Org → workspace → member list flow works; non-member gets 401/403 on
+- [x] Duplicate email registration → 409 in `email` mode.
+- [x] Org → workspace → member list flow works; non-member gets 401/403 on
       the members route.
-- [ ] A request log line shows the resolved `usr-…` id; anonymous requests
+- [x] A request log line shows the resolved `usr-…` id; anonymous requests
       show `principal: null`.
-- [ ] `TWODB_SUPERADMIN_EMAIL` bootstrap inserts exactly one admin row.
+- [x] `TWODB_SUPERADMIN_EMAIL` bootstrap inserts exactly one admin row.
+
+Deviations from the spec as written:
+
+- Password hashing is **scrypt** (node:crypto, zero native deps) with a
+  format-marked credential string, so argon2id can replace it later without
+  a schema change. Plan said argon2id.
+- The 401 enforcement covers `/api/v1/*` only — `/health` and the static app
+  stay public. Notes routes (and SSE) now require a session; the mock shell
+  has no login UI until task-09, so the old demo needs a cookie from curl.
+- `password_hash` lives on `users` for now; task-03 moves it into
+  `user_auth_methods` as specified there.
+- The shared-backend auth stub (`request.user`) is kept for the notes
+  service; `request.principal` lands alongside it.
+- **Amended after review:** uniqueness moved off mode-conditional indexes on
+  `email`/`phone` to a single `users.identifier` column (always unique,
+  populated at runtime). The mode can now change without a schema migration;
+  the dev DB was reset so migration 001 re-applied in the new shape.
 
 ## Out of scope
 
