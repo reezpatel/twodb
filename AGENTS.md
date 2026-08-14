@@ -1,7 +1,8 @@
 # AGENTS.md — twodb working agreements
 
 Guidance for anyone (human or agent) working in this repo. Read `plan.md` for
-the plugin architecture and `DESIGN.md` for the design system.
+identity, tenancy & access control, `checklist.md` + `tasks/` for its build
+breakdown, and `DESIGN.md` for the design system.
 
 ## Repository map
 
@@ -86,6 +87,6 @@ the plugin architecture and `DESIGN.md` for the design system.
 - `pnpm build` in any app — runs `tsc --noEmit` first; keep it green.
 - `pnpm db:up` / `db:down` in `apps/api` for postgres + memgraph.
 
-
 # Important
+
 1. Only add comment when absolutely neccessary.
