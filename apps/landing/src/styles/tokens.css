@@ -1,0 +1,117 @@
+/* ============================================================
+   twodb landing tokens — "Cyclorama Dawn", self-contained.
+   Values mirror DESIGN.md; this app carries no workspace deps.
+   Light is the only chrome. Day is default; night via
+   [data-phase="night"] on any subtree.
+   ============================================================ */
+
+:root {
+	/* --- Raw palette: the horizon, night → day --- */
+	--twdb-night: #050506;
+	--twdb-cobalt: #0a2bff;
+	--twdb-cobalt-deep: #0a22d6;
+	--twdb-cobalt-soft: #6d80ff;
+	--twdb-rose: #d24bff;
+	--twdb-rose-ink: #8a1fa8;
+	--twdb-rose-light: #ff7bae;
+	--twdb-dawn: #ffd7e6;
+	--twdb-day: #ffffff;
+
+	/* --- Type --- */
+	--font-ui: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+	--font-cue: "IBM Plex Sans", "Outfit", system-ui, sans-serif;
+
+	--text-xs: 11.5px;
+	--text-sm: 12.5px;
+	--text-md: 13px;
+	--text-lg: 14.5px;
+	--text-xl: 20px;
+	--text-2xl: 26px;
+
+	/* Marketing display scale — new to the system, owned by this surface */
+	--text-display: clamp(44px, 6.4vw, 84px);
+	--text-headline: clamp(32px, 4.6vw, 60px);
+	--text-lede: clamp(16.5px, 1.6vw, 19px);
+
+	--tracking-cue: 0.14em;
+	--measure: 62ch;
+
+	/* --- Spacing --- */
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-5: 24px;
+	--space-6: 32px;
+	--space-7: 48px;
+	--space-8: 64px;
+	--space-9: 96px;
+	--space-10: 128px;
+
+	/* --- Radii --- */
+	--r-sm: 6px;
+	--r-md: 10px;
+	--r-lg: 14px;
+	--r-pill: 999px;
+
+	/* --- Motion: one exponential ease-out --- */
+	--ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+	/* --- Grain --- */
+	--grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+	/* --- Semantic, day phase (default) --- */
+	--bg: #f5f5f7;
+	--surface: #ffffff;
+	--bg-band: #faf9fc;
+	--bg-band-strong: #f0eef4;
+	--bg-field: #f0eef4;
+	--bg-field-hover: #e8e6ee;
+	--ink: #121218;
+	--ink-2: #40404e;
+	--ink-3: #626274;
+	--line: #e6e4ec;
+	--line-strong: #cfcdd9;
+	--accent: var(--twdb-cobalt);
+	--action: var(--twdb-cobalt);
+	--action-hover: var(--twdb-cobalt-deep);
+	--ring: rgb(10 43 255 / 0.22);
+	--ai: var(--twdb-rose-ink);
+	--ai-band: rgb(210 75 255 / 0.1);
+	--warning-ink: #7a5200;
+	--warning-bg: #f8eed7;
+	--danger-ink: #9d1b4f;
+	--grain-opacity: 0.06;
+	--grain-blend: multiply;
+	--wash: linear-gradient(
+		105deg,
+		var(--twdb-cobalt),
+		var(--twdb-rose) 52%,
+		var(--twdb-rose-light)
+	);
+}
+
+[data-phase="night"] {
+	--bg: #18181b;
+	--surface: #1a1a1e;
+	--bg-band: #1a1a1e;
+	--bg-band-strong: #27272a;
+	--bg-field: #131316;
+	--bg-field-hover: #1f1f24;
+	--ink: #e4e4e7;
+	--ink-2: #a1a1aa;
+	--ink-3: #71717a;
+	--line: #27272a;
+	--line-strong: #3f3f46;
+	--accent: var(--twdb-cobalt-soft);
+	--action: var(--twdb-cobalt);
+	--action-hover: var(--twdb-cobalt-deep);
+	--ring: rgb(109 128 255 / 0.35);
+	--ai: var(--twdb-rose-light);
+	--ai-band: rgb(210 75 255 / 0.14);
+	--warning-ink: #e8c884;
+	--warning-bg: rgb(248 238 215 / 0.09);
+	--danger-ink: #ff9ec4;
+	--grain-opacity: 0.08;
+	--grain-blend: screen;
+}

@@ -1,0 +1,113 @@
+/* Base: reset, body, selection, focus floor, cue utilities, reveal motion */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	scroll-behavior: smooth;
+}
+
+body {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--text-lg);
+	line-height: 1.55;
+	letter-spacing: 0.02em;
+	background: var(--bg);
+	color: var(--ink);
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+	margin: 0;
+	line-height: 1.08;
+	font-weight: 650;
+	letter-spacing: -0.015em;
+	text-wrap: balance;
+}
+
+p {
+	margin: 0;
+	max-width: var(--measure);
+}
+
+button {
+	font: inherit;
+	cursor: pointer;
+}
+
+input {
+	font: inherit;
+}
+
+::selection {
+	background: var(--twdb-dawn);
+	color: var(--twdb-night);
+}
+
+[data-phase="night"] ::selection {
+	background: var(--twdb-rose);
+	color: var(--twdb-night);
+}
+
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* Cue register: tracked caps for instrument labels. Never sentences. */
+.cue {
+	font-family: var(--font-cue);
+	font-weight: 500;
+	font-size: var(--text-xs);
+	letter-spacing: var(--tracking-cue);
+	text-transform: uppercase;
+	color: var(--ink-3);
+}
+
+.tnum {
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum";
+}
+
+/* Scroll reveal: quiet rise, once, staggered by --d */
+[data-reveal] {
+	opacity: 0;
+	transform: translateY(18px);
+	transition:
+		opacity 700ms var(--ease),
+		transform 700ms var(--ease);
+	transition-delay: var(--d, 0ms);
+}
+
+[data-reveal].is-in {
+	opacity: 1;
+	transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		transition-delay: 0ms !important;
+	}
+
+	[data-reveal] {
+		opacity: 1;
+		transform: none;
+	}
+}

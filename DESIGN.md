@@ -193,6 +193,7 @@ The palette is one sweep of light along a horizon, from depthless night to full 
 ### Hierarchy
 
 - **Display / Cue** (IBM Plex Sans 500, 26px, uppercase, +0.14em tracking): wordmark, hero statements, foundation piece. Always uppercase.
+- **Marketing Display** (Outfit 650, `clamp(44px, 6.4vw, 84px)`, 1.08, −0.015em tracking): hero statements on marketing surfaces. New to the system with `apps/landing` (recorded 2026-08, per the landing brief) — section headlines scale down from it at `clamp(32px, 4.6vw, 60px)`. Owned by the landing surface; the app never sets type this large.
 - **Headline** (Outfit 650, 20px, 1.2): page titles (`--text-2xl` at 26px for section heads).
 - **Title** (Outfit 650, 16.5px, 1.2): card and dialog titles.
 - **Body** (Outfit 400, 14px, 1.55, +0.02em tracking): default reading text; measure capped at 68ch (`--measure`). The +0.02em default tracking is set once on `body` and inherited everywhere the UI font runs.
