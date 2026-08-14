@@ -1,5 +1,4 @@
-import type { CSSProperties } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { AutomationsScene } from "../scenes/automations/AutomationsScene";
 import { CalendarScene } from "../scenes/calendar/CalendarScene";
 import { ChatScene } from "../scenes/chat/ChatScene";
@@ -16,22 +15,10 @@ import { CommandPalette } from "./CommandPalette";
 import { ShellStateProvider, useShellState } from "./state";
 
 function ShellFrame() {
-	const { panelOpen, phase } = useShellState();
-	const location = useLocation();
-	const isInboxLayout = location.pathname === "/inbox";
-	const classes = ["shell", isInboxLayout ? "shell--notes" : ""]
-		.filter(Boolean)
-		.join(" ");
-	const shellStyle = {
-		"--shell-columns": isInboxLayout
-			? panelOpen
-				? "212px 292px minmax(0, 1fr) 252px"
-				: "212px 292px minmax(0, 1fr)"
-			: "212px minmax(0, 1fr)",
-	} as CSSProperties;
+	const { phase } = useShellState();
 
 	return (
-		<div className={classes} data-phase={phase} style={shellStyle}>
+		<div className="shell" data-phase={phase}>
 			<style jsx>{appShellStyles}</style>
 			<Sidebar />
 			<Routes>
