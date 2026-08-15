@@ -26,6 +26,8 @@ import { registerMethodRoutes } from "./routes-methods";
 import { registerSsoRoutes } from "./routes-sso";
 import { registerRoleRoutes } from "./routes-roles";
 import { registerAssignmentRoutes } from "./routes-assignments";
+import { registerGrantRoutes } from "./routes-grants";
+import { registerMemberRoutes } from "./routes-members";
 import type { AuthCtx } from "./ctx";
 import { destroySession } from "./sessions";
 import { principalFor, startSession } from "./signin";
@@ -102,6 +104,8 @@ export default defineService({
 		registerMethodRoutes(fastify, ctx);
 		registerRoleRoutes(fastify);
 		registerAssignmentRoutes(fastify);
+		registerGrantRoutes(fastify);
+		registerMemberRoutes(fastify);
 
 		async function maybeSeedSuperadmin(): Promise<void> {
 			const email = config.TWODB_SUPERADMIN_EMAIL?.trim().toLowerCase();

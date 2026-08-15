@@ -34,6 +34,13 @@ export {
 	isProviderSlot,
 	type ProviderSlot,
 } from "./providers";
+export {
+	SHARE_SLOT,
+	registerSharingClaim,
+	sharingClaimFor,
+	listSharingClaims,
+	clearSharingRegistry,
+} from "./sharing";
 export type * from "./identity";
 export type { EventsFor, MergeEventMaps } from "./events";
 
@@ -139,6 +146,7 @@ export interface BackendEventMap {
 		entityType: string;
 		entityId: string;
 		userId: string;
+		claims: string[];
 	};
 	"twodb.identity.entity.revoked": {
 		workspaceId: string;

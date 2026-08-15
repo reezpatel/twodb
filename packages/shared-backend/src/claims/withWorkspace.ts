@@ -8,7 +8,8 @@ export type WithWorkspaceSource =
 	| { entity: "workspaces"; idParam: string }
 	| { entity: "notes"; idParam: string }
 	| { entity: string; idParam: string; workspaceField: string }
-	| { workspaceIdBody: string };
+	| { workspaceIdBody: string }
+	| { workspaceIdQuery: string };
 
 export type WithWorkspaceOpts = WithWorkspaceSource;
 
@@ -72,6 +73,11 @@ async function resolveWorkspaceId(
 	if ("workspaceIdBody" in opts) {
 		const body = request.body as Record<string, unknown> | undefined;
 		const candidate = body?.[opts.workspaceIdBody];
+		return typeof candidate === "string" ? candidate : null;
+	}
+	if ("workspaceIdQuery" in opts) {
+		const query = request.query as Record<string, unknown> | undefined;
+		const candidate = query?.[opts.workspaceIdQuery];
 		return typeof candidate === "string" ? candidate : null;
 	}
 	const idParam = (request.params as Record<string, unknown>)[opts.idParam];
