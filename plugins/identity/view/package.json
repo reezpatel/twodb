@@ -1,0 +1,22 @@
+{
+	"name": "@twodb/identity-view",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./index.ts",
+		"./manifest": "./manifest.ts"
+	},
+	"dependencies": {
+		"@twodb/contracts": "workspace:*",
+		"@twodb/shared-frontend": "workspace:*",
+		"@twodb/ui": "workspace:*",
+		"react-pluggable": "^0.4.3",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	},
+	"devDependencies": {
+		"@types/react": "^19.1.0",
+		"typescript": "^5.8.0"
+	}
+}

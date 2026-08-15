@@ -414,6 +414,34 @@ importers:
         specifier: ^5.8.0
         version: 5.9.3
 
+  plugins/identity/view:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.8(react@19.2.8)
+      react-pluggable:
+        specifier: ^0.4.3
+        version: 0.4.3(react@19.2.8)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.1.0
+        version: 19.2.18
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
+
 packages:
 
   '@babel/code-frame@7.29.7':

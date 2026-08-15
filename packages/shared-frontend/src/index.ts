@@ -16,3 +16,16 @@ export {
 	useProvider,
 	assertRequiredProviders,
 } from "./providers";
+export {
+	type ShareDialogProps,
+	type IdentitySnapshot,
+	type IdentityProvider,
+	registerIdentityProvider,
+	unregisterIdentityProvider,
+	getIdentityProvider,
+	subscribeIdentity,
+	notifyIdentityChange,
+	setIdentitySnapshot,
+	getIdentitySnapshot,
+	useIdentity,
+} from "./identity-provider";
