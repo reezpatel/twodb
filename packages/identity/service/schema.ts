@@ -76,6 +76,7 @@ export interface OrganizationsTable {
 	slug: string;
 	created_by: string;
 	created_at: Generated<Date>;
+	suspended_at: Date | null;
 }
 
 export interface OrgMembershipsTable {
@@ -154,6 +155,8 @@ export interface IdentityDB {
 	app_roles: AppRolesTable;
 	app_role_claims: AppRoleClaimsTable;
 	app_role_assignments: AppRoleAssignmentsTable;
+	audit_log: AuditLogTable;
+	deployment_settings: DeploymentSettingsTable;
 }
 
 export interface AppsTable {
@@ -187,4 +190,19 @@ export interface AppRoleAssignmentsTable {
 	app_role_id: string;
 	assigned_by: string | null;
 	created_at: Generated<Date>;
+}
+
+export interface AuditLogTable {
+	id: string;
+	actor: string;
+	action: string;
+	target: string;
+	payload: Record<string, unknown>;
+	created_at: Generated<Date>;
+}
+
+export interface DeploymentSettingsTable {
+	key: string;
+	value: unknown;
+	updated_at: Generated<Date>;
 }

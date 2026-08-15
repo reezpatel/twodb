@@ -172,6 +172,16 @@ export interface BackendEventMap {
 		appId: string;
 		workspaceId: string;
 	};
+	"twodb.identity.org.suspended": {
+		orgId: string;
+		suspended: boolean;
+	};
+	"twodb.identity.superadmin.promoted": {
+		userId: string;
+	};
+	"twodb.identity.superadmin.demoted": {
+		userId: string;
+	};
 	"twodb.identity.authmethod.configured": { method: string };
 }
 
