@@ -8,9 +8,50 @@ export interface UsersTable {
 	email: string | null;
 	phone: string | null;
 	name: string;
-	password_hash: string;
 	email_verified_at: Date | null;
 	phone_verified_at: Date | null;
+	created_at: Generated<Date>;
+}
+
+/** password → { hash }; sso.<provider> → { issuer, subject }; link/otp → {} */
+export interface AuthCredential {
+	hash?: string;
+	issuer?: string;
+	subject?: string;
+}
+
+export interface UserAuthMethodsTable {
+	id: string;
+	user_id: string;
+	method: string;
+	credential: AuthCredential;
+	enabled: Generated<boolean>;
+	created_at: Generated<Date>;
+}
+
+/** Config for sso.<provider> rows; empty object for the built-in methods. */
+export interface DeploymentMethodConfig {
+	clientId?: string;
+	clientSecret?: string;
+	issuer?: string;
+	authorizationEndpoint?: string;
+	tokenEndpoint?: string;
+	userinfoEndpoint?: string;
+}
+
+export interface DeploymentAuthMethodsTable {
+	method: string;
+	config: DeploymentMethodConfig;
+	enabled: Generated<boolean>;
+}
+
+export interface VerificationCodesTable {
+	id: string;
+	identifier: string;
+	code_hash: string;
+	purpose: string;
+	attempts: Generated<number>;
+	expires_at: Date;
 	created_at: Generated<Date>;
 }
 
@@ -60,6 +101,9 @@ export interface WorkspaceMembersTable {
 
 export interface IdentityDB {
 	users: UsersTable;
+	user_auth_methods: UserAuthMethodsTable;
+	deployment_auth_methods: DeploymentAuthMethodsTable;
+	verification_codes: VerificationCodesTable;
 	sessions: SessionsTable;
 	platform_admins: PlatformAdminsTable;
 	organizations: OrganizationsTable;

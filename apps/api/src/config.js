@@ -56,6 +56,18 @@ export const envSchema = {
 			description:
 				"Email of the first superadmin, granted at register/boot when platform_admins is empty",
 		},
+		TWODB_REQUIRE_VERIFIED: {
+			type: "boolean",
+			default: false,
+			description:
+				"Verified-only gate: unverified sessions get 403 verify_required outside the verify/session endpoints",
+		},
+		TWODB_API_ORIGIN: {
+			type: "string",
+			default: "http://localhost:3001",
+			description:
+				"Absolute origin of this api — used to build magic-link and SSO callback URLs",
+		},
 
 		// --- Memgraph (Bolt) ---
 		MEMGRAPH_URL: {

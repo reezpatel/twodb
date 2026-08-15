@@ -35,6 +35,8 @@ declare module "fastify" {
 			S3_FORCE_PATH_STYLE: boolean;
 			TWODB_IDENTIFIER: "email" | "phone" | "email+phone";
 			TWODB_SUPERADMIN_EMAIL: string;
+			TWODB_REQUIRE_VERIFIED: boolean;
+			TWODB_API_ORIGIN: string;
 		};
 		memgraph: MemgraphDecorator;
 	}

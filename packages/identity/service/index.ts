@@ -1,5 +1,4 @@
 import "@fastify/cookie";
-import type { FastifyReply } from "fastify";
 import type { Principal } from "@twodb/contracts";
 import { SESSION_COOKIE } from "@twodb/contracts";
 import {
@@ -10,8 +9,22 @@ import {
 } from "@twodb/shared-backend";
 import type { IdentifierMode, IdentityDB } from "./schema";
 import { buildMigrations } from "./migrations";
+import {
+	explainSignIn,
+	findUserByLoginIdentifier,
+	getDeploymentMethod,
+	getUserMethod,
+	seedDeploymentMethods,
+	upsertUserMethod,
+} from "./methods";
 import { hashPassword, verifyPassword } from "./passwords";
-import { createSession, destroySession } from "./sessions";
+import { outboxPlugin } from "./outbox";
+import { registerChallengeRoutes } from "./routes-challenges";
+import { registerMethodRoutes } from "./routes-methods";
+import { registerSsoRoutes } from "./routes-sso";
+import type { AuthCtx } from "./ctx";
+import { destroySession } from "./sessions";
+import { principalFor, startSession } from "./signin";
 
 interface CredentialsBody {
 	name?: string;
@@ -21,19 +34,8 @@ interface CredentialsBody {
 }
 
 const PUBLIC = { config: { public: true } };
-
-function setSessionCookie(
-	reply: FastifyReply,
-	token: string,
-	expiresAt: Date,
-): void {
-	reply.setCookie(SESSION_COOKIE, token, {
-		path: "/",
-		httpOnly: true,
-		sameSite: "lax",
-		expires: expiresAt,
-	});
-}
+// Reachable for unverified sessions even when the verified-gate is on.
+const VERIFY_EXEMPT = { config: { verifyExempt: true } };
 
 function normalizeEmail(email: string): string {
 	return email.trim().toLowerCase();
@@ -68,6 +70,8 @@ export default defineService({
 				config: {
 					TWODB_IDENTIFIER: IdentifierMode;
 					TWODB_SUPERADMIN_EMAIL: string;
+					TWODB_REQUIRE_VERIFIED: boolean;
+					TWODB_API_ORIGIN: string;
 				};
 			}
 		).config;
@@ -79,7 +83,19 @@ export default defineService({
 		}
 
 		const db = typedDb<IdentityDB>(fastify);
+		await fastify.register(outboxPlugin);
 		await runPluginMigrations(db, "twodb.identity", buildMigrations());
+		await seedDeploymentMethods(db);
+
+		const ctx: AuthCtx = {
+			db,
+			mode,
+			requireVerified: config.TWODB_REQUIRE_VERIFIED,
+			apiOrigin: config.TWODB_API_ORIGIN,
+		};
+		registerChallengeRoutes(fastify, ctx);
+		registerSsoRoutes(fastify, ctx);
+		registerMethodRoutes(fastify, ctx);
 
 		async function maybeSeedSuperadmin(): Promise<void> {
 			const email = config.TWODB_SUPERADMIN_EMAIL?.trim().toLowerCase();
@@ -115,6 +131,12 @@ export default defineService({
 			if (!body.name?.trim()) {
 				return reply.code(400).send({ error: "Your name is required." });
 			}
+			const passwordOffered = await getDeploymentMethod(db, "password");
+			if (!passwordOffered?.enabled) {
+				return reply.code(403).send({
+					error: "Password sign-in is turned off on this server.",
+				});
+			}
 
 			// One login key regardless of mode: email in the email modes, phone in
 			// phone mode. The schema never bakes in the deployment mode, so the
@@ -143,9 +165,11 @@ export default defineService({
 						name: body.name.trim(),
 						email: parsed.email,
 						phone: parsed.phone,
-						password_hash: await hashPassword(body.password!),
 					})
 					.execute();
+				await upsertUserMethod(db, userId, "password", {
+					hash: await hashPassword(body.password!),
+				});
 			} catch (err) {
 				if ((err as { code?: string }).code === "23505") {
 					return reply
@@ -157,13 +181,7 @@ export default defineService({
 
 			fastify.bus.emit("twodb.identity.user.created", { userId });
 			await maybeSeedSuperadmin();
-
-			const { token, expiresAt } = await createSession(db, userId, "password");
-			fastify.bus.emit("twodb.identity.session.started", {
-				userId,
-				authMethod: "password",
-			});
-			setSessionCookie(reply, token, expiresAt);
+			await startSession(fastify, reply, db, userId, "password");
 			return reply
 				.code(201)
 				.send({ principal: { userId, isSuperadmin: false } });
@@ -174,57 +192,42 @@ export default defineService({
 			const identifier = body.email?.trim()
 				? normalizeEmail(body.email)
 				: (body.phone?.trim() ?? "");
-
-			const user = identifier
-				? await db
-						.selectFrom("users")
-						.select(["id", "password_hash"])
-						.where((eb) =>
-							mode === "email+phone"
-								? eb.or([
-										eb("identifier", "=", identifier),
-										eb("phone", "=", identifier),
-									])
-								: eb("identifier", "=", identifier),
-						)
-						.executeTakeFirst()
-				: undefined;
-
-			if (
-				!user ||
-				!(await verifyPassword(body.password ?? "", user.password_hash))
-			) {
-				return reply
+			const generic = () =>
+				reply
 					.code(401)
 					.send({ error: "Those sign-in details don't match." });
+
+			const user = identifier
+				? await findUserByLoginIdentifier(db, mode, identifier)
+				: undefined;
+			if (!user) return generic();
+
+			const verdict = await explainSignIn(db, user, "password", ctx);
+			if (!verdict.ok) {
+				if (verdict.reason === "verify_required") {
+					return reply.code(403).send({ error: "verify_required" });
+				}
+				return generic();
 			}
 
-			const { token, expiresAt } = await createSession(db, user.id, "password");
-			fastify.bus.emit("twodb.identity.session.started", {
-				userId: user.id,
-				authMethod: "password",
-			});
-			setSessionCookie(reply, token, expiresAt);
-			return { principal: request.principal ?? (await reload(user.id)) };
+			const method = await getUserMethod(db, user.id, "password");
+			const hash = method?.credential.hash;
+			if (!hash || !(await verifyPassword(body.password ?? "", hash))) {
+				return generic();
+			}
+
+			await startSession(fastify, reply, db, user.id, "password");
+			return { principal: request.principal ?? (await principalFor(db, user.id)) };
 		});
 
-		async function reload(userId: string): Promise<Principal> {
-			const admin = await db
-				.selectFrom("platform_admins")
-				.select("user_id")
-				.where("user_id", "=", userId)
-				.executeTakeFirst();
-			return { userId, isSuperadmin: admin !== undefined };
-		}
-
-		fastify.post("/auth/logout", async (request, reply) => {
+		fastify.post("/auth/logout", VERIFY_EXEMPT, async (request, reply) => {
 			const token = request.cookies[SESSION_COOKIE];
 			if (token) await destroySession(db, token);
 			reply.clearCookie(SESSION_COOKIE, { path: "/" });
 			return { ok: true };
 		});
 
-		fastify.get("/auth/session", async (request) => {
+		fastify.get("/auth/session", VERIFY_EXEMPT, async (request) => {
 			return { principal: request.principal };
 		});
 
