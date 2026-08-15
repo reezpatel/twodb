@@ -99,6 +99,38 @@ export interface WorkspaceMembersTable {
 	created_at: Generated<Date>;
 }
 
+export interface RolesTable {
+	id: string;
+	workspace_id: string;
+	name: string;
+	is_system: Generated<boolean>;
+	created_at: Generated<Date>;
+}
+
+export interface RoleClaimsTable {
+	role_id: string;
+	claim: string;
+}
+
+export interface WorkspaceRoleAssignmentsTable {
+	workspace_id: string;
+	user_id: string;
+	role_id: string;
+	assigned_by: string | null;
+	assigned_at: Generated<Date>;
+}
+
+export interface EntityGrantsTable {
+	id: string;
+	workspace_id: string;
+	user_id: string;
+	entity_type: string;
+	entity_id: string;
+	claims: string[];
+	granted_by: string | null;
+	created_at: Generated<Date>;
+}
+
 export interface IdentityDB {
 	users: UsersTable;
 	user_auth_methods: UserAuthMethodsTable;
@@ -110,4 +142,8 @@ export interface IdentityDB {
 	org_memberships: OrgMembershipsTable;
 	workspaces: WorkspacesTable;
 	workspace_members: WorkspaceMembersTable;
+	roles: RolesTable;
+	role_claims: RoleClaimsTable;
+	workspace_role_assignments: WorkspaceRoleAssignmentsTable;
+	entity_grants: EntityGrantsTable;
 }

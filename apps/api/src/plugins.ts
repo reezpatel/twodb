@@ -1,10 +1,13 @@
 import type { ServicePlugin } from "@twodb/shared-backend";
+import type { PluginManifest } from "@twodb/contracts";
 import identityService from "@twodb/plugin-identity/service";
+import identityManifest from "@twodb/plugin-identity/manifest";
 import notesService from "@twodb/plugin-notes/service";
+import notesManifest from "@twodb/plugin-notes/manifest";
 
-/**
- * The service registry — every plugin's fastify half, in boot order.
- * The host mounts each under /api/v1/<plugin_id> and validates declared
- * dependencies against this order at boot.
- */
 export const servicePlugins: ServicePlugin[] = [identityService, notesService];
+
+export const manifests: readonly PluginManifest[] = [
+	identityManifest,
+	notesManifest,
+];

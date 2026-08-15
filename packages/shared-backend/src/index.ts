@@ -9,3 +9,4 @@ export {
 export { authPlugin } from "./auth";
 export { serviceRegistryPlugin, type ServiceRegistry } from "./registry";
 export { realtimePlugin } from "./realtime";
+export * from "./claims";

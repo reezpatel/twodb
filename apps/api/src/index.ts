@@ -6,7 +6,11 @@ import cookie from "@fastify/cookie";
 import {
 	busPlugin,
 	authPlugin,
+	buildClaimCatalog,
 	dbPlugin,
+	makeRequireAppClaim,
+	makeRequireClaim,
+	makeWithWorkspace,
 	realtimePlugin,
 	serviceRegistryPlugin,
 } from "@twodb/shared-backend";
@@ -14,7 +18,7 @@ import { identityAuthPlugin } from "@twodb/plugin-identity/auth";
 import { envSchema, dotenvPath } from "./config.js";
 import postgresPlugin from "./db/postgres.js";
 import memgraphPlugin from "./db/memgraph.js";
-import { servicePlugins } from "./plugins.js";
+import { manifests, servicePlugins } from "./plugins.js";
 import { registerStaticApp } from "./static.js";
 
 const app = Fastify({ logger: true });
@@ -50,6 +54,12 @@ await app.register(authPlugin);
 await app.register(identityAuthPlugin);
 await app.register(serviceRegistryPlugin);
 await app.register(realtimePlugin, { prefix: "/api/v1" });
+
+const claimCatalog = await buildClaimCatalog(manifests);
+app.decorate("claimCatalog", claimCatalog);
+app.decorate("requireClaim", makeRequireClaim(claimCatalog));
+app.decorate("requireAppClaim", makeRequireAppClaim(claimCatalog));
+app.decorate("withWorkspace", makeWithWorkspace(app));
 
 // Service plugins. Boot order is the registry order; a service that declares
 // a hard dependency must come after it, which we validate before mounting.

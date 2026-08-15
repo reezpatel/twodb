@@ -6,7 +6,9 @@
   "exports": {
     "./service": "./service/index.ts",
     "./auth": "./service/auth-plugin.ts",
-    "./manifest": "./manifest.ts"
+    "./manifest": "./manifest.ts",
+    "./schema": "./service/schema.ts",
+    "./sessions": "./service/sessions.ts"
   },
   "dependencies": {
     "@twodb/contracts": "workspace:*",

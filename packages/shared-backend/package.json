@@ -1,23 +1,30 @@
 {
-  "name": "@twodb/shared-backend",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
-  },
-  "dependencies": {
-    "@twodb/contracts": "workspace:*",
-    "fastify-plugin": "^6.0.0",
-    "kysely": "^0.29.5"
-  },
-  "peerDependencies": {
-    "fastify": "^5.0.0"
-  },
-  "devDependencies": {
-    "@types/node": "^24.0.0",
-    "@types/pg": "^8.21.0",
-    "fastify": "^5.3.0",
-    "typescript": "^5.8.0"
-  }
+	"name": "@twodb/shared-backend",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"@twodb/contracts": "workspace:*",
+		"@twodb/plugin-identity": "workspace:*",
+		"fastify-plugin": "^6.0.0",
+		"kysely": "^0.29.5"
+	},
+	"peerDependencies": {
+		"fastify": "^5.0.0"
+	},
+	"devDependencies": {
+		"@fastify/cookie": "^11.1.2",
+		"@types/node": "^24.0.0",
+		"@types/pg": "^8.21.0",
+		"fastify": "^5.3.0",
+		"pg": "^8.23.0",
+		"typescript": "^5.8.0",
+		"vitest": "^3.2.4"
+	}
 }
