@@ -164,6 +164,14 @@ export interface BackendEventMap {
 		userId: string;
 		appRoleId: string;
 	};
+	"twodb.identity.app.created": {
+		appId: string;
+		workspaceId: string;
+	};
+	"twodb.identity.app.deleted": {
+		appId: string;
+		workspaceId: string;
+	};
 	"twodb.identity.authmethod.configured": { method: string };
 }
 

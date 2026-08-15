@@ -150,4 +150,41 @@ export interface IdentityDB {
 	role_claims: RoleClaimsTable;
 	workspace_role_assignments: WorkspaceRoleAssignmentsTable;
 	entity_grants: EntityGrantsTable;
+	apps: AppsTable;
+	app_roles: AppRolesTable;
+	app_role_claims: AppRoleClaimsTable;
+	app_role_assignments: AppRoleAssignmentsTable;
+}
+
+export interface AppsTable {
+	id: string;
+	workspace_id: string;
+	slug: string;
+	name: string;
+	manifest: Record<string, unknown>;
+	created_at: Generated<Date>;
+}
+
+export interface AppRolesTable {
+	id: string;
+	app_id: string;
+	key: string;
+	name: string;
+	description: string | null;
+	is_system: Generated<boolean>;
+	created_at: Generated<Date>;
+}
+
+export interface AppRoleClaimsTable {
+	app_role_id: string;
+	claim: string;
+}
+
+export interface AppRoleAssignmentsTable {
+	id: string;
+	app_id: string;
+	user_id: string;
+	app_role_id: string;
+	assigned_by: string | null;
+	created_at: Generated<Date>;
 }

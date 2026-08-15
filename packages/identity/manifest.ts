@@ -32,6 +32,7 @@ export default {
 		"plugin.twodb.identity:member.invite",
 		"plugin.twodb.identity:member.remove",
 		"plugin.twodb.identity:role.manage",
+		"plugin.twodb.identity:app.manage",
 	],
 	roleDefaults: {
 		manager: [
@@ -39,6 +40,7 @@ export default {
 			"plugin.twodb.identity:member.invite",
 			"plugin.twodb.identity:member.remove",
 			"plugin.twodb.identity:role.manage",
+			"plugin.twodb.identity:app.manage",
 		],
 	},
 } as const satisfies PluginManifest;

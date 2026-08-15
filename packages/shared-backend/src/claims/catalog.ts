@@ -9,7 +9,7 @@ import {
 } from "@twodb/contracts";
 
 export interface ClaimCatalog {
-	readonly all: ReadonlySet<Claim>;
+	readonly all: Set<Claim>;
 	readonly byPlugin: ReadonlyMap<PluginId, ReadonlySet<Claim>>;
 	readonly roleDefaults: ReadonlyMap<
 		PluginId,
@@ -21,6 +21,9 @@ export async function buildClaimCatalog(
 	manifests: readonly PluginManifest[],
 ): Promise<ClaimCatalog> {
 	const all = new Set<Claim>();
+	// Set is mutable at runtime — apps register / unregister their
+	// app.* claims here as they are created / deleted. Plugins take
+	// a Readonly view via the byPlugin map.
 	const byPlugin = new Map<PluginId, Set<Claim>>();
 	const roleDefaults = new Map<
 		PluginId,
