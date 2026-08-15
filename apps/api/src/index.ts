@@ -60,6 +60,7 @@ app.decorate("claimCatalog", claimCatalog);
 app.decorate("requireClaim", makeRequireClaim(claimCatalog));
 app.decorate("requireAppClaim", makeRequireAppClaim(claimCatalog));
 app.decorate("withWorkspace", makeWithWorkspace(app));
+app.decorate("installedPluginManifests", manifests);
 
 // Service plugins. Boot order is the registry order; a service that declares
 // a hard dependency must come after it, which we validate before mounting.

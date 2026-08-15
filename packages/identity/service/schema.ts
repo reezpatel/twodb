@@ -102,7 +102,9 @@ export interface WorkspaceMembersTable {
 export interface RolesTable {
 	id: string;
 	workspace_id: string;
+	key: string;
 	name: string;
+	description: string | null;
 	is_system: Generated<boolean>;
 	created_at: Generated<Date>;
 }
@@ -113,11 +115,13 @@ export interface RoleClaimsTable {
 }
 
 export interface WorkspaceRoleAssignmentsTable {
+	id: string;
 	workspace_id: string;
 	user_id: string;
 	role_id: string;
 	assigned_by: string | null;
 	assigned_at: Generated<Date>;
+	created_at: Generated<Date>;
 }
 
 export interface EntityGrantsTable {

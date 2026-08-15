@@ -95,7 +95,14 @@ async function insertRole(
 ): Promise<void> {
 	await db
 		.insertInto("roles")
-		.values({ id, workspace_id: workspaceId, name, is_system: isSystem })
+		.values({
+			id,
+			workspace_id: workspaceId,
+			key: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+			name,
+			description: null,
+			is_system: isSystem,
+		})
 		.execute();
 	for (const claim of claims) {
 		await db.insertInto("role_claims").values({ role_id: id, claim }).execute();
@@ -109,7 +116,12 @@ async function assignRole(
 ): Promise<void> {
 	await db
 		.insertInto("workspace_role_assignments")
-		.values({ workspace_id: workspaceId, user_id: userId, role_id: roleId })
+		.values({
+			id: `asg-${randomBytes(8).toString("base64url")}`,
+			workspace_id: workspaceId,
+			user_id: userId,
+			role_id: roleId,
+		})
 		.execute();
 }
 

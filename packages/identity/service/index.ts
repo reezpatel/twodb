@@ -7,6 +7,7 @@ import {
 	runPluginMigrations,
 	typedDb,
 } from "@twodb/shared-backend";
+import identityManifest from "../manifest";
 import type { IdentifierMode, IdentityDB } from "./schema";
 import { buildMigrations } from "./migrations";
 import {
@@ -18,10 +19,13 @@ import {
 	upsertUserMethod,
 } from "./methods";
 import { hashPassword, verifyPassword } from "./passwords";
+import { seedWorkspaceRoles } from "./roles";
 import { outboxPlugin } from "./outbox";
 import { registerChallengeRoutes } from "./routes-challenges";
 import { registerMethodRoutes } from "./routes-methods";
 import { registerSsoRoutes } from "./routes-sso";
+import { registerRoleRoutes } from "./routes-roles";
+import { registerAssignmentRoutes } from "./routes-assignments";
 import type { AuthCtx } from "./ctx";
 import { destroySession } from "./sessions";
 import { principalFor, startSession } from "./signin";
@@ -96,6 +100,8 @@ export default defineService({
 		registerChallengeRoutes(fastify, ctx);
 		registerSsoRoutes(fastify, ctx);
 		registerMethodRoutes(fastify, ctx);
+		registerRoleRoutes(fastify);
+		registerAssignmentRoutes(fastify);
 
 		async function maybeSeedSuperadmin(): Promise<void> {
 			const email = config.TWODB_SUPERADMIN_EMAIL?.trim().toLowerCase();
@@ -347,6 +353,12 @@ export default defineService({
 					.code(403)
 					.send({ error: "Only an organization admin can create workspaces." });
 			}
+			const installed =
+				(fastify as unknown as { installedPluginManifests?: readonly import("@twodb/contracts").PluginManifest[] })
+					.installedPluginManifests ?? [];
+			const allManifests = installed.includes(identityManifest)
+				? installed
+				: [identityManifest, ...installed];
 			const workspaceId = newId("wks");
 			try {
 				await db
@@ -361,6 +373,21 @@ export default defineService({
 				await db
 					.insertInto("workspace_members")
 					.values({ workspace_id: workspaceId, user_id: userId })
+					.execute();
+				const roleIds = await seedWorkspaceRoles(
+					db,
+					workspaceId,
+					fastify.claimCatalog.all,
+					allManifests,
+				);
+				await db
+					.insertInto("workspace_role_assignments")
+					.values({
+						id: newId("asg"),
+						workspace_id: workspaceId,
+						user_id: userId,
+						role_id: roleIds.owner,
+					})
 					.execute();
 			} catch (err) {
 				if ((err as { code?: string }).code === "23505") {
@@ -379,6 +406,11 @@ export default defineService({
 			fastify.bus.emit("twodb.identity.workspace.member.added", {
 				workspaceId,
 				userId,
+			});
+			fastify.bus.emit("twodb.identity.role.assigned", {
+				workspaceId,
+				userId,
+				roleId: "owner",
 			});
 			return reply.code(201).send({ workspaceId });
 		});

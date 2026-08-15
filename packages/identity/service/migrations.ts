@@ -259,5 +259,68 @@ export function buildMigrations(): Record<string, Migration> {
 					.execute();
 			},
 		},
+		"004-role-key-description": {
+			async up(db: Kysely<unknown>) {
+				await db.schema
+					.alterTable("roles")
+					.addColumn("key", "text")
+					.addColumn("description", "text")
+					.execute();
+				await sql`
+					UPDATE roles
+					SET key = LOWER(REGEXP_REPLACE(name, '[^a-zA-Z0-9]+', '-', 'g')),
+					    description = ''
+					WHERE key IS NULL
+				`.execute(db);
+				await db.schema
+					.alterTable("roles")
+					.alterColumn("key", (c) => c.setNotNull())
+					.execute();
+				await db.schema
+					.createIndex("roles_workspace_key_unique")
+					.on("roles")
+					.columns(["workspace_id", "key"])
+					.unique()
+					.execute();
+			},
+		},
+		"005-assignment-id": {
+			async up(db: Kysely<unknown>) {
+				await db.schema
+					.alterTable("workspace_role_assignments")
+					.addColumn("id", "text")
+					.addColumn("created_at", "timestamptz", (c) =>
+						c.defaultTo(sql`now()`),
+					)
+					.execute();
+				await sql`
+					UPDATE workspace_role_assignments
+					SET id = 'asg-' || replace(gen_random_uuid()::text, '-', '')
+					WHERE id IS NULL
+				`.execute(db);
+				await sql`
+					UPDATE workspace_role_assignments
+					SET created_at = now()
+					WHERE created_at IS NULL
+				`.execute(db);
+				await sql`
+					ALTER TABLE workspace_role_assignments
+					ALTER COLUMN id SET NOT NULL,
+					ALTER COLUMN created_at SET NOT NULL
+				`.execute(db);
+				await sql`
+					ALTER TABLE workspace_role_assignments
+					DROP CONSTRAINT workspace_role_assignments_pk
+				`.execute(db);
+				await sql`
+					ALTER TABLE workspace_role_assignments
+					ADD PRIMARY KEY (id)
+				`.execute(db);
+				await sql`
+					CREATE UNIQUE INDEX workspace_role_assignments_unique
+					ON workspace_role_assignments (workspace_id, user_id, role_id)
+				`.execute(db);
+			},
+		},
 	};
 }

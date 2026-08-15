@@ -1,17 +1,6 @@
-// Ambient module/decorator declarations for the api host.
-//
-// The db plugins (src/db/*.js) are plain JS and decorate the fastify
-// instance at runtime; @fastify/env populates `fastify.config` from the
-// schema in src/config.js. Those decorations are declared here so the
-// TypeScript host code can use them. Keep in sync with src/config.js and
-// the db plugins.
-//
-// Note: `fastify.pg` is intentionally NOT redeclared here — @fastify/postgres
-// already declares it, and our runtime `ping` helper is attached by
-// src/db/postgres.js. Call sites assert the extension via `PgWithPing`.
+import type { PluginManifest } from "@twodb/contracts";
 
 interface MemgraphDecorator {
-	/** Connectivity probe used by /health/ready. */
 	ping: () => Promise<unknown>;
 }
 
@@ -39,7 +28,6 @@ declare module "fastify" {
 			TWODB_API_ORIGIN: string;
 		};
 		memgraph: MemgraphDecorator;
+		installedPluginManifests: readonly PluginManifest[];
 	}
 }
-
-export {};
