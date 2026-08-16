@@ -1,0 +1,19 @@
+
+export const ID_PREFIXES = {
+	user: "usr",
+	session: "ses",
+	org: "org",
+	orgMembership: "omb",
+	workspace: "wks",
+	workspaceMember: "wmb",
+	role: "rol",
+	assignment: "asg",
+	grant: "grt",
+	app: "app",
+	appRole: "aro",
+	appRoleAssignment: "ara",
+	authMethod: "amt",
+	verificationCode: "vcd",
+	auditEntry: "aud",
+	note: "nte",
+} as const;

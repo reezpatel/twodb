@@ -1,8 +1,9 @@
-import type { FastifyInstance, FastifyRequest, preHandlerHookHandler } from "fastify";
+import type { TwodbFastifyInstance } from "@twodb/contracts";
+import type { FastifyRequest, preHandlerHookHandler } from "fastify";
 import type { Kysely } from "kysely";
 import { sql } from "kysely";
 import type { Claim } from "@twodb/contracts";
-import type { IdentityDB } from "@twodb/plugin-identity/schema";
+import type { IdentityDB } from "@twodb/identity/schema";
 
 export type WithWorkspaceSource =
 	| { entity: "workspaces"; idParam: string }
@@ -18,9 +19,11 @@ const KNOWN_WORKSPACE_FIELD: Record<string, string> = {
 	workspaces: "id",
 };
 
-export function makeWithWorkspace(fastify: FastifyInstance) {
-	const db = (fastify as unknown as { db: Kysely<unknown> }).db;
-	return function withWorkspace(opts: WithWorkspaceOpts): preHandlerHookHandler {
+export function makeWithWorkspace(fastify: TwodbFastifyInstance) {
+	const db = fastify.db;
+	return function withWorkspace(
+		opts: WithWorkspaceOpts,
+	): preHandlerHookHandler {
 		return async (request: FastifyRequest, _reply) => {
 			const principal = request.principal;
 			if (!principal) {

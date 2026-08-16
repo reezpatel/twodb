@@ -1,15 +1,10 @@
-import type { PluginManifest } from "@twodb/contracts";
+import { TwodbIdentityPlugin } from ".";
+import { TwoDbIdentityProvider } from "./provider/IdentityProvider";
 
-export default {
-	id: "twodb.identity",
-	name: "@twodb/identity-view",
-	version: "1.0.0",
-	provides: {
-		functions: [],
-		routes: [],
-	},
-	emits: [],
-	consumes: [],
-	permissions: [],
-	provider: "identity",
-} as const satisfies PluginManifest;
+export const TwodbIdentityViewManifest = {
+  emits: [],
+  consumes: [],
+  permissions: [],
+  provider: TwoDbIdentityProvider,
+  plugin: new TwodbIdentityPlugin(),
+};

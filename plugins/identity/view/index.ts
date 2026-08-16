@@ -5,11 +5,13 @@ import {
 	type IdentitySnapshot,
 } from "@twodb/shared-frontend";
 
-import { LoginScreen } from "./screens/LoginScreen";
-import { VerifyScreen } from "./screens/VerifyScreen";
-import { WorkspacePicker } from "./screens/WorkspacePicker";
-import { ShareDialog } from "./share/ShareDialog";
-import manifest from "./manifest";
+import { LoginScreen } from "./scenes/login-screen/login-screen";
+import { VerifyScreen } from "./scenes/verify-screen/verify-screen";
+import { WorkspacePicker } from "./scenes/workspace-picker/workspace-picker";
+import { WorkspaceCreator } from "./scenes/workspace-creator/workspace-creator";
+import { ShareDialog } from "./scenes/share-dialog/share-dialog";
+import { MembersAndRoles } from "./scenes/members-and-roles/members-and-roles";
+import { SignInAndSecurity } from "./scenes/sign-in-and-security/sign-in-and-security";
 
 async function fetchSnapshot(): Promise<IdentitySnapshot> {
 	const session = await fetch("/api/v1/twodb.identity/auth/session", {
@@ -29,13 +31,21 @@ async function fetchSnapshot(): Promise<IdentitySnapshot> {
 	const me = await fetch("/api/v1/twodb.identity/me/memberships", {
 		credentials: "same-origin",
 	});
-	const memberships = me.ok ? ((await me.json()) as {
-		workspaces: { id: string; orgId: string; name: string; orgName: string }[];
-	}) : { workspaces: [] };
+	const memberships = me.ok
+		? ((await me.json()) as {
+				workspaces: {
+					id: string;
+					orgId: string;
+					name: string;
+					orgName: string;
+				}[];
+			})
+		: { workspaces: [] };
 	const active = localStorage.getItem("activeWorkspaceId");
-	const activeWorkspaceId = active && memberships.workspaces.some((w) => w.id === active)
-		? active
-		: (memberships.workspaces[0]?.id ?? null);
+	const activeWorkspaceId =
+		active && memberships.workspaces.some((w) => w.id === active)
+			? active
+			: (memberships.workspaces[0]?.id ?? null);
 	const snap: IdentitySnapshot = {
 		user: { id: data.principal.userId, name: "", email: null },
 		workspaces: memberships.workspaces,
@@ -84,9 +94,41 @@ export function activate(): void {
 	registerIdentityProvider(provider);
 }
 
-export default {
-	manifest,
-	activate,
+export {
+	LoginScreen,
+	VerifyScreen,
+	WorkspacePicker,
+	WorkspaceCreator,
+	ShareDialog,
+	MembersAndRoles,
+	SignInAndSecurity,
 };
 
-export { LoginScreen, VerifyScreen, WorkspacePicker, ShareDialog };
+import type { IPlugin, PluginStore } from "react-pluggable";
+
+export class TwodbIdentityPlugin implements IPlugin {
+	pluginStore!: PluginStore;
+	namespace = "ShowAlert";
+
+	getPluginName(): string {
+		return "ShowAlert@1.0.0";
+	}
+
+	getDependencies(): string[] {
+		return [];
+	}
+
+	init(pluginStore: PluginStore): void {
+		this.pluginStore = pluginStore;
+	}
+
+	activate(): void {
+		this.pluginStore.addFunction(`${this.namespace}.doIt`, () => {
+			console.log("Hello from the ShowAlert Plugin");
+		});
+	}
+
+	deactivate(): void {
+		this.pluginStore.removeFunction(`${this.namespace}.doIt`);
+	}
+}

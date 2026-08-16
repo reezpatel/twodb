@@ -89,4 +89,7 @@ breakdown, and `DESIGN.md` for the design system.
 
 # Important
 
-1. Only add comment when absolutely neccessary.
+1. Only add comment when absolutely neccessary
+2. Use tanstack-query for interacting with the API
+3. Use tanstack-form to manage form state and validation
+4. Create a use-<component> hook for business logic

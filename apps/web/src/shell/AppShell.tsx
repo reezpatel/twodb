@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router";
 import { AutomationsScene } from "../scenes/automations/AutomationsScene";
 import { CalendarScene } from "../scenes/calendar/CalendarScene";
 import { ChatScene } from "../scenes/chat/ChatScene";

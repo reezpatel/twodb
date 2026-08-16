@@ -1,17 +1,25 @@
-import "@twodb/ui/styles.css"; // the ONLY ui-css import in the repo (see plan.md §6)
+import "@twodb/ui/styles.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import { AppShell } from "./shell/AppShell";
+import { BrowserRouter } from "react-router";
+import { App } from "./App";
 import "./index.css";
+import { TwoDbPluginProvider } from "@twodb/shared-frontend";
 
-// The shell renders standalone for now. Plugin boot (react-pluggable store,
-// core bus/api/shell plugins, the view-plugin registry) lands when the first
-// view plugin is wired into this frame — see plan.md.
+import { view as IdentityPlugin } from "@twodb/identity";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const queryClient = new QueryClient();
+const plugins = [IdentityPlugin];
+
 createRoot(document.getElementById("root")!).render(
-	<StrictMode>
-		<BrowserRouter>
-			<AppShell />
-		</BrowserRouter>
-	</StrictMode>,
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <TwoDbPluginProvider plugins={plugins}>
+          <App />
+        </TwoDbPluginProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  </StrictMode>,
 );

@@ -3,7 +3,7 @@ import { sql } from "kysely";
 import type { Kysely } from "kysely";
 import type { Claim } from "@twodb/contracts";
 import type { ClaimCatalog } from "./catalog";
-import type { IdentityDB } from "@twodb/plugin-identity/schema";
+import type { IdentityDB } from "@twodb/identity/schema";
 
 export type RequireAppClaimOpts = {
 	appIdParam?: string;

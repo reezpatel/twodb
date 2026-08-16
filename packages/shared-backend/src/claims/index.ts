@@ -8,7 +8,9 @@ declare module "fastify" {
 		requireAppClaim: ReturnType<
 			typeof import("./requireAppClaim").makeRequireAppClaim
 		>;
-		withWorkspace: ReturnType<typeof import("./withWorkspace").makeWithWorkspace>;
+		withWorkspace: ReturnType<
+			typeof import("./withWorkspace").makeWithWorkspace
+		>;
 	}
 	interface FastifyRequest {
 		principal: Principal | null;
@@ -33,4 +35,7 @@ export {
 	type WithWorkspaceSource,
 } from "./withWorkspace";
 export { makeRequireClaim, type RequireClaimOpts } from "./requireClaim";
-export { makeRequireAppClaim, type RequireAppClaimOpts } from "./requireAppClaim";
+export {
+	makeRequireAppClaim,
+	type RequireAppClaimOpts,
+} from "./requireAppClaim";

@@ -6,8 +6,8 @@ import { Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
 import { SESSION_COOKIE } from "@twodb/contracts";
 import type { PluginManifest, Principal } from "@twodb/contracts";
-import { createSession, hashToken } from "@twodb/plugin-identity/sessions";
-import type { IdentityDB } from "@twodb/plugin-identity/schema";
+import { createSession, hashToken } from "@twodb/identity/sessions";
+import type { IdentityDB } from "@twodb/identity/schema";
 import { sql } from "kysely";
 
 import { buildClaimCatalog, type ClaimCatalog } from "./catalog";
@@ -170,15 +170,21 @@ async function buildApp() {
 	const kdb = new Kysely<IdentityDB>({
 		dialect: new PostgresDialect({ pool }),
 	});
-	(app as unknown as { db: Kysely<unknown> }).db = kdb as unknown as Kysely<unknown>;
+	(app as unknown as { db: Kysely<unknown> }).db =
+		kdb as unknown as Kysely<unknown>;
 	await app.register(cookie);
 	(app as unknown as { claimCatalog: ClaimCatalog }).claimCatalog = catalog;
-	(app as unknown as { requireClaim: AppDecorations["requireClaim"] }).requireClaim =
-		makeRequireClaim(catalog);
-	(app as unknown as { requireAppClaim: AppDecorations["requireAppClaim"] }).requireAppClaim =
-		makeRequireAppClaim(catalog);
-	(app as unknown as { withWorkspace: AppDecorations["withWorkspace"] }).withWorkspace =
-		makeWithWorkspace(app as unknown as FastifyInstance & { db: Kysely<unknown> });
+	(
+		app as unknown as { requireClaim: AppDecorations["requireClaim"] }
+	).requireClaim = makeRequireClaim(catalog);
+	(
+		app as unknown as { requireAppClaim: AppDecorations["requireAppClaim"] }
+	).requireAppClaim = makeRequireAppClaim(catalog);
+	(
+		app as unknown as { withWorkspace: AppDecorations["withWorkspace"] }
+	).withWorkspace = makeWithWorkspace(
+		app as unknown as FastifyInstance & { db: Kysely<unknown> },
+	);
 
 	app.addHook("onRequest", async (request) => {
 		(request as unknown as { principal: Principal | null }).principal = null;
@@ -229,12 +235,9 @@ describe("withWorkspace + requireClaim", () => {
 	it("rejects an undeclared claim at route registration time", async () => {
 		const app = await buildApp();
 		const checks = makeRequireClaim(catalog);
-		expect(() =>
-			checks(
-				"plugin.unknown:nope" as never,
-				{} as never,
-			),
-		).toThrow(/not declared in the claim catalog/);
+		expect(() => checks("plugin.unknown:nope" as never, {} as never)).toThrow(
+			/not declared in the claim catalog/,
+		);
 		await app.close();
 	});
 

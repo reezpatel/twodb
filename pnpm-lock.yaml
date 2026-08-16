@@ -7,6 +7,40 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@tanstack/react-form':
+        specifier: ^1.33.5
+        version: 1.33.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.4
+        version: 19.2.4(@types/react@19.2.18)
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      fastify-plugin:
+        specifier: ^6.0.0
+        version: 6.0.0
+      kysely:
+        specifier: ^0.29.5
+        version: 0.29.5
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+      react-pluggable:
+        specifier: ^0.4.3
+        version: 0.4.3(react@19.2.8)
+      react-router:
+        specifier: ^7.18.2
+        version: 7.18.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
     devDependencies:
       turbo:
         specifier: ^2.5.0
@@ -32,21 +66,12 @@ importers:
       '@twodb/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@twodb/plugin-identity':
+      '@twodb/identity':
         specifier: workspace:*
-        version: link:../../packages/identity
-      '@twodb/plugin-notes':
-        specifier: workspace:*
-        version: link:../../packages/notes
+        version: link:../../plugins/identity
       '@twodb/shared-backend':
         specifier: workspace:*
         version: link:../../packages/shared-backend
-      fastify:
-        specifier: ^5.3.0
-        version: 5.11.2
-      fastify-plugin:
-        specifier: ^6.0.0
-        version: 6.0.0
       neo4j-driver:
         specifier: ^6.2.0
         version: 6.2.0
@@ -72,12 +97,6 @@ importers:
       '@fontsource/outfit':
         specifier: ^5.3.0
         version: 5.3.0
-      react:
-        specifier: ^19.1.0
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.1.0
-        version: 19.2.8(react@19.2.8)
     devDependencies:
       '@types/react':
         specifier: ^19.1.0
@@ -115,15 +134,9 @@ importers:
       lucide-react:
         specifier: ^1.29.0
         version: 1.29.0(react@19.2.8)
-      react:
-        specifier: ^19.1.0
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.1.0
-        version: 19.2.8(react@19.2.8)
       styled-jsx:
         specifier: ^5.1.7
-        version: 5.1.7(react@19.2.8)
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
     devDependencies:
       '@types/d3-force':
         specifier: ^3.0.10
@@ -155,9 +168,9 @@ importers:
       '@twodb/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@twodb/plugin-notes':
+      '@twodb/identity':
         specifier: workspace:*
-        version: link:../../packages/notes
+        version: link:../../plugins/identity
       '@twodb/shared-frontend':
         specifier: workspace:*
         version: link:../../packages/shared-frontend
@@ -167,21 +180,9 @@ importers:
       lucide-react:
         specifier: ^1.29.0
         version: 1.29.0(react@19.2.8)
-      react:
-        specifier: ^19.1.0
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.1.0
-        version: 19.2.8(react@19.2.8)
-      react-pluggable:
-        specifier: ^0.4.3
-        version: 0.4.3(react@19.2.8)
-      react-router-dom:
-        specifier: ^7.18.2
-        version: 7.18.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       styled-jsx:
         specifier: ^5.1.7
-        version: 5.1.7(react@19.2.8)
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
     devDependencies:
       '@types/react':
         specifier: ^19.1.0
@@ -205,91 +206,17 @@ importers:
         specifier: ^5.8.0
         version: 5.9.3
 
-  packages/identity:
-    dependencies:
-      '@twodb/contracts':
-        specifier: workspace:*
-        version: link:../contracts
-      '@twodb/shared-backend':
-        specifier: workspace:*
-        version: link:../shared-backend
-      fastify-plugin:
-        specifier: ^6.0.0
-        version: 6.0.0
-      kysely:
-        specifier: ^0.29.5
-        version: 0.29.5
-    devDependencies:
-      '@fastify/cookie':
-        specifier: ^11.1.2
-        version: 11.1.2
-      '@types/node':
-        specifier: ^24.0.0
-        version: 24.13.3
-      fastify:
-        specifier: ^5.3.0
-        version: 5.11.2
-      typescript:
-        specifier: ^5.8.0
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.7(@types/node@24.13.3)(tsx@4.23.12)
-
-  packages/notes:
-    dependencies:
-      '@twodb/contracts':
-        specifier: workspace:*
-        version: link:../contracts
-      '@twodb/shared-backend':
-        specifier: workspace:*
-        version: link:../shared-backend
-      '@twodb/shared-frontend':
-        specifier: workspace:*
-        version: link:../shared-frontend
-      '@twodb/ui':
-        specifier: workspace:*
-        version: link:../ui
-      fastify-plugin:
-        specifier: ^6.0.0
-        version: 6.0.0
-      kysely:
-        specifier: ^0.29.5
-        version: 0.29.5
-      lucide-react:
-        specifier: ^1.29.0
-        version: 1.29.0(react@19.2.8)
-      pg:
-        specifier: ^8.23.0
-        version: 8.23.0
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.2.8(react@19.2.8)
-      react-pluggable:
-        specifier: ^0.4.3
-        version: 0.4.3(react@19.2.8)
-    devDependencies:
-      '@types/react':
-        specifier: ^19.1.0
-        version: 19.2.18
-      fastify:
-        specifier: ^5.3.0
-        version: 5.11.2
-      react:
-        specifier: ^19.1.0
-        version: 19.2.8
-      typescript:
-        specifier: ^5.8.0
-        version: 5.9.3
-
   packages/shared-backend:
     dependencies:
       '@twodb/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@twodb/plugin-identity':
+      '@twodb/identity':
         specifier: workspace:*
-        version: link:../identity
+        version: link:../../plugins/identity
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
       fastify-plugin:
         specifier: ^6.0.0
         version: 6.0.0
@@ -306,9 +233,6 @@ importers:
       '@types/pg':
         specifier: ^8.21.0
         version: 8.21.0
-      fastify:
-        specifier: ^5.3.0
-        version: 5.11.2
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -324,8 +248,11 @@ importers:
       '@twodb/contracts':
         specifier: workspace:*
         version: link:../contracts
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
       react-dom:
-        specifier: ^19.0.0
+        specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
       react-pluggable:
         specifier: ^0.4.3
@@ -334,9 +261,6 @@ importers:
       '@types/react':
         specifier: ^19.1.0
         version: 19.2.18
-      react:
-        specifier: ^19.1.0
-        version: 19.2.8
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
@@ -383,7 +307,7 @@ importers:
         specifier: ^2.0.4
         version: 2.0.4
       react:
-        specifier: ^19.0.0
+        specifier: ^19.2.8
         version: 19.2.8
       react-arborist:
         specifier: ^3.16.0
@@ -395,11 +319,11 @@ importers:
         specifier: ^9.14.0
         version: 9.14.0(react@19.2.8)
       react-dom:
-        specifier: ^19.0.0
+        specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
       styled-jsx:
         specifier: ^5.1.7
-        version: 5.1.7(react@19.2.8)
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
     devDependencies:
       '@types/qrcode-generator':
         specifier: ^1.0.6
@@ -414,33 +338,42 @@ importers:
         specifier: ^5.8.0
         version: 5.9.3
 
-  plugins/identity/view:
+  plugins/identity:
     dependencies:
       '@twodb/contracts':
         specifier: workspace:*
-        version: link:../../../packages/contracts
+        version: link:../../packages/contracts
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../packages/shared-backend
       '@twodb/shared-frontend':
         specifier: workspace:*
-        version: link:../../../packages/shared-frontend
+        version: link:../../packages/shared-frontend
       '@twodb/ui':
         specifier: workspace:*
-        version: link:../../../packages/ui
-      react:
-        specifier: ^19.0.0
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.2.8(react@19.2.8)
-      react-pluggable:
-        specifier: ^0.4.3
-        version: 0.4.3(react@19.2.8)
+        version: link:../../packages/ui
+      kysely:
+        specifier: ^0.29.5
+        version: 0.29.5
     devDependencies:
+      '@fastify/cookie':
+        specifier: ^11.1.2
+        version: 11.1.2
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
       '@types/react':
         specifier: ^19.1.0
         version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.1.0
+        version: 19.2.4(@types/react@19.2.18)
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.13.3)(tsx@4.23.12)
 
 packages:
 
@@ -1086,12 +1019,50 @@ packages:
     resolution: {integrity: sha512-r5bClKrcIusDoo049dSL8CawnHR6mRdDwhlQuIgZRNty68q0x8k3Lf1BtPAMxRf/GgnHBnIO4ujd3+GQdLWzxQ==}
     engines: {node: '>=16.0.0'}
 
+  '@tanstack/devtools-event-client@0.4.4':
+    resolution: {integrity: sha512-6T5Yop/793YI+H+5J8Hsyj4kCih9sl4t3ElLgKioW5hk3ocn+ZdSJ94tT7vL7uabxSugWYBZlOTMPzEw2puvQw==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  '@tanstack/form-core@1.33.5':
+    resolution: {integrity: sha512-3dfx9MBP0aq5sXKteikG629X9oviptrQj0IFRk9YGcb+lB7Kv5x8S17oOSk1wUWgjQZ4xVJEMbKwOAODymocgA==}
+
+  '@tanstack/pacer-lite@0.1.1':
+    resolution: {integrity: sha512-y/xtNPNt/YeyoVxE/JCx+T7yjEzpezmbb+toK8DDD1P4m7Kzs5YR956+7OKexG3f8aXgC3rLZl7b1V+yNUSy5w==}
+    engines: {node: '>=18'}
+
+  '@tanstack/query-core@5.101.4':
+    resolution: {integrity: sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw==}
+
+  '@tanstack/react-form@1.33.5':
+    resolution: {integrity: sha512-LlRB28qJwO/QCGaHvWnbdh4haBgTFiZVmzA2uzxSBS3YA7/IqrQ6HOBK70CkFQ+DbflZ7NawsmSln13h5iIdTA==}
+    peerDependencies:
+      '@tanstack/react-start': '*'
+      react: ^17.0.0 || ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      '@tanstack/react-start':
+        optional: true
+
+  '@tanstack/react-query@5.101.4':
+    resolution: {integrity: sha512-yRg2pfOCxIs4ZJW3XYYHU/WgtD04FHSnfHlpRT7h7pR77hwkdRG4wxbKe4aq6P0RvXUTBSQpQeadS1SUYUe+KA==}
+    peerDependencies:
+      react: ^18 || ^19
+
+  '@tanstack/react-store@0.11.1':
+    resolution: {integrity: sha512-HaIGKI3YLmjBYIvy5DFDY23oNaYZIsTZfngey07Uh5iLVJgM3bIGCnZeOFOqzjFld9JHWcaHJnasD/bKoGKwJQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   '@tanstack/react-table@8.21.3':
     resolution: {integrity: sha512-5nNMTSETP4ykGegmVkhjcS8tTLW6Vl4axfEGQN3v0zdHYbK4UfoqfPChclTrJ4EoK9QynqAu9oUf8VEmrpZ5Ww==}
     engines: {node: '>=12'}
     peerDependencies:
       react: '>=16.8'
       react-dom: '>=16.8'
+
+  '@tanstack/store@0.11.1':
+    resolution: {integrity: sha512-mzTOBhypOuDJAy/D8n2MfUZ1HFkXnmSETviRyhqEC8LUE7/IZQExOTxMANj3KjTofYTkFNpBY67qaVrT41YccA==}
 
   '@tanstack/table-core@8.21.3':
     resolution: {integrity: sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg==}
@@ -1969,13 +1940,6 @@ packages:
     resolution: {integrity: sha512-z6F7K9bV85EfseRCp2bzrpyQ0Gkw1uLoCel9XBVWPg/TjRj94SkJzUTGfOa4bs7iJvBWtQG0Wq7wnI0syw3EBQ==}
     engines: {node: '>=0.10.0'}
 
-  react-router-dom@7.18.2:
-    resolution: {integrity: sha512-AIKJ/jgGlFb3EbfCXk5Gzshiwt+l3mqbCrNjmEWMMjqQxNJ3svBa6bgzFyCC2Sw3RA0VWF1kg3uQf2OFhxb8hw==}
-    engines: {node: '>=20.0.0'}
-    peerDependencies:
-      react: '>=18'
-      react-dom: '>=18'
-
   react-router@7.18.2:
     resolution: {integrity: sha512-aUVMjFm3GAPTTZL7oYr5E7ETiqfQCHRLH+B+5afnICvf0r7kkK4eR6SMuwbSTJw/7t+12khT/Kahij49fqOCIg==}
     engines: {node: '>=20.0.0'}
@@ -2745,11 +2709,45 @@ snapshots:
 
   '@tabby_ai/hijri-converter@1.0.5': {}
 
+  '@tanstack/devtools-event-client@0.4.4': {}
+
+  '@tanstack/form-core@1.33.5':
+    dependencies:
+      '@tanstack/devtools-event-client': 0.4.4
+      '@tanstack/pacer-lite': 0.1.1
+      '@tanstack/store': 0.11.1
+
+  '@tanstack/pacer-lite@0.1.1': {}
+
+  '@tanstack/query-core@5.101.4': {}
+
+  '@tanstack/react-form@1.33.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      '@tanstack/form-core': 1.33.5
+      '@tanstack/react-store': 0.11.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react: 19.2.8
+    transitivePeerDependencies:
+      - react-dom
+
+  '@tanstack/react-query@5.101.4(react@19.2.8)':
+    dependencies:
+      '@tanstack/query-core': 5.101.4
+      react: 19.2.8
+
+  '@tanstack/react-store@0.11.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      '@tanstack/store': 0.11.1
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+      use-sync-external-store: 1.6.0(react@19.2.8)
+
   '@tanstack/react-table@8.21.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@tanstack/table-core': 8.21.3
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
+
+  '@tanstack/store@0.11.1': {}
 
   '@tanstack/table-core@8.21.3': {}
 
@@ -3715,12 +3713,6 @@ snapshots:
 
   react-refresh@0.17.0: {}
 
-  react-router-dom@7.18.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
-    dependencies:
-      react: 19.2.8
-      react-dom: 19.2.8(react@19.2.8)
-      react-router: 7.18.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-
   react-router@7.18.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
       cookie: 1.1.1
@@ -3838,10 +3830,12 @@ snapshots:
     dependencies:
       js-tokens: 9.0.1
 
-  styled-jsx@5.1.7(react@19.2.8):
+  styled-jsx@5.1.7(@babel/core@7.29.7)(react@19.2.8):
     dependencies:
       client-only: 0.0.1
       react: 19.2.8
+    optionalDependencies:
+      '@babel/core': 7.29.7
 
   thread-stream@4.2.0:
     dependencies:

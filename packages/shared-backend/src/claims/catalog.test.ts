@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PluginManifest, Claim, PluginId } from "@twodb/contracts";
-import {
-	buildClaimCatalog,
-	claimOwner,
-	danglingClaims,
-} from "./catalog";
+import { buildClaimCatalog, claimOwner, danglingClaims } from "./catalog";
 
 const notesManifest: PluginManifest = {
 	id: "twodb.notes",
@@ -81,10 +77,7 @@ describe("buildClaimCatalog", () => {
 	});
 
 	it("includes app claims in the union", async () => {
-		const catalog = await buildClaimCatalog([
-			notesManifest,
-			ledgerManifest,
-		]);
+		const catalog = await buildClaimCatalog([notesManifest, ledgerManifest]);
 		expect(catalog.all.has("app.ledger:entry.create")).toBe(true);
 	});
 
@@ -101,9 +94,7 @@ describe("buildClaimCatalog", () => {
 			roleDefaults: {},
 			permissions: ["not-a-claim" as unknown as Claim],
 		};
-		await expect(buildClaimCatalog([bad])).rejects.toThrow(
-			/not a valid claim/,
-		);
+		await expect(buildClaimCatalog([bad])).rejects.toThrow(/not a valid claim/);
 	});
 
 	it("throws when roleDefaults references an undeclared claim", async () => {

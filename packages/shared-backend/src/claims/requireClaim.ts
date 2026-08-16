@@ -1,9 +1,10 @@
-import type { FastifyInstance, preHandlerHookHandler } from "fastify";
+import type { TwodbFastifyInstance } from "@twodb/contracts";
+import type { preHandlerHookHandler } from "fastify";
 import { sql } from "kysely";
 import type { Kysely } from "kysely";
 import type { Claim } from "@twodb/contracts";
 import type { ClaimCatalog } from "./catalog";
-import type { IdentityDB } from "@twodb/plugin-identity/schema";
+import type { IdentityDB } from "@twodb/identity/schema";
 
 export type RequireClaimOpts = {
 	entity?: string;
