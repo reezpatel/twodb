@@ -3,6 +3,7 @@ import { createContext, useContext, useMemo, useState } from "react";
 import { IdentityWrapper } from "../scenes/main";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../utils";
+import { useSignOut } from "./use-sign-out.hook";
 
 export type Context = IdentityContext & {
 	isInitialLoading: boolean;
@@ -40,6 +41,8 @@ export const TwoDbIdentityProvider = ({
 		return workspaces?.workspaces?.find((w) => w.id === activeWorkspaceId);
 	}, [workspaces, activeWorkspaceId]);
 
+	const signOutMutation = useSignOut();
+
 	const user = useMemo(() => {
 		const userId = sessionData?.principal?.userId;
 		return userId ? { id: userId, name: "" } : undefined;
@@ -55,7 +58,12 @@ export const TwoDbIdentityProvider = ({
 			await refetchSession();
 			await refetchWorkspaces();
 		},
-		signOut: async () => {},
+		signOut: async () => {
+			await signOutMutation.mutateAsync();
+			setActiveWorkspaceId(undefined);
+			await refetchSession();
+			await refetchWorkspaces();
+		},
 	};
 
 	return (

@@ -5,11 +5,13 @@
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
+    "allowJs": true,
+    "checkJs": false,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
     "strict": true,
     "jsx": "react-jsx"
   },
-  "include": ["view", "index.ts", "service", "shared"]
+  "include": ["view", "service", "shared"]
 }

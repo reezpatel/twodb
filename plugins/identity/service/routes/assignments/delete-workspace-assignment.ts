@@ -1,33 +1,35 @@
+import { identityDb } from "../../db";
 import type { FastifyInstance } from "fastify";
 import type { AuthCtx } from "../../lib/auth/ctx";
-import { typedDb } from "@twodb/shared-backend";
-import type { IdentityDB } from "../../db/schema";
+
 import { ownerAssignmentCount, ownerRoleId } from "./shared";
 
 export function registerDeleteWorkspaceAssignment(
 	fastify: FastifyInstance,
-	ctx: AuthCtx,
+	_ctx: AuthCtx,
 ): void {
-	const requireClaim = fastify.requireClaim;
-	const withWorkspace = fastify.withWorkspace;
-	const db = typedDb<IdentityDB>(fastify);
+	const identityRequireClaim = fastify.identityRequireClaim;
+	const db = identityDb(fastify);
 
 	fastify.delete(
-		"/workspaces/:id/assignments/:assignmentId",
+		"/workspace/assignments/:assignmentId",
 		{
-			preHandler: [
-				withWorkspace({ entity: "workspaces", idParam: "id" }),
-				requireClaim("plugin.twodb.identity:role.manage"),
-			],
+			preHandler: [identityRequireClaim("plugin.twodb.identity:role.manage")],
 		},
 		async (request, reply) => {
-			const workspaceCtx = request.workspaceContext!;
+			const principal = request.principal!;
+			const workspaceId = principal.workspaceId;
+			if (!workspaceId || !principal.isWorkspaceMember) {
+				return reply
+					.code(403)
+					.send({ error: "You are not in this workspace." });
+			}
 			const { assignmentId } = request.params as { assignmentId: string };
 			const target = await db
 				.selectFrom("workspace_role_assignments")
 				.select(["user_id", "role_id"])
 				.where("id", "=", assignmentId)
-				.where("workspace_id", "=", workspaceCtx.workspaceId)
+				.where("workspace_id", "=", workspaceId)
 				.executeTakeFirst();
 			if (!target) {
 				return reply.code(404).send({ error: "Assignment not found." });
@@ -36,16 +38,12 @@ export function registerDeleteWorkspaceAssignment(
 				.selectFrom("roles")
 				.select("key")
 				.where("id", "=", target.role_id)
-				.where("workspace_id", "=", workspaceCtx.workspaceId)
+				.where("workspace_id", "=", workspaceId)
 				.executeTakeFirst();
 			if (role?.key === "owner") {
-				const ownerId = await ownerRoleId(db, workspaceCtx.workspaceId);
+				const ownerId = await ownerRoleId(db, workspaceId);
 				if (ownerId) {
-					const count = await ownerAssignmentCount(
-						db,
-						workspaceCtx.workspaceId,
-						ownerId,
-					);
+					const count = await ownerAssignmentCount(db, workspaceId, ownerId);
 					if (count <= 1) {
 						return reply.code(409).send({
 							error: "Transfer ownership to someone else first.",
@@ -58,7 +56,7 @@ export function registerDeleteWorkspaceAssignment(
 				.where("id", "=", assignmentId)
 				.execute();
 			fastify.bus.emit("twodb.identity.role.revoked", {
-				workspaceId: workspaceCtx.workspaceId,
+				workspaceId,
 				userId: target.user_id,
 				roleId: target.role_id,
 			});

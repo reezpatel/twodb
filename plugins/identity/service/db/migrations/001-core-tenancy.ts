@@ -1,9 +1,14 @@
 import { sql, type Kysely } from "kysely";
 import type { Migration } from "kysely/migration";
+import { IDENTITY_SCHEMA as S } from "..";
 
 export const coreTenancyMigration: Migration = {
 	async up(db: Kysely<unknown>) {
-		await db.schema
+		await db.schema.createSchema(S).ifNotExists().execute();
+
+		const schema = db.schema.withSchema(S);
+
+		await schema
 			.createTable("users")
 			.addColumn("id", "text", (c) => c.primaryKey())
 			.addColumn("identifier", "text", (c) => c.notNull())
@@ -18,14 +23,14 @@ export const coreTenancyMigration: Migration = {
 			)
 			.execute();
 
-		await db.schema
+		await schema
 			.createIndex("users_identifier_unique")
 			.on("users")
 			.column("identifier")
 			.unique()
 			.execute();
 
-		await db.schema
+		await schema
 			.createTable("sessions")
 			.addColumn("id", "text", (c) => c.primaryKey())
 			.addColumn("user_id", "text", (c) =>
@@ -39,7 +44,7 @@ export const coreTenancyMigration: Migration = {
 			)
 			.execute();
 
-		await db.schema
+		await schema
 			.createTable("platform_admins")
 			.addColumn("user_id", "text", (c) =>
 				c.notNull().references("users.id").onDelete("cascade"),
@@ -51,7 +56,7 @@ export const coreTenancyMigration: Migration = {
 			.addPrimaryKeyConstraint("platform_admins_pk", ["user_id"])
 			.execute();
 
-		await db.schema
+		await schema
 			.createTable("organizations")
 			.addColumn("id", "text", (c) => c.primaryKey())
 			.addColumn("name", "text", (c) => c.notNull())
@@ -64,7 +69,7 @@ export const coreTenancyMigration: Migration = {
 			)
 			.execute();
 
-		await db.schema
+		await schema
 			.createTable("org_memberships")
 			.addColumn("org_id", "text", (c) =>
 				c.notNull().references("organizations.id").onDelete("cascade"),
@@ -79,7 +84,7 @@ export const coreTenancyMigration: Migration = {
 			.addPrimaryKeyConstraint("org_memberships_pk", ["org_id", "user_id"])
 			.execute();
 
-		await db.schema
+		await schema
 			.createTable("workspaces")
 			.addColumn("id", "text", (c) => c.primaryKey())
 			.addColumn("org_id", "text", (c) =>
@@ -92,14 +97,14 @@ export const coreTenancyMigration: Migration = {
 			)
 			.execute();
 
-		await db.schema
+		await schema
 			.createIndex("workspaces_org_slug_unique")
 			.on("workspaces")
 			.columns(["org_id", "slug"])
 			.unique()
 			.execute();
 
-		await db.schema
+		await schema
 			.createTable("workspace_members")
 			.addColumn("workspace_id", "text", (c) =>
 				c.notNull().references("workspaces.id").onDelete("cascade"),

@@ -1,26 +1,28 @@
+import { identityDb } from "../../db";
 import type { FastifyInstance } from "fastify";
 import type { AuthCtx } from "../../lib/auth/ctx";
-import { typedDb } from "@twodb/shared-backend";
-import type { IdentityDB } from "../../db/schema";
+
 
 export function registerDeleteGrant(
 	fastify: FastifyInstance,
-	ctx: AuthCtx,
+	_ctx: AuthCtx,
 ): void {
-	const withWorkspace = fastify.withWorkspace;
-	const requireClaim = fastify.requireClaim;
-	const db = typedDb<IdentityDB>(fastify);
+	const identityRequireClaim = fastify.identityRequireClaim;
+	const db = identityDb(fastify);
 
 	fastify.delete(
 		"/grants/:id",
 		{
-			preHandler: [
-				withWorkspace({ workspaceIdBody: "workspaceId" }),
-				requireClaim("plugin.twodb.identity:role.manage"),
-			],
+			preHandler: [identityRequireClaim("plugin.twodb.identity:role.manage")],
 		},
 		async (request, reply) => {
-			const workspaceCtx = request.workspaceContext!;
+			const principal = request.principal!;
+			const workspaceId = principal.workspaceId;
+			if (!workspaceId || !principal.isWorkspaceMember) {
+				return reply
+					.code(403)
+					.send({ error: "You are not in this workspace." });
+			}
 			const { id } = request.params as { id: string };
 			const target = await db
 				.selectFrom("entity_grants")
@@ -30,7 +32,7 @@ export function registerDeleteGrant(
 			if (!target) {
 				return reply.code(404).send({ error: "Grant not found." });
 			}
-			if (target.workspace_id !== workspaceCtx.workspaceId) {
+			if (target.workspace_id !== workspaceId) {
 				return reply
 					.code(403)
 					.send({ error: "Grant belongs to a different workspace." });

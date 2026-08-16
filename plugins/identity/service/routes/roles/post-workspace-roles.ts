@@ -1,29 +1,31 @@
+import { identityDb } from "../../db";
 import type { FastifyInstance } from "fastify";
 import type { Claim } from "@twodb/contracts";
-import { typedDb } from "@twodb/shared-backend";
+
 import type { AuthCtx } from "../../lib/auth/ctx";
-import type { IdentityDB } from "../../db/schema";
 import { isSystemRoleKey, slugifyRoleKey } from "../../lib/roles/roles";
 
 export function registerPostWorkspaceRoles(
 	fastify: FastifyInstance,
-	ctx: AuthCtx,
+	_ctx: AuthCtx,
 ): void {
-	const requireClaim = fastify.requireClaim;
-	const withWorkspace = fastify.withWorkspace;
-	const catalog = fastify.claimCatalog;
-	const db = typedDb<IdentityDB>(fastify);
+	const identityRequireClaim = fastify.identityRequireClaim;
+	const identityCatalog = fastify.identityClaimCatalog;
+	const db = identityDb(fastify);
 
 	fastify.post(
-		"/workspaces/:id/roles",
+		"/workspace/roles",
 		{
-			preHandler: [
-				withWorkspace({ entity: "workspaces", idParam: "id" }),
-				requireClaim("plugin.twodb.identity:role.manage"),
-			],
+			preHandler: [identityRequireClaim("plugin.twodb.identity:role.manage")],
 		},
 		async (request, reply) => {
-			const workspaceCtx = request.workspaceContext;
+			const principal = request.principal!;
+			const workspaceId = principal.workspaceId;
+			if (!workspaceId || !principal.isWorkspaceMember) {
+				return reply
+					.code(403)
+					.send({ error: "You are not in this workspace." });
+			}
 			const body = request.body as {
 				name?: string;
 				description?: string;
@@ -40,7 +42,7 @@ export function registerPostWorkspaceRoles(
 			}
 			const claims = body.claims ?? [];
 			for (const c of claims) {
-				if (!catalog.all.has(c as Claim)) {
+				if (!identityCatalog.all.has(c as Claim)) {
 					return reply.code(400).send({ error: `Unknown claim "${c}".` });
 				}
 				if (c.startsWith("app.")) {
@@ -55,7 +57,7 @@ export function registerPostWorkspaceRoles(
 					const existing = await trx
 						.selectFrom("roles")
 						.select("id")
-						.where("workspace_id", "=", workspaceCtx!.workspaceId)
+						.where("workspace_id", "=", workspaceId)
 						.where("key", "=", candidateKey)
 						.executeTakeFirst();
 					if (existing) {
@@ -65,7 +67,7 @@ export function registerPostWorkspaceRoles(
 						.insertInto("roles")
 						.values({
 							id,
-							workspace_id: workspaceCtx!.workspaceId,
+							workspace_id: workspaceId,
 							key: candidateKey,
 							name: body.name!.trim(),
 							description: body.description ?? null,

@@ -1,7 +1,6 @@
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { CurrentUser } from "@twodb/contracts";
-
 declare module "fastify" {
 	interface FastifyRequest {
 		/** The authenticated identity for this request. */

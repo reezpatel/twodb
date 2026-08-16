@@ -1,8 +1,8 @@
+import { identityDb } from "../../db";
 import type { FastifyInstance } from "fastify";
 import type { Principal } from "../../lib/types";
-import { typedDb } from "@twodb/shared-backend";
+
 import type { AuthCtx } from "../../lib/auth/ctx";
-import type { IdentityDB } from "../../db/schema";
 import { audit } from "../../lib/admin/admin";
 import { adminGate } from "./shared";
 
@@ -10,7 +10,7 @@ export function registerPostAdminSuperadmins(
 	fastify: FastifyInstance,
 	ctx: AuthCtx,
 ): void {
-	const db = typedDb<IdentityDB>(fastify);
+	const db = identityDb(fastify);
 	const gate = adminGate(fastify);
 
 	fastify.post(

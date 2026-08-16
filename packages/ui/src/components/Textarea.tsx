@@ -12,14 +12,12 @@ export function Textarea({ label, hint, error, id, className = "", ...rest }: Te
   const inputId = id ?? autoId;
   const classes = ["tw-textarea", className].filter(Boolean).join(" ");
 
-  const textarea = (
-    <textarea id={inputId} className={classes} aria-invalid={error ? true : undefined} {...rest} />
-  );
-
+  // Keep <textarea> lexically inside the tree that carries <style jsx>:
+  // styled-jsx only scopes elements written in the same JSX tree.
   if (!label && !hint && !error) {
     return (
       <>
-        {textarea}
+        <textarea id={inputId} className={classes} aria-invalid={error ? true : undefined} {...rest} />
         <style jsx>{fieldStyles}</style>
       </>
     );
@@ -33,7 +31,7 @@ export function Textarea({ label, hint, error, id, className = "", ...rest }: Te
           {label}
         </label>
       ) : null}
-      {textarea}
+      <textarea id={inputId} className={classes} aria-invalid={error ? true : undefined} {...rest} />
       {error ? (
         <span className="tw-field__error" role="alert">
           {error}

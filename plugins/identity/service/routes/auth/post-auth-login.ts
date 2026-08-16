@@ -21,13 +21,16 @@ export function registerPostAuthLogin(
 
 	fastify.post("/auth/login", PUBLIC, async (request, reply) => {
 		const body = request.body as {
+			identifier?: string;
 			email?: string;
 			phone?: string;
 			password?: string;
 		};
-		const identifier = body.email?.trim()
-			? normalizeEmail(body.email)
-			: (body.phone?.trim() ?? "");
+		const raw =
+			body.identifier?.trim() ||
+			(body.email?.trim() ? normalizeEmail(body.email) : "") ||
+			(body.phone?.trim() ?? "");
+		const identifier = raw.includes("@") ? raw.toLowerCase() : raw;
 		const generic = () =>
 			reply.code(401).send({ error: "Those sign-in details don't match." });
 

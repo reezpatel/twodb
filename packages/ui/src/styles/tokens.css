@@ -21,14 +21,17 @@
 	--font-cue: "IBM Plex Sans", "Outfit", system-ui, sans-serif;
 	--font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
 
-	--text-xs: 11.5px;
-	--text-sm: 12.5px;
-	--text-md: 13px;
-	--text-lg: 14.5px;
+	--text-xxs: 12px;
+	--text-xs: 13px;
+	--text-sm: 14px;
+	--text-md: 15px;
+	--text-lg: 16px;
 	--text-xl: 20px;
-	--text-2xl: 26px;
+	--text-2xl: 24px;
 	--text-3xl: 34px;
 
+	--tracking-narrowest: -0.02em;
+	--tracking-narrower: 0.06em;
 	--tracking-narrow: 0.1em;
 	--tracking-cue: 0.14em;
 	--measure: 68ch;

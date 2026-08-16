@@ -1,26 +1,33 @@
+import { identityDb } from "../../db";
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { Claim } from "@twodb/contracts";
-import { typedDb } from "@twodb/shared-backend";
+
 import type { AuthCtx } from "../../lib/auth/ctx";
-import type { IdentityDB } from "../../db/schema";
 import type { PluginManifest } from "../../lib/types";
 import { seedAppRoles } from "../../lib/apps/apps";
 
-export function registerPostApps(fastify: FastifyInstance, ctx: AuthCtx): void {
-	const withWorkspace = fastify.withWorkspace;
-	const db = typedDb<IdentityDB>(fastify);
+export function registerPostApps(
+	fastify: FastifyInstance,
+	_ctx: AuthCtx,
+): void {
+	const db = identityDb(fastify);
 
 	fastify.post(
 		"/apps",
 		{
 			preHandler: [
-				withWorkspace({ workspaceIdBody: "workspaceId" }),
-				fastify.requireClaim("plugin.twodb.identity:app.manage"),
+				fastify.identityRequireClaim("plugin.twodb.identity:app.manage"),
 			],
 		},
 		async (request, reply) => {
-			const workspaceCtx = request.workspaceContext!;
+			const principal = request.principal!;
+			const workspaceId = principal.workspaceId;
+			if (!workspaceId || !principal.isWorkspaceMember) {
+				return reply
+					.code(403)
+					.send({ error: "You are not in this workspace." });
+			}
 			const body = request.body as {
 				slug?: string;
 				name?: string;
@@ -54,7 +61,7 @@ export function registerPostApps(fastify: FastifyInstance, ctx: AuthCtx): void {
 					.insertInto("apps")
 					.values({
 						id,
-						workspace_id: workspaceCtx.workspaceId,
+						workspace_id: workspaceId,
 						slug: body.slug.trim(),
 						name: body.name.trim(),
 						manifest: {
@@ -72,10 +79,10 @@ export function registerPostApps(fastify: FastifyInstance, ctx: AuthCtx): void {
 				throw err;
 			}
 			await seedAppRoles(db, id, permissions, roleDefaults);
-			for (const c of permissions) fastify.claimCatalog.all.add(c);
+			for (const c of permissions) fastify.identityClaimCatalog.all.add(c);
 			fastify.bus.emit("twodb.identity.app.created", {
 				appId: id,
-				workspaceId: workspaceCtx.workspaceId,
+				workspaceId,
 			});
 			return reply.code(201).send({ id, slug: body.slug });
 		},

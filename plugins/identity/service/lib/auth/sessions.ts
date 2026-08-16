@@ -49,7 +49,13 @@ export async function resolveSession(
 		.select("user_id")
 		.where("user_id", "=", session.user_id)
 		.executeTakeFirst();
-	return { userId: session.user_id, isSuperadmin: admin !== undefined };
+	return {
+		userId: session.user_id,
+		isSuperadmin: admin !== undefined,
+		workspaceId: null,
+		claims: [],
+		isWorkspaceMember: false,
+	};
 }
 
 export async function destroySession(

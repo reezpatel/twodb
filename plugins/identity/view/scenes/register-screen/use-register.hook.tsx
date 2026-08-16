@@ -1,10 +1,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../utils";
 
-export type AuthMethod = { method: string; enabled: boolean };
-
 export function useAuthMethods() {
-	return useQuery<{ methods?: AuthMethod[] }>({
+	return useQuery<{ methods?: string[] }>({
 		queryKey: ["twodb.identity:auth:methods"],
 		queryFn: () => apiClient.get("/auth/methods"),
 		staleTime: 60_000,

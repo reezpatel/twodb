@@ -26,7 +26,7 @@ export function useMembersAndRoles() {
 		queryKey: ["twodb.identity:workspace:roles", workspaceId],
 		queryFn: async () => {
 			const data = await apiClient.get<{ roles: RoleRow[]; catalog: string[] }>(
-				`/workspaces/${workspaceId}/roles`,
+				`/workspace/roles`,
 			);
 			return {
 				roles: data.roles ?? [],
@@ -40,7 +40,7 @@ export function useMembersAndRoles() {
 		queryKey: ["twodb.identity:workspace:members", workspaceId],
 		queryFn: async () => {
 			const data = await apiClient.get<{ members: Member[] }>(
-				`/workspaces/${workspaceId}/members`,
+				`/workspace/members`,
 			);
 			return data.members ?? [];
 		},
@@ -50,7 +50,7 @@ export function useMembersAndRoles() {
 	const createRole = useMutation({
 		mutationFn: async (vars: { name: string; claims: string[] }) => {
 			if (!workspaceId) throw new Error("No active workspace");
-			await apiClient.post(`/workspaces/${workspaceId}/roles`, {
+			await apiClient.post(`/workspace/roles`, {
 				name: vars.name.trim(),
 				claims: vars.claims,
 			});

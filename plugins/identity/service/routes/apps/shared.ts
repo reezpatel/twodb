@@ -1,12 +1,12 @@
+import { identityDb } from "../../db";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { typedDb } from "@twodb/shared-backend";
+
 import type { Claim } from "@twodb/contracts";
-import type { IdentityDB } from "../../db/schema";
 import type { Principal } from "../../lib/types";
 import { effectiveAppClaims } from "../../lib/apps/apps";
 
 export async function loadAppOr404(fastify: FastifyInstance, appId: string) {
-	const db = typedDb<IdentityDB>(fastify);
+	const db = identityDb(fastify);
 	const row = await db
 		.selectFrom("apps")
 		.select(["id", "workspace_id", "slug", "manifest"])
@@ -43,7 +43,14 @@ export async function requireAppAdmin(
 			body: { error: "Sign in to continue." },
 		};
 	}
-	const db = typedDb<IdentityDB>(request.server);
+	if (app.workspace_id !== principal.workspaceId) {
+		return {
+			ok: false,
+			status: 403,
+			body: { error: "App does not belong to the active workspace." },
+		};
+	}
+	const db = identityDb(request.server);
 	const held = await effectiveAppClaims(
 		db,
 		principal.userId,

@@ -1,9 +1,12 @@
 import { sql, type Kysely } from "kysely";
 import type { Migration } from "kysely/migration";
+import { IDENTITY_SCHEMA as S } from "..";
 
 export const rolesAndGrantsMigration: Migration = {
 	async up(db: Kysely<unknown>) {
-		await db.schema
+		const schema = db.schema.withSchema(S);
+
+		await schema
 			.createTable("roles")
 			.addColumn("id", "text", (c) => c.primaryKey())
 			.addColumn("workspace_id", "text", (c) =>
@@ -16,14 +19,14 @@ export const rolesAndGrantsMigration: Migration = {
 			)
 			.execute();
 
-		await db.schema
+		await schema
 			.createIndex("roles_workspace_name_unique")
 			.on("roles")
 			.columns(["workspace_id", "name"])
 			.unique()
 			.execute();
 
-		await db.schema
+		await schema
 			.createTable("role_claims")
 			.addColumn("role_id", "text", (c) =>
 				c.notNull().references("roles.id").onDelete("cascade"),
@@ -32,7 +35,7 @@ export const rolesAndGrantsMigration: Migration = {
 			.addPrimaryKeyConstraint("role_claims_pk", ["role_id", "claim"])
 			.execute();
 
-		await db.schema
+		await schema
 			.createTable("workspace_role_assignments")
 			.addColumn("workspace_id", "text", (c) =>
 				c.notNull().references("workspaces.id").onDelete("cascade"),
@@ -54,7 +57,7 @@ export const rolesAndGrantsMigration: Migration = {
 			])
 			.execute();
 
-		await db.schema
+		await schema
 			.createTable("entity_grants")
 			.addColumn("id", "text", (c) => c.primaryKey())
 			.addColumn("workspace_id", "text", (c) =>
@@ -72,7 +75,7 @@ export const rolesAndGrantsMigration: Migration = {
 			)
 			.execute();
 
-		await db.schema
+		await schema
 			.createIndex("entity_grants_target_unique")
 			.on("entity_grants")
 			.columns(["workspace_id", "user_id", "entity_type", "entity_id"])

@@ -4,34 +4,47 @@ import fastifyEnv from "@fastify/env";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import { dbPlugin } from "@twodb/shared-backend";
+import { busPlugin, authPlugin } from "@twodb/shared-backend";
 import { envSchema, dotenvPath } from "./config.js";
 import postgresPlugin from "./db/postgres.js";
 import memgraphPlugin from "./db/memgraph.js";
 import { registerStaticApp } from "./static.js";
-import { service as TwodbIdentiy } from "@twodb/identity";
+import { service as TwodbIdentiy } from "@twodb/identity/service";
+import { identityAuthPlugin } from "@twodb/identity/service";
+import { identityManifest } from "@twodb/identity/shared/manifest";
 
 const app = Fastify({ logger: true });
 
 await app.register(cors, { origin: true });
 
 await app.register(fastifyEnv, {
-  dotenv: {
-    path: path.resolve(import.meta.dirname, dotenvPath),
-  },
-  schema: envSchema,
+	dotenv: {
+		path: path.resolve(import.meta.dirname, dotenvPath),
+	},
+	schema: envSchema,
 });
 
 await app.register(postgresPlugin);
 await app.register(memgraphPlugin);
 await app.register(dbPlugin);
 await app.register(cookie);
+await app.register(busPlugin);
+await app.register(authPlugin);
+
+// Global session hook: resolves request.principal and 401s /api/v1/* routes
+// that are not marked public. Registered at the root so it gates every
+// service plugin mounted below.
+await app.register(identityAuthPlugin);
+
+const manifests = [identityManifest];
+app.decorate("installedPluginManifests", manifests);
 
 const plugins = [TwodbIdentiy];
 
 for (const plugin of plugins) {
-  await app.register(plugin.plugin, {
-    prefix: `/api/v1/${plugin.id}`,
-  });
+	await app.register(plugin.plugin, {
+		prefix: `/api/v1/${plugin.id}`,
+	});
 }
 
 // // Core services: the typed backend bus, cookies, the (stub) user context,
@@ -68,7 +81,7 @@ for (const plugin of plugins) {
 // }
 
 app.get("/health", async () => {
-  return { status: "ok" };
+	return { status: "ok" };
 });
 
 // src/db/postgres.js attaches `ping` to the existing `fastify.pg` decorator
@@ -78,25 +91,25 @@ type PgWithPing = typeof app.pg & { ping: () => Promise<unknown> };
 // Deep health check: pings each database so a single endpoint can tell you
 // whether the api is merely up or whether both backends are reachable.
 app.get("/health/ready", async (_request, reply) => {
-  const checks = { postgres: "unknown", memgraph: "unknown" };
+	const checks = { postgres: "unknown", memgraph: "unknown" };
 
-  try {
-    await (app.pg as PgWithPing).ping();
-    checks.postgres = "ok";
-  } catch (err) {
-    checks.postgres = `down: ${err instanceof Error ? err.message : err}`;
-  }
+	try {
+		await (app.pg as PgWithPing).ping();
+		checks.postgres = "ok";
+	} catch (err) {
+		checks.postgres = `down: ${err instanceof Error ? err.message : err}`;
+	}
 
-  try {
-    await app.memgraph.ping();
-    checks.memgraph = "ok";
-  } catch (err) {
-    checks.memgraph = `down: ${err instanceof Error ? err.message : err}`;
-  }
+	try {
+		await app.memgraph.ping();
+		checks.memgraph = "ok";
+	} catch (err) {
+		checks.memgraph = `down: ${err instanceof Error ? err.message : err}`;
+	}
 
-  const allOk = checks.postgres === "ok" && checks.memgraph === "ok";
-  reply.code(allOk ? 200 : 503);
-  return { status: allOk ? "ready" : "degraded", checks };
+	const allOk = checks.postgres === "ok" && checks.memgraph === "ok";
+	reply.code(allOk ? 200 : 503);
+	return { status: allOk ? "ready" : "degraded", checks };
 });
 
 await registerStaticApp(app);
@@ -104,8 +117,8 @@ await registerStaticApp(app);
 const port = app.config.PORT;
 
 try {
-  await app.listen({ port, host: "0.0.0.0" });
+	await app.listen({ port, host: "0.0.0.0" });
 } catch (err) {
-  app.log.error(err);
-  process.exit(1);
+	app.log.error(err);
+	process.exit(1);
 }

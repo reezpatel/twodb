@@ -5,17 +5,18 @@
  * it freely without bundle contamination.
  */
 
+export * from "./auth";
 export * from "./claims";
 export * from "./identity";
 export * from "./plugin";
 
 // TODO: Need to review if we need this
 export {
-  DEFAULT_ROLE_KEYS,
-  ROLE_DEFAULT_KEYS,
-  isDefaultRoleKey,
-  type DefaultRoleKey,
-  type RoleDefaultKey,
+	DEFAULT_ROLE_KEYS,
+	ROLE_DEFAULT_KEYS,
+	isDefaultRoleKey,
+	type DefaultRoleKey,
+	type RoleDefaultKey,
 } from "./roles";
 
 // TODO: Need to review if we need this

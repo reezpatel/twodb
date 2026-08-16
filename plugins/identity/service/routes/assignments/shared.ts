@@ -1,8 +1,8 @@
-import type { typedDb } from "@twodb/shared-backend";
-import type { IdentityDB } from "../../db/schema";
+import { identityDb } from "../../db";
+
 
 export async function ownerRoleId(
-	db: ReturnType<typeof typedDb<IdentityDB>>,
+	db: ReturnType<typeof identityDb>,
 	workspaceId: string,
 ): Promise<string | null> {
 	const row = await db
@@ -15,7 +15,7 @@ export async function ownerRoleId(
 }
 
 export async function ownerAssignmentCount(
-	db: ReturnType<typeof typedDb<IdentityDB>>,
+	db: ReturnType<typeof identityDb>,
 	workspaceId: string,
 	ownerId: string,
 ): Promise<number> {

@@ -1,7 +1,7 @@
+import { identityDb } from "../../db";
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { typedDb } from "@twodb/shared-backend";
-import type { IdentityDB } from "../../db/schema";
+
 
 /**
  * Admin helpers (task-08 §8.2 + §8.5).
@@ -49,7 +49,7 @@ export async function audit(
 		payload?: Record<string, unknown>;
 	},
 ): Promise<void> {
-	const db = typedDb<IdentityDB>(fastify);
+	const db = identityDb(fastify);
 	const id = `aud-${randomBytes(8).toString("base64url")}`;
 	const safe = redact(args.payload ?? {});
 	await db

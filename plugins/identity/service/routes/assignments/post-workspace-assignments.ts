@@ -1,27 +1,28 @@
+import { identityDb } from "../../db";
 import type { FastifyInstance } from "fastify";
-import type { Principal } from "../../lib/types";
 import type { AuthCtx } from "../../lib/auth/ctx";
-import { newId, typedDb } from "@twodb/shared-backend";
-import type { IdentityDB } from "../../db/schema";
+import { newId } from "@twodb/shared-backend";
 
 export function registerPostWorkspaceAssignments(
 	fastify: FastifyInstance,
-	ctx: AuthCtx,
+	_ctx: AuthCtx,
 ): void {
-	const requireClaim = fastify.requireClaim;
-	const withWorkspace = fastify.withWorkspace;
-	const db = typedDb<IdentityDB>(fastify);
+	const identityRequireClaim = fastify.identityRequireClaim;
+	const db = identityDb(fastify);
 
 	fastify.post(
-		"/workspaces/:id/assignments",
+		"/workspace/assignments",
 		{
-			preHandler: [
-				withWorkspace({ entity: "workspaces", idParam: "id" }),
-				requireClaim("plugin.twodb.identity:role.manage"),
-			],
+			preHandler: [identityRequireClaim("plugin.twodb.identity:role.manage")],
 		},
 		async (request, reply) => {
-			const workspaceCtx = request.workspaceContext!;
+			const principal = request.principal!;
+			const workspaceId = principal.workspaceId;
+			if (!workspaceId || !principal.isWorkspaceMember) {
+				return reply
+					.code(403)
+					.send({ error: "You are not in this workspace." });
+			}
 			const body = request.body as { userId?: string; roleId?: string };
 			if (!body.userId || !body.roleId) {
 				return reply
@@ -31,7 +32,7 @@ export function registerPostWorkspaceAssignments(
 			const member = await db
 				.selectFrom("workspace_members")
 				.select("user_id")
-				.where("workspace_id", "=", workspaceCtx.workspaceId)
+				.where("workspace_id", "=", workspaceId)
 				.where("user_id", "=", body.userId)
 				.executeTakeFirst();
 			if (!member) {
@@ -46,7 +47,7 @@ export function registerPostWorkspaceAssignments(
 				const role = await db
 					.selectFrom("roles")
 					.select(["id", "key"])
-					.where("workspace_id", "=", workspaceCtx.workspaceId)
+					.where("workspace_id", "=", workspaceId)
 					.where("key", "=", roleId)
 					.executeTakeFirst();
 				if (!role) {
@@ -64,7 +65,7 @@ export function registerPostWorkspaceAssignments(
 					.insertInto("workspace_role_assignments")
 					.values({
 						id: assignmentId,
-						workspace_id: workspaceCtx.workspaceId,
+						workspace_id: workspaceId,
 						user_id: body.userId,
 						role_id: roleId,
 					})
@@ -78,7 +79,7 @@ export function registerPostWorkspaceAssignments(
 				throw err;
 			}
 			fastify.bus.emit("twodb.identity.role.assigned", {
-				workspaceId: workspaceCtx.workspaceId,
+				workspaceId,
 				userId: body.userId,
 				roleId,
 			});

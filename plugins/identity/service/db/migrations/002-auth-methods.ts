@@ -1,9 +1,12 @@
 import { sql, type Kysely } from "kysely";
 import type { Migration } from "kysely/migration";
+import { IDENTITY_SCHEMA as S } from "..";
 
 export const authMethodsMigration: Migration = {
 	async up(db: Kysely<unknown>) {
-		await db.schema
+		const schema = db.schema.withSchema(S);
+
+		await schema
 			.createTable("user_auth_methods")
 			.addColumn("id", "text", (c) => c.primaryKey())
 			.addColumn("user_id", "text", (c) =>
@@ -17,21 +20,21 @@ export const authMethodsMigration: Migration = {
 			)
 			.execute();
 
-		await db.schema
+		await schema
 			.createIndex("user_auth_methods_user_method_unique")
 			.on("user_auth_methods")
 			.columns(["user_id", "method"])
 			.unique()
 			.execute();
 
-		await db.schema
+		await schema
 			.createTable("deployment_auth_methods")
 			.addColumn("method", "text", (c) => c.primaryKey())
 			.addColumn("config", "jsonb", (c) => c.notNull())
 			.addColumn("enabled", "boolean", (c) => c.notNull().defaultTo(false))
 			.execute();
 
-		await db.schema
+		await schema
 			.createTable("verification_codes")
 			.addColumn("id", "text", (c) => c.primaryKey())
 			.addColumn("identifier", "text", (c) => c.notNull())
@@ -44,7 +47,7 @@ export const authMethodsMigration: Migration = {
 			)
 			.execute();
 
-		await db.schema
+		await schema
 			.createIndex("verification_codes_identifier_purpose")
 			.on("verification_codes")
 			.columns(["identifier", "purpose"])
@@ -53,12 +56,12 @@ export const authMethodsMigration: Migration = {
 		// Retrofit task-02: the password hash moves off the users row into
 		// a user_auth_methods row (method 'password').
 		await sql`
-			insert into user_auth_methods (id, user_id, method, credential, enabled, created_at)
+			insert into ${sql.id(S, "user_auth_methods")} (id, user_id, method, credential, enabled, created_at)
 			select 'amt-' || replace(gen_random_uuid()::text, '-', ''),
 			       id, 'password', jsonb_build_object('hash', password_hash), true, now()
-			from users
+			from ${sql.id(S, "users")}
 		`.execute(db);
 
-		await db.schema.alterTable("users").dropColumn("password_hash").execute();
+		await schema.alterTable("users").dropColumn("password_hash").execute();
 	},
 };

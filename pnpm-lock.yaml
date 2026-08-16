@@ -355,6 +355,9 @@ importers:
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
     devDependencies:
       '@fastify/cookie':
         specifier: ^11.1.2

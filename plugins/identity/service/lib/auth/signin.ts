@@ -35,5 +35,11 @@ export async function principalFor(
 		.select("user_id")
 		.where("user_id", "=", userId)
 		.executeTakeFirst();
-	return { userId, isSuperadmin: admin !== undefined };
+	return {
+		userId,
+		isSuperadmin: admin !== undefined,
+		workspaceId: null,
+		claims: [],
+		isWorkspaceMember: false,
+	};
 }

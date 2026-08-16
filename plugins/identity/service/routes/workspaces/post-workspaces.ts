@@ -64,7 +64,7 @@ export function registerPostWorkspaces(
 			const roleIds = await seedWorkspaceRoles(
 				db,
 				workspaceId,
-				fastify.claimCatalog.all,
+				fastify.identityClaimCatalog.all,
 				allManifests,
 			);
 			await db

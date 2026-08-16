@@ -23,7 +23,7 @@ export function useShareDialog(props: ShareDialogProps) {
 		],
 		queryFn: async () => {
 			const data = await apiClient.get<{ grants: GrantRow[] }>(
-				`/grants?workspaceId=${encodeURIComponent(props.workspaceId)}&entityType=${encodeURIComponent(props.entityType)}&entityId=${encodeURIComponent(props.entityId)}`,
+				`/grants?entityType=${encodeURIComponent(props.entityType)}&entityId=${encodeURIComponent(props.entityId)}`,
 			);
 			return data.grants ?? [];
 		},
@@ -36,7 +36,7 @@ export function useShareDialog(props: ShareDialogProps) {
 
 			const claim = vars.level === "edit" ? editableClaim : readableClaim;
 			const inviteRes = await apiClient.post<{ userId: string }>(
-				`/workspaces/${identity.workspaceId}/members`,
+				`/workspace/members`,
 				{
 					identifier: vars.email.trim(),
 					role: "guest",
@@ -44,7 +44,6 @@ export function useShareDialog(props: ShareDialogProps) {
 			);
 
 			await apiClient.post("/grants", {
-				workspaceId: identity.workspaceId,
 				entityType: props.entityType,
 				entityId: props.entityId,
 				userId: inviteRes.userId,
@@ -56,9 +55,7 @@ export function useShareDialog(props: ShareDialogProps) {
 
 	const revoke = useMutation({
 		mutationFn: async (grantId: string) => {
-			await apiClient.del(`/grants/${grantId}`, {
-				workspaceId: props.workspaceId,
-			});
+			await apiClient.del(`/grants/${grantId}`);
 		},
 		onSuccess: () => grantsQuery.refetch(),
 	});

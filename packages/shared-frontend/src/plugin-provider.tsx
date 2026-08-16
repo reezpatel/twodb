@@ -1,5 +1,6 @@
 import type { ViewPluginManifest } from "@twodb/contracts";
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { createPluginStore, PluginProvider } from "react-pluggable";
 
 export type TwoDbPluginCtx = {};
 
@@ -10,10 +11,18 @@ export type TwoDbPluginProviderProps = {
 
 const ProviderContext = createContext<TwoDbPluginCtx | null>(null);
 
+const pluginStore = createPluginStore();
+
 export const TwoDbPluginProvider: React.FC<TwoDbPluginProviderProps> = ({
   children,
-  plugins,
+  plugins = [],
 }) => {
+  useEffect(() => {
+    for (const plugin of plugins) {
+      pluginStore.install(plugin.plugin);
+    }
+  }, []);
+
   const providers = (plugins ?? [])
     .filter(
       (
@@ -30,7 +39,11 @@ export const TwoDbPluginProvider: React.FC<TwoDbPluginProviderProps> = ({
   );
 
   return (
-    <ProviderContext.Provider value={null}>{wrapped}</ProviderContext.Provider>
+    <PluginProvider pluginStore={pluginStore}>
+      <ProviderContext.Provider value={null}>
+        {wrapped}
+      </ProviderContext.Provider>
+    </PluginProvider>
   );
 };
 

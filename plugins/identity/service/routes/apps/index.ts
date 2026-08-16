@@ -17,5 +17,5 @@ export function registerAppRoutes(
 	registerDeleteAppAssignment(fastify, ctx);
 
 	// Mark requireAppClaim as used (registered above for future dogfood routes).
-	void fastify.requireAppClaim;
+	void fastify.identityRequireAppClaim;
 }

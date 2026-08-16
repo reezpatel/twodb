@@ -1,6 +1,8 @@
 import type { Claim, Principal } from "@twodb/contracts";
 import type { ClaimCatalog } from "./catalog";
 
+export type { Principal } from "@twodb/contracts";
+
 declare module "fastify" {
 	interface FastifyInstance {
 		claimCatalog: ClaimCatalog;

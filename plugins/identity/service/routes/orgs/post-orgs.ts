@@ -42,7 +42,7 @@ export function registerPostOrgs(fastify: FastifyInstance, ctx: AuthCtx): void {
 			}
 			throw err;
 		}
-		const catalog = fastify.claimCatalog;
+		const identityCatalog = fastify.identityClaimCatalog;
 		const defaultWorkspaceId = newId("wks");
 		try {
 			await db
@@ -64,7 +64,7 @@ export function registerPostOrgs(fastify: FastifyInstance, ctx: AuthCtx): void {
 			const roleIds = await seedWorkspaceRoles(
 				db,
 				defaultWorkspaceId,
-				catalog.all,
+				identityCatalog.all,
 				[identityManifest as unknown as PluginManifest],
 			);
 			await db

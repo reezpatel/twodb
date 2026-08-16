@@ -1,6 +1,6 @@
 import fp from "fastify-plugin";
 import type { FastifyInstance } from "fastify";
-import { Kysely, PostgresDialect } from "kysely";
+import { Kysely, PostgresDialect, WithSchemaPlugin } from "kysely";
 import { Migrator, type Migration } from "kysely/migration";
 import type { Pool } from "pg";
 
@@ -25,6 +25,21 @@ export function typedDb<DB>(fastify: FastifyInstance): Kysely<DB> {
 	return fastify.db as unknown as Kysely<DB>;
 }
 
+/** Postgres schema owned by a plugin: `io.twodb.identity` -> `io_twodb_identity`. */
+export function pluginSchemaName(pluginId: string): string {
+	return pluginId.replaceAll(".", "_");
+}
+
+/** db handle that resolves every unqualified table into the plugin's schema. */
+export function scopedDb<DB>(
+	fastify: FastifyInstance,
+	pluginId: string,
+): Kysely<DB> {
+	return typedDb<DB>(fastify).withPlugin(
+		new WithSchemaPlugin(pluginSchemaName(pluginId)),
+	);
+}
+
 export async function runPluginMigrations<DB>(
 	db: Kysely<DB>,
 	pluginId: string,
@@ -32,7 +47,8 @@ export async function runPluginMigrations<DB>(
 ): Promise<void> {
 	const migrator = new Migrator({
 		db,
-		migrationTableName: `kysely_migration_${pluginId.replaceAll(".", "_")}`,
+		migrationTableName: "kysely_migration",
+		migrationTableSchema: pluginSchemaName(pluginId),
 		provider: { getMigrations: async () => migrations },
 	});
 	const { error, results } = await migrator.migrateToLatest();

@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type { PluginManifest, Claim, PluginId } from "@twodb/contracts";
-import { buildClaimCatalog, claimOwner, danglingClaims } from "./catalog";
+import type { Claim } from "@twodb/contracts";
+import {
+	buildClaimCatalog,
+	claimOwner,
+	danglingClaims,
+	type PluginManifest,
+	type PluginId,
+} from "./catalog";
 
 const notesManifest: PluginManifest = {
 	id: "twodb.notes",
 	name: "Notes",
 	version: "1.0.0",
-	provides: { functions: [], routes: ["/api/v1/twodb.notes"] },
-	emits: [],
-	consumes: [],
 	permissions: [
 		"plugin.twodb.notes:note.create",
 		"plugin.twodb.notes:note.edit",
@@ -35,9 +38,6 @@ const identityManifest: PluginManifest = {
 	id: "twodb.identity",
 	name: "Identity",
 	version: "1.0.0",
-	provides: { functions: [], routes: ["/api/v1/twodb.identity"] },
-	emits: [],
-	consumes: [],
 	permissions: [
 		"plugin.twodb.identity:workspace.manage",
 		"plugin.twodb.identity:member.invite",
@@ -54,9 +54,6 @@ const ledgerManifest: PluginManifest = {
 	id: "ledger",
 	name: "Ledger App",
 	version: "1.0.0",
-	provides: { functions: [], routes: [] },
-	emits: [],
-	consumes: [],
 	permissions: ["app.ledger:entry.create", "app.ledger:entry.read"],
 };
 
@@ -94,7 +91,7 @@ describe("buildClaimCatalog", () => {
 			roleDefaults: {},
 			permissions: ["not-a-claim" as unknown as Claim],
 		};
-		await expect(buildClaimCatalog([bad])).rejects.toThrow(/not a valid claim/);
+		await expect(buildClaimCatalog([bad])).rejects.toThrow(/invalid claim/);
 	});
 
 	it("throws when roleDefaults references an undeclared claim", async () => {

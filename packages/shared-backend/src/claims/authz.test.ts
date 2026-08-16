@@ -4,13 +4,17 @@ import Fastify, { type FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
 import { Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
-import { SESSION_COOKIE } from "@twodb/contracts";
-import type { PluginManifest, Principal } from "@twodb/contracts";
+import {
+	buildClaimCatalog,
+	type ClaimCatalog,
+	type PluginManifest,
+} from "./catalog";
+import type { Principal } from "./index";
 import { createSession, hashToken } from "@twodb/identity/sessions";
+import { SESSION_COOKIE } from "@twodb/identity/shared/constants";
 import type { IdentityDB } from "@twodb/identity/schema";
 import { sql } from "kysely";
 
-import { buildClaimCatalog, type ClaimCatalog } from "./catalog";
 import { makeRequireClaim } from "./requireClaim";
 import { makeRequireAppClaim } from "./requireAppClaim";
 import { makeWithWorkspace } from "./withWorkspace";
@@ -19,9 +23,6 @@ const notesManifest: PluginManifest = {
 	id: "twodb.notes",
 	name: "Notes",
 	version: "1.0.0",
-	provides: { functions: [], routes: [] },
-	emits: [],
-	consumes: [],
 	permissions: [
 		"plugin.twodb.notes:note.create",
 		"plugin.twodb.notes:note.read",
@@ -33,9 +34,6 @@ const ledgerManifest: PluginManifest = {
 	id: "ledger",
 	name: "Ledger",
 	version: "1.0.0",
-	provides: { functions: [], routes: [] },
-	emits: [],
-	consumes: [],
 	permissions: ["app.ledger:entry.create"],
 };
 
@@ -204,6 +202,9 @@ async function buildApp() {
 		(request as unknown as { principal: Principal }).principal = {
 			userId: session.user_id,
 			isSuperadmin: admin !== undefined,
+			workspaceId: null,
+			claims: [],
+			isWorkspaceMember: false,
 		};
 	});
 

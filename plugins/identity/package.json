@@ -4,15 +4,20 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		".": "./index.ts",
-		"./schema": "./service/lib/db/schema.ts"
+		"./service": "./service/index.ts",
+		"./view": "./view/index.ts",
+		"./shared/manifest": "./shared/manifest.ts",
+		"./schema": "./service/db/schema.ts",
+		"./sessions": "./service/lib/auth/sessions.ts",
+		"./shared/constants": "./shared/constants.ts"
 	},
 	"dependencies": {
 		"@twodb/contracts": "workspace:*",
 		"@twodb/shared-backend": "workspace:*",
 		"@twodb/shared-frontend": "workspace:*",
 		"@twodb/ui": "workspace:*",
-		"kysely": "^0.29.5"
+		"kysely": "^0.29.5",
+		"styled-jsx": "^5.1.7"
 	},
 	"devDependencies": {
 		"@fastify/cookie": "^11.1.2",

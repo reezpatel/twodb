@@ -1,28 +1,30 @@
+import { identityDb } from "../../db";
 import type { FastifyInstance } from "fastify";
-import type { Principal } from "../../lib/types";
 import type { AuthCtx } from "../../lib/auth/ctx";
-import { typedDb, newId } from "@twodb/shared-backend";
+import { newId } from "@twodb/shared-backend";
 import type { IdentifierMode, IdentityDB } from "../../db/schema";
 
 export function registerPostWorkspaceMembers(
 	fastify: FastifyInstance,
-	ctx: AuthCtx,
+	_ctx: AuthCtx,
 ): void {
-	const withWorkspace = fastify.withWorkspace;
-	const requireClaim = fastify.requireClaim;
-	const db = typedDb<IdentityDB>(fastify);
+	const identityRequireClaim = fastify.identityRequireClaim;
+	const db = identityDb(fastify);
 
 	fastify.post(
-		"/workspaces/:id/members",
+		"/workspace/members",
 		{
-			preHandler: [
-				withWorkspace({ entity: "workspaces", idParam: "id" }),
-				requireClaim("plugin.twodb.identity:member.invite"),
-			],
+			preHandler: [identityRequireClaim("plugin.twodb.identity:member.invite")],
 		},
 		async (request, reply) => {
-			const workspaceCtx = request.workspaceContext!;
-			const inviter = request.principal as Principal;
+			const principal = request.principal!;
+			const workspaceId = principal.workspaceId;
+			if (!workspaceId || !principal.isWorkspaceMember) {
+				return reply
+					.code(403)
+					.send({ error: "You are not in this workspace." });
+			}
+			const inviter = principal;
 			const mode = (
 				request.server as unknown as {
 					config: { TWODB_IDENTIFIER: IdentifierMode };
@@ -55,7 +57,6 @@ export function registerPostWorkspaceMembers(
 				userId = existing.id;
 			} else {
 				userId = newId("usr");
-				const identifierColumn = mode === "phone" ? null : identifier;
 				await db
 					.insertInto("users")
 					.values({
@@ -71,14 +72,14 @@ export function registerPostWorkspaceMembers(
 
 			await db
 				.insertInto("workspace_members")
-				.values({ workspace_id: workspaceCtx.workspaceId, user_id: userId })
+				.values({ workspace_id: workspaceId, user_id: userId })
 				.onConflict((oc) => oc.doNothing())
 				.execute();
 
 			const role = await db
 				.selectFrom("roles")
 				.select("id")
-				.where("workspace_id", "=", workspaceCtx.workspaceId)
+				.where("workspace_id", "=", workspaceId)
 				.where("key", "=", roleKey)
 				.executeTakeFirst();
 			if (!role) {
@@ -90,7 +91,7 @@ export function registerPostWorkspaceMembers(
 				.insertInto("workspace_role_assignments")
 				.values({
 					id: newId("asg"),
-					workspace_id: workspaceCtx.workspaceId,
+					workspace_id: workspaceId,
 					user_id: userId,
 					role_id: role.id,
 					assigned_by: inviter.userId,
@@ -99,11 +100,11 @@ export function registerPostWorkspaceMembers(
 				.execute();
 
 			fastify.bus.emit("twodb.identity.workspace.member.added", {
-				workspaceId: workspaceCtx.workspaceId,
+				workspaceId,
 				userId,
 			});
 			fastify.bus.emit("twodb.identity.role.assigned", {
-				workspaceId: workspaceCtx.workspaceId,
+				workspaceId,
 				userId,
 				roleId: role.id,
 			});

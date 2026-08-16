@@ -1,27 +1,17 @@
+import { identityDb } from "../../db";
 import type { FastifyInstance } from "fastify";
-import { typedDb } from "@twodb/shared-backend";
+
 import type { AuthCtx } from "../../lib/auth/ctx";
-import type { IdentityDB } from "../../db/schema";
 import { requireAppAdmin } from "./shared";
 
 export function registerDeleteAppAssignment(
 	fastify: FastifyInstance,
-	ctx: AuthCtx,
+	_ctx: AuthCtx,
 ): void {
-	const withWorkspace = fastify.withWorkspace;
-	const db = typedDb<IdentityDB>(fastify);
+	const db = identityDb(fastify);
 
 	fastify.delete(
 		"/apps/:appId/assignments/:assignmentId",
-		{
-			preHandler: [
-				withWorkspace({
-					entity: "apps",
-					idParam: "appId",
-					workspaceField: "workspace_id",
-				}),
-			],
-		},
 		async (request, reply) => {
 			const { appId, assignmentId } = request.params as {
 				appId: string;

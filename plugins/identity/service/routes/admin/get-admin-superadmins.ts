@@ -1,14 +1,14 @@
+import { identityDb } from "../../db";
 import type { FastifyInstance } from "fastify";
-import { typedDb } from "@twodb/shared-backend";
+
 import type { AuthCtx } from "../../lib/auth/ctx";
-import type { IdentityDB } from "../../db/schema";
 import { adminGate } from "./shared";
 
 export function registerGetAdminSuperadmins(
 	fastify: FastifyInstance,
 	ctx: AuthCtx,
 ): void {
-	const db = typedDb<IdentityDB>(fastify);
+	const db = identityDb(fastify);
 	const gate = adminGate(fastify);
 
 	fastify.get("/admin/superadmins", { preHandler: gate }, async () => {
