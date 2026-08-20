@@ -17,6 +17,7 @@
     "@fastify/env": "^7.0.0",
     "@fastify/postgres": "^6.1.0",
     "@fastify/static": "^10.1.3",
+    "@twodb/content": "workspace:*",
     "@twodb/contracts": "workspace:*",
     "@twodb/identity": "workspace:*",
     "@twodb/shared-backend": "workspace:*",

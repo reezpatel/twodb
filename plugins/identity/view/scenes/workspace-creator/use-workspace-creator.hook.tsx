@@ -2,7 +2,7 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { ApiError } from "@twodb/shared-frontend";
-import { useTwoDbIdentity } from "../../provider/IdentityProvider";
+import { useTwoDbIdentity } from "../../provider/identity-provider";
 import { apiClient } from "../../utils";
 
 type Step = "org" | "workspace";

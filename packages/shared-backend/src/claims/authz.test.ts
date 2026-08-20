@@ -15,9 +15,9 @@ import { SESSION_COOKIE } from "@twodb/identity/shared/constants";
 import type { IdentityDB } from "@twodb/identity/schema";
 import { sql } from "kysely";
 
-import { makeRequireClaim } from "./requireClaim";
-import { makeRequireAppClaim } from "./requireAppClaim";
-import { makeWithWorkspace } from "./withWorkspace";
+import { makeRequireClaim } from "./require-claim";
+import { makeRequireAppClaim } from "./require-app-claim";
+import { makeWithWorkspace } from "./with-workspace";
 
 const notesManifest: PluginManifest = {
 	id: "twodb.notes",

@@ -2,7 +2,7 @@ import { useForm } from "@tanstack/react-form";
 import { Button, Input } from "@twodb/ui";
 import { AuthShell } from "../../components/auth-shell/auth-shell";
 import { useVerify } from "./use-verify.hook";
-import { useTwoDbIdentity } from "../../provider/IdentityProvider";
+import { useTwoDbIdentity } from "../../provider/identity-provider";
 
 export function VerifyScreen() {
 	const { userName, sent, requestCode, confirm, error } = useVerify();

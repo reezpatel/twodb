@@ -7,6 +7,7 @@
 
 export * from "./auth";
 export * from "./claims";
+export * from "./content";
 export * from "./identity";
 export * from "./plugin";
 

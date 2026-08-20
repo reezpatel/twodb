@@ -5,13 +5,15 @@ import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import { dbPlugin } from "@twodb/shared-backend";
 import { busPlugin, authPlugin } from "@twodb/shared-backend";
-import { envSchema, dotenvPath } from "./config.js";
-import postgresPlugin from "./db/postgres.js";
-import memgraphPlugin from "./db/memgraph.js";
-import { registerStaticApp } from "./static.js";
+import { envSchema, dotenvPath } from "./config";
+import postgresPlugin from "./db/postgres";
+import memgraphPlugin from "./db/memgraph";
+import { registerStaticApp } from "./static";
 import { service as TwodbIdentiy } from "@twodb/identity/service";
 import { identityAuthPlugin } from "@twodb/identity/service";
 import { identityManifest } from "@twodb/identity/shared/manifest";
+import { service as TwodbContent } from "@twodb/content/service";
+import { contentManifest } from "@twodb/content/shared/manifest";
 
 const app = Fastify({ logger: true });
 
@@ -36,10 +38,10 @@ await app.register(authPlugin);
 // service plugin mounted below.
 await app.register(identityAuthPlugin);
 
-const manifests = [identityManifest];
+const manifests = [identityManifest, contentManifest];
 app.decorate("installedPluginManifests", manifests);
 
-const plugins = [TwodbIdentiy];
+const plugins = [TwodbIdentiy, TwodbContent];
 
 for (const plugin of plugins) {
 	await app.register(plugin.plugin, {

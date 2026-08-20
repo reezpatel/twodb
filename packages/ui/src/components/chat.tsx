@@ -12,11 +12,11 @@ import {
 	SmilePlus,
 	MessageSquareReply,
 } from "lucide-react";
-import { Avatar } from "./Avatar";
-import { Badge } from "./Badge";
-import { Button } from "./Button";
-import { IconButton } from "./IconButton";
-import { chatStyles } from "./Chat.style";
+import { Avatar } from "./avatar";
+import { Badge } from "./badge";
+import { Button } from "./button";
+import { IconButton } from "./icon-button";
+import { chatStyles } from "./chat.style";
 
 /* ---------------- Shell ---------------- */
 

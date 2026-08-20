@@ -35,6 +35,7 @@ export interface ShellState {
 
 	pickSidebar: (id: string) => void;
 	openNote: (id: string) => void;
+	closeNote: () => void;
 	addNote: () => void;
 	setQuery: (query: string) => void;
 	toggleSearch: () => void;
@@ -93,6 +94,10 @@ function useShellStateValue(): ShellState {
 		setStarred(false);
 	}
 
+	function closeNote() {
+		setOpenId(null);
+	}
+
 	function addNote() {
 		addedSeq += 1;
 		const note: Note = {
@@ -144,6 +149,7 @@ function useShellStateValue(): ShellState {
 		visible,
 		pickSidebar,
 		openNote,
+		closeNote,
 		addNote,
 		setQuery,
 		toggleSearch,

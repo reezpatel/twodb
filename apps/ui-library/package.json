@@ -14,7 +14,6 @@
     "d3-force": "^3.0.0",
     "d3-selection": "^3.0.0",
     "d3-zoom": "^3.0.0",
-    "lucide-react": "^1.29.0",
     "styled-jsx": "^5.1.7"
   },
   "devDependencies": {

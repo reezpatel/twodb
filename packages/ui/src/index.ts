@@ -7,96 +7,96 @@ import "@fontsource/outfit/700.css";
 import "@fontsource/ibm-plex-sans/500.css";
 import "@fontsource/ibm-plex-sans/600.css";
 
-import "./styles.css";
+import "./styles";
 
-export { Button } from "./components/Button";
+export { Button } from "./components/button";
 export type {
 	ButtonProps,
 	ButtonVariant,
 	ButtonSize,
-} from "./components/Button";
+} from "./components/button";
 
-export { Input } from "./components/Input";
-export type { InputProps, InputSize } from "./components/Input";
+export { Input } from "./components/input";
+export type { InputProps, InputSize } from "./components/input";
 
-export { Textarea } from "./components/Textarea";
-export type { TextareaProps } from "./components/Textarea";
+export { Textarea } from "./components/textarea";
+export type { TextareaProps } from "./components/textarea";
 
-export { Select } from "./components/Select";
-export type { SelectProps } from "./components/Select";
+export { Select } from "./components/select";
+export type { SelectProps } from "./components/select";
 
-export { Checkbox } from "./components/Checkbox";
-export type { CheckboxProps } from "./components/Checkbox";
+export { Checkbox } from "./components/checkbox";
+export type { CheckboxProps } from "./components/checkbox";
 
-export { Checklist, CheckItem } from "./components/Checklist";
+export { Checklist, CheckItem } from "./components/checklist";
 export type {
 	ChecklistProps,
 	CheckItemProps,
 	ChecklistPriority,
-} from "./components/Checklist";
+} from "./components/checklist";
 
-export { Radio } from "./components/Radio";
-export type { RadioProps } from "./components/Radio";
+export { Radio } from "./components/radio";
+export type { RadioProps } from "./components/radio";
 
-export { Switch } from "./components/Switch";
-export type { SwitchProps } from "./components/Switch";
+export { Switch } from "./components/switch";
+export type { SwitchProps } from "./components/switch";
 
-export { Badge } from "./components/Badge";
-export type { BadgeProps, BadgeTone, BadgeSize } from "./components/Badge";
+export { Badge } from "./components/badge";
+export type { BadgeProps, BadgeTone, BadgeSize } from "./components/badge";
 
-export { TagChip } from "./components/TagChip";
-export type { TagChipIcon, TagChipProps } from "./components/TagChip";
+export { TagChip } from "./components/tag-chip";
+export type { TagChipIcon, TagChipProps } from "./components/tag-chip";
 
-export { Card } from "./components/Card";
-export type { CardDensity, CardProps, CardTone } from "./components/Card";
+export { Card } from "./components/card";
+export type { CardDensity, CardProps, CardTone } from "./components/card";
 
-export { Tabs } from "./components/Tabs";
-export type { TabsProps, TabItem } from "./components/Tabs";
+export { Tabs } from "./components/tabs";
+export type { TabsProps, TabItem } from "./components/tabs";
 
-export { Segmented } from "./components/Segmented";
-export type { SegmentedProps, SegmentedItem } from "./components/Segmented";
+export { Segmented } from "./components/segmented";
+export type { SegmentedProps, SegmentedItem } from "./components/segmented";
 
-export { Dialog } from "./components/Dialog";
-export type { DialogProps } from "./components/Dialog";
+export { Dialog } from "./components/dialog";
+export type { DialogProps } from "./components/dialog";
 
-export { Avatar } from "./components/Avatar";
+export { Avatar } from "./components/avatar";
 export type {
 	AvatarProps,
 	AvatarSize,
 	AvatarPresence,
-} from "./components/Avatar";
+} from "./components/avatar";
 
-export { Divider } from "./components/Divider";
-export type { DividerProps } from "./components/Divider";
+export { Divider } from "./components/divider";
+export type { DividerProps } from "./components/divider";
 
-export { Skeleton } from "./components/Skeleton";
-export type { SkeletonProps } from "./components/Skeleton";
+export { Skeleton } from "./components/skeleton";
+export type { SkeletonProps } from "./components/skeleton";
 
-export { Tooltip } from "./components/Tooltip";
-export type { TooltipProps, TooltipSide } from "./components/Tooltip";
+export { Tooltip } from "./components/tooltip";
+export type { TooltipProps, TooltipSide } from "./components/tooltip";
 
-export { Kbd } from "./components/Kbd";
-export type { KbdProps } from "./components/Kbd";
+export { Kbd } from "./components/kbd";
+export type { KbdProps } from "./components/kbd";
 
-export { IconButton } from "./components/IconButton";
+export { IconButton } from "./components/icon-button";
 export type {
 	IconButtonProps,
 	IconButtonVariant,
 	IconButtonSize,
-} from "./components/IconButton";
+} from "./components/icon-button";
 
-export { Menu, MenuItem, MenuDivider } from "./components/Menu";
+export { Menu, MenuItem, MenuDivider } from "./components/menu";
 export type {
 	MenuProps,
 	MenuItemProps,
 	MenuPlacement,
-} from "./components/Menu";
+} from "./components/menu";
 
-export { SearchInput } from "./components/SearchInput";
-export type { SearchInputProps } from "./components/SearchInput";
+export { SearchInput } from "./components/search-input";
+export type { SearchInputProps } from "./components/search-input";
 
-export { NavRail } from "./components/NavRail";
-export type { NavRailProps, NavRailItem } from "./components/NavRail";
+export { NavRail } from "./components/nav-rail";
+export type { NavRailProps, NavRailItem } from "./components/nav-rail";
 
 export {
 	NavPanel,
@@ -118,33 +118,33 @@ export type {
 	NavPanelTreeProps,
 } from "./components/nav-panel";
 
-export { AccountMenu } from "./components/AccountMenu";
-export type { AccountMenuProps } from "./components/AccountMenu";
+export { AccountMenu } from "./components/account-menu";
+export type { AccountMenuProps } from "./components/account-menu";
 
-export { Table, THead, TBody, TR, TH, TD } from "./components/Table";
-export type { THProps, TDProps } from "./components/Table";
+export { Table, THead, TBody, TR, TH, TD } from "./components/table";
+export type { THProps, TDProps } from "./components/table";
 
-export { DataTable } from "./components/DataTable";
+export { DataTable } from "./components/data-table";
 export type {
 	DataTableProps,
 	DataColumn,
 	FilterSpec,
 	FilterRule,
-} from "./components/DataTable";
+} from "./components/data-table";
 
-export { DataGantt } from "./components/DataGantt";
+export { DataGantt } from "./components/data-gantt";
 export type {
 	DataGanttProps,
 	DataGanttItem,
 	DataGanttMeta,
 	DataGanttMilestone,
-} from "./components/DataGantt";
+} from "./components/data-gantt";
 
 export { CellView, CellEditor } from "./components/cells";
 export type { CellType, CellOption } from "./components/cells";
 
-export { Calendar } from "./components/Calendar";
-export type { CalendarProps } from "./components/Calendar";
+export { Calendar } from "./components/calendar";
+export type { CalendarProps } from "./components/calendar";
 
 export {
 	DatePicker,
@@ -184,48 +184,48 @@ export type {
 	ChatComposerProps,
 } from "./components/chat";
 
-export { MarkdownEditor } from "./components/MarkdownEditor";
-export type { MarkdownEditorProps } from "./components/MarkdownEditor";
+export { MarkdownEditor } from "./components/markdown-editor";
+export type { MarkdownEditorProps } from "./components/markdown-editor";
 
-export { SettingGroup, SettingRow } from "./components/SettingRow";
+export { SettingGroup, SettingRow } from "./components/setting-row";
 export type {
 	SettingGroupProps,
 	SettingRowProps,
-} from "./components/SettingRow";
+} from "./components/setting-row";
 
-export { PasswordInput } from "./components/PasswordInput";
-export type { PasswordInputProps } from "./components/PasswordInput";
+export { PasswordInput } from "./components/password-input";
+export type { PasswordInputProps } from "./components/password-input";
 
-export { ColorPicker, CURATED_COLORS } from "./components/ColorPicker";
+export { ColorPicker, CURATED_COLORS } from "./components/color-picker";
 export type {
 	ColorPickerProps,
 	ColorSwatchOption,
-} from "./components/ColorPicker";
+} from "./components/color-picker";
 
-export { QRCode } from "./components/QRCode";
-export type { QRCodeProps } from "./components/QRCode";
+export { QRCode } from "./components/qr-code";
+export type { QRCodeProps } from "./components/qr-code";
 
-export { CodeInput } from "./components/CodeInput";
-export type { CodeInputProps } from "./components/CodeInput";
+export { CodeInput } from "./components/code-input";
+export type { CodeInputProps } from "./components/code-input";
 
-export { ScoreRing } from "./components/ScoreRing";
-export type { ScoreRingProps } from "./components/ScoreRing";
+export { ScoreRing } from "./components/score-ring";
+export type { ScoreRingProps } from "./components/score-ring";
 
-export { Progress } from "./components/Progress";
-export type { ProgressProps } from "./components/Progress";
+export { Progress } from "./components/progress";
+export type { ProgressProps } from "./components/progress";
 
-export { DayTimeline } from "./components/DayTimeline";
+export { DayTimeline } from "./components/day-timeline";
 export type {
 	DayTimelineProps,
 	TimelineSegment,
-} from "./components/DayTimeline";
+} from "./components/day-timeline";
 
-export { MonthCalendar } from "./components/MonthCalendar";
+export { MonthCalendar } from "./components/month-calendar";
 export type {
 	MonthCalendarProps,
 	MonthEvent,
 	CalTone,
-} from "./components/MonthCalendar";
+} from "./components/month-calendar";
 
-export { FileTree } from "./components/FileTree";
-export type { FileTreeProps, FileTreeNode } from "./components/FileTree";
+export { FileTree } from "./components/file-tree";
+export type { FileTreeProps, FileTreeNode } from "./components/file-tree";

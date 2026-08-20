@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useIdentity } from "@twodb/shared-frontend";
 import { apiClient } from "../../utils";
-import { useTwoDbIdentity } from "../../provider/IdentityProvider";
+import { useTwoDbIdentity } from "../../provider/identity-provider";
 
 export function useVerify() {
 	const { refetch } = useTwoDbIdentity();

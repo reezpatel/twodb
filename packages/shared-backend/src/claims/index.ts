@@ -6,12 +6,12 @@ export type { Principal } from "@twodb/contracts";
 declare module "fastify" {
 	interface FastifyInstance {
 		claimCatalog: ClaimCatalog;
-		requireClaim: ReturnType<typeof import("./requireClaim").makeRequireClaim>;
+		requireClaim: ReturnType<typeof import("./require-claim").makeRequireClaim>;
 		requireAppClaim: ReturnType<
-			typeof import("./requireAppClaim").makeRequireAppClaim
+			typeof import("./require-app-claim").makeRequireAppClaim
 		>;
 		withWorkspace: ReturnType<
-			typeof import("./withWorkspace").makeWithWorkspace
+			typeof import("./with-workspace").makeWithWorkspace
 		>;
 	}
 	interface FastifyRequest {
@@ -35,9 +35,9 @@ export {
 	makeWithWorkspace,
 	type WithWorkspaceOpts,
 	type WithWorkspaceSource,
-} from "./withWorkspace";
-export { makeRequireClaim, type RequireClaimOpts } from "./requireClaim";
+} from "./with-workspace";
+export { makeRequireClaim, type RequireClaimOpts } from "./require-claim";
 export {
 	makeRequireAppClaim,
 	type RequireAppClaimOpts,
-} from "./requireAppClaim";
+} from "./require-app-claim";

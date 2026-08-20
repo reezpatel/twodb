@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Link2, Paperclip, Star } from "lucide-react";
-import { Badge, type BadgeTone } from "./Badge";
-import { tableStyles } from "./Table.style";
+import { Badge, type BadgeTone } from "./badge";
+import { tableStyles } from "./table.style";
 
 export type CellType =
 	| "text"

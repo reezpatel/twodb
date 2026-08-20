@@ -45,7 +45,7 @@
 import type { ViewPluginManifest } from "../../../packages/contracts/src/plugin";
 import { identityManifest } from "../shared/manifest";
 import { TwodbIdentityPlugin } from "./plugin";
-import { TwoDbIdentityProvider } from "./provider/IdentityProvider";
+import { TwoDbIdentityProvider } from "./provider/identity-provider";
 
 // function emptySnapshot(): IdentitySnapshot {
 //   return {

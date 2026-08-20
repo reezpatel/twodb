@@ -9,11 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@twodb/content": "workspace:*",
     "@twodb/contracts": "workspace:*",
     "@twodb/identity": "workspace:*",
     "@twodb/shared-frontend": "workspace:*",
     "@twodb/ui": "workspace:*",
-    "lucide-react": "^1.29.0",
     "styled-jsx": "^5.1.7"
   },
   "devDependencies": {

@@ -1,38 +1,27 @@
 import type { ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router";
-import { useTwoDbIdentity } from "../provider/IdentityProvider";
+import { useTwoDbIdentity } from "../provider/identity-provider";
 import { LoginScreen } from "./login-screen/login-screen";
 import { RegisterScreen } from "./register-screen/register-screen";
 import { FullPageLoader } from "./full-page-loader/full-page-loader";
 import { WorkspaceCreator } from "./workspace-creator/workspace-creator";
 import { WorkspacePicker } from "./workspace-picker/workspace-picker";
+import { BrowserRouter } from "react-router";
 
 export const IdentityWrapper: React.FC<{ children: ReactNode }> = ({
-	children,
+  children,
 }) => {
-	const { isInitialLoading, user } = useTwoDbIdentity();
+  const { isInitialLoading, user, activeWorkspace } = useTwoDbIdentity();
 
-	if (isInitialLoading) {
-		return <FullPageLoader />;
-	}
+  if (isInitialLoading) {
+    return <FullPageLoader />;
+  }
 
-	const principalUserId = user?.id ?? null;
+  const principalUserId = user?.id ?? null;
 
-	if (!principalUserId) {
-		return (
-			<Routes>
-				<Route path="/register" element={<RegisterScreen />} />
-				<Route path="/login" element={<LoginScreen />} />
-				<Route path="*" element={<Navigate to="/login" replace />} />
-			</Routes>
-		);
-	}
+  if (!principalUserId) {
+    return <p>No Principal ID</p>;
+  }
 
-	return (
-		<Routes>
-			<Route path="/create-workspace" element={<WorkspaceCreator />} />
-			<Route path="/workspaces" element={<WorkspacePicker />} />
-			<Route path="*" element={children} />
-		</Routes>
-	);
+  return children;
 };

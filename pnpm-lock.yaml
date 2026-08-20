@@ -29,6 +29,9 @@ importers:
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
+      lucide-react:
+        specifier: ^1.29.0
+        version: 1.29.0(react@19.2.8)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -63,6 +66,9 @@ importers:
       '@fastify/static':
         specifier: ^10.1.3
         version: 10.1.3
+      '@twodb/content':
+        specifier: workspace:*
+        version: link:../../plugins/content
       '@twodb/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -131,9 +137,6 @@ importers:
       d3-zoom:
         specifier: ^3.0.0
         version: 3.0.0
-      lucide-react:
-        specifier: ^1.29.0
-        version: 1.29.0(react@19.2.8)
       styled-jsx:
         specifier: ^5.1.7
         version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
@@ -165,6 +168,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@twodb/content':
+        specifier: workspace:*
+        version: link:../../plugins/content
       '@twodb/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -177,9 +183,6 @@ importers:
       '@twodb/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      lucide-react:
-        specifier: ^1.29.0
-        version: 1.29.0(react@19.2.8)
       styled-jsx:
         specifier: ^5.1.7
         version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
@@ -300,9 +303,6 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^3.29.2
         version: 3.29.2
-      lucide-react:
-        specifier: ^1.29.0
-        version: 1.29.0(react@19.2.8)
       qrcode-generator:
         specifier: ^2.0.4
         version: 2.0.4
@@ -328,6 +328,40 @@ importers:
       '@types/qrcode-generator':
         specifier: ^1.0.6
         version: 1.0.6
+      '@types/react':
+        specifier: ^19.1.0
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.1.0
+        version: 19.2.4(@types/react@19.2.18)
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
+
+  plugins/content:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      kysely:
+        specifier: ^0.29.5
+        version: 0.29.5
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
       '@types/react':
         specifier: ^19.1.0
         version: 19.2.18
