@@ -37,3 +37,11 @@ import { Button, Card, Input, Badge } from "@twodb/ui";
 Add a new component in `packages/ui/src/components/`, export it from
 `packages/ui/src/index.ts`, and register a showcase entry in
 `apps/ui-library/src/registry.tsx`.
+
+
+
+
+[ TWO_DB_CONTROLLER ] -> Frontend, API
+- [ TWO_DB_NODE ] -> Role: StorageProvider - Providers storages, nodes balances themselves
+										- Role: ExecutionProvider - Provides a surface to execute code and host code
+										- Role: JobProvider - Provides runner to execute jobs.. (serverless env)

@@ -1,5 +1,5 @@
 {
-  "name": "twodb-node",
+  "name": "twodb-api",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,6 +12,8 @@
     "db:logs": "docker compose -f ../../docker-compose.db.yaml logs -f"
   },
   "dependencies": {
+	"fastify": "^5.11.2",
+	"fastify-plugin": "^6.0.0",
     "@fastify/cookie": "^11.1.2",
     "@fastify/cors": "^11.0.0",
     "@fastify/env": "^7.0.0",
