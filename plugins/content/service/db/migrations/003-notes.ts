@@ -14,7 +14,10 @@ export const notesMigration: Migration = {
 				c.notNull().references("content_nodes.id").onDelete("cascade"),
 			)
 			.addColumn("title", "text", (c) => c.notNull().defaultTo(""))
-			.addColumn("content", "text", (c) => c.notNull().defaultTo(""))
+			.addColumn("preview", "text", (c) => c.notNull().defaultTo(""))
+			// Full document as json (not jsonb): preserves key order, rarely
+			// queried — content is fetched via its own endpoint.
+			.addColumn("content", "json")
 			.addColumn("completed", "boolean", (c) => c.notNull().defaultTo(false))
 			.addColumn("deleted", "boolean", (c) => c.notNull().defaultTo(false))
 			.addColumn("position", "float8", (c) => c.notNull().defaultTo(0))

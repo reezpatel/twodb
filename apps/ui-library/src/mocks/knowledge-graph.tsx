@@ -18,7 +18,7 @@ import { select } from "d3-selection";
 import { zoom, zoomIdentity } from "d3-zoom";
 import { Badge, Dialog, SearchInput } from "@twodb/ui";
 import { Waypoints } from "lucide-react";
-import "./knowledge-graph";
+import "./knowledge-graph.css";
 
 /* --- model ------------------------------------------------- */
 

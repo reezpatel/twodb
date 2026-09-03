@@ -14,7 +14,7 @@ import {
 	Settings,
 	Sparkles,
 } from "lucide-react";
-import "./notification-dialog";
+import "./notification-dialog.css";
 
 /* ---------- data ---------- */
 

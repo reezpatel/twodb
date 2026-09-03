@@ -5,6 +5,7 @@ import type {
 	ContentColumnType,
 	ContentFilter,
 	ContentLink,
+	ContentRowContentDto,
 	ContentRowDto,
 	ContentSort,
 	ContentTag,
@@ -27,6 +28,26 @@ export class RowError extends Error {
 
 type NoteRow = Selectable<ContentNotesTable>;
 
+/** Row shape returned by the rows APIs — content stays out (too large). */
+type NoteListRow = Omit<NoteRow, "content">;
+
+const ROW_COLUMNS = [
+	"n.id",
+	"n.workspace_id",
+	"n.section_id",
+	"n.title",
+	"n.preview",
+	"n.completed",
+	"n.deleted",
+	"n.position",
+	"n.tags",
+	"n.links",
+	"n.attachments",
+	"n.created_by",
+	"n.created_at",
+	"n.updated_at",
+] as const;
+
 const CORE_REFS: Record<string, ContentColumnType> = {
 	title: "text",
 	content: "text",
@@ -48,7 +69,14 @@ function refFor(
 	columnId: string,
 ): { ref: RawBuilder<unknown>; type: ContentColumnType } {
 	const core = CORE_REFS[columnId];
-	if (core) return { ref: sql.ref(`n.${columnId}`), type: core };
+	// The "content" column filters/sorts against the preview text; the JSON
+	// document itself is never scanned.
+	if (core) {
+		return {
+			ref: sql.ref(`n.${columnId === "content" ? "preview" : columnId}`),
+			type: core,
+		};
+	}
 	const config = (node.columns_config ?? []).find(
 		(c) => c.column_id === columnId,
 	);
@@ -151,7 +179,7 @@ export async function listRows(
 		.leftJoin(propsTable.as("p") as never as "content_notes", (join) =>
 			join.on(sql<boolean>`p.note_id = n.id`),
 		)
-		.selectAll("n")
+		.select(ROW_COLUMNS)
 		.select(
 			config.map(
 				(c) => sql`${sql.ref(`p.${c.column_id}`)}`.as(c.column_id) as never,
@@ -169,7 +197,7 @@ export async function listRows(
 		qb = qb.where((eb) =>
 			eb.or([
 				eb("n.title", "ilike", pattern),
-				eb("n.content", "ilike", pattern),
+				eb("n.preview", "ilike", pattern),
 			]),
 		);
 	}
@@ -187,7 +215,7 @@ export async function listRows(
 	const records = (await qb
 		.limit(limit + 1)
 		.offset(offset)
-		.execute()) as (NoteRow & Record<string, unknown>)[];
+		.execute()) as (NoteListRow & Record<string, unknown>)[];
 	const page = records.slice(0, limit);
 	return {
 		rows: page.map((row) => serializeRow(row, row, config)),
@@ -199,7 +227,7 @@ export async function listRows(
 }
 
 export function serializeRow(
-	note: NoteRow,
+	note: NoteListRow,
 	props: Record<string, unknown> | undefined,
 	config: ContentColumnConfig[],
 ): ContentRowDto {
@@ -214,7 +242,7 @@ export function serializeRow(
 		section_id: note.section_id,
 		workspace_id: note.workspace_id,
 		title: note.title,
-		content: note.content,
+		preview: note.preview,
 		completed: note.completed,
 		deleted: note.deleted,
 		position: note.position,
@@ -235,7 +263,22 @@ export async function getRow(
 ): Promise<ContentRowDto | null> {
 	const note = await db
 		.selectFrom("content_notes")
-		.selectAll()
+		.select([
+			"id",
+			"workspace_id",
+			"section_id",
+			"title",
+			"preview",
+			"completed",
+			"deleted",
+			"position",
+			"tags",
+			"links",
+			"attachments",
+			"created_by",
+			"created_at",
+			"updated_at",
+		])
 		.where("id", "=", rowId)
 		.where("section_id", "=", node.id)
 		.where("workspace_id", "=", node.workspace_id)
@@ -243,6 +286,23 @@ export async function getRow(
 	if (!note) return null;
 	const props = await fetchProps(db, node, [rowId]);
 	return serializeRow(note, props.get(rowId), node.columns_config ?? []);
+}
+
+/** The full JSON document of one row — separate endpoint, not in DTOs. */
+export async function getRowContent(
+	db: Kysely<ContentDB>,
+	node: ContentNode,
+	rowId: string,
+): Promise<ContentRowContentDto | null> {
+	const note = await db
+		.selectFrom("content_notes")
+		.select(["id", "content"])
+		.where("id", "=", rowId)
+		.where("section_id", "=", node.id)
+		.where("workspace_id", "=", node.workspace_id)
+		.executeTakeFirst();
+	if (!note) return null;
+	return { id: note.id, content: note.content };
 }
 
 async function fetchProps(
@@ -332,7 +392,9 @@ function coerceValues(
 
 export interface RowInput {
 	title?: string;
-	content?: string;
+	/** Full JSON document — stored in the json content column. */
+	content?: unknown;
+	preview?: string;
 	completed?: boolean;
 	deleted?: boolean;
 	position?: number;
@@ -340,6 +402,13 @@ export interface RowInput {
 	links?: unknown;
 	attachments?: unknown;
 	values?: unknown;
+}
+
+/** Preview for a write: explicit input wins, plain-text docs self-preview. */
+function previewFor(input: RowInput): string | undefined {
+	if (input.preview !== undefined) return input.preview;
+	if (typeof input.content === "string") return input.content;
+	return undefined;
 }
 
 export async function createRow(
@@ -373,7 +442,8 @@ export async function createRow(
 			workspace_id: node.workspace_id,
 			section_id: node.id,
 			title: input.title ?? "",
-			content: input.content ?? "",
+			content: jsonb(input.content ?? null),
+			preview: previewFor(input) ?? "",
 			completed: input.completed ?? false,
 			position,
 			tags: jsonb(tags),
@@ -400,7 +470,9 @@ export async function updateRow(
 	const values = coerceValues(node, input.values);
 	const patch: Record<string, unknown> = { updated_at: new Date() };
 	if (input.title !== undefined) patch.title = input.title;
-	if (input.content !== undefined) patch.content = input.content;
+	if (input.content !== undefined) patch.content = jsonb(input.content ?? null);
+	const preview = previewFor(input);
+	if (preview !== undefined) patch.preview = preview;
 	if (input.completed !== undefined) patch.completed = input.completed;
 	if (input.deleted !== undefined) patch.deleted = input.deleted;
 	if (input.position !== undefined) patch.position = input.position;

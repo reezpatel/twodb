@@ -31,7 +31,7 @@ import {
 	ArrowUp,
 	Video,
 } from "lucide-react";
-import "./ai-saas-dashboard";
+import "./ai-saas-dashboard.css";
 
 /* ---------- data ---------- */
 

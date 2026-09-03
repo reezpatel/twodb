@@ -10,7 +10,7 @@ import {
 	MoreHorizontal,
 	Plus,
 } from "lucide-react";
-import "./ticket-creator";
+import "./ticket-creator.css";
 
 /* ---------- data ---------- */
 

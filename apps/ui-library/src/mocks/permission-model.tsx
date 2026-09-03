@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, IconButton } from "@twodb/ui";
 import { ArrowLeftRight, BookOpen, Check, Copy, X } from "lucide-react";
-import "./permission-model";
+import "./permission-model.css";
 
 /* ---------- App Icons ---------- */
 

@@ -23,7 +23,7 @@ import {
 	Select,
 } from "@twodb/ui";
 import { Box, ChevronDown, Copy, Send, X } from "lucide-react";
-import "./invite-modal";
+import "./invite-modal.css";
 
 /* ---------- data ---------- */
 

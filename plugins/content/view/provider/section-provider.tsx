@@ -1,74 +1,93 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import {
+	createContext,
+	useContext,
+	useEffect,
+	useState,
+	type ReactNode,
+} from "react";
 import type {
-  ContentNodeDto,
-  ContentRowDto,
-  ContentViewConfig,
-  ContentViewDto,
+	ContentNodeDto,
+	ContentSchemaColumn,
+	ContentViewConfig,
+	ContentViewDto,
 } from "@twodb/contracts";
-import { useTree } from "../hooks/use-tree.hook";
 import { useQuery } from "@tanstack/react-query";
 import { PLUGIN_ID } from "../../shared/constants";
-import { rowsApi, schemaApi, viewsApi } from "../api";
+import { schemaApi, viewsApi } from "../api";
 
 export interface SectionContextValue {
-  isLoading: boolean;
-  section?: ContentNodeDto;
-  views: ContentViewDto[];
-  activeViewConfig: ActiveViewConfig;
-  setActiveViewConfig: React.Dispatch<React.SetStateAction<ActiveViewConfig>>;
+	isLoading: boolean;
+	section?: ContentNodeDto;
+	columns: ContentSchemaColumn[];
+	views: ContentViewDto[];
+	activeViewConfig: ActiveViewConfig;
+	setActiveViewConfig: React.Dispatch<React.SetStateAction<ActiveViewConfig>>;
+	openNoteId: string | null;
+	setOpenNoteId: (id: string | null) => void;
 }
 
 export type ActiveViewConfig = ContentViewConfig & {
-  showSearch: boolean;
+	showSearch: boolean;
 };
 
 const SectionContext = createContext<SectionContextValue>({
-  isLoading: false,
-  section: undefined,
-  views: [],
-  activeViewConfig: { showSearch: false, type: "list" },
-  setActiveViewConfig: () => {},
+	isLoading: false,
+	section: undefined,
+	columns: [],
+	views: [],
+	activeViewConfig: { showSearch: false, type: "list" },
+	setActiveViewConfig: () => {},
+	openNoteId: null,
+	setOpenNoteId: () => {},
 });
 
 export function SectionProvider({
-  children,
-  sectionId,
+	children,
+	sectionId,
 }: {
-  children: ReactNode;
-  sectionId: string;
+	children: ReactNode;
+	sectionId: string;
 }) {
-  const [activeViewConfig, setActiveViewConfig] = useState<ActiveViewConfig>({
-    showSearch: false,
-    type: "list",
-  });
+	const [activeViewConfig, setActiveViewConfig] = useState<ActiveViewConfig>({
+		showSearch: false,
+		type: "list",
+	});
+	const [openNoteId, setOpenNoteId] = useState<string | null>(null);
 
-  const { data: section, isLoading } = useQuery({
-    queryKey: [PLUGIN_ID, "schema", sectionId],
-    enabled: !!sectionId,
-    queryFn: () => schemaApi.get(sectionId),
-  });
+	useEffect(() => {
+		setOpenNoteId(null);
+	}, [sectionId]);
 
-  const { data: view, isLoading: isViewLoading } = useQuery({
-    queryKey: [PLUGIN_ID, "view", sectionId],
-    // TODO: implement pagination
-    queryFn: () => viewsApi.list(sectionId),
-  });
+	const { data: schema, isLoading } = useQuery({
+		queryKey: [PLUGIN_ID, "schema", sectionId],
+		enabled: !!sectionId,
+		queryFn: () => schemaApi.get(sectionId),
+	});
 
-  return (
-    <SectionContext.Provider
-      value={{
-        isLoading,
-        section: section?.section,
-        views: view?.views ?? [],
-        activeViewConfig,
-        setActiveViewConfig,
-      }}
-    >
-      {children}
-    </SectionContext.Provider>
-  );
+	const { data: view } = useQuery({
+		queryKey: [PLUGIN_ID, "view", sectionId],
+		// TODO: implement pagination
+		queryFn: () => viewsApi.list(sectionId),
+	});
+
+	return (
+		<SectionContext.Provider
+			value={{
+				isLoading,
+				section: schema?.section,
+				columns: schema?.columns ?? [],
+				views: view?.views ?? [],
+				activeViewConfig,
+				setActiveViewConfig,
+				openNoteId,
+				setOpenNoteId,
+			}}
+		>
+			{children}
+		</SectionContext.Provider>
+	);
 }
 
 export function useSection(): SectionContextValue {
-  return useContext(SectionContext);
+	return useContext(SectionContext);
 }

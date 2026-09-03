@@ -18,7 +18,7 @@ import {
 	Wallet,
 	X,
 } from "lucide-react";
-import "./finance-dashboard";
+import "./finance-dashboard.css";
 
 /* ---------- Types ---------- */
 

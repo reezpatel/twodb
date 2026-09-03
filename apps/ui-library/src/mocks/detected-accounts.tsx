@@ -11,7 +11,7 @@ import {
 	UserPlus,
 	Video,
 } from "lucide-react";
-import "./detected-accounts";
+import "./detected-accounts.css";
 
 type Brand = "salesforce" | "loom" | "google" | "supabase";
 

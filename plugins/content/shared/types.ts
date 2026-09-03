@@ -74,7 +74,9 @@ export interface ListRowsQuery {
  */
 export interface RowMutationBody {
 	title?: string;
-	content?: string;
+	/** Full row document (JSON). Large — prefer preview for listings. */
+	content?: unknown;
+	preview?: string;
 	completed?: boolean;
 	/** PATCH-only flag; create rows are inserted live. */
 	deleted?: boolean;

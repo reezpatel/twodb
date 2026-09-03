@@ -12,6 +12,7 @@
     "@twodb/content": "workspace:*",
     "@twodb/contracts": "workspace:*",
     "@twodb/identity": "workspace:*",
+    "@twodb/code": "workspace:*",
     "@twodb/shared-frontend": "workspace:*",
     "@twodb/ui": "workspace:*",
     "styled-jsx": "^5.1.7"

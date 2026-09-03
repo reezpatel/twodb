@@ -27,7 +27,7 @@ import {
 	Users,
 	Zap,
 } from "lucide-react";
-import "./issue-kanban";
+import "./issue-kanban.css";
 
 /* ---------- Types ---------- */
 

@@ -1,6 +1,11 @@
-import type { Note } from "../../shell/types";
-
 export type NotesViewMode = "list" | "table" | "kanban" | "project";
+
+export interface Note {
+	id: string;
+	title: string;
+	preview?: string;
+	updatedAt?: string;
+}
 
 export type NotesViewProps = {
 	query: string;

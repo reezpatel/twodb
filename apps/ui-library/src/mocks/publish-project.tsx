@@ -1,6 +1,6 @@
 import { Button, Switch, Avatar } from "@twodb/ui";
 import { Calendar, ChevronDown, Plus, Search } from "lucide-react";
-import "./publish-project";
+import "./publish-project.css";
 
 interface TeamMember {
 	id: string;

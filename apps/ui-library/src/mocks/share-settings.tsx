@@ -10,7 +10,7 @@ import {
 	Users,
 	X,
 } from "lucide-react";
-import "./share-settings";
+import "./share-settings.css";
 
 type AccessTone = "owner" | "person" | "group" | "product";
 

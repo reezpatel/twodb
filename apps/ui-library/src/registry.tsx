@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import {
 	AccountMenu,
 	Avatar,
@@ -26,6 +26,8 @@ import {
 	NavRail,
 	Progress,
 	Radio,
+	Resizable,
+	ResizablePanel,
 	SearchInput,
 	Segmented,
 	Select,
@@ -1354,6 +1356,74 @@ function ChatPanelDemo() {
 	);
 }
 
+const PANEL_BOX: CSSProperties = {
+	display: "flex",
+	alignItems: "center",
+	justifyContent: "center",
+	height: "100%",
+	fontFamily: "var(--font-cue)",
+	fontSize: 10.5,
+	letterSpacing: "var(--tracking-cue)",
+	textTransform: "uppercase",
+	color: "var(--ink-3)",
+};
+
+function ResizableDemo() {
+	return (
+		<div
+			style={{
+				width: "100%",
+				height: 420,
+				border: "1px solid var(--line)",
+				borderRadius: "var(--r-md)",
+				overflow: "hidden",
+			}}
+		>
+			<Resizable direction="horizontal">
+				<ResizablePanel size={240} minSize={180} maxSize={400}>
+					<div style={{ ...PANEL_BOX, background: "var(--bg-band)" }}>
+						240px · max 400
+					</div>
+				</ResizablePanel>
+				<ResizablePanel size="auto">
+					<div style={PANEL_BOX}>auto — main</div>
+				</ResizablePanel>
+				<ResizablePanel size="30%" minSize="15%" maxSize="45%">
+					<div style={{ ...PANEL_BOX, background: "var(--bg-band)" }}>
+						30% · 15–45%
+					</div>
+				</ResizablePanel>
+			</Resizable>
+		</div>
+	);
+}
+
+function ResizableVerticalDemo() {
+	return (
+		<div
+			style={{
+				width: "100%",
+				maxWidth: 560,
+				height: 420,
+				border: "1px solid var(--line)",
+				borderRadius: "var(--r-md)",
+				overflow: "hidden",
+			}}
+		>
+			<Resizable direction="vertical">
+				<ResizablePanel size="60%">
+					<div style={PANEL_BOX}>60% — editor</div>
+				</ResizablePanel>
+				<ResizablePanel size="auto" maxSize={260}>
+					<div style={{ ...PANEL_BOX, background: "var(--bg-band)" }}>
+						auto · max 260px — console
+					</div>
+				</ResizablePanel>
+			</Resizable>
+		</div>
+	);
+}
+
 export const registry: ComponentEntry[] = [
 	{
 		id: "horizon",
@@ -2368,6 +2438,38 @@ body      { letter-spacing: 0.02em; /* default tracking */ }
   <MenuDivider />
   <MenuItem icon={<LogOut />} danger>Log out</MenuItem>
 </AccountMenu>`,
+			},
+		],
+	},
+	{
+		id: "resizable",
+		group: "Shell",
+		name: "Resizable",
+		description:
+			"Split layouts with drag handles. Panels take px or % sizes, px/% min and max constraints, and \"auto\" panels flex to fill what's left.",
+		stories: [
+			{
+				title: "Horizontal — px, auto, and % panels",
+				render: () => <ResizableDemo />,
+				code: `<Resizable direction="horizontal" style={{ height: 420 }}>
+  <ResizablePanel size={240} minSize={180} maxSize={400}>
+    <Sidebar />
+  </ResizablePanel>
+  <ResizablePanel size="auto">
+    <Main />        {/* flexes to fill */}
+  </ResizablePanel>
+  <ResizablePanel size="30%" minSize="15%" maxSize="45%">
+    <Inspector />
+  </ResizablePanel>
+</Resizable>`,
+			},
+			{
+				title: "Vertical stack",
+				render: () => <ResizableVerticalDemo />,
+				code: `<Resizable direction="vertical" style={{ height: 420 }}>
+  <ResizablePanel size="60%"><Editor /></ResizablePanel>
+  <ResizablePanel size="auto" maxSize={200}><Console /></ResizablePanel>
+</Resizable>`,
 			},
 		],
 	},

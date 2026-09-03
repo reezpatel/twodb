@@ -23,7 +23,7 @@ import {
 	UserPlus,
 	X,
 } from "lucide-react";
-import "./share-dialog2";
+import "./share-dialog2.css";
 
 /* ---------- shared data ---------- */
 

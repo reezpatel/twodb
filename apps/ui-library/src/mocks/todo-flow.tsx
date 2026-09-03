@@ -22,7 +22,7 @@ import {
 	Trash2,
 	CircleHelp,
 } from "lucide-react";
-import "./todo-flow";
+import "./todo-flow.css";
 
 /* ---------- data ---------- */
 

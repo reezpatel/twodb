@@ -7,7 +7,7 @@ import "@fontsource/outfit/700.css";
 import "@fontsource/ibm-plex-sans/500.css";
 import "@fontsource/ibm-plex-sans/600.css";
 
-import "./styles";
+import "./styles.css";
 
 export { Button } from "./components/button";
 export type {
@@ -184,8 +184,9 @@ export type {
 	ChatComposerProps,
 } from "./components/chat";
 
-export { MarkdownEditor } from "./components/markdown-editor";
-export type { MarkdownEditorProps } from "./components/markdown-editor";
+export { MarkdownEditor } from "./components/markdown-editor/markdown-editor";
+export type { MarkdownEditorProps } from "./components/markdown-editor/markdown-editor";
+export type { SlashMenuItem } from "./components/markdown-editor/slash-menu";
 
 export { SettingGroup, SettingRow } from "./components/setting-row";
 export type {
@@ -213,6 +214,12 @@ export type { ScoreRingProps } from "./components/score-ring";
 
 export { Progress } from "./components/progress";
 export type { ProgressProps } from "./components/progress";
+
+export { Resizable, ResizablePanel } from "./components/resizable/resizable";
+export type {
+	ResizableProps,
+	ResizablePanelProps,
+} from "./components/resizable/resizable";
 
 export { DayTimeline } from "./components/day-timeline";
 export type {

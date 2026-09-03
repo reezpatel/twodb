@@ -1,6 +1,5 @@
 import { TagChip } from "@twodb/ui";
 import { noteListItemStyles } from "./list-item.style";
-import { NoteMarker } from "../../notes-old/notes-list/note-marker";
 import type { ContentRowDto } from "@twodb/contracts";
 
 type NoteListItemProps = {
@@ -17,12 +16,9 @@ export function ListItem({ note, open, onOpen }: NoteListItemProps) {
     >
       <style jsx>{noteListItemStyles}</style>
       <div className="shell__notehead">
-        <strong>
-          <NoteMarker marker={"glyph"} />
-          {note.title}
-        </strong>
+        <strong>{note.title}</strong>
       </div>
-      <p>{note.content}</p>
+      <p>{note.preview}</p>
       {note.tags.length > 0 && (
         <div className="shell__notechips">
           {note.tags.map((tag) => (

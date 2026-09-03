@@ -15,7 +15,7 @@ import {
 	CornerDownLeft,
 	Search,
 } from "lucide-react";
-import "./command-search";
+import "./command-search.css";
 
 /* ---------- illustration ---------- */
 

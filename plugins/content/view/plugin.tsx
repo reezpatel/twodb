@@ -1,6 +1,7 @@
 import type { IPlugin, PluginStore } from "react-pluggable";
 import type { RouteObject } from "react-router";
 import { NotesShell } from "./shell/note-shell";
+import { ContentTree } from "./components/content-tree/content-tree";
 
 export class TwodbContentPlugin implements IPlugin {
   pluginStore!: PluginStore;
@@ -27,6 +28,10 @@ export class TwodbContentPlugin implements IPlugin {
 
   activate(): void {
     this.pluginStore.executeFunction("core::add_routes", this.routes);
+
+    this.pluginStore.executeFunction("Renderer.add", "sidebar_section", () => (
+      <ContentTree />
+    ));
   }
 
   deactivate(): void {}

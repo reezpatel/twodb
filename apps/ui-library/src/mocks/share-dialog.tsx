@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { Avatar, Badge, Button, Input, Segmented } from "@twodb/ui";
 import { ChevronDown, Code2, Copy, Link as LinkIcon, X } from "lucide-react";
-import "./share-dialog";
+import "./share-dialog.css";
 
 /* ---------- data ---------- */
 

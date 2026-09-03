@@ -1,8 +1,4 @@
-import {
-  ArrowDownNarrowWide,
-  ArrowUpWideNarrow,
-  MoreHorizontal,
-} from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { useSection } from "../../provider/section-provider";
 import { IconButton, Menu, Segmented } from "@twodb/ui";
 import { VIEW_OPTIONS } from "../../notes-old/view-options";

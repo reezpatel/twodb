@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Avatar, Switch } from "@twodb/ui";
 import { ArrowLeft, Moon, Search, Settings } from "lucide-react";
-import "./search-menu";
+import "./search-menu.css";
 
 /* ---------- Integration Icons (exact brand colors) ---------- */
 

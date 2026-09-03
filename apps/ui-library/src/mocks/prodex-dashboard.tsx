@@ -1,5 +1,5 @@
 import { Avatar, Badge, Button } from "@twodb/ui";
-import "./prodex-dashboard";
+import "./prodex-dashboard.css";
 import {
 	Bell,
 	Box,

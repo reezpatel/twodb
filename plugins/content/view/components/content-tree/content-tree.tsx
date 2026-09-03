@@ -1,8 +1,13 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router";
-import { NavPanelTree, type NavPanelTreeNode } from "@twodb/ui";
+import {
+	NavPanelSection,
+	NavPanelTree,
+	type NavPanelTreeNode,
+} from "@twodb/ui";
 import type { ContentNodeDto } from "@twodb/contracts";
 import { useTree } from "../../hooks/use-tree.hook";
+import { useTreeMutations } from "../../hooks/use-tree-mutations.hook";
 
 function toTreeNodes(nodes: ContentNodeDto[]): NavPanelTreeNode[] {
 	const byParent = new Map<string | null, ContentNodeDto[]>();
@@ -28,10 +33,20 @@ function toTreeNodes(nodes: ContentNodeDto[]): NavPanelTreeNode[] {
 
 export function ContentTree() {
 	const tree = useTree();
+	const { create } = useTreeMutations();
 	const navigate = useNavigate();
 	const nodes = tree.data ?? [];
 	const data = useMemo(() => toTreeNodes(nodes), [nodes]);
 	const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+
+	const handleAdd = () => {
+		create.mutate(
+			{ type: "section", name: "Untitled" },
+			{
+				onSuccess: ({ node }) => navigate(`/notes/${node.identifier}`),
+			},
+		);
+	};
 
 	// NavPanelTree (react-arborist) captures initialData at mount — don't
 	// render until the tree has loaded, and remount when the dataset changes.
@@ -41,16 +56,19 @@ export function ContentTree() {
 		.join("|");
 
 	return (
-		<NavPanelTree
-			key={treeKey}
-			ariaLabel="Content"
-			initialData={data}
-			onPick={(id) => {
-				const node = byId.get(id);
-				if (node?.type === "section") {
-					navigate(`/notes/${node.identifier}`);
-				}
-			}}
-		/>
+		<div>
+			<NavPanelSection label="Content" onAdd={handleAdd} />
+			<NavPanelTree
+				key={treeKey}
+				ariaLabel="Content"
+				initialData={data}
+				onPick={(id) => {
+					const node = byId.get(id);
+					if (node?.type === "section") {
+						navigate(`/notes/${node.identifier}`);
+					}
+				}}
+			/>
+		</div>
 	);
 }

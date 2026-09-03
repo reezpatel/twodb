@@ -1,41 +1,30 @@
-import { IconButton, Menu, Segmented } from "@twodb/ui";
 import { usePluginStore } from "react-pluggable";
-import type { NotesViewMode } from "../../notes-old/types";
-import { VIEW_OPTIONS } from "../../notes-old/view-options";
-import {
-  ArrowDownNarrowWide,
-  ArrowUpWideNarrow,
-  MoreHorizontal,
-  Plus,
-  Search,
-} from "lucide-react";
 
 export type ContentHeaderProps = {
-  title?: string;
-  children?: React.ReactNode;
+	title?: string;
+	children?: React.ReactNode;
 };
 
 export const ContentHeader = ({ title = "", children }: ContentHeaderProps) => {
-  const pluginStore = usePluginStore();
-  const Renderer = pluginStore.executeFunction("Renderer.getRendererComponent");
+	const pluginStore = usePluginStore();
+	const Renderer = pluginStore.executeFunction("Renderer.getRendererComponent");
 
-  return (
-    <div className="shell__chrome shell__chrome--list">
-      <Renderer placement="toggle_side_nav" />
-      <strong className="shell__listtitle">{title}</strong>
-      <span className="shell__chromespacer" />
-      {children}
+	return (
+		<div className="shell__chrome shell__chrome--list">
+			<Renderer placement="toggle_side_nav" />
+			<strong className="shell__listtitle">{title}</strong>
+			<span className="shell__chromespacer" />
+			{children}
 
-      <style jsx>{`
+			<style jsx>{`
         .shell__chrome--list {
-          grid-column: 2;
+          grid-column: 1;
           grid-row: 1;
           display: flex;
           align-items: center;
           gap: 1px;
           min-width: 0;
           padding: 0 8px 0 12px;
-          border-right: 1px solid var(--line);
           border-bottom: 1px solid var(--line);
           background: var(--surface);
         }
@@ -50,6 +39,6 @@ export const ContentHeader = ({ title = "", children }: ContentHeaderProps) => {
           white-space: nowrap;
         }
       `}</style>
-    </div>
-  );
+		</div>
+	);
 };

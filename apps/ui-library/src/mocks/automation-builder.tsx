@@ -71,7 +71,7 @@ import {
 	X,
 	type LucideIcon,
 } from "lucide-react";
-import "./automation-builder";
+import "./automation-builder.css";
 
 /* ============================================================
    Automation Builder — a visual path builder on React Flow.

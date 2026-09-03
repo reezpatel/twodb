@@ -26,7 +26,7 @@ import {
 	Sparkles,
 	Archive,
 } from "lucide-react";
-import "./plans-billing";
+import "./plans-billing.css";
 
 /* ---------- Sidebar Data ---------- */
 

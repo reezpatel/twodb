@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@twodb/ui";
 import { X, Eye, Copy, Lock, Plus } from "lucide-react";
-import "./virtual-card";
+import "./virtual-card.css";
 
 interface Transaction {
 	id: string;

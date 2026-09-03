@@ -3,11 +3,15 @@ packages:
   - "packages/*"
   - "plugins/*"
   - "plugins/identity/view"
+  - "stack/*"
+  - "libs/*"
 
 onlyBuiltDependencies:
   - esbuild
 allowBuilds:
+  '@google/genai': set this to true or false
   esbuild: true
+  protobufjs: set this to true or false
 minimumReleaseAgeExclude:
   - pg-protocol@1.16.0
   - pg@8.23.0

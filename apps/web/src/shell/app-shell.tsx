@@ -1,24 +1,19 @@
-import { Navigate, Route, Routes } from "react-router";
-import { SectionScene } from "@twodb/content/view";
-import { AutomationsScene } from "../scenes/automations/automations-scene";
-import { CalendarScene } from "../scenes/calendar/calendar-scene";
-import { ChatScene } from "../scenes/chat/chat-scene";
-import { CodeScene } from "../scenes/code/code-scene";
-import { EmailScene } from "../scenes/email/email-scene";
-import { FilesScene } from "../scenes/files/files-scene";
-import { InboxScene } from "../scenes/inbox/inbox-scene";
-import { NotesScene } from "../scenes/notes/notes-scene";
-import { RecordingScene } from "../scenes/recording/recording-scene";
+import {
+  createBrowserRouter,
+  Navigate,
+  Outlet,
+  RouterProvider,
+} from "react-router";
 import { Sidebar } from "./sidebar";
 import { StatusBar } from "./status-bar";
 import { appShellStyles } from "./app-shell.style";
 import { CommandPalette } from "./command-palette";
 import { ShellStateProvider, useShellState } from "./state";
-import { createBrowserRouter } from "react-router";
 import { usePluginStore } from "react-pluggable";
-import { RouterProvider } from "react-router";
-import { useMemo, type ReactNode } from "react";
-import { Outlet } from "react-router";
+import { useMemo } from "react";
+import { EmailScene } from "../scenes/email/email-scene";
+import { ChatScene } from "../scenes/chat/chat-scene";
+import { FilesScene } from "../scenes/files/files-scene";
 
 export const ShellFrame = () => {
   const { phase } = useShellState();
@@ -33,32 +28,12 @@ export const ShellFrame = () => {
       <CommandPalette />
     </div>
   );
-
-  // <Routes>
-  {
-    /*<Route path="/notes/:identifier/:noteId" element={<NotesScene />} />
-
-    <Route path="/" element={} />
-    <Route path="/inbox" element={<InboxScene />} />
-    <Route path="/email" element={<EmailScene />} />
-    <Route path="/calendar" element={<CalendarScene />} />
-    <Route path="/files" element={<FilesScene />} />
-    <Route path="/automations" element={<AutomationsScene />} />
-    <Route path="/chat" element={<ChatScene />} />
-    <Route path="/code" element={<CodeScene />} />
-    <Route path="/notes" element={<NotesScene />} />
-    <Route path="/notes/:identifier" element={<NotesScene />} />
-    <Route path="/recording" element={<RecordingScene />} />
-    <Route path="*" element={} />
-  </Routes>;*/
-  }
 };
 
 export function AppShell() {
   const e = usePluginStore();
 
   const routes = useMemo(() => {
-    console.log("routes", e.executeFunction("core::get_routes"));
     return createBrowserRouter([
       {
         path: "/",
@@ -69,7 +44,18 @@ export function AppShell() {
         element: <ShellFrame />,
         children: [
           ...(e.executeFunction("core::get_routes") || []),
-
+          {
+            path: "email",
+            element: <EmailScene />,
+          },
+          {
+            path: "chat",
+            element: <ChatScene />,
+          },
+          {
+            path: "files",
+            element: <FilesScene />,
+          },
           {
             path: "*",
             element: <Navigate to="/inbox" replace />,

@@ -26,7 +26,7 @@ import {
 	User,
 	X,
 } from "lucide-react";
-import "./habit-tracker";
+import "./habit-tracker.css";
 
 /* ---------- Types ---------- */
 

@@ -18,7 +18,7 @@ import {
 	Users,
 	WalletCards,
 } from "lucide-react";
-import "./sales-mate-pro";
+import "./sales-mate-pro.css";
 
 /* ---------- Data ---------- */
 

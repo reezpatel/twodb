@@ -37,7 +37,7 @@ import {
 	Upload,
 	X,
 } from "lucide-react";
-import "./notes-overview";
+import "./notes-overview.css";
 
 /* --- data --- */
 

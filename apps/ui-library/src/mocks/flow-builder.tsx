@@ -30,7 +30,7 @@ import {
 	Variable,
 	Webhook,
 } from "lucide-react";
-import "./flow-builder";
+import "./flow-builder.css";
 
 /* --- node library --- */
 

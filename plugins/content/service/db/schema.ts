@@ -45,7 +45,8 @@ export interface ContentNotesTable {
 	workspace_id: string;
 	section_id: string;
 	title: Generated<string>;
-	content: Generated<string>;
+	preview: Generated<string>;
+	content: Generated<unknown | null>;
 	completed: Generated<boolean>;
 	deleted: Generated<boolean>;
 	position: Generated<number>;

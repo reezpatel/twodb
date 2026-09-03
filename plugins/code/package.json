@@ -1,0 +1,33 @@
+{
+	"name": "@twodb/code",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./service": "./service/index.ts",
+		"./view": "./view/index.ts",
+		"./shared/manifest": "./shared/manifest.ts",
+		"./schema": "./service/db/schema.ts",
+		"./sessions": "./service/lib/auth/sessions.ts",
+		"./shared/constants": "./shared/constants.ts"
+	},
+	"dependencies": {
+		"@twodb/contracts": "workspace:*",
+		"@twodb/shared-backend": "workspace:*",
+		"@twodb/shared-frontend": "workspace:*",
+		"@twodb/ui": "workspace:*",
+		"kysely": "^0.29.5",
+		"styled-jsx": "^5.1.7"
+	},
+	"devDependencies": {
+		"@fastify/cookie": "^11.1.2",
+		"@types/node": "^24.0.0",
+		"@types/react": "^19.1.0",
+		"@types/react-dom": "^19.1.0",
+		"typescript": "^5.8.0",
+		"vitest": "^3.2.4"
+	},
+	"scripts": {
+		"test": "vitest run"
+	}
+}

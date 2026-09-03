@@ -2,7 +2,7 @@
  * Row API — mirrors plugins/content/service/routes/rows. Filters, sorts and
  * cursors are passed as URLSearchParams per the service contract.
  */
-import type { ContentRowDto } from "@twodb/contracts";
+import type { ContentRowContentDto, ContentRowDto } from "@twodb/contracts";
 import type {
 	CreateRowBody,
 	ListRowsQuery,
@@ -39,6 +39,12 @@ export const rowsApi = {
 	get: (sectionId: string, rowId: string) =>
 		apiClient.get<{ row: ContentRowDto }>(
 			`/sections/${sectionId}/rows/${rowId}`,
+		),
+
+	/** Full JSON document — separate endpoint, not part of ContentRowDto. */
+	getContent: (sectionId: string, rowId: string) =>
+		apiClient.get<ContentRowContentDto>(
+			`/sections/${sectionId}/rows/${rowId}/content`,
 		),
 
 	update: (sectionId: string, rowId: string, body: UpdateRowBody) =>

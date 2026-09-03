@@ -23,7 +23,7 @@ import {
 	Wand2,
 	Check,
 } from "lucide-react";
-import "./ai-editor";
+import "./ai-editor.css";
 
 /* ---------- Types ---------- */
 

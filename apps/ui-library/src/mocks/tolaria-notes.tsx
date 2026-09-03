@@ -55,7 +55,7 @@ import {
 	Users,
 	X,
 } from "lucide-react";
-import "./tolaria-notes";
+import "./tolaria-notes.css";
 
 /* --- data --- */
 
