@@ -8,3 +8,5 @@ dist/
 .vercel
 workbench/
 .work/
+result
+result-*
