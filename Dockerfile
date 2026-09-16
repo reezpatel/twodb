@@ -3,42 +3,45 @@
 FROM node:22-alpine AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
+# better-sqlite3 compiles from source on musl (no prebuilt binaries).
+# Only build stages inherit this; the runtime stage copies node_modules.
+RUN apk add --no-cache python3 make g++
 RUN corepack enable
 WORKDIR /app
 
+# Full-context installs: plugin packages (plugins/*) declare their own deps
+# (e.g. @fastify/multipart), so every workspace manifest must be present at
+# install time and every package's node_modules must reach the runtime.
+# The pnpm store cache mount keeps repeated installs fast despite COPY . .
+# invalidating the layer on any source change.
 FROM base AS deps
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
-COPY apps/api/package.json apps/api/package.json
-COPY apps/web/package.json apps/web/package.json
-COPY apps/ui-library/package.json apps/ui-library/package.json
-COPY packages/contracts/package.json packages/contracts/package.json
-COPY packages/notes/package.json packages/notes/package.json
-COPY packages/shared-backend/package.json packages/shared-backend/package.json
-COPY packages/shared-frontend/package.json packages/shared-frontend/package.json
-COPY packages/ui/package.json packages/ui/package.json
-RUN pnpm install --frozen-lockfile
+COPY . .
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+FROM base AS prod-deps
+COPY . .
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+	pnpm install --frozen-lockfile --prod
 
 FROM deps AS build
-COPY . .
 RUN pnpm --filter twodb-api typecheck
 RUN pnpm --filter twodb-web-app build
-
-FROM deps AS prod-deps
-RUN CI=true pnpm prune --prod
 
 FROM node:22-alpine AS runtime
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV STATIC_DIR=../../../apps/web/dist
-ENV PNPM_HOME=/pnpm
-ENV PATH=$PNPM_HOME:$PATH
-RUN corepack enable
+# Api-owned sqlite db lives here; mount a volume to persist it:
+#   docker run -v twodb-data:/data ...
+ENV TWO_DB_WORK_DIR=/data
 WORKDIR /app
-COPY --from=prod-deps /app/node_modules ./node_modules
-COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
-COPY --from=build /app/packages ./packages
-COPY --from=build /app/apps/api ./apps/api
+# prod-deps already contains the full workspace sources + prod node_modules
+# for every package (root, apps, packages, plugins).
+COPY --from=prod-deps /app ./
 COPY --from=build /app/apps/web/dist ./apps/web/dist
-COPY package.json pnpm-workspace.yaml ./
 EXPOSE 3001
-CMD ["pnpm", "--filter", "twodb-api", "start"]
+WORKDIR /app/apps/api
+# The api's start script (tsx src/index.ts), invoked directly: running via
+# `pnpm --filter twodb-api start` would reconcile the partial workspace
+# (auto-install) on every boot — tsx needs neither pnpm nor network.
+CMD ["./node_modules/.bin/tsx", "src/index.ts"]

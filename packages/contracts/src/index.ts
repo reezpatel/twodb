@@ -6,9 +6,12 @@
  */
 
 export * from "./auth";
+export * from "./calendar";
 export * from "./claims";
+export * from "./chat";
 export * from "./content";
 export * from "./identity";
+export * from "./meetings";
 export * from "./plugin";
 
 // TODO: Need to review if we need this

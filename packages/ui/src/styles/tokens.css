@@ -90,8 +90,8 @@
 	--surface: #ffffff;
 
 	/* fields: muted fill, no resting hairline */
-	--bg-field: var(--bg-band-strong);
-	--bg-field-hover: #e9e7f0;
+	--bg-field: #e9e7f0;
+	--bg-field-hover: #dfdce6;
 
 	--ink: #121218;
 	--ink-2: #40404e;
@@ -142,8 +142,8 @@
 	--surface: #1a1a1e;
 
 	/* fields: muted fill, no resting hairline */
-	--bg-field: var(--bg-band-strong);
-	--bg-field-hover: #3f3f46;
+	--bg-field: #222225;
+	--bg-field-hover: #303034;
 
 	--ink: #e4e4e7;
 	--ink-2: #a1a1aa;

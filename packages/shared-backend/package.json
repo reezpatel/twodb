@@ -5,6 +5,12 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
+		"./agent/model": "./src/agent/model.ts",
+		"./agent/provider": "./src/agent/provider.ts",
+		"./agent/tool": "./src/agent/tool.ts",
+		"./agent/store": "./src/agent/store.ts",
+		"./agent/cypher": "./src/agent/cypher.ts",
+		"./agent/loop": "./src/agent/loop.ts",
 		"./*": "./src/*"
 	},
 	"scripts": {

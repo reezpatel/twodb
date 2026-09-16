@@ -1,0 +1,11 @@
+
+
+Twodb Shell -> provider /admin and /api/admin routes => single install point and rest is all plugin -> doesn't have db, use embeded sqlite..
+
+Twodb Auth surface -> helps login into any platform.
+hosted at /api/auth
+
+
+
+
+Multi user..

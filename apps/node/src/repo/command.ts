@@ -1,94 +1,145 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
+import { NodeError } from "../types";
 
 export type CommandOptions = {
-  cwd: string;
-  args?: string[];
-  env?: NodeJS.ProcessEnv;
-};
-
-const createCommand = (command: string, options: CommandOptions) => {
-  if (!command || typeof command !== "string") {
-    throw new TypeError("A non-empty command is required");
-  }
-
-  return spawn(command, options.args ?? [], {
-    cwd: options.cwd,
-    env: { ...process.env, ...options.env },
-    shell: !options.args?.length,
-  });
+	cwd: string;
+	args?: string[];
+	env?: NodeJS.ProcessEnv;
+	timeoutMs?: number;
+	input?: string;
 };
 
 export type CommandResult = {
-  stdout: string;
-  stderr: string;
-  exitCode: number;
+	stdout: string;
+	stderr: string;
+	exitCode: number;
+	timedOut: boolean;
 };
 
-export const streamCommand = async (
-  command: string,
-  options: CommandOptions,
-): AsyncGenerator<string> => {
-  const child = createCommand(command, options);
-  const chunks: string[] = [];
-  const output: string[] = [];
-  let done = false;
-  let exitCode = 1;
-  let failure: Error | undefined;
-  let notify = () => {};
-  const wake = () => notify();
-  child.stdout.setEncoding("utf8");
-  child.stderr.setEncoding("utf8");
-  const onData = (chunk: string) => {
-    chunks.push(chunk);
-    output.push(chunk);
-    wake();
-  };
-  child.stdout.on("data", onData);
-  child.stderr.on("data", onData);
-  child.once("error", (error) => {
-    failure = error;
-    done = true;
-    wake();
-  });
-  child.once("close", (code) => {
-    exitCode = code ?? 1;
-    done = true;
-    wake();
-  });
+export class ProcessRegistry {
+	private readonly processes = new Map<string, ChildProcess>();
 
-  while (!done || chunks.length > 0) {
-    if (chunks.length > 0) {
-      yield chunks.shift()!;
-      continue;
-    }
-    await new Promise<void>((resolve) => {
-      notify = resolve;
-    });
-  }
+	add(id: string, child: ChildProcess): void {
+		this.processes.set(id, child);
+	}
 
-  if (failure) throw failure;
-  if (exitCode !== 0)
-    throw new Error(output.join("") || `Command exited with code ${exitCode}`);
+	remove(id: string): void {
+		this.processes.delete(id);
+	}
+
+	kill(id: string, signal: NodeJS.Signals = "SIGTERM"): boolean {
+		const child = this.processes.get(id);
+		if (!child) return false;
+		child.kill(signal);
+		return true;
+	}
+
+	killAll(signal: NodeJS.Signals = "SIGTERM"): void {
+		for (const child of this.processes.values()) child.kill(signal);
+		this.processes.clear();
+	}
+
+	get size(): number {
+		return this.processes.size;
+	}
+}
+
+const createCommand = (command: string, options: CommandOptions) => {
+	if (!command || typeof command !== "string") {
+		throw new NodeError("BAD_PAYLOAD", "a non-empty command is required");
+	}
+	return spawn(command, options.args ?? [], {
+		cwd: options.cwd,
+		env: { ...process.env, ...options.env },
+		shell: !options.args?.length,
+	});
 };
+
+type Collected = {
+	stdout: string;
+	stderr: string;
+};
+
+const settle = (
+	child: ChildProcess,
+	collected: Collected,
+	options: CommandOptions,
+): Promise<CommandResult> =>
+	new Promise((resolve, reject) => {
+		let timedOut = false;
+		const timer =
+			options.timeoutMs && options.timeoutMs > 0
+				? setTimeout(() => {
+						timedOut = true;
+						child.kill("SIGTERM");
+					}, options.timeoutMs)
+				: undefined;
+
+		child.once("error", (error) => {
+			if (timer) clearTimeout(timer);
+			reject(error);
+		});
+		child.once("close", (code) => {
+			if (timer) clearTimeout(timer);
+			resolve({
+				stdout: collected.stdout,
+				stderr: collected.stderr,
+				exitCode: code ?? 1,
+				timedOut,
+			});
+		});
+	});
 
 export const runCommand = async (
-  command: string,
-  options: CommandOptions,
+	command: string,
+	options: CommandOptions,
 ): Promise<CommandResult> => {
-  const child = createCommand(command, options);
-  let stdout = "";
-  let stderr = "";
-  child.stdout.setEncoding("utf8");
-  child.stderr.setEncoding("utf8");
-  child.stdout.on("data", (chunk: string) => {
-    stdout += chunk;
-  });
-  child.stderr.on("data", (chunk: string) => {
-    stderr += chunk;
-  });
-  const exitCode = await new Promise<number>((resolve, reject) => {
-    child.once("error", reject);
-    child.once("close", (code) => resolve(code ?? 1));
-  });
-  return { stdout, stderr, exitCode };
+	const child = createCommand(command, options);
+	const collected: Collected = { stdout: "", stderr: "" };
+	child.stdout!.setEncoding("utf8");
+	child.stderr!.setEncoding("utf8");
+	child.stdout!.on("data", (chunk: string) => {
+		collected.stdout += chunk;
+	});
+	child.stderr!.on("data", (chunk: string) => {
+		collected.stderr += chunk;
+	});
+	if (options.input !== undefined && child.stdin) {
+		child.stdin.write(options.input);
+		child.stdin.end();
+	}
+	return settle(child, collected, options);
+};
+
+export type StreamSink = (stream: "stdout" | "stderr", chunk: string) => void;
+
+export type StreamingHooks = {
+	register?: (child: ChildProcess) => void;
+	unregister?: () => void;
+};
+
+export const runCommandStreaming = async (
+	command: string,
+	options: CommandOptions,
+	onOutput: StreamSink,
+	hooks: StreamingHooks = {},
+): Promise<CommandResult> => {
+	const child = createCommand(command, options);
+	const collected: Collected = { stdout: "", stderr: "" };
+	child.stdout!.setEncoding("utf8");
+	child.stderr!.setEncoding("utf8");
+	child.stdout!.on("data", (chunk: string) => {
+		collected.stdout += chunk;
+		onOutput("stdout", chunk);
+	});
+	child.stderr!.on("data", (chunk: string) => {
+		collected.stderr += chunk;
+		onOutput("stderr", chunk);
+	});
+	hooks.register?.(child);
+	try {
+		return await settle(child, collected, options);
+	} finally {
+		hooks.unregister?.();
+	}
 };

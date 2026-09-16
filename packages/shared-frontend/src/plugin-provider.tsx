@@ -7,7 +7,9 @@ import {
 } from "react-pluggable";
 import { CorePlugin } from "./core/core-plugin";
 
-export type TwoDbPluginCtx = {};
+export type TwoDbPluginCtx = {
+	plugins: ViewPluginManifest[];
+};
 
 export type TwoDbPluginProviderProps = {
 	children: ReactNode;
@@ -56,7 +58,7 @@ export const TwoDbPluginProvider: React.FC<TwoDbPluginProviderProps> = ({
 
 	return (
 		<PluginProvider pluginStore={pluginStore}>
-			<ProviderContext.Provider value={null}>
+			<ProviderContext.Provider value={{ plugins }}>
 				{wrapped}
 			</ProviderContext.Provider>
 		</PluginProvider>

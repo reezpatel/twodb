@@ -1,6 +1,6 @@
 import type { InputHTMLAttributes } from "react";
 import { useId } from "react";
-import { fieldStyles } from "./field.style";
+import { inputStyles } from "./input.style";
 
 export type InputSize = "sm" | "md" | "lg";
 
@@ -38,14 +38,14 @@ export function Input({
 					aria-invalid={error ? true : undefined}
 					{...rest}
 				/>
-				<style jsx>{fieldStyles}</style>
+				<style jsx>{inputStyles}</style>
 			</>
 		);
 	}
 
 	return (
 		<div className="tw-field">
-			<style jsx>{fieldStyles}</style>
+			<style jsx>{inputStyles}</style>
 			{label ? (
 				<label className="tw-field__label" htmlFor={inputId}>
 					{label}

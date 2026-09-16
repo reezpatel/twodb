@@ -1,5 +1,5 @@
 {
-  "name": "twodb-api",
+  "name": "twodb-node",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -25,10 +25,12 @@
     "@twodb/shared-backend": "workspace:*",
     "neo4j-driver": "^6.2.0",
     "pg": "^8.23.0",
-    "tsx": "^4.23.12"
+    "tsx": "^4.23.12",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.0",
     "typescript": "^5.8.0"
   }
 }

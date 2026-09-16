@@ -1,7 +1,11 @@
 import { identityDb } from "./db";
 import "@fastify/cookie";
 import type { TwodbFastifyInstance } from "@twodb/contracts";
-import { runPluginMigrations, typedDb } from "@twodb/shared-backend";
+import {
+	rootServicePlugin,
+	runPluginMigrations,
+	typedDb,
+} from "@twodb/shared-backend";
 import { outboxPlugin } from "./lib/outbox/outbox";
 import { seedDeploymentMethods } from "./lib/users/methods";
 import { requireSuperadmin as makeRequireSuperadmin } from "./lib/admin/admin";
@@ -58,7 +62,7 @@ export const TwodbIdentityServiceManifest = {
 		],
 	},
 
-	plugin: async (fastify: TwodbFastifyInstance) => {
+	plugin: rootServicePlugin("twodb-identity-service", async (fastify) => {
 		const config = (
 			fastify as unknown as {
 				config: {
@@ -93,10 +97,11 @@ export const TwodbIdentityServiceManifest = {
 			fastify,
 			buildIdentityClaimCatalog(TwodbIdentityServiceManifest.permissions),
 		);
-		registerRoutes(fastify, ctx);
 
 		await maybeSeedSuperadmin(db, fastify, config.TWODB_SUPERADMIN_EMAIL);
-	},
+
+		return (scope: TwodbFastifyInstance) => registerRoutes(scope, ctx);
+	}),
 };
 
 export const service = TwodbIdentityServiceManifest;

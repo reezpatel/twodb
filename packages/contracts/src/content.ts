@@ -91,6 +91,7 @@ export interface ContentViewDto {
 	section_id: string;
 	workspace_id: string;
 	name: string;
+	type: ContentViewType;
 	config: ContentViewConfig;
 	is_default: boolean;
 	position: number;

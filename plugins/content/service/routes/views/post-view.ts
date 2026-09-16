@@ -53,7 +53,7 @@ export function registerPostView(
 					workspace_id: node.workspace_id,
 					name: body.name!.trim(),
 					type: body.type!,
-					config: body.config ?? {},
+					config: body.config ?? { type: body.type! },
 					is_default: body.is_default ?? false,
 					position: (last?.position ?? 0) + POSITION_GAP,
 				})

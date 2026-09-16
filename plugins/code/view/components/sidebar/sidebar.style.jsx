@@ -7,7 +7,7 @@ export const codeSidebarStyles = css`
 		height: 100%;
 		overflow-y: auto;
 		border-left: 1px solid var(--line);
-		background: var(--bg);
+		background: transparent;
 		padding: var(--space-2) 0;
 	}
 

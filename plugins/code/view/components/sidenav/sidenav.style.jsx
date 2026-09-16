@@ -6,7 +6,7 @@ export const codeSidenavStyles = css`
 		flex-direction: column;
 		height: 100%;
 		border-right: 1px solid var(--line);
-		background: var(--bg);
+		background: transparent;
 		overflow: hidden;
 	}
 
@@ -52,6 +52,12 @@ export const codeSidenavStyles = css`
 		min-height: 0;
 		overflow-y: auto;
 		padding: var(--space-2) 0;
+	}
+
+	.code-sidenav__empty {
+		padding: var(--space-3) var(--space-4);
+		font-size: 12px;
+		color: var(--ink-3);
 	}
 
 	.code-sidenav__folder-header {

@@ -14,7 +14,7 @@ export const appShellStyles = css`
 		--shell-amber: #d9930d;
 
 		display: grid;
-		grid-template-columns: var(--shell-columns, 212px minmax(0, 1fr));
+		grid-template-columns: var(--shell-columns, 56px minmax(0, 1fr));
 		grid-template-rows: 40px minmax(0, 1fr) 27px;
 		width: 100%;
 		height: 100%;

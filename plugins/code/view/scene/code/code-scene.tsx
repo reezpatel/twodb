@@ -19,7 +19,7 @@ export const CodeScene = () => {
 						<Sidenav selectedId={selectedSessionId} onSelect={selectSession} />
 					</ResizablePanel>
 					<ResizablePanel size="auto">
-						<ChatSection />
+						<ChatSection sessionId={selectedSessionId} />
 					</ResizablePanel>
 					<ResizablePanel size="26%" minSize="15%" maxSize="45%">
 						<Sidebar />

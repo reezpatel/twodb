@@ -9,69 +9,16 @@ import {
 	Plus,
 	SlidersHorizontal,
 } from "lucide-react";
+import {
+	useArchivedSessions,
+	useSessionGroups,
+	type SessionItemStatus,
+} from "../../hooks/use-sessions.hook";
 import { ManageDialog } from "./manage-dialog";
+import { ProjectSelectorDialog } from "../../scene/code/project-selector-dialog";
 import { codeSidenavStyles } from "./sidenav.style";
 
-type SessionStatus = "running" | "idle" | "done";
-
-interface AgentSession {
-	id: string;
-	title: string;
-	status: SessionStatus;
-	time: string;
-}
-
-interface AgentFolder {
-	id: string;
-	name: string;
-	sessions: AgentSession[];
-}
-
-const FOLDERS: AgentFolder[] = [
-	{
-		id: "api",
-		name: "twodb/api",
-		sessions: [
-			{
-				id: "s1",
-				title: "Refactor rows router",
-				status: "running",
-				time: "2m",
-			},
-			{ id: "s2", title: "Fix migration order", status: "done", time: "1h" },
-		],
-	},
-	{
-		id: "web",
-		name: "twodb/web",
-		sessions: [
-			{
-				id: "s3",
-				title: "Editor drag handles",
-				status: "running",
-				time: "12m",
-			},
-			{ id: "s4", title: "Kanban drop polish", status: "done", time: "3h" },
-			{ id: "s5", title: "Theme token audit", status: "idle", time: "1d" },
-		],
-	},
-	{
-		id: "scripts",
-		name: "personal/scripts",
-		sessions: [
-			{ id: "s6", title: "Backup rotation", status: "done", time: "2d" },
-		],
-	},
-];
-
-const ARCHIVED: AgentSession[] = [
-	{ id: "a1", title: "Old auth spike", status: "done", time: "5d" },
-	{ id: "a2", title: "Vite config cleanup", status: "done", time: "1w" },
-	{ id: "a3", title: "Seed script v1", status: "done", time: "2w" },
-	{ id: "a4", title: "Icon audit", status: "done", time: "3w" },
-];
-
-function StatusIcon({ status }: { status: SessionStatus }) {
+function StatusIcon({ status }: { status: SessionItemStatus }) {
 	if (status === "running")
 		return (
 			<span className="code-sidenav__status code-sidenav__status--running">
@@ -94,30 +41,42 @@ function StatusIcon({ status }: { status: SessionStatus }) {
 export function Sidenav({
 	selectedId,
 	onSelect,
+	hideHeader = false,
 }: {
 	selectedId: string;
 	onSelect: (id: string) => void;
+	/** Panes that provide their own header (e.g. the project bar) skip this. */
+	hideHeader?: boolean;
 }) {
 	const [archiveOpen, setArchiveOpen] = useState(false);
 	const [manageOpen, setManageOpen] = useState(false);
+	const [newProjectOpen, setNewProjectOpen] = useState(false);
+	const { groups } = useSessionGroups();
+	const { sessions: archivedSessions } = useArchivedSessions();
 
 	return (
 		<aside className="code-sidenav">
 			<style jsx>{codeSidenavStyles}</style>
-			<div className="code-sidenav__header">
-				<span className="code-sidenav__title">Agents</span>
-				<div className="code-sidenav__actions">
-					<button className="code-sidenav__action" aria-label="New session">
-						<Plus size={16} aria-hidden="true" />
-					</button>
-					<button className="code-sidenav__action" aria-label="Filter">
-						<Filter size={16} aria-hidden="true" />
-					</button>
+			{hideHeader ? null : (
+				<div className="code-sidenav__header">
+					<span className="code-sidenav__title">Agents</span>
+					<div className="code-sidenav__actions">
+						<button
+							className="code-sidenav__action"
+							aria-label="New session"
+							onClick={() => setNewProjectOpen(true)}
+						>
+							<Plus size={16} aria-hidden="true" />
+						</button>
+						<button className="code-sidenav__action" aria-label="Filter">
+							<Filter size={16} aria-hidden="true" />
+						</button>
+					</div>
 				</div>
-			</div>
+			)}
 
 			<div className="code-sidenav__folders">
-				{FOLDERS.map((folder) => (
+				{groups.map((folder) => (
 					<div key={folder.id} className="code-sidenav__folder">
 						<div className="code-sidenav__folder-header">
 							<Folder size={14} aria-hidden="true" />
@@ -144,16 +103,22 @@ export function Sidenav({
 					</div>
 				))}
 
+				{groups.length === 0 ? (
+					<div className="code-sidenav__empty">
+						No sessions yet — hit + to start one.
+					</div>
+				) : null}
+
 				{archiveOpen ? (
 					<div className="code-sidenav__folder">
 						<div className="code-sidenav__folder-header">
 							<Archive size={14} aria-hidden="true" />
 							Archived
 							<span className="code-sidenav__folder-count">
-								{ARCHIVED.length}
+								{archivedSessions.length}
 							</span>
 						</div>
-						{ARCHIVED.map((session) => (
+						{archivedSessions.map((session) => (
 							<button
 								key={session.id}
 								className={`code-sidenav__session code-sidenav__session--archived${selectedId === session.id ? " is-selected" : ""}`}
@@ -179,7 +144,9 @@ export function Sidenav({
 				>
 					<Archive size={14} aria-hidden="true" />
 					Archive
-					<span className="code-sidenav__folder-count">{ARCHIVED.length}</span>
+					<span className="code-sidenav__folder-count">
+						{archivedSessions.length}
+					</span>
 				</button>
 				<button
 					className="code-sidenav__footer-btn"
@@ -191,6 +158,10 @@ export function Sidenav({
 			</div>
 
 			<ManageDialog open={manageOpen} onClose={() => setManageOpen(false)} />
+			<ProjectSelectorDialog
+				open={newProjectOpen}
+				onClose={() => setNewProjectOpen(false)}
+			/>
 		</aside>
 	);
 }

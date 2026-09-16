@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+# Social crawlers only need the brand assets; the app itself is behind auth.

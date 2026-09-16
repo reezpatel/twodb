@@ -8,6 +8,26 @@ export const chartStyles = css`
 	flex-shrink: 0;
 }
 
+.tw-ring-wrap {
+	display: inline-grid;
+	place-items: center;
+	flex-shrink: 0;
+}
+
+.tw-ring-wrap > * {
+	grid-area: 1 / 1;
+}
+
+.tw-ring__center {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 600;
+	color: var(--ink-2);
+	font-variant-numeric: tabular-nums;
+	pointer-events: none;
+}
+
 .tw-ring__track {
 	stroke: var(--bg-band-strong);
 }
@@ -18,6 +38,10 @@ export const chartStyles = css`
 
 .tw-ring--danger .tw-ring__arc {
 	stroke: var(--danger-ink);
+}
+
+.tw-ring--warning .tw-ring__arc {
+	stroke: var(--warning-ink);
 }
 
 /* DayTimeline — the day as segments of light */

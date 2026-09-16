@@ -9,7 +9,6 @@
     "moduleResolution": "bundler",
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
-    "allowJs": true,
     "noEmit": true,
     "strict": true,
     "types": [

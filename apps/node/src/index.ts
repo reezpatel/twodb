@@ -1,24 +1,38 @@
-import { NODE_SECRET } from "./config";
+import { HEARTBEAT_MS, NODE_SECRET, ROOT_DIR, controllerWsUrl } from "./config";
 import { ConnectionManager } from "./connection_manager";
 
-const secret = NODE_SECRET;
-
 const init = async () => {
-  if (secret) {
-    const cm = new ConnectionManager(secret);
+	if (!NODE_SECRET) {
+		console.warn(
+			"[node] TWO_DB_NODE_SECRET is not set — node agent is disabled.",
+		);
+		console.warn(
+			"[node] create apps/node/.env with TWO_DB_NODE_SECRET=<secret> and restart to enable.",
+		);
+		// Stay alive so `turbo dev` doesn't treat this package as crashed.
+		await new Promise(() => {});
+		return;
+	}
 
-    cm.begin()
-      .then(() => {
-        console.log("Bye!");
-      })
-      .catch((e) => {
-        throw new Error("Connection Manager errored", e);
-      });
-  } else {
-    throw new Error(
-      "NODE_SECRET is missing, can't connect to controller, exiting...",
-    );
-  }
+	const cm = new ConnectionManager({
+		url: controllerWsUrl(),
+		token: NODE_SECRET,
+		rootDir: ROOT_DIR,
+		heartbeatMs: HEARTBEAT_MS,
+	});
+
+	const shutdown = () => {
+		console.log("[node] shutting down...");
+		void cm.stop();
+	};
+	process.once("SIGINT", shutdown);
+	process.once("SIGTERM", shutdown);
+
+	await cm.begin();
+	console.log("Bye!");
 };
 
-init();
+init().catch((error) => {
+	console.error(error);
+	process.exit(1);
+});

@@ -25,6 +25,12 @@ export type { TextareaProps } from "./components/textarea";
 export { Select } from "./components/select";
 export type { SelectProps } from "./components/select";
 
+export { Typeahead } from "./components/typeahead";
+export type {
+	TypeaheadProps,
+	TypeaheadItem,
+} from "./components/typeahead";
+
 export { Checkbox } from "./components/checkbox";
 export type { CheckboxProps } from "./components/checkbox";
 
@@ -59,6 +65,16 @@ export type { SegmentedProps, SegmentedItem } from "./components/segmented";
 export { Dialog } from "./components/dialog";
 export type { DialogProps } from "./components/dialog";
 
+export { Overlay } from "./components/overlay";
+export type { OverlayProps } from "./components/overlay";
+
+export { SideNav } from "./components/sidenav";
+export type {
+	SideNavFrom,
+	SideNavProps,
+	SideNavWidth,
+} from "./components/sidenav";
+
 export { Avatar } from "./components/avatar";
 export type {
 	AvatarProps,
@@ -71,6 +87,12 @@ export type { DividerProps } from "./components/divider";
 
 export { Skeleton } from "./components/skeleton";
 export type { SkeletonProps } from "./components/skeleton";
+
+export { EmptyState } from "./components/empty-state";
+export type {
+	EmptyStateProps,
+	EmptyStateIconTone,
+} from "./components/empty-state";
 
 export { Tooltip } from "./components/tooltip";
 export type { TooltipProps, TooltipSide } from "./components/tooltip";

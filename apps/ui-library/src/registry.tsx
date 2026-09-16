@@ -697,7 +697,6 @@ function NavRailDemo() {
 							placeItems: "center",
 							width: 32,
 							height: 32,
-							marginBottom: 8,
 							borderRadius: "var(--r-md)",
 							background: "var(--action)",
 							color: "#fff",
@@ -2446,7 +2445,7 @@ body      { letter-spacing: 0.02em; /* default tracking */ }
 		group: "Shell",
 		name: "Resizable",
 		description:
-			"Split layouts with drag handles. Panels take px or % sizes, px/% min and max constraints, and \"auto\" panels flex to fill what's left.",
+			'Split layouts with drag handles. Panels take px or % sizes, px/% min and max constraints, and "auto" panels flex to fill what\'s left.',
 		stories: [
 			{
 				title: "Horizontal — px, auto, and % panels",

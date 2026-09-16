@@ -65,7 +65,7 @@ p {
 	font-family: var(--font-cue);
 	font-weight: 500;
 	font-size: var(--text-xs);
-	letter-spacing: var(--tracking-cue);
+	letter-spacing: var(--tracking-narrow);
 	text-transform: uppercase;
 	color: var(--ink-3);
 }

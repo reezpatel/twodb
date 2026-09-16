@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { overlayStyles } from "./overlay.style";
+import { dialogStyles } from "./dialog.style";
 
 export interface DialogProps {
 	open: boolean;
@@ -34,7 +34,7 @@ export function Dialog({
 				if (e.target === ref.current) onClose();
 			}}
 		>
-			<style jsx>{overlayStyles}</style>
+			<style jsx>{dialogStyles}</style>
 			{title ? (
 				<div className="tw-dialog__header">
 					<h2 className="tw-dialog__title">{title}</h2>

@@ -1,7 +1,15 @@
 import type { PluginManifest } from "@twodb/contracts";
+import type { Database as BetterSqliteDatabase } from "better-sqlite3";
+import type { Kysely } from "kysely";
+import type { Database } from "./db/schema";
+import type { MemgraphDecorator } from "./db/memgraph";
 
-interface MemgraphDecorator {
-	ping: () => Promise<unknown>;
+interface SqliteDecorator {
+	db: Kysely<Database>;
+	raw: BetterSqliteDatabase;
+	filePath: string;
+	appliedMigrations: string[];
+	ping: () => Promise<void>;
 }
 
 declare module "fastify" {
@@ -26,8 +34,16 @@ declare module "fastify" {
 			TWODB_SUPERADMIN_EMAIL: string;
 			TWODB_REQUIRE_VERIFIED: boolean;
 			TWODB_API_ORIGIN: string;
+			TWODB_AGENT_ENCRYPTION_KEY: string;
+			TWODB_AGENT_USAGE_INTERVAL_MS: number;
+			TWODB_STORAGE_ENCRYPTION_KEY: string;
+			TWO_DB_WORK_DIR: string;
+			TWODB_ADMIN_RP_ID: string;
+			TWODB_ADMIN_ORIGIN: string;
+			TWODB_ADMIN_SESSION_TTL_MS: number;
 		};
 		memgraph: MemgraphDecorator;
+		sqlite: SqliteDecorator;
 		installedPluginManifests: readonly PluginManifest[];
 	}
 }

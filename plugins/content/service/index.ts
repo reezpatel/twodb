@@ -1,5 +1,9 @@
 import type { TwodbFastifyInstance } from "@twodb/contracts";
-import { runPluginMigrations, typedDb } from "@twodb/shared-backend";
+import {
+	rootServicePlugin,
+	runPluginMigrations,
+	typedDb,
+} from "@twodb/shared-backend";
 import { contentDb } from "./db";
 import { buildMigrations } from "./db/migrations";
 import type { ContentCtx } from "./lib/ctx";
@@ -36,11 +40,11 @@ export const TwodbContentServiceManifest = {
 		],
 	},
 
-	plugin: async (fastify: TwodbFastifyInstance) => {
+	plugin: rootServicePlugin("twodb-content-service", async (fastify) => {
 		await runPluginMigrations(typedDb(fastify), PLUGIN_ID, buildMigrations());
 		const ctx: ContentCtx = { db: contentDb(fastify) };
-		registerRoutes(fastify, ctx);
-	},
+		return (scope: TwodbFastifyInstance) => registerRoutes(scope, ctx);
+	}),
 };
 
 export const service = TwodbContentServiceManifest;

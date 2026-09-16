@@ -7,7 +7,7 @@ export interface SearchInputProps
 	extends InputHTMLAttributes<HTMLInputElement> {}
 
 export function SearchInput({ className = "", ...rest }: SearchInputProps) {
-	const classes = ["tw-input", className].filter(Boolean).join(" ");
+	const classes = ["tw-search__input", className].filter(Boolean).join(" ");
 
 	return (
 		<span className="tw-search">

@@ -72,7 +72,19 @@ export const identityAuthPlugin = fp(
 			request.workspaceContext = null;
 
 			if (request.principal) {
-				const workspaceId = request.headers["x-workspace-id"];
+				// Query fallback exists for WebSocket upgrades — browsers cannot
+				// set headers on them. The id is not credential material; auth
+				// still comes from the session cookie.
+				const headerWorkspace = request.headers["x-workspace-id"];
+				const queryWorkspace = (
+					request.query as Record<string, unknown> | undefined
+				)?.workspace_id;
+				const workspaceId =
+					typeof headerWorkspace === "string"
+						? headerWorkspace
+						: typeof queryWorkspace === "string"
+							? queryWorkspace
+							: undefined;
 				if (typeof workspaceId === "string") {
 					const db = identityDb(fastify);
 					const { isWorkspaceMember, claims } = await resolveWorkspaceContext(

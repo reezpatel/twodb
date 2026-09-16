@@ -3,15 +3,17 @@ packages:
   - "packages/*"
   - "plugins/*"
   - "plugins/identity/view"
+  - "plugins/agent-providers/*"
   - "stack/*"
   - "libs/*"
 
 onlyBuiltDependencies:
   - esbuild
 allowBuilds:
-  '@google/genai': set this to true or false
+  "@google/genai": false
+  better-sqlite3: true
   esbuild: true
-  protobufjs: set this to true or false
+  protobufjs: false
 minimumReleaseAgeExclude:
   - pg-protocol@1.16.0
   - pg@8.23.0

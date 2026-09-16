@@ -1,0 +1,24 @@
+import type { Principal } from "@twodb/contracts";
+import type { FastifyReply, FastifyRequest } from "fastify";
+
+export function requireWorkspace(
+	request: FastifyRequest,
+	reply: FastifyReply,
+): string | null {
+	const principal = request.principal as Principal | null | undefined;
+	if (!principal?.userId) {
+		void reply.code(401).send({ error: "Not authenticated." });
+		return null;
+	}
+	if (!principal.workspaceId || !principal.isWorkspaceMember) {
+		void reply
+			.code(403)
+			.send({ error: "Select a workspace you belong to first." });
+		return null;
+	}
+	return principal.workspaceId;
+}
+
+export function principalOf(request: { principal?: unknown }): Principal {
+	return request.principal as Principal;
+}

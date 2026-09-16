@@ -25,7 +25,6 @@
 	place-items: center;
 	width: 34px;
 	height: 34px;
-	margin-bottom: 8px;
 	border: 1.5px solid var(--line-strong);
 	border-radius: var(--r-pill);
 	color: var(--ink);
