@@ -11,6 +11,7 @@
     "db:ps": "docker compose -f docker-compose.db.yaml ps"
   },
   "devDependencies": {
+    "@types/pg": "^8.21.0",
     "@types/ws": "^8.18.1",
     "turbo": "^2.5.0"
   },
@@ -26,6 +27,7 @@
     "fastify-plugin": "^6.0.0",
     "kysely": "^0.29.5",
     "lucide-react": "^1.29.0",
+    "pg": "^8.23.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-pluggable": "^0.4.3",

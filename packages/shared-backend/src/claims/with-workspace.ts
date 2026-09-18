@@ -33,7 +33,7 @@ export function makeWithWorkspace(fastify: TwodbFastifyInstance) {
 			}
 
 			const workspaceId = await resolveWorkspaceId(
-				db as Kysely<IdentityDB>,
+				db as unknown as Kysely<IdentityDB>,
 				request,
 				opts,
 			);
@@ -48,12 +48,12 @@ export function makeWithWorkspace(fastify: TwodbFastifyInstance) {
 			}
 
 			const roleClaims = await loadRoleClaims(
-				db as Kysely<IdentityDB>,
+				db as unknown as Kysely<IdentityDB>,
 				workspaceId,
 				principal.userId,
 			);
 			const isMember = await isWorkspaceMember(
-				db as Kysely<IdentityDB>,
+				db as unknown as Kysely<IdentityDB>,
 				workspaceId,
 				principal.userId,
 			);

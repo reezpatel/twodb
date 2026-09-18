@@ -1,5 +1,12 @@
 {
   "name": "@twodb/auth",
+  "description": "Basic authentication plugin for Twod",
+  "twodb": {
+	 	"logo": "",
+		"provides": ["auth"],
+		"requires": [],
+		"tags": ["Core", "Auth"]
+  },
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -8,11 +15,13 @@
     "./view": "./view/index.ts"
   },
   "dependencies": {
+    "@simplewebauthn/server": "^14.0.2",
     "@twodb/shared-backend": "workspace:*",
     "@twodb/shared-frontend": "workspace:*",
     "@twodb/ui": "workspace:*"
   },
   "devDependencies": {
+    "@fastify/cookie": "^11.1.2",
     "esbuild": "^0.25.12"
   },
   "scripts": {

@@ -1,8 +1,6 @@
+import type { FastifyInstance } from "fastify";
 import type { TwodbContext } from "./context";
-
-type HttpMethod = "get" | "post" | "put" | "delete";
-
-export type RouteHandler = (ctx: TwodbContext, req: Request) => Promise<void>;
+import type { Migration } from "kysely/migration";
 
 export type BackupResult = {
   data: unknown;
@@ -15,18 +13,13 @@ export type RestoreResult = {
   errors: string[];
 };
 
+// init receives a scoped fastify instance already prefixed with the
+// plugin's /api/v1/<id> mount point — services register their routes on it
+// and never hardcode their own prefix.
 export type ServicePlugin = {
-  init?: (ctx: TwodbContext) => Promise<void>;
+  init?: (ctx: TwodbContext, app: FastifyInstance) => Promise<void>;
   backup?: (ctx: TwodbContext) => Promise<BackupResult>;
   restore?: (ctx: TwodbContext, data: unknown) => Promise<RestoreResult>;
 
-  routes?: Record<string, Partial<Record<HttpMethod, RouteHandler>>>;
-
-  migrations?: Record<
-    string,
-    {
-      up: (db: TwodbContext["db"]) => Promise<void>;
-      down: (db: TwodbContext["db"]) => Promise<void>;
-    }
-  >;
+  migrations?: Record<string, Migration>;
 };

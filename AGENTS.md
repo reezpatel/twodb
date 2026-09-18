@@ -1,5 +1,7 @@
 # AGENTS.md — twodb working agreements
 
+IMPORTANT: Don't add redundant comments, only add comments that add value.
+
 Guidance for anyone (human or agent) working in this repo. Read `plan.md` for
 identity, tenancy & access control, `checklist.md` + `tasks/` for its build
 breakdown, and `DESIGN.md` for the design system.

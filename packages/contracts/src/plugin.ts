@@ -1,8 +1,19 @@
 import type { FastifyInstance as FastifyInstanceBase } from "fastify";
-import type { Kysely } from "kysely";
-import type { Claim } from "./claims";
-import type { ReactNode } from "react";
-import type { IPlugin } from "react-pluggable";
+
+/**
+ * Structural stand-in for react-pluggable's IPlugin, declared here so the
+ * pure-types contracts package doesn't import it — its bundled d.ts
+ * predates React 19 (React.SFC) and breaks under skipLibCheck: false.
+ * The pluginStore member is assigned by the store at install time; twodb
+ * code never reads it.
+ */
+export interface IPlugin {
+  getPluginName(): string;
+  getDependencies(): string[];
+  init(pluginStore: unknown): void;
+  activate(): void;
+  deactivate(): void;
+}
 
 export type NodeInvokeStream = (stream: "stdout" | "stderr", chunk: string) => void;
 
@@ -183,7 +194,6 @@ export type AgentSummary = {
 export type AgentListFn = (workspaceId: string) => Promise<AgentSummary[]>;
 
 export interface TwodbFastifyInstance extends FastifyInstanceBase {
-  db: Kysely<unknown>;
   /** Decorated by the node plugin: execute actions on node agents. */
   nodeInvoke?: NodeInvokeFn;
   /** Decorated by the node plugin: list the workspace's nodes. */

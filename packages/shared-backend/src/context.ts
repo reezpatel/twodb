@@ -6,3 +6,5 @@ export interface TwodbContext {
   db: Kysely<unknown>;
   fn: TwodbFn;
 }
+
+export interface TwodbDatabase {}
