@@ -1168,6 +1168,22 @@ importers:
         specifier: ^5.8.0
         version: 5.9.3
 
+  plugins/auth:
+    dependencies:
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+
   plugins/calendar:
     dependencies:
       '@twodb/contracts':

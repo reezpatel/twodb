@@ -1,13 +1,7 @@
 export { TypedBus, busPlugin, type BackendBus } from "./bus";
 export { newId } from "./ids";
 export { parseJsonArray } from "./utils";
-export {
-	dbPlugin,
-	typedDb,
-	scopedDb,
-	pluginSchemaName,
-	runPluginMigrations,
-} from "./db";
+export { dbPlugin, typedDb, scopedDb, pluginSchemaName, runPluginMigrations } from "./db";
 export { authPlugin } from "./auth";
 export { rootServicePlugin } from "./service-plugin";
 export * from "./claims";
@@ -17,3 +11,5 @@ export * from "./agent/store";
 export * from "./agent/tool";
 export * from "./agent/provider";
 export * from "./agent/loop";
+export * from "./plugin";
+export * from "./context";

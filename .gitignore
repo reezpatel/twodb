@@ -10,3 +10,4 @@ workbench/
 .work/
 result
 result-*
+.build/

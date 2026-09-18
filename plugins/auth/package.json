@@ -1,0 +1,23 @@
+{
+  "name": "@twodb/auth",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./service": "./service/index.ts",
+    "./view": "./view/index.ts"
+  },
+  "dependencies": {
+    "@twodb/shared-backend": "workspace:*",
+    "@twodb/shared-frontend": "workspace:*",
+    "@twodb/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "test": "vitest run"
+  }
+}

@@ -15,10 +15,7 @@ export class ApiClient {
   }
 
   private headers(body?: unknown): Record<string, string> | undefined {
-    const workspaceId =
-      typeof localStorage !== "undefined"
-        ? localStorage.getItem("activeWorkspaceId")
-        : null;
+    const workspaceId = typeof localStorage !== "undefined" ? localStorage.getItem("activeWorkspaceId") : null;
     if (body === undefined && !workspaceId) return undefined;
     const result: Record<string, string> = {};
     if (body !== undefined) {
@@ -30,14 +27,7 @@ export class ApiClient {
     return result;
   }
 
-  private async request<T>(
-    method: string,
-    path: string,
-    body?: unknown,
-  ): Promise<T> {
-    if (!path.startsWith("/")) {
-      throw new Error(`ApiClient: path must start with /, got "${path}"`);
-    }
+  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const url = `${this.basePath}${path}`;
     const res = await fetch(url, {
       method,
@@ -60,5 +50,17 @@ export class ApiClient {
   }
   del(path: string, body?: unknown): Promise<void> {
     return this.request<void>("DELETE", path, body);
+  }
+
+  getRaw(path: string): Promise<Response> {
+    return fetch(`${this.basePath}${path}`, {
+      headers: this.headers(),
+    });
+  }
+
+  resolve(path: string) {
+    const url = `${this.basePath}${path}`;
+
+    return url;
   }
 }

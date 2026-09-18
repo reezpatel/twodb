@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import Fastify from "fastify";
 import fastifyEnv from "@fastify/env";
@@ -10,6 +11,7 @@ import postgresPlugin from "./db/postgres";
 import memgraphPlugin from "./db/memgraph";
 import sqlitePlugin from "./db/sqlite";
 import adminRoutes from "./admin/routes";
+import { registerServicePlugins } from "./plugins";
 import { registerStaticApp } from "./static";
 
 // Plugins are bundled later (loaded via the admin plugin registry instead of
@@ -41,10 +43,10 @@ const app = Fastify({ logger: true });
 await app.register(cors, { origin: true });
 
 await app.register(fastifyEnv, {
-	dotenv: {
-		path: path.resolve(import.meta.dirname, dotenvPath),
-	},
-	schema: envSchema,
+  dotenv: {
+    path: path.resolve(import.meta.dirname, dotenvPath),
+  },
+  schema: envSchema,
 });
 
 await app.register(postgresPlugin);
@@ -54,6 +56,21 @@ await app.register(dbPlugin);
 await app.register(cookie);
 await app.register(busPlugin);
 await app.register(authPlugin);
+
+// Built plugin bundles from the admin plugin registry (sqlite `plugins`
+// table): local:<path> .build dirs load today; git:/npm: sources extract
+// into the work dir later. Each service is mounted at /api/v1/<plugin_id>
+// and its view bundle is served at /api/v1/<plugin_id>/view/.
+await registerServicePlugins(app);
+
+app.get("/api/v1/plugins", async () => {
+  return app.loadedPlugins.map((p) => ({
+    id: p.id,
+    name: p.name,
+    version: p.version,
+    hasStyles: fs.existsSync(path.join(p.dir, "view", "styles.css")),
+  }));
+});
 
 // Global session hook: resolves request.principal and 401s /api/v1/* routes
 // that are not marked public. Re-enable when plugins are bundled again.
@@ -126,7 +143,7 @@ await app.register(authPlugin);
 // }
 
 app.get("/health", async () => {
-	return { status: "ok" };
+  return { status: "ok" };
 });
 
 // Admin api (feature surface TBD) - backed by the api-owned sqlite db.
@@ -139,39 +156,36 @@ type PgWithPing = typeof app.pg & { ping: () => Promise<unknown> };
 // Deep health check: pings each database so a single endpoint can tell you
 // whether the api is merely up or whether both backends are reachable.
 app.get("/health/ready", async (_request, reply) => {
-	const checks = {
-		postgres: "unknown",
-		memgraph: "unknown",
-		sqlite: "unknown",
-	};
+  const checks = {
+    postgres: "unknown",
+    memgraph: "unknown",
+    sqlite: "unknown",
+  };
 
-	try {
-		await (app.pg as PgWithPing).ping();
-		checks.postgres = "ok";
-	} catch (err) {
-		checks.postgres = `down: ${err instanceof Error ? err.message : err}`;
-	}
+  try {
+    await (app.pg as PgWithPing).ping();
+    checks.postgres = "ok";
+  } catch (err) {
+    checks.postgres = `down: ${err instanceof Error ? err.message : err}`;
+  }
 
-	try {
-		await app.memgraph.ping();
-		checks.memgraph = "ok";
-	} catch (err) {
-		checks.memgraph = `down: ${err instanceof Error ? err.message : err}`;
-	}
+  try {
+    await app.memgraph.ping();
+    checks.memgraph = "ok";
+  } catch (err) {
+    checks.memgraph = `down: ${err instanceof Error ? err.message : err}`;
+  }
 
-	try {
-		await app.sqlite.ping();
-		checks.sqlite = "ok";
-	} catch (err) {
-		checks.sqlite = `down: ${err instanceof Error ? err.message : err}`;
-	}
+  try {
+    await app.sqlite.ping();
+    checks.sqlite = "ok";
+  } catch (err) {
+    checks.sqlite = `down: ${err instanceof Error ? err.message : err}`;
+  }
 
-	const allOk =
-		checks.postgres === "ok" &&
-		checks.memgraph === "ok" &&
-		checks.sqlite === "ok";
-	reply.code(allOk ? 200 : 503);
-	return { status: allOk ? "ready" : "degraded", checks };
+  const allOk = checks.postgres === "ok" && checks.memgraph === "ok" && checks.sqlite === "ok";
+  reply.code(allOk ? 200 : 503);
+  return { status: allOk ? "ready" : "degraded", checks };
 });
 
 await registerStaticApp(app);
@@ -179,8 +193,8 @@ await registerStaticApp(app);
 const port = app.config.PORT;
 
 try {
-	await app.listen({ port, host: "0.0.0.0" });
+  await app.listen({ port, host: "0.0.0.0" });
 } catch (err) {
-	app.log.error(err);
-	process.exit(1);
+  app.log.error(err);
+  process.exit(1);
 }

@@ -42,47 +42,13 @@ import { TwoDbPluginProvider } from "@twodb/shared-frontend";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const queryClient = new QueryClient();
-const plugins: never[] = [
-	// IdentityPlugin,
-	// ContentPlugin,
-	// CalendarPlugin,
-	// NodePlugin,
-	// CodePlugin,
-	// AgentPlugin,
-	// KimiCodePlugin,
-	// OpenaiPlugin,
-	// AnthropicPlugin,
-	// CodexPlugin,
-	// GooglePlugin,
-	// OpenrouterPlugin,
-	// XaiPlugin,
-	// GroqPlugin,
-	// MistralPlugin,
-	// DeepseekPlugin,
-	// TogetherPlugin,
-	// FireworksPlugin,
-	// CerebrasPlugin,
-	// ZaiPlugin,
-	// MinimaxPlugin,
-	// KilocodePlugin,
-	// ClinePlugin,
-	// OllamaCloudPlugin,
-	// AzureOpenaiPlugin,
-	// AmazonBedrockPlugin,
-	// GoogleVertexPlugin,
-	// CloudflareAiGatewayPlugin,
-	// CloudflareWorkersAiPlugin,
-	// CustomOpenaiPlugin,
-	// ChatPlugin,
-	// MeetingsPlugin,
-];
 
 createRoot(document.getElementById("root")!).render(
-	<StrictMode>
-		<QueryClientProvider client={queryClient}>
-			<TwoDbPluginProvider plugins={plugins}>
-				<App />
-			</TwoDbPluginProvider>
-		</QueryClientProvider>
-	</StrictMode>,
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <TwoDbPluginProvider>
+        <App />
+      </TwoDbPluginProvider>
+    </QueryClientProvider>
+  </StrictMode>,
 );
