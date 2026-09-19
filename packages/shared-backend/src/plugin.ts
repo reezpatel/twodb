@@ -13,9 +13,6 @@ export type RestoreResult = {
   errors: string[];
 };
 
-// init receives a scoped fastify instance already prefixed with the
-// plugin's /api/v1/<id> mount point — services register their routes on it
-// and never hardcode their own prefix.
 export type ServicePlugin = {
   init?: (ctx: TwodbContext, app: FastifyInstance) => Promise<void>;
   backup?: (ctx: TwodbContext) => Promise<BackupResult>;

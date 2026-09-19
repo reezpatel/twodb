@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "@tanstack/react-form";
 import { Button, Input, Kbd } from "@twodb/ui";
 import { Check } from "lucide-react";
-import { useInstance } from "../../hooks/use-instance";
+import { useInstance } from "./use-instance";
 import { instanceSectionStyles } from "./instance-section.style";
 
 export function InstanceSection() {
@@ -67,12 +67,7 @@ export function InstanceSection() {
             />
           )}
         </form.Field>
-        <Button
-          type="submit"
-          variant="secondary"
-          size="lg"
-          disabled={renameInstance.isPending}
-        >
+        <Button type="submit" variant="secondary" size="lg" disabled={renameInstance.isPending}>
           <Check aria-hidden="true" size={16} />
           Rename
         </Button>

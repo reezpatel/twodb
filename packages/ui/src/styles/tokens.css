@@ -5,126 +5,123 @@
    ============================================================ */
 
 :root {
-	/* --- Raw palette: the horizon, night → day --- */
-	--twdb-night: #050506;
-	--twdb-cobalt: #0a2bff;
-	--twdb-cobalt-deep: #0a22d6;
-	--twdb-cobalt-soft: #6d80ff; /* legible on night */
-	--twdb-rose: #d24bff;
-	--twdb-rose-ink: #8a1fa8; /* rose deepened for text on day */
-	--twdb-rose-light: #ff7bae;
-	--twdb-dawn: #ffd7e6;
-	--twdb-day: #ffffff;
+  /* --- Raw palette: the horizon, night → day --- */
+  --twdb-night: #050506;
+  --twdb-cobalt: #0a2bff;
+  --twdb-cobalt-deep: #0a22d6;
+  --twdb-cobalt-soft: #6d80ff; /* legible on night */
+  --twdb-rose: #d24bff;
+  --twdb-rose-ink: #8a1fa8; /* rose deepened for text on day */
+  --twdb-rose-light: #ff7bae;
+  --twdb-dawn: #ffd7e6;
+  --twdb-day: #ffffff;
 
-	/* --- Type --- */
-	--font-ui: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
-	--font-cue: "IBM Plex Sans", "Outfit", system-ui, sans-serif;
-	--font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+  /* --- Type --- */
+  --font-ui: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-cue: "IBM Plex Sans", "Outfit", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
 
-	--text-xxs: 12px;
-	--text-xs: 13px;
-	--text-sm: 14px;
-	--text-md: 15px;
-	--text-lg: 16px;
-	--text-xl: 20px;
-	--text-2xl: 24px;
-	--text-3xl: 34px;
+  --text-xxs: 12px;
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-md: 15px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 34px;
 
-	--tracking-narrowest: -0.02em;
-	--tracking-narrower: 0.06em;
-	--tracking-narrow: 0.1em;
-	--tracking-cue: 0.14em;
-	--measure: 68ch;
+  --tracking-narrowest: -0.02em;
+  --tracking-narrower: 0.06em;
+  --tracking-narrow: 0.1em;
+  --tracking-cue: 0.14em;
+  --measure: 68ch;
 
-	/* --- Spacing (condensed, with air) --- */
-	--space-1: 4px;
-	--space-2: 8px;
-	--space-3: 12px;
-	--space-4: 16px;
-	--space-5: 24px;
-	--space-6: 32px;
-	--space-7: 48px;
-	--space-8: 64px;
+  /* --- Spacing (condensed, with air) --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
 
-	/* --- Radii --- */
-	--r-sm: 6px;
-	--r-md: 10px;
-	--r-lg: 14px;
-	--r-pill: 999px;
+  /* --- Radii --- */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
 
-	/* --- Motion: light rises, never bounces --- */
-	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-	--dur-1: 120ms;
-	--dur-2: 200ms;
-	--dur-3: 320ms;
+  /* --- Motion: light rises, never bounces --- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
 
-	/* --- Layering --- */
-	--z-overlay: 40;
-	--z-dialog: 50;
-	--z-tooltip: 60;
+  /* --- Layering --- */
+  --z-overlay: 40;
+  --z-dialog: 50;
+  --z-tooltip: 60;
 
-	/* --- Grain (fine structure, matte) --- */
-	--grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
+  /* --- Grain (fine structure, matte) --- */
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
 
-	/* --- The sweep: identity gradient, foundation only --- */
-	/* Components stay flat (user-pinned, 2026-08): no gradient   */
-	/* fills on controls. This sweep is reserved for the Horizon  */
-	/* foundation piece and future brand moments.                 */
-	--wash: linear-gradient(
-		105deg,
-		var(--twdb-cobalt) 0%,
-		var(--twdb-rose) 55%,
-		var(--twdb-rose-light) 100%
-	);
+  /* --- The sweep: identity gradient, foundation only --- */
+  /* Components stay flat (user-pinned, 2026-08): no gradient   */
+  /* fills on controls. This sweep is reserved for the Horizon  */
+  /* foundation piece and future brand moments.                 */
+  --wash: linear-gradient(105deg, var(--twdb-cobalt) 0%, var(--twdb-rose) 55%, var(--twdb-rose-light) 100%);
 }
 
 /* --- Day phase (default) --- */
 :root,
 [data-phase="day"] {
-	color-scheme: light;
+  color-scheme: light;
 
-	--bg: #f5f5f7; /* stage: light gray ground — surfaces float on it */
-	--bg-band: #faf9fc; /* sidebar: a band sitting just above the stage */
-	--bg-rail: #ffffff; /* rail: lifted accent strip, brightest of the three */
-	--bg-band-strong: #f2f0f7;
-	--surface: #ffffff;
+  --bg: #f5f5f7; /* stage: light gray ground — surfaces float on it */
+  --bg-band: #faf9fc; /* sidebar: a band sitting just above the stage */
+  --bg-rail: #ffffff; /* rail: lifted accent strip, brightest of the three */
+  --bg-band-strong: #f2f0f7;
+  --bg-band-stronger: #e9e7f0;
+  --bg-band-strongest: #dfdce6;
+  --surface: #ffffff;
 
-	/* fields: muted fill, no resting hairline */
-	--bg-field: #e9e7f0;
-	--bg-field-hover: #dfdce6;
+  /* fields: muted fill, no resting hairline */
+  --bg-field: #e9e7f0;
+  --bg-field-hover: #dfdce6;
 
-	--ink: #121218;
-	--ink-2: #40404e;
-	--ink-3: #626274;
+  --ink: #121218;
+  --ink-2: #40404e;
+  --ink-3: #626274;
 
-	--line: #e6e4ec;
-	--line-strong: #cfcdd9;
+  --line: #e6e4ec;
+  --line-strong: #cfcdd9;
 
-	--accent: var(--twdb-cobalt);
-	--accent-strong: var(--twdb-cobalt-deep);
-	--accent-ink: #ffffff;
-	--accent-soft-bg: rgb(10 43 255 / 0.08);
+  --accent: var(--twdb-cobalt);
+  --accent-strong: var(--twdb-cobalt-deep);
+  --accent-ink: #ffffff;
+  --accent-soft-bg: rgb(10 43 255 / 0.08);
 
-	/* solid action fill — the one lit control */
-	--action: var(--twdb-cobalt);
-	--action-strong: var(--twdb-cobalt-deep);
+  /* solid action fill — the one lit control */
+  --action: var(--twdb-cobalt);
+  --action-strong: var(--twdb-cobalt-deep);
 
-	--rose-accent: var(--twdb-rose-ink);
-	--rose-soft-bg: rgb(210 75 255 / 0.1);
+  --rose-accent: var(--twdb-rose-ink);
+  --rose-soft-bg: rgb(210 75 255 / 0.1);
 
-	/* semantic lights */
-	--go: var(--twdb-cobalt);
-	--go-bg: rgb(10 43 255 / 0.08);
-	--warning-ink: #7a5200;
-	--warning-bg: #f8eed7;
-	--danger-ink: #9d1b4f;
-	--danger-bg: #fce3ec;
+  /* semantic lights */
+  --go: var(--twdb-cobalt);
+  --go-bg: rgb(10 43 255 / 0.08);
+  --warning-ink: #7a5200;
+  --warning-bg: #f8eed7;
+  --danger-ink: #9d1b4f;
+  --danger-bg: #fce3ec;
 
-	--ring: rgb(10 43 255 / 0.22);
-	--shadow-overlay: 0 12px 28px -10px rgb(5 5 6 / 0.18);
+  --ring: rgb(10 43 255 / 0.22);
+  --shadow-overlay: 0 12px 28px -10px rgb(5 5 6 / 0.18);
 
-	--grain-opacity: 0.06;
-	--grain-blend: multiply;
+  --grain-opacity: 0.06;
+  --grain-blend: multiply;
 }
 
 /* --- Night phase ---
@@ -133,47 +130,49 @@
    Hairlines are solid zinc steps; the working light shifts from
    cobalt to editor blue. */
 [data-phase="night"] {
-	color-scheme: dark;
+  color-scheme: dark;
 
-	--bg: #18181b; /* stage: zinc-900, the focused work surface */
-	--bg-band: #1a1a1e; /* sidebar: a half-step above the stage */
-	--bg-rail: #131316; /* rail: recessed, darkest of the three */
-	--bg-band-strong: #27272a;
-	--surface: #1a1a1e;
+  --bg: #18181b; /* stage: zinc-900, the focused work surface */
+  --bg-band: #1a1a1e; /* sidebar: a half-step above the stage */
+  --bg-rail: #131316; /* rail: recessed, darkest of the three */
+  --bg-band-strong: #27272a;
+  --bg-band-stronger: #34343a;
+  --bg-band-strongest: #3f3f46;
+  --surface: #1a1a1e;
 
-	/* fields: muted fill, no resting hairline */
-	--bg-field: #222225;
-	--bg-field-hover: #303034;
+  /* fields: muted fill, no resting hairline */
+  --bg-field: #222225;
+  --bg-field-hover: #303034;
 
-	--ink: #e4e4e7;
-	--ink-2: #a1a1aa;
-	--ink-3: #71717a;
+  --ink: #e4e4e7;
+  --ink-2: #a1a1aa;
+  --ink-3: #71717a;
 
-	--line: #27272a;
-	--line-strong: #3f3f46;
+  --line: #27272a;
+  --line-strong: #3f3f46;
 
-	--accent: #60a5fa;
-	--accent-strong: #93c5fd;
-	--accent-ink: #ffffff;
-	--accent-soft-bg: rgb(59 130 246 / 0.15);
+  --accent: #60a5fa;
+  --accent-strong: #93c5fd;
+  --accent-ink: #ffffff;
+  --accent-soft-bg: rgb(59 130 246 / 0.15);
 
-	/* solid action fill — the one lit control */
-	--action: #3b82f6;
-	--action-strong: #2563eb;
+  /* solid action fill — the one lit control */
+  --action: #3b82f6;
+  --action-strong: #2563eb;
 
-	--rose-accent: var(--twdb-rose-light);
-	--rose-soft-bg: rgb(255 123 174 / 0.14);
+  --rose-accent: var(--twdb-rose-light);
+  --rose-soft-bg: rgb(255 123 174 / 0.14);
 
-	--go: #22c55e;
-	--go-bg: rgb(34 197 94 / 0.15);
-	--warning-ink: #f59e0b;
-	--warning-bg: rgb(245 158 11 / 0.12);
-	--danger-ink: #f87171;
-	--danger-bg: rgb(239 68 68 / 0.15);
+  --go: #22c55e;
+  --go-bg: rgb(34 197 94 / 0.15);
+  --warning-ink: #f59e0b;
+  --warning-bg: rgb(245 158 11 / 0.12);
+  --danger-ink: #f87171;
+  --danger-bg: rgb(239 68 68 / 0.15);
 
-	--ring: rgb(59 130 246 / 0.35);
-	--shadow-overlay: 0 14px 32px -10px rgb(0 0 0 / 0.6);
+  --ring: rgb(59 130 246 / 0.35);
+  --shadow-overlay: 0 14px 32px -10px rgb(0 0 0 / 0.6);
 
-	--grain-opacity: 0.08;
-	--grain-blend: screen;
+  --grain-opacity: 0.08;
+  --grain-blend: screen;
 }

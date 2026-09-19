@@ -1,40 +1,29 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-	adminFetch,
-	type PluginEntry,
-	type PluginTemplateEntry,
-} from "../lib/admin-api";
+import { adminRepo } from "../lib/admin-api";
 
 export function usePlugins() {
 	const queryClient = useQueryClient();
 
 	const pluginsQuery = useQuery({
 		queryKey: ["admin", "plugins"],
-		queryFn: () => adminFetch<PluginEntry[]>("/plugins"),
+		queryFn: () => adminRepo.listPlugins(),
 	});
 
 	const templatesQuery = useQuery({
 		queryKey: ["admin", "plugin-templates"],
-		queryFn: () => adminFetch<PluginTemplateEntry[]>("/plugin-templates"),
+		queryFn: () => adminRepo.listPluginTemplates(),
 	});
 
 	const invalidate = () =>
 		queryClient.invalidateQueries({ queryKey: ["admin", "plugins"] });
 
 	const addPlugin = useMutation({
-		mutationFn: (identifier: string) =>
-			adminFetch<PluginEntry>("/plugins", {
-				method: "POST",
-				body: { identifier },
-			}),
+		mutationFn: (identifier: string) => adminRepo.addPlugin(identifier),
 		onSuccess: invalidate,
 	});
 
 	const removePlugin = useMutation({
-		mutationFn: (identifier: string) =>
-			adminFetch(`/plugins/${encodeURIComponent(identifier)}`, {
-				method: "DELETE",
-			}),
+		mutationFn: (identifier: string) => adminRepo.removePlugin(identifier),
 		onSuccess: invalidate,
 	});
 

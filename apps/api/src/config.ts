@@ -1,36 +1,21 @@
-// Single source of truth for runtime configuration.
-//
-// This schema is consumed by @fastify/fastify-env at boot. fastify-env
-// validates process.env (overlaid with values from `.env`) against the
-// schema, fills in defaults when keys are missing, and exposes the result
-// as `fastify.config.*`. Plugins should never read `process.env` directly -
-// they should pull from `fastify.config` so defaults stay centralized.
-//
-// To add a new env var:
-//   1. Add it here with a default.
-//   2. Reference `fastify.config.YOUR_VAR` from a plugin or handler.
-//   3. (Optional) Add it to /<repo-root>/.env.example so humans know it
-//      exists.
-//
-// Defaults are dev-friendly and match the docker-compose.db.yaml service
-// defaults so the api runs out of the box against `pnpm db:up`.
+import path from "node:path";
 
 export const envSchema = {
   type: "object",
   properties: {
     // --- API ---
-    PORT: {
+    TWODB_PORT: {
       type: "number",
       default: 3001,
       description: "HTTP port the api listens on",
     },
-    TWO_DB_WORK_DIR: {
+    TWODB_WORK_DIR: {
       type: "string",
-      default: "../../../.work",
-      description: "Directory holding the api-owned sqlite database (db-v1.sqlite), resolved from apps/api/src; created if missing",
+      default: path.resolve(import.meta.dirname, "../../../.work"),
+      description: "Absolute path to the api-owned work dir (fetched-plugin extractions); created if missing",
     },
 
-    // --- Admin (passkey auth, /api/admin) ---
+    // --- Admin (passkey auth, /api/v1/admin) ---
     TWODB_ADMIN_RP_ID: {
       type: "string",
       default: "localhost",
@@ -48,12 +33,12 @@ export const envSchema = {
     },
 
     // --- Postgres (consumed by @fastify/postgres) ---
-    DATABASE_URL: {
+    TWODB_DATABASE_URL: {
       type: "string",
       default: "postgres://twodb:twodb@localhost:5432/twodb",
       description: "Full postgres:// connection URI",
     },
-    POSTGRES_POOL_SIZE: {
+    TWODB_POSTGRES_POOL_SIZE: {
       type: "number",
       default: 10,
       description: "Max connections in the pg pool",
@@ -61,11 +46,4 @@ export const envSchema = {
   },
 };
 
-/**
- * Path to the .env file the api should load. Resolved against the api's
- * entry-point directory (apps/api/src) at runtime, so the file lives three
- * levels up - at the repo root. Dotenv silently no-ops if the file is
- * missing, so this is safe to leave alone in environments where the api
- * runs without a .env (CI, production with real env vars, etc.).
- */
 export const dotenvPath = "../../../.env";

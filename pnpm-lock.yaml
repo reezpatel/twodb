@@ -1170,6 +1170,9 @@ importers:
 
   plugins/auth:
     dependencies:
+      '@simplewebauthn/browser':
+        specifier: ^14.0.0
+        version: 14.0.0
       '@simplewebauthn/server':
         specifier: ^14.0.2
         version: 14.0.2
@@ -1183,12 +1186,21 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
     devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
       '@fastify/cookie':
         specifier: ^11.1.2
         version: 11.1.2
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
       esbuild:
         specifier: ^0.25.12
         version: 0.25.12
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
 
   plugins/calendar:
     dependencies:

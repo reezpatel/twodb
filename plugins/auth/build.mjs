@@ -12,7 +12,9 @@
 // rebuilds on change.
 //
 import { context } from "esbuild";
+import { transformSync } from "@babel/core";
 import fs from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -37,7 +39,33 @@ async function readJson(file) {
 }
 
 const pkg = await readJson(path.join(root, "package.json"));
-const manifest = await readJson(path.join(root, "manifest.json"));
+
+const styledJsx = {
+  name: "styled-jsx",
+  setup(b) {
+    b.onLoad({ filter: /\.(jsx|tsx)$|\.style\.ts$/ }, (args) => {
+      const code = readFileSync(args.path, "utf8");
+      const result = transformSync(code, {
+        babelrc: false,
+        configFile: false,
+        plugins: ["styled-jsx/babel"],
+        sourceFileName: args.path,
+        parserOpts: { sourceType: "module", plugins: ["typescript", "jsx"] },
+      });
+      return { contents: result.code, loader: path.extname(args.path).slice(1) };
+    });
+  },
+};
+
+const dropFonts = {
+  name: "drop-fontsource",
+  setup(b) {
+    b.onLoad({ filter: /\.css$/ }, (args) => {
+      if (!args.path.includes("fontsource")) return null;
+      return { contents: "", loader: "css" };
+    });
+  },
+};
 
 // Runs after every successful view build: normalize the css name and write
 // the bundle package.json (its exports depend on whether styles exist).
@@ -56,9 +84,9 @@ async function finalize() {
   const outPkg = {
     name: pkg.name,
     version: pkg.version,
-    description: manifest.description,
+    description: pkg.twodb?.description,
     type: "module",
-    twodb: manifest,
+    twodb: pkg.twodb,
     exports: {
       "./service": "./service/main.js",
       "./view": "./view/main.js",
@@ -111,14 +139,20 @@ const service = await context({
 // imports when it loads the bundle.
 const view = await context({
   entryPoints: [path.join(root, "view/index.tsx")],
+  loader: { ".woff": "dataurl", ".woff2": "dataurl" },
+  // bundled CJS deps (styled-jsx runtime) require("react") — hand them the
+  // shell's react (the facade default) instead of esbuild's broken ESM shim
+  banner: {
+    js: `import __twodbReact from "react";const require=(id)=>{if(id==="react")return __twodbReact;throw new Error(\'Dynamic require of "\'+id+\'" is not supported in the view bundle\')};`,
+  },
   outfile: path.join(outdir, "view/main.js"),
   bundle: true,
   platform: "browser",
   format: "esm",
   target: "es2022",
   jsx: "automatic",
-  external: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
-  plugins: [finalizeOnEnd],
+  external: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query"],
+  plugins: [styledJsx, dropFonts, finalizeOnEnd],
 });
 
 await Promise.all([service.rebuild(), view.rebuild()]);

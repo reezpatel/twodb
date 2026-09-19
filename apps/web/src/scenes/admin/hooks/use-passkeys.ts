@@ -1,40 +1,30 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { startRegistration } from "@simplewebauthn/browser";
-import type { PublicKeyCredentialCreationOptionsJSON } from "@simplewebauthn/browser";
-import { adminFetch, type Passkey } from "../lib/admin-api";
+import { adminRepo } from "../lib/admin-api";
 
 export function usePasskeys() {
-	const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-	const passkeysQuery = useQuery({
-		queryKey: ["admin", "passkeys"],
-		queryFn: () => adminFetch<Passkey[]>("/passkeys"),
-	});
+  const passkeysQuery = useQuery({
+    queryKey: ["admin", "passkeys"],
+    queryFn: () => adminRepo.listPasskeys(),
+  });
 
-	const invalidate = () =>
-		queryClient.invalidateQueries({ queryKey: ["admin"] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin"] });
 
-	const registerPasskey = useMutation({
-		mutationFn: async (name?: string) => {
-			const optionsJSON =
-				await adminFetch<PublicKeyCredentialCreationOptionsJSON>(
-					"/passkeys/register/options",
-					{ method: "POST" },
-				);
-			const response = await startRegistration({ optionsJSON });
-			await adminFetch("/passkeys/register/verify", {
-				method: "POST",
-				body: { response, name },
-			});
-		},
-		onSuccess: invalidate,
-	});
+  const registerPasskey = useMutation({
+    mutationFn: async (name?: string) => {
+      const optionsJSON = await adminRepo.registerPasskeyOptions();
+      const response = await startRegistration({ optionsJSON });
+      await adminRepo.registerPasskeyVerify(response, name);
+    },
+    onSuccess: invalidate,
+  });
 
-	const deletePasskey = useMutation({
-		mutationFn: (id: string) =>
-			adminFetch(`/passkeys/${encodeURIComponent(id)}`, { method: "DELETE" }),
-		onSuccess: invalidate,
-	});
+  const deletePasskey = useMutation({
+    mutationFn: (id: string) => adminRepo.deletePasskey(id),
+    onSuccess: invalidate,
+  });
 
-	return { passkeysQuery, registerPasskey, deletePasskey };
+  return { passkeysQuery, registerPasskey, deletePasskey };
 }

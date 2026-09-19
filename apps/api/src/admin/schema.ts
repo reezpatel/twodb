@@ -30,9 +30,9 @@ declare module "@twodb/shared-backend" {
     name: string | null;
     extracted_path: string | null;
     version: string | null;
-    provides: Generated<string>;
-    manifest: string | null;
-    config: string | null;
+    provides: Generated<string[] | string>;
+    manifest: Record<string, unknown> | null;
+    config: Record<string, unknown> | null;
     created_at: Generated<Date>;
     updated_at: Generated<Date>;
   }

@@ -1,4 +1,4 @@
-import { Blocks, KeyRound, LogOut, Puzzle, Server } from "lucide-react";
+import { Blocks, KeyRound, LogOut, Server } from "lucide-react";
 import { IconButton, NavRail, type NavRailItem } from "@twodb/ui";
 import { useAdminRail } from "./hooks/use-admin-rail";
 
@@ -9,17 +9,11 @@ const SECTIONS = [
 ] as const;
 
 export function AdminRail() {
-  const { activeId, pluginItems, navigate, logout } = useAdminRail();
-  const items: NavRailItem[] = [
-    ...SECTIONS.map(({ icon: Icon, ...item }) => ({
-      ...item,
-      icon: <Icon aria-hidden="true" />,
-    })),
-    ...pluginItems.map((item) => ({
-      ...item,
-      icon: <Puzzle aria-hidden="true" />,
-    })),
-  ];
+  const { activeId, navigate, logout } = useAdminRail();
+  const items: NavRailItem[] = SECTIONS.map(({ icon: Icon, ...item }) => ({
+    ...item,
+    icon: <Icon aria-hidden="true" />,
+  }));
 
   return (
     <NavRail
@@ -27,15 +21,7 @@ export function AdminRail() {
       items={items}
       value={activeId}
       onValueChange={navigate}
-      footer={
-        <IconButton
-          label="Sign out"
-          icon={<LogOut />}
-          size="lg"
-          disabled={logout.isPending}
-          onClick={() => logout.mutate()}
-        />
-      }
+      footer={<IconButton label="Sign out" icon={<LogOut />} size="lg" disabled={logout.isPending} onClick={() => logout.mutate()} />}
     />
   );
 }

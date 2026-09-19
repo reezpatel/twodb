@@ -1,12 +1,7 @@
 import type { FastifyInstance as FastifyInstanceBase } from "fastify";
 
-/**
- * Structural stand-in for react-pluggable's IPlugin, declared here so the
- * pure-types contracts package doesn't import it — its bundled d.ts
- * predates React 19 (React.SFC) and breaks under skipLibCheck: false.
- * The pluginStore member is assigned by the store at install time; twodb
- * code never reads it.
- */
+// structural stand-in: importing react-pluggable here pulls its d.ts,
+// which predates React 19 (React.SFC) and fails typecheck
 export interface IPlugin {
   getPluginName(): string;
   getDependencies(): string[];

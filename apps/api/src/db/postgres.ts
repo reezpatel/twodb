@@ -12,11 +12,11 @@ interface PostgresPluginOptions {
 
 const postgresPlugin: FastifyPluginAsync<PostgresPluginOptions> = async (fastify, opts) => {
   const cfg = fastify.config ?? {};
-  const connectionString = opts?.connectionString ?? cfg.DATABASE_URL;
-  const poolSize = opts?.poolSize ?? cfg.POSTGRES_POOL_SIZE ?? 10;
+  const connectionString = opts?.connectionString ?? cfg.TWODB_DATABASE_URL;
+  const poolSize = opts?.poolSize ?? cfg.TWODB_POSTGRES_POOL_SIZE ?? 10;
 
   if (!connectionString) {
-    throw new Error("postgres plugin: DATABASE_URL is not set");
+    throw new Error("postgres plugin: TWODB_DATABASE_URL is not set");
   }
 
   const dialect = new PostgresDialect({

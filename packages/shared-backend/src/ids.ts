@@ -1,7 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-const BASE62_ALPHABET =
-  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 function base62Encode(bytes: Uint8Array): string {
   let value = 0n;
@@ -26,7 +25,7 @@ function uuidV7Bytes(now: number): Uint8Array {
 }
 
 export function newId(prefix: string): string {
-  const id = `${prefix}-${base62Encode(uuidV7Bytes(Date.now()))}`;
+  const id = `${prefix}_${base62Encode(uuidV7Bytes(Date.now()))}`;
 
   return id;
 }

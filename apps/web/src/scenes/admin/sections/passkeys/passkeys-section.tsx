@@ -1,7 +1,7 @@
 import { Badge, Button, EmptyState, IconButton, Skeleton } from "@twodb/ui";
 import { KeyRound, Plus, Trash2 } from "lucide-react";
 import { usePasskeys } from "../../hooks/use-passkeys";
-import { AdminApiError } from "../../lib/admin-api";
+import { TwodbApiError } from "@twodb/shared-frontend";
 import { passkeysSectionStyles } from "./passkeys-section.style";
 
 export function PasskeysSection() {
@@ -16,16 +16,9 @@ export function PasskeysSection() {
       <header className="passkeys-page__header">
         <div>
           <h1>Passkeys</h1>
-          <p>
-            Passkeys are the only way in. At least one must exist at all times.
-          </p>
+          <p>Passkeys are the only way in. At least one must exist at all times.</p>
         </div>
-        <Button
-          variant="secondary"
-          size="lg"
-          disabled={registerPasskey.isPending}
-          onClick={() => registerPasskey.mutate(undefined)}
-        >
+        <Button variant="secondary" size="lg" disabled={registerPasskey.isPending} onClick={() => registerPasskey.mutate(undefined)}>
           <Plus aria-hidden="true" size={16} />
           {registerPasskey.isPending ? "Adding…" : "New passkey"}
         </Button>
@@ -38,8 +31,7 @@ export function PasskeysSection() {
       ) : null}
       {deleteError ? (
         <p className="passkeys-page__error" role="alert">
-          {deleteError instanceof AdminApiError &&
-          deleteError.code === "last_passkey"
+          {deleteError instanceof TwodbApiError && deleteError.code === "last_passkey"
             ? "Can't delete the last passkey — one passkey must always exist."
             : deleteError.message}
         </p>
@@ -47,10 +39,7 @@ export function PasskeysSection() {
 
       <div className="passkeys-page__list-section">
         {passkeysQuery.isPending ? (
-          <div
-            className="passkeys-page__list passkeys-page__list--loading"
-            aria-label="Loading passkeys"
-          >
+          <div className="passkeys-page__list passkeys-page__list--loading" aria-label="Loading passkeys">
             {Array.from({ length: 2 }, (_, index) => (
               <div className="passkeys-page__loading-row" key={index}>
                 <Skeleton width={40} height={40} />
@@ -68,11 +57,7 @@ export function PasskeysSection() {
             title="No passkeys registered"
             description="Add a passkey to secure access to this instance."
             action={
-              <Button
-                variant="secondary"
-                disabled={registerPasskey.isPending}
-                onClick={() => registerPasskey.mutate(undefined)}
-              >
+              <Button variant="secondary" disabled={registerPasskey.isPending} onClick={() => registerPasskey.mutate(undefined)}>
                 <Plus aria-hidden="true" />
                 Add passkey
               </Button>
@@ -88,25 +73,17 @@ export function PasskeysSection() {
                 <div className="passkeys-page__row-main">
                   <div className="passkeys-page__row-title">
                     <strong>{passkey.name || "Unnamed passkey"}</strong>
-                    {hasMultiplePasskeys ? null : (
-                      <Badge size="sm">Required</Badge>
-                    )}
+                    {hasMultiplePasskeys ? null : <Badge size="sm">Required</Badge>}
                   </div>
                   <div className="passkeys-page__meta">
                     <span>
-                      Added{" "}
-                      <time dateTime={passkey.created_at}>
-                        {new Date(passkey.created_at).toLocaleDateString()}
-                      </time>
+                      Added <time dateTime={passkey.created_at}>{new Date(passkey.created_at).toLocaleDateString()}</time>
                     </span>
                     <span aria-hidden="true">·</span>
                     <span>
                       {passkey.last_used_at ? (
                         <>
-                          Last used{" "}
-                          <time dateTime={passkey.last_used_at}>
-                            {new Date(passkey.last_used_at).toLocaleString()}
-                          </time>
+                          Last used <time dateTime={passkey.last_used_at}>{new Date(passkey.last_used_at).toLocaleString()}</time>
                         </>
                       ) : (
                         "Never used"
@@ -115,11 +92,7 @@ export function PasskeysSection() {
                   </div>
                 </div>
                 <IconButton
-                  label={
-                    hasMultiplePasskeys
-                      ? `Delete ${passkey.name || "passkey"}`
-                      : "The only passkey cannot be deleted"
-                  }
+                  label={hasMultiplePasskeys ? `Delete ${passkey.name || "passkey"}` : "The only passkey cannot be deleted"}
                   icon={<Trash2 />}
                   disabled={deletePasskey.isPending || !hasMultiplePasskeys}
                   onClick={() => deletePasskey.mutate(passkey.id)}

@@ -8,7 +8,7 @@
 # Alongside the full stack (docker-compose.all.yaml): the controller container
 # is named twodb-server on the twodb-net network, so set in .env:
 #
-#   TWO_DB_CONTROLLER_URL=http://twodb-server:3001
+#   TWODB_CONTROLLER_URL=http://twodb-server:3001
 #
 # and uncomment the two `networks` blocks below before starting this compose.
 
@@ -26,17 +26,17 @@ services:
     # controller running on the host (e.g. `pnpm dev` in apps/api). The
     # default bridge is often blocked by host firewalls for host-process
     # ports. For remote controllers, drop network_mode and set
-    # TWO_DB_CONTROLLER_URL to the controller's address.
+    # TWODB_CONTROLLER_URL to the controller's address.
     network_mode: host
     environment:
-      TWO_DB_CONTROLLER_URL: ${TWO_DB_CONTROLLER_URL:-http://host.docker.internal:3001}
-      TWO_DB_CONTROLLER_WS_PATH: ${TWO_DB_CONTROLLER_WS_PATH:-/api/v1/io.twodb.node/nodes/ws}
-      TWO_DB_NODE_SECRET: ${TWO_DB_NODE_SECRET:?set TWO_DB_NODE_SECRET in .env — create it in the nodes UI (see .env.example)}
-      TWO_DB_HEARTBEAT_MS: ${TWO_DB_HEARTBEAT_MS:-10000}
-      TWO_DB_ROOT_DIR: ${TWO_DB_ROOT_DIR:-/host}
+      TWODB_CONTROLLER_URL: ${TWODB_CONTROLLER_URL:-http://host.docker.internal:3001}
+      TWODB_CONTROLLER_WS_PATH: ${TWODB_CONTROLLER_WS_PATH:-/api/v1/io.twodb.node/nodes/ws}
+      TWODB_NODE_SECRET: ${TWODB_NODE_SECRET:?set TWODB_NODE_SECRET in .env — create it in the nodes UI (see .env.example)}
+      TWODB_HEARTBEAT_MS: ${TWODB_HEARTBEAT_MS:-10000}
+      TWODB_ROOT_DIR: ${TWODB_ROOT_DIR:-/host}
     volumes:
       # Jail root for the agent's file/command APIs: the host filesystem,
-      # mounted at /host (TWO_DB_ROOT_DIR=/host).
+      # mounted at /host (TWODB_ROOT_DIR=/host).
       - /:/host
     # networks:
     #   - twodb-net

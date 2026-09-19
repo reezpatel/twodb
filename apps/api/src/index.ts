@@ -1,3 +1,4 @@
+import path from "node:path";
 import Fastify from "fastify";
 import fastifyEnv from "@fastify/env";
 import cors from "@fastify/cors";
@@ -8,11 +9,14 @@ import { registerStaticApp } from "./static";
 import { adminPlugin } from "./admin";
 
 const app = Fastify({ logger: true });
-await app.register(fastifyEnv, { schema: envSchema });
+await app.register(fastifyEnv, {
+  dotenv: { path: path.resolve(import.meta.dirname, dotenvPath) },
+  schema: envSchema,
+});
 await app.register(cors, { origin: true });
 await app.register(postgresPlugin);
 await app.register(cookie);
-await app.register(adminPlugin, { prefix: "/api/admin" });
+await app.register(adminPlugin);
 
 app.get("/health/ready", async (_request, reply) => {
   const checks = {
@@ -32,7 +36,7 @@ app.get("/health/ready", async (_request, reply) => {
 
 await registerStaticApp(app);
 
-const port = app.config.PORT;
+const port = app.config.TWODB_PORT;
 
 try {
   await app.listen({ port, host: "0.0.0.0" });

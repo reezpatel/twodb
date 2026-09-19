@@ -22,7 +22,7 @@ import react from "@vitejs/plugin-react";
 // (Prod builds leave the marker in place; serving plugin views in prod
 // needs the shell to externalize react to stable URLs — not wired yet.)
 const IMPORTMAP_MARKER = "<!-- twodb:plugin-view-importmap (dev: replaced with a generated import map) -->";
-const VIEW_DEP_SPECS = ["react", "react-dom", "react-dom/client", "react/jsx-runtime", "react/jsx-dev-runtime"];
+const VIEW_DEP_SPECS = ["react", "react-dom", "react-dom/client", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query"];
 const depsMetadataPath = path.join(import.meta.dirname, "node_modules/.vite/deps/_metadata.json");
 
 const facadePath = (spec: string) => `/@twodb-view-deps/${spec.replace(/\//g, "_")}.js`;
@@ -78,12 +78,24 @@ function pluginViewDepFacades(): Plugin {
           }
         }
 
-        // `export const { a, b } = D` binds the same objects the optimized
-        // module's default export holds — functions included, so hooks land
-        // on the shell's single ReactSharedInternals.
-        const source = names.length
-          ? `import D from "/node_modules/.vite/deps/${file}.js${version}";\nexport const { ${names.join(", ")} } = D;\n`
-          : `import D from "/node_modules/.vite/deps/${file}.js${version}";\nexport default D;\n`;
+        // `export default D` keeps default imports (import React from
+        // "react") working; `export const { a, b } = D` binds the same
+        // objects the optimized module's default export holds — functions
+        // included, so hooks land on the shell's single
+        // ReactSharedInternals.
+        const depUrl = `/node_modules/.vite/deps/${file}.js${version}`;
+        let hasDefault = true;
+        try {
+          const depSource = fs.readFileSync(path.join(import.meta.dirname, `node_modules/.vite/deps/${file}.js`), "utf8");
+          hasDefault = /(^|\n)\s*export default|\bas default\b/.test(depSource);
+        } catch {
+          // file not readable — assume CJS-style default interop
+        }
+        const source = !hasDefault
+          ? `export * from "${depUrl}";\n`
+          : names.length
+            ? `import D from "${depUrl}";\nexport default D;\nexport const { ${names.join(", ")} } = D;\n`
+            : `import D from "${depUrl}";\nexport default D;\n`;
         res.setHeader("content-type", "text/javascript");
         res.end(source);
       });

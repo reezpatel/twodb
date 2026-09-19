@@ -4,6 +4,7 @@ import { usePluginsSection } from "../../hooks/use-plugins-section";
 import { pluginsSectionStyles } from "./plugins-section.style";
 import { CatalogContent } from "./partials/catalog-content";
 import { CustomIntegrationDialog } from "./partials/custom-integration-dialog";
+import { PluginDetailDialog } from "./partials/plugin-detail-dialog";
 
 const FILTERS = [
   { id: "all", label: "All integrations" },
@@ -56,6 +57,7 @@ export function PluginsSection() {
 
       <CatalogContent state={state} />
       <CustomIntegrationDialog state={state} />
+      <PluginDetailDialog state={state} />
     </section>
   );
 }

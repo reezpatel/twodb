@@ -1,123 +1,61 @@
 import { useMemo, useState } from "react";
 import { useForm } from "@tanstack/react-form";
-import { useNavigate } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { useTwoDbPlugin } from "@twodb/shared-frontend";
+import { adminRepo } from "../lib/admin-api";
 import { usePlugins } from "./use-plugins";
+import type { PluginEntry } from "../lib/admin-api";
 
 const IDENTIFIER_RE = /^(git:\S+|npm:\S+|local:\S+)$/;
 
 type CatalogFilter = "all" | "connected" | "custom";
 
 export type IntegrationCatalogItem = {
-  identifier: string;
-  pluginId: string;
-  name: string;
-  version: string | null;
-  description: string;
-  logo: string;
+  plugin: PluginEntry;
   connected: boolean;
-  custom: boolean;
 };
 
-function displayName(identifier: string, name: string | null): string {
-  if (name?.trim()) return name;
-  const clean = identifier.replace(/^(git:|npm:|local:)/, "").replace(/\/$/, "");
-  const segments = clean
-    .split("/")
-    .filter(Boolean)
-    .filter((segment) => !segment.startsWith("."));
-  return segments.at(-1)?.replace(/\.git$/, "") || clean || identifier;
-}
-
-// Card data comes from the plugin's own manifest (identifier, description,
-// logo) whenever it is available — registry rows for not-yet-fetched
-// git:/npm: sources have no manifest and fall back to placeholders.
-function manifestOf(entry?: { manifest: string | null }): {
-  identifier: string;
-  description: string;
-  logo: string;
-} {
-  try {
-    const parsed = entry?.manifest ? (JSON.parse(entry.manifest) as Record<string, unknown>) : {};
-    const str = (value: unknown) => (typeof value === "string" && value.trim() ? value : "");
-    return {
-      identifier: str(parsed.identifier),
-      description: str(parsed.description),
-      logo: str(parsed.logo),
-    };
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
-    return { identifier: "", description: "", logo: "" };
-  }
-}
-
-function descriptionFor(provides: string, custom: boolean): string {
-  if (custom) return "Added with a custom npm, Git or local-path identifier.";
-  try {
-    const capabilities = JSON.parse(provides);
-    if (Array.isArray(capabilities) && capabilities.length > 0) {
-      return `Provides ${capabilities.slice(0, 3).join(", ")}.`;
-    }
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
-  }
-  return "Ready to connect from the shared integration catalog.";
-}
-
 export function usePluginsSection() {
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { pluginsQuery, templatesQuery, addPlugin, removePlugin } = usePlugins();
+  const { plugins: viewPlugins } = useTwoDbPlugin();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CatalogFilter>("all");
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
+  const [detailIdentifier, setDetailIdentifier] = useState<string | null>(null);
   const plugins = pluginsQuery.data ?? [];
   const templates = templatesQuery.data ?? [];
 
   const catalog = useMemo<IntegrationCatalogItem[]>(() => {
-    const installed = new Map(plugins.map((plugin) => [plugin.identifier, plugin]));
-    const templateIds = new Set(templates.map((template) => template.identifier));
-    const templateItems = templates.map((template) => {
-      const manifest = manifestOf(installed.get(template.identifier));
-      return {
-        identifier: template.identifier,
-        pluginId: manifest.identifier,
-        name: displayName(template.identifier, template.name),
-        version: template.version,
-        description: manifest.description || descriptionFor(template.provides, false),
-        logo: manifest.logo,
-        connected: installed.has(template.identifier),
-        custom: false,
-      };
-    });
-    const customItems = plugins
-      .filter((plugin) => !templateIds.has(plugin.identifier))
-      .map((plugin) => {
-        const manifest = manifestOf(plugin);
-        return {
-          identifier: plugin.identifier,
-          pluginId: manifest.identifier,
-          name: displayName(plugin.identifier, plugin.name),
-          version: plugin.version,
-          description: manifest.description || descriptionFor(plugin.provides, true),
-          logo: manifest.logo,
-          connected: true,
-          custom: true,
-        };
-      });
-    return [...templateItems, ...customItems];
+    const items = plugins.map((plugin) => ({
+      plugin,
+      connected: true,
+    }));
+
+    return items;
   }, [plugins, templates]);
 
   const visibleIntegrations = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
+
     return catalog.filter((integration) => {
-      const matchesFilter = filter === "all" || (filter === "connected" && integration.connected) || (filter === "custom" && integration.custom);
-      const matchesQuery =
-        !normalizedQuery ||
-        integration.name.toLowerCase().includes(normalizedQuery) ||
-        integration.identifier.toLowerCase().includes(normalizedQuery) ||
-        integration.pluginId.toLowerCase().includes(normalizedQuery);
+      const matchesFilter = filter === "all" || (filter === "connected" && integration.connected);
+
+      const str = [integration.plugin.manifest?.name, integration.plugin.identifier, ...(integration.plugin.manifest?.tags ?? [])];
+
+      const matchesQuery = !normalizedQuery || str.some((s) => (s ?? "").toLocaleLowerCase().includes(normalizedQuery));
+
       return matchesFilter && matchesQuery;
     });
   }, [catalog, filter, query]);
+
+  const detailPlugin = useMemo(() => {
+    if (detailIdentifier === null) return null;
+    const entry = catalog.find((integration) => integration.plugin.identifier === detailIdentifier);
+    return entry ? { ...entry.plugin, connected: entry.connected } : null;
+  }, [catalog, detailIdentifier]);
+
+  const settingsFor = (pluginId: string) => viewPlugins.find((view) => view.id === pluginId)?.admin?.settings ?? null;
 
   const form = useForm({
     defaultValues: { identifier: "" },
@@ -160,7 +98,14 @@ export function usePluginsSection() {
       else addPlugin.mutate(identifier);
     },
     removeIntegration: (identifier: string) => removePlugin.mutate(identifier),
-    openIntegration: (identifier: string) => navigate(`/admin/plugins/${encodeURIComponent(identifier)}`),
+    detailPlugin,
+    openDetail: (identifier: string) => setDetailIdentifier(identifier),
+    closeDetail: () => setDetailIdentifier(null),
+    settingsFor,
+    updatePluginConfig: async (identifier: string, config: unknown) => {
+      await adminRepo.updatePluginConfig(identifier, config);
+      await queryClient.invalidateQueries({ queryKey: ["admin", "plugins"] });
+    },
   };
 }
 

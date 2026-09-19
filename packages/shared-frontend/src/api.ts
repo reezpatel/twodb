@@ -1,9 +1,10 @@
-export class ApiError extends Error {
+export class TwodbApiError extends Error {
   constructor(
     public status: number,
-    public body: string,
+    public code: string,
+    message: string,
   ) {
-    super(`API request failed (${status}): ${body}`);
+    super(message);
   }
 }
 
@@ -34,7 +35,18 @@ export class ApiClient {
       headers: this.headers(body),
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    if (!res.ok) throw new ApiError(res.status, await res.text());
+    if (!res.ok) {
+      let code = "request_failed";
+      let message = `API request failed (${res.status})`;
+      try {
+        const body = (await res.json()) as { error?: string; message?: string };
+        code = body.error ?? code;
+        message = body.message ?? message;
+      } catch {
+        // non-json error body — keep defaults
+      }
+      throw new TwodbApiError(res.status, code, message);
+    }
     if (res.status === 204) return undefined as T;
     return (await res.json()) as T;
   }

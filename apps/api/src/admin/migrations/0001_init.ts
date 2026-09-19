@@ -49,9 +49,9 @@ export default {
       .addColumn("name", "text")
       .addColumn("extracted_path", "text")
       .addColumn("version", "text")
-      .addColumn("provides", "text", (c) => c.notNull().defaultTo("[]"))
-      .addColumn("manifest", "text")
-      .addColumn("config", "text")
+      .addColumn("provides", "jsonb", (c) => c.notNull().defaultTo(sql`'[]'::jsonb`))
+      .addColumn("manifest", "jsonb")
+      .addColumn("config", "jsonb")
       .addColumn("created_at", "timestamptz", (c) => c.notNull().defaultTo(now))
       .addColumn("updated_at", "timestamptz", (c) => c.notNull().defaultTo(now))
       .execute();

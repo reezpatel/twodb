@@ -1,14 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { startAuthentication } from "@simplewebauthn/browser";
-import type { PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/browser";
-import { adminFetch, type AdminSessionState } from "../lib/admin-api";
+import { adminRepo } from "../lib/admin-api";
 
 export function useAdminSession() {
 	const queryClient = useQueryClient();
 
 	const sessionQuery = useQuery({
 		queryKey: ["admin", "session"],
-		queryFn: () => adminFetch<AdminSessionState>("/session"),
+		queryFn: () => adminRepo.getSession(),
 	});
 
 	const invalidate = () =>
@@ -16,19 +15,15 @@ export function useAdminSession() {
 
 	const login = useMutation({
 		mutationFn: async () => {
-			const optionsJSON =
-				await adminFetch<PublicKeyCredentialRequestOptionsJSON>(
-					"/login/options",
-					{ method: "POST" },
-				);
+			const optionsJSON = await adminRepo.loginOptions();
 			const response = await startAuthentication({ optionsJSON });
-			await adminFetch("/login/verify", { method: "POST", body: { response } });
+			await adminRepo.loginVerify(response);
 		},
 		onSuccess: invalidate,
 	});
 
 	const logout = useMutation({
-		mutationFn: () => adminFetch("/logout", { method: "POST" }),
+		mutationFn: () => adminRepo.logout(),
 		onSuccess: invalidate,
 	});
 

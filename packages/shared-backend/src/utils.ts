@@ -7,3 +7,4 @@ export function parseJsonArray(raw: string | null): string[] | undefined {
     return undefined;
   }
 }
+export const normalizeTableName = (name: string): string => name.replaceAll(".", "_").replace("@", "_");

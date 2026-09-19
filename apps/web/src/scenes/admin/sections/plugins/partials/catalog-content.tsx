@@ -15,7 +15,7 @@ export function CatalogContent({ state }: { state: PluginsSectionState }) {
 			<style jsx>{catalogContentStyles}</style>
 			{state.visibleIntegrations.map((integration) => (
 				<IntegrationCard
-					key={integration.identifier}
+					key={integration.plugin.identifier}
 					integration={integration}
 					state={state}
 				/>

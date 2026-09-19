@@ -8,12 +8,12 @@ export const badgeStyles = css`
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    height: 26px;
-    padding: 0 10px;
-    border-radius: var(--r-pill);
-    font-size: var(--text-xs);
+    height: 24px;
+    padding: 0 8px;
+    border-radius: var(--r-sm);
+    font-size: var(--text-xxs);
     font-weight: 500;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

@@ -1,5 +1,7 @@
 import { AuthProvider } from "./provider/auth-provider";
-import { ViewPlugin } from "@twodb/shared-frontend";
+import { AdminSettings } from "./admin-settings";
+import { useAuth } from "./hooks/use-auth";
+import type { ViewPlugin } from "@twodb/shared-frontend";
 
 const AuthViewPlugin = {
   id: "io.twodb.auth",
@@ -10,12 +12,14 @@ const AuthViewPlugin = {
       priority: 100,
       provides: "auth",
       hooks: {
-        useAuth: () => {},
+        useAuth,
       },
     },
   ],
 
-  admin: {},
+  admin: {
+    settings: AdminSettings,
+  },
 
   workspace: {
     settings: <></>,

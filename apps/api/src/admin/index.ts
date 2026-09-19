@@ -19,21 +19,27 @@ export const adminPlugin = async (app: FastifyInstance) => {
     },
     allowUnorderedMigrations: true,
     migrationTableName: "migration_admin",
+    migrationLockTableName: "migration_admin_lock",
   });
 
-  await migrator.migrateToLatest();
+  // migrateToLatest returns errors instead of throwing
+  const { error } = await migrator.migrateToLatest();
+  if (error) throw error;
 
   const loadedPlugins = await registerServicePlugins(app);
 
   app.get("/api/v1/plugins", async () => {
     return loadedPlugins.map((p) => ({
-      ...p.manifest,
+      id: p.manifest.twodb.identifier,
+      name: p.manifest.name,
+      version: p.manifest.version,
+      manifest: p.manifest.twodb,
       hasStyles: fs.existsSync(path.join(p.dir, "view", "styles.css")),
     }));
   });
 
-  await app.register(authRoutes);
-  await app.register(passkeyRoutes);
-  await app.register(instanceRoutes);
-  await app.register(pluginRoutes);
+  await app.register(authRoutes, { prefix: "/api/v1/admin" });
+  await app.register(passkeyRoutes, { prefix: "/api/v1/admin" });
+  await app.register(instanceRoutes, { prefix: "/api/v1/admin" });
+  await app.register(pluginRoutes, { prefix: "/api/v1/admin" });
 };

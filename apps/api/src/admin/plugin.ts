@@ -4,7 +4,11 @@ import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import type { ServicePlugin } from "@twodb/shared-backend";
 import { Migrator } from "kysely/migration";
+import { sql } from "kysely";
 import fastifyStatic from "@fastify/static";
+import { normalizeTableName } from "@twodb/shared-backend/utils.js";
+import type { Kysely } from "kysely";
+import { requireAdmin } from "./lib/session";
 
 export type LoadedPlugin = {
   dir: string;
@@ -36,10 +40,29 @@ async function mountPlugin(app: FastifyInstance, bundle: LoadedPlugin): Promise<
     provider: {
       getMigrations: async () => service.migrations ?? {},
     },
-    migrationTableName: `migration_${manifest.twodb.identifier}`,
+    migrationTableName: `migration_${normalizeTableName(manifest.twodb.identifier)}`,
+    migrationLockTableName: `migration_${normalizeTableName(manifest.twodb.identifier)}_lock`,
   });
 
-  await migrator.migrateToLatest();
+  const { error } = await migrator.migrateToLatest();
+  if (error) throw error;
+
+  const pluginId = manifest.twodb.identifier;
+  const ctx = { db: app.db as unknown as Kysely<unknown>, fn: {}, pluginId };
+  const adminBase = `/api/v1/${pluginId}/admin`;
+
+  await app.register(
+    async (scope) => {
+      scope.addHook("preHandler", async (request, reply) => {
+        const url = request.url.split("?")[0];
+        if (url === adminBase || url.startsWith(`${adminBase}/`)) {
+          await requireAdmin(request, reply);
+        }
+      });
+      await service.init?.(ctx, scope);
+    },
+    { prefix: `/api/v1/${pluginId}` },
+  );
 
   return service;
 }
@@ -48,13 +71,39 @@ const resolvePluginDir = async (app: FastifyInstance, identifier: string, extrac
   const p = identifier.startsWith("local:") ? identifier.slice("local:".length) : extractedPath;
 
   if (p) {
-    return path.isAbsolute(p) ? p : path.resolve(app.config.TWO_DB_WORK_DIR, p);
+    const workDir = app.config.TWODB_WORK_DIR;
+    return path.isAbsolute(p) ? p : path.resolve(workDir, p);
   }
 
   // TODO: Fetch
   app.log.warn(`plugin "${identifier}" needs the git:/npm: fetch pipeline, which is not implemented yet — skipping`);
 
   return null;
+};
+
+export const getPluginBundle = async (app: FastifyInstance, identifier: string, extractedPath = ""): Promise<LoadedPlugin | null> => {
+  try {
+    const dir = await resolvePluginDir(app, identifier, extractedPath);
+
+    if (!dir) {
+      return null;
+    }
+
+    const pkgJson = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf-8"));
+    const twodb = pkgJson?.twodb ?? {};
+    if (typeof twodb.identifier !== "string" || !twodb.identifier) {
+      app.log.warn(`plugin "${identifier}" at ${dir} has no twodb.identifier — skipping`);
+      return null;
+    }
+
+    return {
+      dir,
+      manifest: { name: pkgJson?.name ?? "", version: pkgJson?.version ?? "", twodb },
+    };
+  } catch (err) {
+    app.log.warn(`plugin "${identifier}" has an invalid manifest — skipping: ${err instanceof Error ? err.message : err}`);
+    return null;
+  }
 };
 
 export async function registerServicePlugins(app: FastifyInstance): Promise<LoadedPlugin[]> {
@@ -67,42 +116,32 @@ export async function registerServicePlugins(app: FastifyInstance): Promise<Load
   const loaded: LoadedPlugin[] = [];
 
   for (const { identifier, extracted_path: extractedPath } of entries) {
-    const dir = await resolvePluginDir(app, identifier, extractedPath || "");
+    const bundle = await getPluginBundle(app, identifier, extractedPath || "");
 
-    if (!dir) continue;
-
-    let bundle: LoadedPlugin;
-
-    try {
-      const text = fs.readFileSync(path.join(dir, "package.json"), "utf-8");
-
-      const data = JSON.parse(text)?.twodb ?? {};
-
-      bundle = {
-        dir,
-        manifest: data,
-      };
-    } catch (err) {
-      app.log.warn(`plugin "${identifier}" at ${dir} has an invalid manifest — skipping: ${err instanceof Error ? err.message : err}`);
-      continue;
-    }
+    if (!bundle) continue;
 
     await mountPlugin(app, bundle);
     loaded.push(bundle);
 
-    app.log.info(`loaded service plugin ${bundle.manifest.name}@${bundle.manifest.version} from ${dir}`);
+    app.log.info(`loaded service plugin ${bundle.manifest.name}@${bundle.manifest.version} from ${bundle.dir}`);
 
     await app.db
       .updateTable("admin_plugins")
-      .set({ ...bundle.manifest, updated_at: new Date() })
+      .set({
+        name: bundle.manifest.name,
+        version: bundle.manifest.version,
+        provides: sql`${JSON.stringify(bundle.manifest.twodb.provides ?? [])}::jsonb`,
+        manifest: bundle.manifest.twodb,
+        updated_at: new Date(),
+      })
       .where("identifier", "=", identifier)
       .execute();
 
-    if (fs.existsSync(path.join(dir, "view", "main.js"))) {
+    if (fs.existsSync(path.join(bundle.dir, "view", "main.js"))) {
       console.log(`registering view plugin for ${bundle.manifest.name} on prefix /api/v1/plugins/${bundle.manifest.twodb.identifier}/view/`);
 
       await app.register(fastifyStatic, {
-        root: path.join(dir, "view"),
+        root: path.join(bundle.dir, "view"),
         prefix: `/api/v1/plugins/${bundle.manifest.twodb.identifier}/view/`,
         decorateReply: false,
       });
