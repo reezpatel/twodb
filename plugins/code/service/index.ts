@@ -1,50 +1,25 @@
-import websocket from "@fastify/websocket";
-import type { TwodbFastifyInstance } from "@twodb/contracts";
-import {
-	rootServicePlugin,
-	runPluginMigrations,
-	typedDb,
-} from "@twodb/shared-backend";
-import { codeDb } from "./db";
-import { buildMigrations } from "./db/migrations";
-import type { CodeCtx } from "./lib/ctx";
-import { registerRoutes } from "./routes";
-import { PLUGIN_ID } from "../shared/constants";
-import { codeManifest } from "../shared/manifest";
+import type { FastifyInstance } from "fastify";
+import type { Kysely } from "kysely";
+import type { ServicePlugin, TwodbContext } from "@twodb/shared-backend";
+import { codeMigrations, type CodeTables } from "./db";
+import { registerSessionRoutes } from "./routes";
+import { registerSessionSocket } from "./ws";
 
-export const TwodbCodeServiceManifest = {
-	...codeManifest,
-
-	permissions: [
-		{
-			permission: "plugin.twodb.code:sessions.read",
-			description: "List and view sessions and their messages",
-		},
-		{
-			permission: "plugin.twodb.code:sessions.manage",
-			description: "Create sessions, prompt and stop them",
-		},
-	],
-	roleDefaults: {
-		manager: [
-			"plugin.twodb.code:sessions.read",
-			"plugin.twodb.code:sessions.manage",
-		],
-		member: ["plugin.twodb.code:sessions.read"],
-	},
-
-	plugin: rootServicePlugin("twodb-code-service", async (fastify) => {
-		await runPluginMigrations(typedDb(fastify), PLUGIN_ID, buildMigrations());
-		// Not fp-wrapped, so registering twice throws — guard on boot order
-		// (the node plugin normally registers it first, with bigger payloads).
-		if (!fastify.hasPlugin("@fastify/websocket")) {
-			await fastify.register(websocket);
-		}
-		const ctx: CodeCtx = { db: codeDb(fastify) };
-		return (scope: TwodbFastifyInstance) => registerRoutes(scope, ctx);
-	}),
+let invokeRef: <T>(name: string, ...args: unknown[]) => Promise<T> = () => {
+  throw new Error("code plugin not initialized");
 };
 
-export const service = TwodbCodeServiceManifest;
+const CodeServicePlugin = {
+  init: async (ctx: TwodbContext, app: FastifyInstance) => {
+    invokeRef = app.invoke.bind(app) as <T>(name: string, ...args: unknown[]) => Promise<T>;
+    const kysely = ctx.db as unknown as Kysely<CodeTables>;
+    await app.register(async (scope) => {
+      await registerSessionRoutes(kysely, invokeRef, scope);
+      await registerSessionSocket(kysely, invokeRef, scope);
+    });
+  },
 
-export default TwodbCodeServiceManifest;
+  migrations: codeMigrations,
+} satisfies ServicePlugin;
+
+export default CodeServicePlugin;

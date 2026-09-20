@@ -1,36 +1,21 @@
 {
   "name": "twodb-node",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev:with-node": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
-    "db:up": "docker compose -f ../../docker-compose.db.yaml up -d",
-    "db:down": "docker compose -f ../../docker-compose.db.yaml down",
-    "db:logs": "docker compose -f ../../docker-compose.db.yaml logs -f"
+    "build": "node build.mjs"
   },
   "dependencies": {
-	"fastify": "^5.11.2",
-	"fastify-plugin": "^6.0.0",
-    "@fastify/cookie": "^11.1.2",
-    "@fastify/cors": "^11.0.0",
-    "@fastify/env": "^7.0.0",
-    "@fastify/postgres": "^6.1.0",
-    "@fastify/static": "^10.1.3",
-    "@twodb/content": "workspace:*",
-    "@twodb/contracts": "workspace:*",
-    "@twodb/identity": "workspace:*",
-    "@twodb/shared-backend": "workspace:*",
-    "neo4j-driver": "^6.2.0",
-    "pg": "^8.23.0",
-    "tsx": "^4.23.12",
-    "ws": "^8.18.0"
+    "@twodb/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "@types/ws": "^8.18.0",
-    "typescript": "^5.8.0"
+    "tsx": "^4.23.12",
+    "typescript": "^5.8.0",
+    "esbuild": "^0.25.12"
   }
 }

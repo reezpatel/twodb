@@ -4,6 +4,7 @@ packages:
   - "plugins/*"
   - "plugins/identity/view"
   - "plugins/agent-providers/*"
+  - "plugins/llm-adapters/*"
   - "stack/*"
   - "libs/*"
 

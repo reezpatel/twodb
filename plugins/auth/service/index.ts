@@ -18,6 +18,7 @@ import type {
 import { readAuthConfig } from "./config";
 import { authMigrations } from "./db";
 import { createUserSession, destroySession, sessionUser, USER_COOKIE } from "./sessions";
+import type {} from "../shared/fn";
 import { authenticationOptions, hostConfig, registrationOptions, verifyAuthentication, verifyRegistration } from "./webauthn";
 
 const db = (ctx: TwodbContext) => ctx.db as unknown as Kysely<TwodbDatabase>;
@@ -194,6 +195,13 @@ function registerUserRoutes(ctx: TwodbContext, app: FastifyInstance) {
 }
 
 const AuthServicePlugin = {
+  setup: async (ctx: TwodbContext, app: FastifyInstance) => {
+    app.decorateRequest("userId", null);
+    app.addHook("onRequest", async (request) => {
+      const user = await sessionUser(db(ctx), request.cookies[USER_COOKIE]);
+      request.userId = user?.id ?? null;
+    });
+  },
   init: async (ctx: TwodbContext, app: FastifyInstance) => {
     registerUserRoutes(ctx, app);
   },

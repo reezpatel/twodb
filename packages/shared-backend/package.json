@@ -1,34 +1,33 @@
 {
-	"name": "@twodb/shared-backend",
-	"version": "0.0.0",
-	"private": true,
-	"type": "module",
-	"exports": {
-		".": "./src/index.ts",
-		"./agent/model": "./src/agent/model.ts",
-		"./agent/provider": "./src/agent/provider.ts",
-		"./agent/tool": "./src/agent/tool.ts",
-		"./agent/store": "./src/agent/store.ts",
-		"./agent/cypher": "./src/agent/cypher.ts",
-		"./agent/loop": "./src/agent/loop.ts",
-		"./*": "./src/*"
-	},
-	"scripts": {
-		"test": "vitest run"
-	},
-	"dependencies": {
-		"@twodb/contracts": "workspace:*",
-		"@twodb/identity": "workspace:*",
-		"fastify": "^5.11.2",
-		"fastify-plugin": "^6.0.0",
-		"kysely": "^0.29.5"
-	},
-	"devDependencies": {
-		"@fastify/cookie": "^11.1.2",
-		"@types/node": "^24.0.0",
-		"@types/pg": "^8.21.0",
-		"pg": "^8.23.0",
-		"typescript": "^5.8.0",
-		"vitest": "^3.2.4"
-	}
+  "name": "@twodb/shared-backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./agent/model": "./src/agent/model.ts",
+    "./agent/provider": "./src/agent/provider.ts",
+    "./agent/tool": "./src/agent/tool.ts",
+    "./agent/store": "./src/agent/store.ts",
+    "./agent/cypher": "./src/agent/cypher.ts",
+    "./agent/loop": "./src/agent/loop.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@twodb/contracts": "workspace:*",
+    "fastify": "^5.11.2",
+    "fastify-plugin": "^6.0.0",
+    "kysely": "^0.29.5"
+  },
+  "devDependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.21.0",
+    "pg": "^8.23.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.4"
+  }
 }

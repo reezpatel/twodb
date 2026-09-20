@@ -1,0 +1,47 @@
+{
+  "name": "@twodb/llm-adapter-claude-code",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./service": "./service/index.ts",
+    "./view": "./view/index.tsx",
+    "./shared/api": "./shared/api.ts"
+  },
+  "twodb": {
+    "identifier": "io.twodb.llm.claude-code",
+    "name": "TwoDB LLM · Claude Code (subscription)",
+    "description": "Claude Code (subscription) provider adapter for the LLM plugin (Messages API: completions, streaming, tools)",
+    "logo": "",
+    "provides": [
+      "llm.provider"
+    ],
+    "requires": [
+      "llm"
+    ],
+    "tags": [
+      "LLM",
+      "Provider"
+    ],
+    "additional_tags": []
+  },
+  "dependencies": {
+    "@twodb/contracts": "workspace:*",
+    "@twodb/llm": "workspace:*",
+    "@twodb/shared-backend": "workspace:*",
+    "@twodb/shared-frontend": "workspace:*",
+    "@twodb/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@tanstack/react-query": "^5.101.4",
+    "esbuild": "^0.25.12",
+    "fastify": "^5.11.2",
+    "styled-jsx": "^5.1.7"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "test": "vitest run"
+  }
+}

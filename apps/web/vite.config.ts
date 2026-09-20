@@ -1,103 +1,85 @@
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Plugin view bundles are served by the api under /api/v1/plugins/<id>/view/
-// and loaded by the shell as native ESM. They keep the react family external
-// so they run on the SHELL'S react — the same instance the importing
-// ("parent") code uses. The browser has no "inherit the importer's deps"
-// mechanism: bare specifiers resolve through the document's import map, and
-// module identity is by URL. Pointing the map straight at Vite's optimized
-// dep files fails two ways: their URLs carry a `?v=<optimizerHash>` that
-// rotates (a stale map would silently load a SECOND react), and optimized
-// CJS deps are default-export-only (`export default require_react()`), so
-// the bundle's named `import { jsx, Fragment }` is a SyntaxError. Both are
-// solved by serving tiny facade modules at STABLE urls
-// (/@twodb-view-deps/react.js, …) that re-export the live-hash optimized
-// module's named exports — same module instance as the shell's own code,
-// real named exports, hash-free import map.
-// (Prod builds leave the marker in place; serving plugin views in prod
-// needs the shell to externalize react to stable URLs — not wired yet.)
-const IMPORTMAP_MARKER = "<!-- twodb:plugin-view-importmap (dev: replaced with a generated import map) -->";
-const VIEW_DEP_SPECS = ["react", "react-dom", "react-dom/client", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query"];
-const depsMetadataPath = path.join(import.meta.dirname, "node_modules/.vite/deps/_metadata.json");
+// Plugin view bundles are self-contained ESM files under <plugin>/.build/view/.
+// The shell loads them as native ESM, but their bare imports (react,
+// @tanstack/react-query, @twodb/shared-frontend …) must land on the SHELL'S
+// module instances — a second react or react-query copy breaks hooks/contexts
+// ("Invalid hook call" / "No QueryClient set"). Import maps + facades turned
+// out to chase vite's rotating optimizer hashes and drift into double
+// instances. Instead we serve each bundle through vite's OWN transform
+// pipeline: server.transformRequest rewrites bare imports to the CURRENT
+// optimized/source URLs — module identity is owned by vite and can never
+// desync from what the shell itself uses.
+const PLUGIN_VIEW_URL_PREFIX = "/@twodb-plugin-view/";
 
-const facadePath = (spec: string) => `/@twodb-view-deps/${spec.replace(/\//g, "_")}.js`;
+function pluginViewServe(): Plugin {
+  const repoRoot = path.resolve(import.meta.dirname, "../..");
+  const byIdentifier = new Map<string, string>();
 
-function pluginViewImportmap(): Plugin {
-  return {
-    name: "twodb-plugin-view-importmap",
-    apply: "serve",
-    transformIndexHtml(html) {
-      const imports = Object.fromEntries(VIEW_DEP_SPECS.map((spec) => [spec, facadePath(spec)]));
-      return html.replace(IMPORTMAP_MARKER, `<script type="importmap">${JSON.stringify({ imports })}</script>`);
-    },
+  const scan = () => {
+    const pluginsDir = path.join(repoRoot, "plugins");
+    let groups: string[];
+    try {
+      groups = fs.readdirSync(pluginsDir);
+    } catch {
+      return;
+    }
+    for (const group of groups) {
+      const candidates = [
+        path.join(pluginsDir, group),
+        ...fs
+          .readdirSync(path.join(pluginsDir, group), { withFileTypes: true })
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => path.join(pluginsDir, group, entry.name)),
+      ];
+      for (const dir of candidates) {
+        const pkgPath = path.join(dir, ".build", "package.json");
+        try {
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { twodb?: { identifier?: string } };
+          if (pkg.twodb?.identifier) byIdentifier.set(pkg.twodb.identifier, path.join(dir, ".build"));
+        } catch {
+          // not a built plugin directory — skip
+        }
+      }
+    }
   };
-}
 
-// Serves the facades. The optimizer hash is read per request so the facade
-// always re-exports the CURRENT optimized module — never a second copy.
-function pluginViewDepFacades(): Plugin {
-  const nodeRequire = createRequire(import.meta.url);
-  const exportNames = new Map<string, string[]>();
   return {
-    name: "twodb-plugin-view-dep-facades",
+    name: "twodb-plugin-view-serve",
     apply: "serve",
     configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const match = /^\/@twodb-view-deps\/([\w@.-]+)\.js$/.exec(req.url ?? "");
+      server.middlewares.use(async (req, res, next) => {
+        const match = new RegExp(`^${PLUGIN_VIEW_URL_PREFIX}(.+)/main.js$`).exec(decodeURIComponent(req.url ?? ""));
         if (!match) return next();
 
-        const file = match[1];
-        const spec = file.replace(/_/g, "/");
-        if (!VIEW_DEP_SPECS.includes(spec)) {
+        if (byIdentifier.size === 0) scan();
+        const identifier = match[1];
+        const buildDir = byIdentifier.get(identifier);
+        const entry = buildDir ? path.join(buildDir, "view", "main.js") : null;
+        if (!entry || !fs.existsSync(entry)) {
           res.statusCode = 404;
-          res.end(`unknown view dep: ${spec}`);
+          res.end(`unknown plugin view: ${identifier}`);
           return;
         }
 
-        let version = "";
         try {
-          const metadata = JSON.parse(fs.readFileSync(depsMetadataPath, "utf8")) as { browserHash?: unknown };
-          if (typeof metadata.browserHash === "string" && metadata.browserHash) version = `?v=${metadata.browserHash}`;
-        } catch {
-          // optimizer hasn't written metadata yet — the unversioned URL
-          // still serves the same file, this is cache-busting only
-        }
-
-        let names = exportNames.get(spec);
-        if (!names) {
-          try {
-            names = Object.keys(nodeRequire(spec));
-            exportNames.set(spec, names);
-          } catch {
-            names = [];
+          const result = await server.transformRequest(`/@fs/${entry}`);
+          if (!result) {
+            res.statusCode = 500;
+            res.end(`plugin view transform returned nothing for ${identifier}`);
+            return;
           }
+          res.setHeader("content-type", "text/javascript");
+          res.setHeader("cache-control", "no-store");
+          res.end(result.code);
+        } catch (error) {
+          res.statusCode = 500;
+          res.end(`plugin view transform failed for ${identifier}: ${error instanceof Error ? error.message : String(error)}`);
         }
-
-        // `export default D` keeps default imports (import React from
-        // "react") working; `export const { a, b } = D` binds the same
-        // objects the optimized module's default export holds — functions
-        // included, so hooks land on the shell's single
-        // ReactSharedInternals.
-        const depUrl = `/node_modules/.vite/deps/${file}.js${version}`;
-        let hasDefault = true;
-        try {
-          const depSource = fs.readFileSync(path.join(import.meta.dirname, `node_modules/.vite/deps/${file}.js`), "utf8");
-          hasDefault = /(^|\n)\s*export default|\bas default\b/.test(depSource);
-        } catch {
-          // file not readable — assume CJS-style default interop
-        }
-        const source = !hasDefault
-          ? `export * from "${depUrl}";\n`
-          : names.length
-            ? `import D from "${depUrl}";\nexport default D;\nexport const { ${names.join(", ")} } = D;\n`
-            : `import D from "${depUrl}";\nexport default D;\n`;
-        res.setHeader("content-type", "text/javascript");
-        res.end(source);
       });
     },
   };
@@ -157,8 +139,7 @@ if (useHttps) await ensureDevCert();
 
 export default defineConfig({
   plugins: [
-    pluginViewImportmap(),
-    pluginViewDepFacades(),
+    pluginViewServe(),
     react({
       babel: {
         // styled-jsx: scoped component styles via `<style jsx>` / css``.

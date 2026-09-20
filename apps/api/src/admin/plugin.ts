@@ -26,14 +26,76 @@ export type LoadedPlugin = {
   };
 };
 
-async function mountPlugin(app: FastifyInstance, bundle: LoadedPlugin): Promise<ServicePlugin> {
-  const { manifest, dir } = bundle;
-  const serviceFile = path.join(dir, "service", "main.js");
-
+async function loadService(bundle: LoadedPlugin): Promise<ServicePlugin> {
+  const serviceFile = path.join(bundle.dir, "service", "main.js");
   const mod = (await import(pathToFileURL(serviceFile).href)) as {
     default: ServicePlugin;
   };
-  const service = mod.default;
+  return mod.default;
+}
+
+type Loaded = { identifier: string; bundle: LoadedPlugin; service: ServicePlugin };
+
+// orders plugins so every `requires` (a provides capability or a plugin id)
+// is setup/init-ed before its dependents. Plugins with missing or skipped
+// dependencies are skipped with a warning instead of crashing the boot.
+function orderPlugins(app: FastifyInstance, loaded: Loaded[]): Loaded[] {
+  const byCapability = new Map<string, Loaded>();
+  const byIdentifier = new Map<string, Loaded>();
+  for (const entry of loaded) {
+    byIdentifier.set(entry.bundle.manifest.twodb.identifier, entry);
+    for (const capability of entry.bundle.manifest.twodb.provides ?? []) {
+      if (!byCapability.has(capability)) byCapability.set(capability, entry);
+    }
+  }
+
+  const depsOf = new Map<Loaded, Loaded[]>();
+  const skipped = new Set<Loaded>();
+  for (const entry of loaded) {
+    const deps: Loaded[] = [];
+    for (const requirement of entry.bundle.manifest.twodb.requires ?? []) {
+      const dep = byCapability.get(requirement) ?? byIdentifier.get(requirement);
+      if (!dep) {
+        app.log.warn(`plugin ${entry.bundle.manifest.twodb.identifier} requires "${requirement}" — not installed, skipping plugin`);
+        skipped.add(entry);
+      } else if (dep !== entry) {
+        deps.push(dep);
+      }
+    }
+    depsOf.set(entry, deps);
+  }
+
+  const ordered: Loaded[] = [];
+  const settled = new Set<Loaded>();
+  let progress = true;
+  while (progress) {
+    progress = false;
+    for (const entry of loaded) {
+      if (settled.has(entry)) continue;
+      const deps = depsOf.get(entry) ?? [];
+      if (!deps.every((dep) => settled.has(dep))) continue;
+      if (skipped.has(entry) || deps.some((dep) => skipped.has(dep))) {
+        skipped.add(entry);
+      } else {
+        ordered.push(entry);
+      }
+      settled.add(entry);
+      progress = true;
+    }
+  }
+
+  for (const entry of loaded) {
+    if (!settled.has(entry)) {
+      app.log.warn(`plugin ${entry.bundle.manifest.twodb.identifier} is in a requires cycle — skipping`);
+    }
+  }
+
+  return ordered;
+}
+
+async function mountPlugin(app: FastifyInstance, bundle: LoadedPlugin, service: ServicePlugin): Promise<void> {
+  const { manifest, dir } = bundle;
+  void dir;
 
   const migrator = new Migrator({
     db: app.db,
@@ -63,8 +125,6 @@ async function mountPlugin(app: FastifyInstance, bundle: LoadedPlugin): Promise<
     },
     { prefix: `/api/v1/${pluginId}` },
   );
-
-  return service;
 }
 
 const resolvePluginDir = async (app: FastifyInstance, identifier: string, extractedPath = ""): Promise<string | null> => {
@@ -113,15 +173,43 @@ export async function registerServicePlugins(app: FastifyInstance): Promise<Load
     app.log.info("plugin registry is empty — no service plugins to load");
   }
 
-  const loaded: LoadedPlugin[] = [];
+  const fnRegistry = new Map<string, (...args: unknown[]) => unknown>();
+  await app.decorate("invoke", ((name: string, ...args: unknown[]) => {
+    const fn = fnRegistry.get(name);
+    if (!fn) throw new Error(`invoke: unknown function "${name}"`);
+    return fn(...args);
+  }) as FastifyInstance["invoke"]);
+
+  const loaded: Loaded[] = [];
 
   for (const { identifier, extracted_path: extractedPath } of entries) {
     const bundle = await getPluginBundle(app, identifier, extractedPath || "");
 
     if (!bundle) continue;
 
-    await mountPlugin(app, bundle);
-    loaded.push(bundle);
+    const service = await loadService(bundle);
+
+    for (const [name, fn] of Object.entries(service.functions ?? {})) {
+      if (fnRegistry.has(name)) app.log.warn(`plugin function "${name}" re-registered by ${bundle.manifest.name} — overriding`);
+      fnRegistry.set(name, fn as (...args: unknown[]) => unknown);
+    }
+
+    loaded.push({ identifier, bundle, service });
+  }
+
+  const ordered = orderPlugins(app, loaded);
+
+  for (const { bundle, service } of ordered) {
+    const pluginId = bundle.manifest.twodb.identifier;
+    const ctx = { db: app.db as unknown as Kysely<unknown>, fn: {}, pluginId };
+    await service.setup?.(ctx, app);
+  }
+
+  const mounted: LoadedPlugin[] = [];
+
+  for (const { identifier, bundle, service } of ordered) {
+    await mountPlugin(app, bundle, service);
+    mounted.push(bundle);
 
     app.log.info(`loaded service plugin ${bundle.manifest.name}@${bundle.manifest.version} from ${bundle.dir}`);
 
@@ -148,5 +236,5 @@ export async function registerServicePlugins(app: FastifyInstance): Promise<Load
     }
   }
 
-  return loaded;
+  return mounted;
 }

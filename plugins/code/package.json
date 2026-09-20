@@ -5,30 +5,53 @@
   "type": "module",
   "exports": {
     "./service": "./service/index.ts",
-    "./view": "./view/index.ts",
-    "./shared/manifest": "./shared/manifest.ts",
-    "./shared/constants": "./shared/constants.ts",
-    "./shared/types": "./shared/types.ts"
+    "./view": "./view/index.tsx",
+    "./shared/api": "./shared/api.ts"
+  },
+  "twodb": {
+    "identifier": "io.twodb.code",
+    "name": "TwoDB Code",
+    "description": "Agentic coding sessions — a node + folder harness with read/write/patch/command tools",
+    "logo": "",
+    "provides": [
+      "code"
+    ],
+    "requires": [
+      "node",
+      "llm"
+    ],
+    "tags": [
+      "Core",
+      "Code"
+    ],
+    "additional_tags": []
   },
   "dependencies": {
-    "@fastify/websocket": "^11.3.0",
-    "@tanstack/react-form": "^1.33.5",
-    "@tanstack/react-query": "^5.101.4",
     "@twodb/contracts": "workspace:*",
+    "@twodb/llm": "workspace:*",
+    "@twodb/node": "workspace:*",
     "@twodb/shared-backend": "workspace:*",
     "@twodb/shared-frontend": "workspace:*",
     "@twodb/ui": "workspace:*",
-    "kysely": "^0.29.5",
-    "styled-jsx": "^5.1.7",
-    "unique-names-generator": "^4.7.1",
-    "ws": "^8.21.3",
-    "streamdown": "^1.3.0"
+    "@twodb/workspace": "workspace:*",
+    "@twodb/auth": "workspace:*",
+    "@fastify/websocket": "^11.3.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "@types/react": "^19.1.0",
-    "@types/react-dom": "^19.1.0",
-    "@types/ws": "^8.18.1",
-    "typescript": "^5.8.0"
+    "@babel/core": "^7.26.0",
+    "@fastify/cookie": "^11.1.2",
+    "@tanstack/react-query": "^5.101.4",
+    "esbuild": "^0.25.12",
+    "fastify": "^5.11.2",
+    "styled-jsx": "^5.1.7",
+    "react-pluggable": "^0.4.3",
+    "lucide-react": "^1.29.0",
+    "ws": "^8.18.0",
+    "@types/ws": "^8.18.0"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "test": "vitest run"
   }
 }

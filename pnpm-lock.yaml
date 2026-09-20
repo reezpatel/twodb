@@ -146,58 +146,19 @@ importers:
 
   apps/node:
     dependencies:
-      '@fastify/cookie':
-        specifier: ^11.1.2
-        version: 11.1.2
-      '@fastify/cors':
-        specifier: ^11.0.0
-        version: 11.3.0
-      '@fastify/env':
-        specifier: ^7.0.0
-        version: 7.0.0
-      '@fastify/postgres':
-        specifier: ^6.1.0
-        version: 6.1.0(pg@8.23.0)
-      '@fastify/static':
-        specifier: ^10.1.3
-        version: 10.1.3
-      '@twodb/content':
-        specifier: workspace:*
-        version: link:../../plugins/content
       '@twodb/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@twodb/identity':
-        specifier: workspace:*
-        version: link:../../plugins/identity
-      '@twodb/shared-backend':
-        specifier: workspace:*
-        version: link:../../packages/shared-backend
-      fastify:
-        specifier: ^5.11.2
-        version: 5.11.2
-      fastify-plugin:
-        specifier: ^6.0.0
-        version: 6.0.0
-      neo4j-driver:
-        specifier: ^6.2.0
-        version: 6.2.0
-      pg:
-        specifier: ^8.23.0
-        version: 8.23.0
-      tsx:
-        specifier: ^4.23.12
-        version: 4.23.12
-      ws:
-        specifier: ^8.18.0
-        version: 8.21.3
     devDependencies:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
-      '@types/ws':
-        specifier: ^8.18.0
-        version: 8.18.1
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      tsx:
+        specifier: ^4.23.12
+        version: 4.23.12
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
@@ -299,9 +260,6 @@ importers:
       '@twodb/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@twodb/identity':
-        specifier: workspace:*
-        version: link:../../plugins/identity
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
@@ -1198,6 +1156,9 @@ importers:
       esbuild:
         specifier: ^0.25.12
         version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
       styled-jsx:
         specifier: ^5.1.7
         version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
@@ -1286,6 +1247,67 @@ importers:
         version: 5.9.3
 
   plugins/code:
+    dependencies:
+      '@fastify/websocket':
+        specifier: ^11.3.0
+        version: 11.3.0
+      '@twodb/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../llm
+      '@twodb/node':
+        specifier: workspace:*
+        version: link:../node
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@twodb/workspace':
+        specifier: workspace:*
+        version: link:../workspace
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@fastify/cookie':
+        specifier: ^11.1.2
+        version: 11.1.2
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      '@types/ws':
+        specifier: ^8.18.0
+        version: 8.18.1
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      lucide-react:
+        specifier: ^1.29.0
+        version: 1.29.0(react@19.2.8)
+      react-pluggable:
+        specifier: ^0.4.3
+        version: 0.4.3(react@19.2.8)
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+      ws:
+        specifier: ^8.18.0
+        version: 8.21.3
+
+  plugins/code-old:
     dependencies:
       '@fastify/websocket':
         specifier: ^11.3.0
@@ -1383,7 +1405,7 @@ importers:
         specifier: ^5.8.0
         version: 5.9.3
 
-  plugins/identity:
+  plugins/llm:
     dependencies:
       '@twodb/contracts':
         specifier: workspace:*
@@ -1397,31 +1419,912 @@ importers:
       '@twodb/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      kysely:
-        specifier: ^0.29.5
-        version: 0.29.5
-      styled-jsx:
-        specifier: ^5.1.7
-        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+      '@twodb/workspace':
+        specifier: workspace:*
+        version: link:../workspace
     devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
       '@fastify/cookie':
         specifier: ^11.1.2
         version: 11.1.2
-      '@types/node':
-        specifier: ^24.0.0
-        version: 24.13.3
-      '@types/react':
-        specifier: ^19.1.0
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: ^19.1.0
-        version: 19.2.4(@types/react@19.2.18)
-      typescript:
-        specifier: ^5.8.0
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/amazon-bedrock:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/anthropic:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/azure-openai:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/cerebras:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/claude-code:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/cline:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/cloudflare-ai-gateway:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/cloudflare-workers-ai:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/codex:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/deepseek:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/fireworks:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/google:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/google-vertex:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/groq:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/kilo-code:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/kimi:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/minimax:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/mistral:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/ollama-cloud:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/ollama-self-hosted:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/openai:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/openai-compatible:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/openrouter:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/together:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/xai:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
+
+  plugins/llm-adapters/zai:
+    dependencies:
+      '@twodb/contracts':
+        specifier: workspace:*
+        version: link:../../../packages/contracts
+      '@twodb/llm':
+        specifier: workspace:*
+        version: link:../../llm
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
 
   plugins/meetings:
     dependencies:
@@ -1459,15 +2362,9 @@ importers:
 
   plugins/node:
     dependencies:
-      '@fastify/websocket':
-        specifier: ^11.3.0
-        version: 11.3.0
-      '@tanstack/react-form':
-        specifier: ^1.33.5
-        version: 1.33.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@tanstack/react-query':
-        specifier: ^5.101.4
-        version: 5.101.4(react@19.2.8)
+      '@twodb/auth':
+        specifier: workspace:*
+        version: link:../auth
       '@twodb/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -1480,40 +2377,28 @@ importers:
       '@twodb/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      fastify-plugin:
-        specifier: ^6.0.0
-        version: 6.0.0
-      kysely:
-        specifier: ^0.29.5
-        version: 0.29.5
-      styled-jsx:
-        specifier: ^5.1.7
-        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
-      ws:
-        specifier: ^8.18.0
-        version: 8.21.3
+      '@twodb/workspace':
+        specifier: workspace:*
+        version: link:../workspace
     devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
       '@fastify/cookie':
         specifier: ^11.1.2
         version: 11.1.2
-      '@types/node':
-        specifier: ^24.0.0
-        version: 24.13.3
-      '@types/react':
-        specifier: ^19.1.0
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: ^19.1.0
-        version: 19.2.4(@types/react@19.2.18)
-      '@types/ws':
-        specifier: ^8.18.0
-        version: 8.18.1
-      typescript:
-        specifier: ^5.8.0
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
 
   plugins/storage:
     dependencies:
@@ -1542,6 +2427,40 @@ importers:
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
+
+  plugins/workspace:
+    dependencies:
+      '@twodb/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@twodb/shared-backend':
+        specifier: workspace:*
+        version: link:../../packages/shared-backend
+      '@twodb/shared-frontend':
+        specifier: workspace:*
+        version: link:../../packages/shared-frontend
+      '@twodb/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+    devDependencies:
+      '@babel/core':
+        specifier: ^7.26.0
+        version: 7.29.7
+      '@fastify/cookie':
+        specifier: ^11.1.2
+        version: 11.1.2
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
+      styled-jsx:
+        specifier: ^5.1.7
+        version: 5.1.7(@babel/core@7.29.7)(react@19.2.8)
 
 packages:
 

@@ -1,31 +1,11 @@
 import { useLocation, useNavigate } from "react-router";
-import {
-  CalendarDays,
-  Code2,
-  Files,
-  Inbox,
-  LogOut,
-  Mail,
-  Moon,
-  MessageCircle,
-  SlidersHorizontal,
-  StickyNote,
-  Sun,
-  User,
-  Video,
-  Workflow,
-} from "lucide-react";
-import {
-  Avatar,
-  Menu,
-  MenuDivider,
-  MenuItem,
-  NavRail,
-  type NavRailItem,
-} from "@twodb/ui";
+import { CalendarDays, Files, Inbox, LogOut, Mail, Moon, MessageCircle, SlidersHorizontal, StickyNote, Sun, User, Video, Workflow } from "lucide-react";
+import { Avatar, Menu, MenuDivider, MenuItem, NavRail, type NavRailItem } from "@twodb/ui";
 import { sidebarStyles } from "./sidebar.style";
 import { useShellState } from "./state";
-import { useIdentity } from "../utils/hooks";
+import { usePluginStore } from "react-pluggable";
+import { useHook } from "@twodb/shared-frontend";
+import type { PluginNavItem } from "@twodb/shared-frontend";
 
 const NAV_ITEMS: (NavRailItem & { route: string })[] = [
   { id: "inbox", label: "Inbox", icon: <Inbox size={15} />, route: "/inbox" },
@@ -55,7 +35,6 @@ const NAV_ITEMS: (NavRailItem & { route: string })[] = [
     icon: <MessageCircle size={15} />,
     route: "/chat",
   },
-  { id: "code", label: "Code", icon: <Code2 size={15} />, route: "/code" },
   {
     id: "meetings",
     label: "Meetings",
@@ -65,16 +44,24 @@ const NAV_ITEMS: (NavRailItem & { route: string })[] = [
 ];
 
 export function Sidebar() {
-  // const { signOut } = useIdentity();
   const { phase, togglePhase } = useShellState();
   const navigate = useNavigate();
   const location = useLocation();
-  const activeId =
-    NAV_ITEMS.find(
-      (item) =>
-        item.route === location.pathname ||
-        location.pathname.startsWith(`${item.route}/`),
-    )?.id ?? "";
+  const pluginStore = usePluginStore();
+
+  const pluginNavItems = ((pluginStore.executeFunction("core::get_nav_items") ?? []) as PluginNavItem[]).map((item) => ({
+    id: item.id,
+    label: item.label,
+    icon: item.icon,
+    route: item.path,
+  }));
+
+  const items = [...NAV_ITEMS, ...pluginNavItems];
+  const activeId = items.find((item) => item.route === location.pathname || location.pathname.startsWith(`${item.route}/`))?.id ?? "";
+
+  const useAuth = useHook<{ logout: () => void }>("useAuth");
+
+  console.log("useAuth", useAuth);
 
   return (
     <>
@@ -82,42 +69,30 @@ export function Sidebar() {
       <div className="shell__sidebarSlot">
         <NavRail
           aria-label="Workspace navigation"
-          items={NAV_ITEMS}
+          items={items}
           value={activeId}
           onValueChange={(id) => {
-            const item = NAV_ITEMS.find((x) => x.id === id);
+            const item = items.find((x) => x.id === id);
             if (item) navigate(item.route);
           }}
           footer={
             <Menu
               placement="top-start"
               trigger={
-                <button
-                  type="button"
-                  className="shell__rail-account"
-                  aria-label="Account menu"
-                >
+                <button type="button" className="shell__rail-account" aria-label="Account menu">
                   <Avatar name="Asha Verma" size="sm" />
                 </button>
               }
             >
               <MenuItem icon={<User />}>Profile</MenuItem>
-              <MenuItem
-                icon={<SlidersHorizontal />}
-                onClick={() => navigate("/settings")}
-              >
+              <MenuItem icon={<SlidersHorizontal />} onClick={() => navigate("/settings")}>
                 Preferences
               </MenuItem>
-              <MenuItem
-                icon={phase === "day" ? <Moon /> : <Sun />}
-                onClick={togglePhase}
-              >
-                {phase === "day"
-                  ? "Switch to dark theme"
-                  : "Switch to light theme"}
+              <MenuItem icon={phase === "day" ? <Moon /> : <Sun />} onClick={togglePhase}>
+                {phase === "day" ? "Switch to dark theme" : "Switch to light theme"}
               </MenuItem>
               <MenuDivider />
-              <MenuItem icon={<LogOut />} danger onClick={() => {}}>
+              <MenuItem icon={<LogOut />} danger onClick={() => useAuth?.logout()}>
                 Log out
               </MenuItem>
             </Menu>

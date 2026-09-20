@@ -1,0 +1,50 @@
+{
+  "name": "@twodb/workspace",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./service": "./service/index.ts",
+    "./view": "./view/index.tsx",
+    "./shared/api": "./shared/api.ts",
+    "./shared/fn": "./shared/fn.ts"
+  },
+  "twodb": {
+    "identifier": "io.twodb.workspace",
+    "name": "TwoDB Workspace",
+    "description": "Vaults and workspaces \u2014 the two-layer container users switch between",
+    "logo": "",
+    "provides": [
+      "workspace"
+    ],
+    "requires": [
+      "auth"
+    ],
+    "tags": [
+      "Core",
+      "Workspace"
+    ],
+    "additional_tags": [
+      "Vault"
+    ]
+  },
+  "dependencies": {
+    "@twodb/auth": "workspace:*",
+    "@twodb/shared-backend": "workspace:*",
+    "@twodb/shared-frontend": "workspace:*",
+    "@twodb/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@fastify/cookie": "^11.1.2",
+    "@tanstack/react-query": "^5.101.4",
+    "esbuild": "^0.25.12",
+    "fastify": "^5.11.2",
+    "styled-jsx": "^5.1.7"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "test": "vitest run"
+  }
+}

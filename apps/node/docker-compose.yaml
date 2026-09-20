@@ -1,0 +1,14 @@
+services:
+  node-agent:
+    build: .
+    environment:
+      TWODB_NODE_URL: ${TWODB_NODE_URL:?set TWODB_NODE_URL}
+      TWODB_NODE_TOKEN: ${TWODB_NODE_TOKEN:?set TWODB_NODE_TOKEN}
+      TWODB_ROOT: /workspace
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "divine.local:host-gateway"
+    volumes:
+      - ./workspace:/workspace
+    restart: unless-stopped

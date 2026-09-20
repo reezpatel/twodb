@@ -1,171 +1,124 @@
-import type { TwodbFastifyInstance } from "@twodb/contracts";
-import { newId } from "@twodb/shared-backend";
-import type { NodeCtx } from "../lib/ctx";
-import { principalOf, requireWorkspace } from "../lib/require-workspace";
-import { generateNodeSecret } from "../lib/secrets";
-import { toNodeDto, toSecretDto } from "../lib/serialize";
+import type { FastifyInstance } from "fastify";
+import type { Kysely } from "kysely";
+import { createHash, randomBytes } from "node:crypto";
+import type { TwodbNodeInfo, TwodbNodePlatform, TwodbNodeStatus } from "@twodb/contracts";
+import type { NodeDatabase } from "../db";
+import type {} from "@twodb/auth/shared/fn";
+import type { CreatedNode, CreateNodeRequest, UpdateNodeRequest } from "../../shared/api";
 
-type NodeParams = { id: string };
-type NodeBody = { name?: string };
-type NodeInvokeBody = {
-	action?: string;
-	payload?: unknown;
-	timeout_ms?: number;
+type NodeRow = {
+  id: string;
+  name: string;
+  platform: string;
+  hostname: string;
+  arch: string;
+  agent_version: string;
+  labels: Record<string, string> | null;
+  status: string;
+  last_seen_at: Date | null;
+  token_hash: string;
+  created_at: Date;
 };
 
-const nameFrom = (body: NodeBody | null | undefined): string | null => {
-	const name = body?.name?.trim();
-	return name && name.length > 0 ? name : null;
-};
+export const toNodeInfo = (row: NodeRow): TwodbNodeInfo => ({
+  id: row.id,
+  name: row.name,
+  platform: (row.platform as TwodbNodePlatform) ?? "unknown",
+  hostname: row.hostname,
+  arch: row.arch,
+  agent_version: row.agent_version,
+  labels: row.labels ?? {},
+  status: (row.status as TwodbNodeStatus) ?? "unknown",
+  last_seen_at: row.last_seen_at ? row.last_seen_at.toISOString() : null,
+  created_at: row.created_at.toISOString(),
+});
 
-export function registerNodeRoutes(
-	fastify: TwodbFastifyInstance,
-	ctx: NodeCtx,
-): void {
-	fastify.get("/nodes", async (request, reply) => {
-		const workspaceId = requireWorkspace(request, reply);
-		if (!workspaceId) return reply;
-		const nodes = await ctx.db
-			.selectFrom("node_nodes")
-			.selectAll()
-			.where("workspace_id", "=", workspaceId)
-			.orderBy("created_at", "asc")
-			.execute();
-		return { nodes: nodes.map(toNodeDto) };
-	});
+export const hashToken = (token: string): string => createHash("sha256").update(token).digest("hex");
 
-	fastify.post("/nodes", async (request, reply) => {
-		const workspaceId = requireWorkspace(request, reply);
-		if (!workspaceId) return reply;
-		const name = nameFrom(request.body as NodeBody);
-		if (!name) return reply.code(400).send({ error: "name is required" });
+export const newToken = (): string => randomBytes(32).toString("base64url");
 
-		const principal = principalOf(request);
-		const nodeId = newId("node");
-		const secret = generateNodeSecret();
+export async function loadNode(kysely: Kysely<NodeDatabase>, id: string): Promise<NodeRow | null> {
+  const rows = await kysely.selectFrom("node_nodes").selectAll().where("id", "=", id).limit(1).execute();
+  return (rows[0] as NodeRow | undefined) ?? null;
+}
 
-		await ctx.db
-			.insertInto("node_nodes")
-			.values({
-				id: nodeId,
-				workspace_id: workspaceId,
-				name,
-				created_by: principal.userId,
-			})
-			.execute();
-		await ctx.db
-			.insertInto("node_node_secrets")
-			.values({
-				id: newId("nsec"),
-				node_id: nodeId,
-				workspace_id: workspaceId,
-				secret_hash: secret.hash,
-				label: "initial",
-				created_by: principal.userId,
-			})
-			.execute();
+export function nodeRoutes(kysely: Kysely<NodeDatabase>): (app: FastifyInstance) => Promise<void> {
+  return async (app) => {
+    app.addHook("preHandler", async (request, reply) => {
+      if (!request.userId) {
+        reply.code(401).send({ error: "unauthorized" });
+        return reply;
+      }
+    });
 
-		const node = await ctx.db
-			.selectFrom("node_nodes")
-			.selectAll()
-			.where("id", "=", nodeId)
-			.executeTakeFirstOrThrow();
-		return reply
-			.code(201)
-			.send({ node: toNodeDto(node), secret: secret.plaintext });
-	});
+    app.get("/nodes", async () => {
+      const rows = await kysely.selectFrom("node_nodes").selectAll().orderBy("created_at").execute();
+      return { nodes: rows.map((row) => toNodeInfo(row as NodeRow)) };
+    });
 
-	fastify.get("/nodes/:id", async (request, reply) => {
-		const workspaceId = requireWorkspace(request, reply);
-		if (!workspaceId) return reply;
-		const { id } = request.params as NodeParams;
+    app.post<{ Body: CreateNodeRequest }>("/nodes", async (request, reply) => {
+      const name = request.body?.name?.trim();
+      if (!name) {
+        reply.code(400).send({ error: "invalid_request" });
+        return reply;
+      }
+      const token = newToken();
+      const rows = await kysely
+        .insertInto("node_nodes")
+        .values({
+          name,
+          labels: request.body.labels ?? {},
+          token_hash: hashToken(token),
+        })
+        .returningAll()
+        .execute();
+      const created: CreatedNode = { node: toNodeInfo(rows[0] as NodeRow), token };
+      return created;
+    });
 
-		const node = await ctx.db
-			.selectFrom("node_nodes")
-			.selectAll()
-			.where("id", "=", id)
-			.where("workspace_id", "=", workspaceId)
-			.executeTakeFirst();
-		if (!node) return reply.code(404).send({ error: "node not found" });
+    app.patch<{ Params: { id: string }; Body: UpdateNodeRequest }>("/nodes/:id", async (request, reply) => {
+      const node = await loadNode(kysely, request.params.id);
+      if (!node) {
+        reply.code(404).send({ error: "node_not_found" });
+        return reply;
+      }
+      const body = request.body ?? {};
+      const rows = await kysely
+        .updateTable("node_nodes")
+        .set({
+          ...(body.name != null ? { name: body.name.trim() } : {}),
+          ...(body.labels != null ? { labels: body.labels } : {}),
+          updated_at: new Date(),
+        })
+        .where("id", "=", node.id)
+        .returningAll()
+        .execute();
+      return { node: toNodeInfo(rows[0] as NodeRow) };
+    });
 
-		const secrets = await ctx.db
-			.selectFrom("node_node_secrets")
-			.selectAll()
-			.where("node_id", "=", id)
-			.orderBy("created_at", "asc")
-			.execute();
-		return { node: toNodeDto(node), secrets: secrets.map(toSecretDto) };
-	});
+    app.post<{ Params: { id: string } }>("/nodes/:id/token", async (request, reply) => {
+      const node = await loadNode(kysely, request.params.id);
+      if (!node) {
+        reply.code(404).send({ error: "node_not_found" });
+        return reply;
+      }
+      const token = newToken();
+      await kysely
+        .updateTable("node_nodes")
+        .set({ token_hash: hashToken(token), updated_at: new Date() })
+        .where("id", "=", node.id)
+        .execute();
+      return { token };
+    });
 
-	fastify.post("/nodes/:id/invoke", async (request, reply) => {
-		const workspaceId = requireWorkspace(request, reply);
-		if (!workspaceId) return reply;
-		const { id } = request.params as NodeParams;
-		const body = (request.body ?? {}) as NodeInvokeBody;
-
-		if (!body.action || typeof body.action !== "string") {
-			return reply.code(400).send({ error: "action is required" });
-		}
-
-		const node = await ctx.db
-			.selectFrom("node_nodes")
-			.select("id")
-			.where("id", "=", id)
-			.where("workspace_id", "=", workspaceId)
-			.executeTakeFirst();
-		if (!node) return reply.code(404).send({ error: "node not found" });
-		if (!ctx.gateway.isOnline(id)) {
-			return reply.code(409).send({ error: "node is offline" });
-		}
-
-		try {
-			const data = await ctx.gateway.callNode(id, body.action, body.payload, {
-				timeoutMs: body.timeout_ms,
-			});
-			return { ok: true, data: data ?? null };
-		} catch (error) {
-			return reply.code(502).send({ error: (error as Error).message });
-		}
-	});
-
-	fastify.patch("/nodes/:id", async (request, reply) => {
-		const workspaceId = requireWorkspace(request, reply);
-		if (!workspaceId) return reply;
-		const { id } = request.params as NodeParams;
-		const name = nameFrom(request.body as NodeBody);
-		if (!name) return reply.code(400).send({ error: "name is required" });
-
-		const result = await ctx.db
-			.updateTable("node_nodes")
-			.set({ name, updated_at: new Date() })
-			.where("id", "=", id)
-			.where("workspace_id", "=", workspaceId)
-			.executeTakeFirst();
-		if (result.numUpdatedRows === 0n) {
-			return reply.code(404).send({ error: "node not found" });
-		}
-		const node = await ctx.db
-			.selectFrom("node_nodes")
-			.selectAll()
-			.where("id", "=", id)
-			.executeTakeFirstOrThrow();
-		return { node: toNodeDto(node) };
-	});
-
-	fastify.delete("/nodes/:id", async (request, reply) => {
-		const workspaceId = requireWorkspace(request, reply);
-		if (!workspaceId) return reply;
-		const { id } = request.params as NodeParams;
-
-		const result = await ctx.db
-			.deleteFrom("node_nodes")
-			.where("id", "=", id)
-			.where("workspace_id", "=", workspaceId)
-			.executeTakeFirst();
-		if (result.numDeletedRows === 0n) {
-			return reply.code(404).send({ error: "node not found" });
-		}
-		ctx.gateway.disconnect(id);
-		return { deleted: true };
-	});
+    app.delete<{ Params: { id: string } }>("/nodes/:id", async (request, reply) => {
+      const node = await loadNode(kysely, request.params.id);
+      if (!node) {
+        reply.code(404).send({ error: "node_not_found" });
+        return reply;
+      }
+      await kysely.deleteFrom("node_nodes").where("id", "=", node.id).execute();
+      return { ok: true };
+    });
+  };
 }

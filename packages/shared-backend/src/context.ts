@@ -1,6 +1,7 @@
 import type { Kysely } from "kysely";
 
-export type TwodbFn = {};
+// biome-ignore lint/suspicious/noEmptyInterface: declaration-merged by plugins via `declare module`
+export interface TwodbFn {}
 
 export interface TwodbContext {
   db: Kysely<unknown>;
@@ -8,4 +9,5 @@ export interface TwodbContext {
   pluginId?: string;
 }
 
+// biome-ignore lint/suspicious/noEmptyInterface: declaration-merged by plugins via `declare module`
 export interface TwodbDatabase {}
