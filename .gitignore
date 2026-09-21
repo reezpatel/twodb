@@ -6,7 +6,6 @@ dist/
 .env.local
 .DS_Store
 .vercel
-workbench/
 .work/
 result
 result-*
