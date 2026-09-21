@@ -226,7 +226,7 @@ jobs:
         run: sed -i "s/__VERSION__/${GITHUB_REF_NAME#v}/g" deploy/choco/twodb-node.nuspec
 
       - name: Choco pack
-        run: docker run --rm -v "$PWD/deploy/choco:/choco" -w /choco chocolatey/choco pack twodb-node.nuspec
+        run: docker run --rm -v "$PWD/deploy/choco:/choco" -w /choco chocolatey/choco choco pack twodb-node.nuspec
 
       # Choco push is manual: choco push nupkg --source https://push.chocolatey.org/ -k $CHOCO_API_KEY
       - name: Upload choco package

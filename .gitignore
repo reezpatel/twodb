@@ -11,3 +11,4 @@ result
 result-*
 .build/
 apps/api/vendor/
+deploy/choco/tools/*.exe
