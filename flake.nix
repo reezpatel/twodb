@@ -86,10 +86,9 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         version = "0.0.4";
-        placeholderHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
         serverSrc = pkgs.fetchurl {
           url = "https://github.com/reezpatel/twodb/releases/download/v${version}/twodb-server-v${version}.tar.gz";
-          sha256 = placeholderHash;
+          sha256 = "0mfb81m116ix5bys3mmi9db2d1s6mmvb5v69i85mps2x89ccjdiz";
         };
         nodeAsset =
           {
@@ -98,10 +97,17 @@
             "aarch64-darwin" = "twodb-node-darwin-arm64";
           }
           .${system} or (throw "twodb-node: unsupported system ${system}");
+        nodeHash =
+          {
+            "x86_64-linux" = "0ha140cj4y2nxqmizxlpmd7zylay012hs9n24ffi9cjkdgd2hhdl";
+            "x86_64-darwin" = "0lb84abyl2jwln33rjwabl3jssdpryy8zg76gl7a1n9j5slwj8fl";
+            "aarch64-darwin" = "04n9gyyhvz7f4pw9v5mppla3wj0fqdqpq9zlwfij3d64a78hjk0b";
+          }
+          .${system} or (throw "twodb-node: unsupported system ${system}");
         nodeSrc = pkgs.fetchurl {
           url = "https://github.com/reezpatel/twodb/releases/download/v${version}/${nodeAsset}";
           name = "twodb-node";
-          sha256 = placeholderHash;
+          sha256 = nodeHash;
         };
       in
       {
@@ -112,6 +118,11 @@
             src = serverSrc;
             dontConfigure = true;
             dontBuild = true;
+            unpackPhase = ''
+              sourceRoot=unpacked
+              mkdir $sourceRoot
+              tar -xzf $src -C $sourceRoot
+            '';
             installPhase = ''
               mkdir -p $out/share/twodb $out/bin
               cp -R server.mjs web-dist vendor plugins $out/share/twodb/
@@ -130,12 +141,13 @@
             pname = "twodb-node";
             inherit version;
             src = nodeSrc;
+            dontUnpack = true;
             dontConfigure = true;
             dontBuild = true;
             dontStrip = true;
             installPhase = ''
               mkdir -p $out/bin
-              install -m 0755 twodb-node $out/bin/twodb-node
+              install -m 0755 $src $out/bin/twodb-node
             ''
             + pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
               patchelf --set-interpreter ${pkgs.stdenv.cc.bintools.dynamicLinker} $out/bin/twodb-node || true

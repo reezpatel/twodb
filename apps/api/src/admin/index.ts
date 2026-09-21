@@ -1,5 +1,6 @@
 import { Migrator } from "kysely/migration";
 import { migrations } from "./migrations";
+import { seedBakedPlugins } from "./seed";
 import { registerServicePlugins } from "./plugin";
 import fs from "node:fs";
 import path from "node:path";
@@ -25,6 +26,8 @@ export const adminPlugin = async (app: FastifyInstance) => {
   // migrateToLatest returns errors instead of throwing
   const { error } = await migrator.migrateToLatest();
   if (error) throw error;
+
+  await seedBakedPlugins(app);
 
   const loadedPlugins = await registerServicePlugins(app);
 
