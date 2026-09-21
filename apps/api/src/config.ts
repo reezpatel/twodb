@@ -24,6 +24,11 @@ export const envSchema = {
       default: "",
       description: "Directory of baked-in plugin folders; missing registry rows are seeded from their .build manifests",
     },
+    TWODB_STATIC_DIR: {
+      type: "string",
+      default: "../../../apps/web/dist",
+      description: "Directory of the built web app served at /",
+    },
 
     // --- Admin (passkey auth, /api/v1/admin) ---
     TWODB_ADMIN_RP_ID: {

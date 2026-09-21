@@ -88,13 +88,13 @@
         version = "0.0.5";
         serverSrc = pkgs.fetchurl {
           url = "https://github.com/reezpatel/twodb/releases/download/v${version}/twodb-server-v${version}.tar.gz";
-          sha256 = "0mfb81m116ix5bys3mmi9db2d1s6mmvb5v69i85mps2x89ccjdiz";
+          sha256 = "0f69q3x7y6svh3vh9i8gq504v9fm0qbxjp6sl939ga50dv0nly2p";
         };
         nodeAsset =
           {
-            "x86_64-linux" = "twodb-node-linux-x64";
-            "x86_64-darwin" = "twodb-node-darwin-x64";
-            "aarch64-darwin" = "twodb-node-darwin-arm64";
+            "x86_64-linux" = "0ha140cj4y2nxqmizxlpmd7zylay012hs9n24ffi9cjkdgd2hhdl";
+            "x86_64-darwin" = "0lb84abyl2jwln33rjwabl3jssdpryy8zg76gl7a1n9j5slwj8fl";
+            "aarch64-darwin" = "04n9gyyhvz7f4pw9v5mppla3wj0fqdqpq9zlwfij3d64a78hjk0b";
           }
           .${system} or (throw "twodb-node: unsupported system ${system}");
         nodeHash =
