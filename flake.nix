@@ -85,7 +85,7 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        version = "0.0.6";
+        version = "0.0.7";
         serverSrc = pkgs.fetchurl {
           url = "https://github.com/reezpatel/twodb/releases/download/v${version}/twodb-server-v${version}.tar.gz";
           sha256 = "0f69q3x7y6svh3vh9i8gq504v9fm0qbxjp6sl939ga50dv0nly2p";
