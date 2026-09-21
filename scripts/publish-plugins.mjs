@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const publish = process.argv.includes("--yes");
+const stage = process.argv.includes("--stage");
 
 const groups = [path.join(root, "plugins"), path.join(root, "plugins/llm-adapters")];
 
@@ -69,11 +70,11 @@ for (const plugin of plugins) {
 
   try {
     execSync("node build.mjs", { cwd: plugin.dir, stdio: "inherit" });
-    execSync(`npm publish ${JSON.stringify(path.join(plugin.dir, ".build"))} --access public`, {
+    execSync(`npm ${stage ? "stage " : ""}publish ${JSON.stringify(path.join(plugin.dir, ".build"))} --access public`, {
       cwd: root,
       stdio: "inherit",
     });
-    console.log(`  + ${label} — published`);
+    console.log(`  + ${label} — ${stage ? "staged (needs promotion by a 2FA maintainer)" : "published"}`);
     published += 1;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -87,5 +88,7 @@ for (const plugin of plugins) {
   }
 }
 
-console.log(`\n${publish ? `published ${published}, skipped ${skipped}, failed ${failed}` : `dry run — pass --yes to publish (${plugins.length} plugins)`}`);
+console.log(
+  `\n${publish ? `${stage ? "staged" : "published"} ${published}, skipped ${skipped}, failed ${failed}` : `dry run — pass --yes to publish (${plugins.length} plugins)`}`,
+);
 if (failed > 0) process.exit(1);

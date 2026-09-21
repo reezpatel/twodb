@@ -114,7 +114,9 @@ jobs:
 
       - name: Publish plugins to npm
         continue-on-error: false
-        run: node scripts/publish-plugins.mjs --yes
+        run: |
+          npm install -g npm@latest
+          node scripts/publish-plugins.mjs --yes --stage
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
