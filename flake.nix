@@ -88,20 +88,20 @@
         version = "0.0.8";
         serverSrc = pkgs.fetchurl {
           url = "https://github.com/reezpatel/twodb/releases/download/v${version}/twodb-server-v${version}.tar.gz";
-          sha256 = "13wwasfilcxv5c5dzzbn7917n78pxrw5nxsdpjqwcldixzqw8nr8";
+          sha256 = "1a0k3b6siai78r62wd2l1fgcvwgg52v0xifhx4r30267czs75jid";
         };
         nodeAsset =
           {
-            "x86_64-linux" = "0ha140cj4y2nxqmizxlpmd7zylay012hs9n24ffi9cjkdgd2hhdl";
-            "x86_64-darwin" = "0lb84abyl2jwln33rjwabl3jssdpryy8zg76gl7a1n9j5slwj8fl";
-            "aarch64-darwin" = "04n9gyyhvz7f4pw9v5mppla3wj0fqdqpq9zlwfij3d64a78hjk0b";
+            "x86_64-linux" = "1ah6bxf9sifi7gjhwk1lrk0bipy23hi21rl9vl9paar2jvq4zz12";
+            "x86_64-darwin" = "0y6px4ymdwiy5rfqamydx151cncyc80kc9ggb41iqjrrh4yjcq3r";
+            "aarch64-darwin" = "1qbalksdbk15khq4li4x90zpnk6l035ljlxj95j8y9s6fs7j269h";
           }
           .${system} or (throw "twodb-node: unsupported system ${system}");
         nodeHash =
           {
-            "x86_64-linux" = "0ha140cj4y2nxqmizxlpmd7zylay012hs9n24ffi9cjkdgd2hhdl";
-            "x86_64-darwin" = "0lb84abyl2jwln33rjwabl3jssdpryy8zg76gl7a1n9j5slwj8fl";
-            "aarch64-darwin" = "04n9gyyhvz7f4pw9v5mppla3wj0fqdqpq9zlwfij3d64a78hjk0b";
+            "x86_64-linux" = "1ah6bxf9sifi7gjhwk1lrk0bipy23hi21rl9vl9paar2jvq4zz12";
+            "x86_64-darwin" = "0y6px4ymdwiy5rfqamydx151cncyc80kc9ggb41iqjrrh4yjcq3r";
+            "aarch64-darwin" = "1qbalksdbk15khq4li4x90zpnk6l035ljlxj95j8y9s6fs7j269h";
           }
           .${system} or (throw "twodb-node: unsupported system ${system}");
         nodeSrc = pkgs.fetchurl {
