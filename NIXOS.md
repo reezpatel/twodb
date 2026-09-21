@@ -35,7 +35,8 @@ Then in `configuration.nix`:
   services.twodb-server = {
     enable = true;
     port = 3001;
-    databaseUrl = "postgres://twodb:twodb@localhost:5432/twodb";
+    # unix socket — no password juggling with the dynamic service user
+    databaseUrl = "postgres:///twodb?host=/run/postgresql";
     # workDir defaults to /var/lib/twodb (StateDirectory handles it)
 
     extraEnvironment = {
@@ -54,11 +55,10 @@ Then in `configuration.nix`:
         ensureDBOwnership = true;
       }
     ];
-    # the packaged default connection string uses password auth on localhost;
-    # either set a password or point databaseUrl at your socket/peer config
+    # the service runs as a dynamic user, so peer auth cannot identify it —
+    # trust the local unix socket instead (single-host, no network exposure)
     authentication = ''
-      local twodb twodb peer
-      host twodb twodb 127.0.0.1/32 scram-sha-256
+      local twodb twodb trust
     '';
   };
 
@@ -132,7 +132,6 @@ Machines within seconds (the agent holds a streaming connection).
 ### Ad-hoc (any machine, no service)
 
 ```bash
-nix run github:reezpatel/twodb#twodb-node --help
 TWODB_NODE_URL=http://myhost:3001 \
 TWODB_NODE_TOKEN=... \
 TWODB_ROOT=$HOME/projects/app \
