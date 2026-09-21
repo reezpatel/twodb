@@ -79,7 +79,7 @@ Then in `configuration.nix`:
 1. Open `http://myhost:3001` — you'll sign in via the auth plugin (passkey;
    set the `TWODB_ADMIN_*` vars above when serving from a real hostname)
 2. Create your vault + workspace (first-run flow creates them)
-3. Machines: Settings → **Machines** → *Add machine* → copy the token (shown
+3. Machines: Settings → **Machines** → _Add machine_ → copy the token (shown
    once) — that's what a node agent below needs
 
 ### Reverse proxy (optional)
@@ -129,6 +129,26 @@ origin (passkeys bind to it).
 After `nixos-rebuild switch`, the machine shows **online** under Settings →
 Machines within seconds (the agent holds a streaming connection).
 
+#### Tokens via agenix (secret files)
+
+Set `TWODB_NODE_TOKEN_FILE` instead of a plaintext env var — the agent reads
+and trims the file at startup, and refuses to start if it is unreadable:
+
+```nix
+age.secrets.twodb-node-token.file = ./secrets/twodb-node-token.age;
+
+systemd.services.twodb-node = {
+  environment = {
+    TWODB_NODE_URL = "http://myhost:3001";
+    TWODB_NODE_TOKEN_FILE = config.age.secrets.twodb-node-token.path;
+    TWODB_ROOT = "/srv/project";
+  };
+  # ...rest as above
+};
+```
+
+`TWODB_NODE_TOKEN` (inline) still wins when both are set.
+
 ### Ad-hoc (any machine, no service)
 
 ```bash
@@ -147,7 +167,7 @@ nix run github:reezpatel/twodb#twodb-node
 
 ## 3. Using it
 
-- **Code sessions**: rail → Code → *New session* → pick the machine + folder →
+- **Code sessions**: rail → Code → _New session_ → pick the machine + folder →
   talk to the agent; it reads/writes/patches files and runs commands on that
   machine, streaming output live
 - **LLM providers**: Settings → LLM Providers → add connections (per
