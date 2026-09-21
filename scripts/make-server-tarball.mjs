@@ -4,10 +4,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const tag = process.argv[2]?.replace(/^v/, "");
+const tag = process.argv[2];
 
-if (!tag) {
-  console.error("usage: node scripts/make-server-tarball.mjs <tag>");
+if (!tag || !/^v\d/.test(tag)) {
+  console.error("usage: node scripts/make-server-tarball.mjs <vX.Y.Z tag>");
   process.exit(1);
 }
 

@@ -59,7 +59,7 @@ CI then automatically:
 | --------------- | ---------------------------------------------------------------------------------------- |
 | build + test    | green pipeline gate                                                                      |
 | docker-image    | `ghcr.io/reezpatel/twodb-server:v0.1.0` + `:latest`                                      |
-| publish-plugins | all plugins **staged** to npm — promote with a 2FA maintainer account (see §1)                                |
+| publish-plugins | all plugins **staged** to npm — promote with a 2FA maintainer account (see §1)           |
 | agent-binaries  | `twodb-node-{linux-x64,darwin-arm64,darwin-x64,windows-x64.exe}` attached to the release |
 | server-tarball  | `twodb-server-v0.1.0.tar.gz` attached to the release                                     |
 | choco-pack      | `choco-package` artifact (nupkg) — NOT pushed                                            |

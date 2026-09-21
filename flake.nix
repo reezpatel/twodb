@@ -78,10 +78,10 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        version = "0.1.0";
+        version = "0.0.3";
         placeholderHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
         serverSrc = pkgs.fetchurl {
-          url = "https://github.com/reezpatel/twodb/releases/download/v${version}/twodb-server-${version}.tar.gz";
+          url = "https://github.com/reezpatel/twodb/releases/download/v${version}/twodb-server-v${version}.tar.gz";
           sha256 = placeholderHash;
         };
         nodeAsset =
@@ -92,7 +92,8 @@
           }
           .${system} or (throw "twodb-node: unsupported system ${system}");
         nodeSrc = pkgs.fetchurl {
-          url = "https://github.com/reezpatel/twodb/releases/download/v${version}/${nodeAsset}.tar.gz";
+          url = "https://github.com/reezpatel/twodb/releases/download/v${version}/${nodeAsset}";
+          name = "twodb-node";
           sha256 = placeholderHash;
         };
       in
