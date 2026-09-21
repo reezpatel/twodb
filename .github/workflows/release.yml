@@ -176,6 +176,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
@@ -195,8 +197,6 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build server tarball
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
         run: node scripts/make-server-tarball.mjs "$RELEASE_TAG"
 
       - name: Attach tarball to release

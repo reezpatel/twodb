@@ -49,6 +49,12 @@
               default = "/var/lib/twodb";
               description = "Runtime data directory.";
             };
+
+            extraEnvironment = lib.mkOption {
+              type = lib.types.attrsOf lib.types.str;
+              default = { };
+              description = "Extra environment variables for the service (e.g. TWODB_ADMIN_RP_ID, TWODB_ADMIN_ORIGIN).";
+            };
           };
 
           config = lib.mkIf cfg.enable {
@@ -63,7 +69,8 @@
                 TWODB_WORK_DIR = cfg.workDir;
                 TWODB_STATIC_DIR = "${cfg.package}/share/twodb/web-dist";
                 TWODB_VENDOR_DIR = "${cfg.package}/share/twodb/vendor";
-              };
+                TWODB_PLUGINS_DIR = "${cfg.package}/share/twodb/plugins";
+              } // cfg.extraEnvironment;
               serviceConfig = {
                 ExecStart = "${cfg.package}/bin/twodb-server";
                 DynamicUser = true;
@@ -78,7 +85,7 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        version = "0.0.3";
+        version = "0.0.4";
         placeholderHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
         serverSrc = pkgs.fetchurl {
           url = "https://github.com/reezpatel/twodb/releases/download/v${version}/twodb-server-v${version}.tar.gz";
@@ -112,6 +119,7 @@
               #!/bin/sh
               export TWODB_STATIC_DIR="$out/share/twodb/web-dist"
               export TWODB_VENDOR_DIR="$out/share/twodb/vendor"
+              export TWODB_PLUGINS_DIR="$out/share/twodb/plugins"
               exec ${pkgs.nodejs_22}/bin/node $out/share/twodb/server.mjs
               EOF
               chmod +x $out/bin/twodb-server
