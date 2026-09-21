@@ -1,0 +1,40 @@
+services:
+  twodb-server:
+    image: ghcr.io/reezpatel/twodb-server:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      TWODB_DATABASE_URL: postgres://twodb:twodb@db:5432/twodb
+      TWODB_ADMIN_RP_ID: localhost
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - twodb-data:/data
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: twodb
+      POSTGRES_PASSWORD: twodb
+      POSTGRES_DB: twodb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U twodb -d twodb"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # memgraph:
+  #   image: memgraph/memgraph:latest
+  #   ports:
+  #     - "7687:7687"
+
+volumes:
+  twodb-data:
+  pgdata:

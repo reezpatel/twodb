@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "db:up": "docker compose -f ../../docker-compose.db.yaml up -d",
     "db:down": "docker compose -f ../../docker-compose.db.yaml down",
-    "db:logs": "docker compose -f ../../docker-compose.db.yaml logs -f"
+    "db:logs": "docker compose -f ../../docker-compose.db.yaml logs -f",
+    "build": "node build.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

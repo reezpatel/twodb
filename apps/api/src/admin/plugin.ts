@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify/types/instance";
 import path from "node:path";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import type { ServicePlugin } from "@twodb/shared-backend";
 import { Migrator } from "kysely/migration";
@@ -127,16 +128,56 @@ async function mountPlugin(app: FastifyInstance, bundle: LoadedPlugin, service: 
   );
 }
 
-const resolvePluginDir = async (app: FastifyInstance, identifier: string, extractedPath = ""): Promise<string | null> => {
-  const p = identifier.startsWith("local:") ? identifier.slice("local:".length) : extractedPath;
+const NPM_REGISTRY = process.env.TWODB_NPM_REGISTRY ?? "https://registry.npmjs.org";
 
+const fetchNpmPlugin = async (app: FastifyInstance, name: string): Promise<string> => {
+  const encoded = name.startsWith("@") ? `@${encodeURIComponent(name.slice(1))}` : encodeURIComponent(name);
+  const metaResponse = await fetch(`${NPM_REGISTRY}/${encoded}`);
+  if (!metaResponse.ok) throw new Error(`npm registry lookup failed for ${name}: ${metaResponse.status}`);
+  const meta = (await metaResponse.json()) as {
+    "dist-tags"?: { latest?: string };
+    versions?: Record<string, { dist?: { tarball?: string } }>;
+  };
+  const version = meta["dist-tags"]?.latest;
+  const tarball = version ? meta.versions?.[version]?.dist?.tarball : null;
+  if (!version || !tarball) throw new Error(`npm registry has no latest version for ${name}`);
+
+  const workDir = app.config.TWODB_WORK_DIR;
+  const target = path.join(workDir, "plugins", `${name.replace("/", "+")}-${version}`);
+  if (fs.existsSync(path.join(target, "package.json"))) return target;
+
+  const tgz = path.join(workDir, "cache", `${name.replace("/", "+")}-${version}.tgz`);
+  await fs.promises.mkdir(path.dirname(tgz), { recursive: true });
+  const tarballResponse = await fetch(tarball);
+  if (!tarballResponse.ok) throw new Error(`tarball download failed for ${name}@${version}: ${tarballResponse.status}`);
+  await fs.promises.writeFile(tgz, Buffer.from(await tarballResponse.arrayBuffer()));
+
+  await fs.promises.mkdir(target, { recursive: true });
+  execFileSync("tar", ["-xzf", tgz, "-C", target, "--strip-components=1"]);
+  return target;
+};
+
+const resolvePluginDir = async (app: FastifyInstance, identifier: string, extractedPath = ""): Promise<string | null> => {
+  if (identifier.startsWith("local:")) {
+    return path.resolve(app.config.TWODB_WORK_DIR, identifier.slice("local:".length));
+  }
+  if (identifier.startsWith("npm:")) {
+    try {
+      return await fetchNpmPlugin(app, identifier.slice("npm:".length));
+    } catch (error) {
+      app.log.warn(`npm fetch failed for ${identifier}: ${error instanceof Error ? error.message : String(error)} — skipping`);
+      return null;
+    }
+  }
+
+  const p = extractedPath;
   if (p) {
     const workDir = app.config.TWODB_WORK_DIR;
     return path.isAbsolute(p) ? p : path.resolve(workDir, p);
   }
 
-  // TODO: Fetch
-  app.log.warn(`plugin "${identifier}" needs the git:/npm: fetch pipeline, which is not implemented yet — skipping`);
+  // TODO: git:<url> fetch pipeline
+  app.log.warn(`plugin "${identifier}" needs the git: fetch pipeline, which is not implemented yet — skipping`);
 
   return null;
 };

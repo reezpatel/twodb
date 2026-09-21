@@ -14,6 +14,16 @@ export const envSchema = {
       default: path.resolve(import.meta.dirname, "../../../.work"),
       description: "Absolute path to the api-owned work dir (fetched-plugin extractions); created if missing",
     },
+    TWODB_VENDOR_DIR: {
+      type: "string",
+      default: "../vendor",
+      description: "Directory of vendored browser modules served at /vendor (react, react-query, shared-frontend)",
+    },
+    TWODB_PLUGINS_DIR: {
+      type: "string",
+      default: "",
+      description: "Directory of baked-in plugin folders; missing registry rows are seeded from their .build manifests",
+    },
 
     // --- Admin (passkey auth, /api/v1/admin) ---
     TWODB_ADMIN_RP_ID: {

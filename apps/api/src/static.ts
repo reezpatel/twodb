@@ -4,8 +4,19 @@ import type { FastifyInstance } from "fastify";
 import fastifyStatic from "@fastify/static";
 
 export async function registerStaticApp(app: FastifyInstance) {
-  const staticDir = path.resolve(import.meta.dirname, app.config.STATIC_DIR ?? "../../../apps/web/dist");
+  const staticDir = path.resolve(import.meta.dirname, app.config.TWODB_STATIC_DIR ?? "../../../apps/web/dist");
   const hasStaticApp = fs.existsSync(path.join(staticDir, "index.html"));
+
+  const vendorDir = path.resolve(import.meta.dirname, app.config.TWODB_VENDOR_DIR ?? "../vendor");
+  if (fs.existsSync(vendorDir)) {
+    await app.register(fastifyStatic, {
+      root: vendorDir,
+      prefix: "/vendor/",
+      decorateReply: false,
+      immutable: true,
+      maxAge: "365d",
+    });
+  }
 
   if (hasStaticApp) {
     await app.register(fastifyStatic, {

@@ -1,0 +1,237 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4 # zizmor: ignore[unpinned-uses]
+
+      - name: Set up Node
+        uses: actions/setup-node@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build plugins
+        run: |
+          for dir in plugins/auth plugins/workspace plugins/llm plugins/node plugins/code plugins/llm-adapters/*; do
+            (cd "$dir" && node build.mjs)
+          done
+
+      - name: Build web
+        working-directory: apps/web
+        run: npx vite build
+
+      - name: Build api
+        working-directory: apps/api
+        run: node build.mjs
+
+      - name: Vendor browser deps
+        run: node scripts/vendor-deps.mjs
+
+  docker-image:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3 # zizmor: ignore[unpinned-uses]
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3 # zizmor: ignore[unpinned-uses]
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3 # zizmor: ignore[unpinned-uses]
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6 # zizmor: ignore[unpinned-uses]
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/twodb-server:${{ github.ref_name }}
+            ghcr.io/${{ github.repository_owner }}/twodb-server:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish-plugins:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4 # zizmor: ignore[unpinned-uses]
+
+      - name: Set up Node
+        uses: actions/setup-node@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org/
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build plugins
+        run: |
+          for dir in plugins/auth plugins/workspace plugins/llm plugins/node plugins/code plugins/llm-adapters/*; do
+            (cd "$dir" && node build.mjs)
+          done
+
+      - name: Publish plugins to npm
+        continue-on-error: false
+        run: node scripts/publish-plugins.mjs --yes
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  agent-binaries:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: bun-linux-x64
+            outfile: twodb-node-linux-x64
+          - target: bun-darwin-arm64
+            outfile: twodb-node-darwin-arm64
+          - target: bun-darwin-x64
+            outfile: twodb-node-darwin-x64
+          - target: bun-windows-x64
+            outfile: twodb-node-windows-x64.exe
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2 # zizmor: ignore[unpinned-uses]
+
+      - name: Compile agent
+        working-directory: apps/node
+        env:
+          BUN_TARGET: ${{ matrix.target }}
+          OUTFILE: ${{ matrix.outfile }}
+        run: bun build --compile --target="$BUN_TARGET" src/index.ts --outfile "dist/$OUTFILE"
+
+      - name: Make executable
+        env:
+          OUTFILE: ${{ matrix.outfile }}
+        run: chmod +x "apps/node/dist/$OUTFILE"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          name: ${{ matrix.outfile }}
+          path: apps/node/dist/${{ matrix.outfile }}
+          if-no-files-found: error
+
+      # Homebrew formula prep stays manual: fill deploy/homebrew/twodb-node.rb, push to tap by hand.
+      - name: Attach binary to release
+        uses: softprops/action-gh-release@v2 # zizmor: ignore[unpinned-uses]
+        with:
+          files: apps/node/dist/${{ matrix.outfile }}
+
+  server-tarball:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4 # zizmor: ignore[unpinned-uses]
+
+      - name: Set up Node
+        uses: actions/setup-node@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build server tarball
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/make-server-tarball.mjs "$RELEASE_TAG"
+
+      - name: Attach tarball to release
+        uses: softprops/action-gh-release@v2 # zizmor: ignore[unpinned-uses]
+        with:
+          files: twodb-server-${{ env.RELEASE_TAG }}.tar.gz
+
+  choco-pack:
+    needs: agent-binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          persist-credentials: false
+
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          name: twodb-node-windows-x64.exe
+          path: deploy/choco/tools/
+
+      - name: Download WinSW
+        run: curl -fsSL -o deploy/choco/tools/WinSW.exe https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe
+
+      - name: Stamp version
+        run: sed -i "s/__VERSION__/${GITHUB_REF_NAME#v}/g" deploy/choco/twodb-node.nuspec
+
+      - name: Choco pack
+        run: docker run --rm -v "$PWD/deploy/choco:/choco" -w /choco chocolatey/choco pack twodb-node.nuspec
+
+      # Choco push is manual: choco push nupkg --source https://push.chocolatey.org/ -k $CHOCO_API_KEY
+      - name: Upload choco package
+        uses: actions/upload-artifact@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          name: choco-package
+          path: deploy/choco/*.nupkg
+          if-no-files-found: error

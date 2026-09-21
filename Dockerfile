@@ -1,47 +1,40 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-alpine AS base
-ENV PNPM_HOME=/pnpm
-ENV PATH=$PNPM_HOME:$PATH
-# better-sqlite3 compiles from source on musl (no prebuilt binaries).
-# Only build stages inherit this; the runtime stage copies node_modules.
-RUN apk add --no-cache python3 make g++
+FROM node:22-slim AS build
 RUN corepack enable
+WORKDIR /repo
+COPY . .
+RUN pnpm install --frozen-lockfile
+RUN for p in auth workspace llm node code; do (cd "plugins/$p" && node build.mjs); done
+RUN cd apps/web && npx vite build
+RUN cd apps/api && node build.mjs
+RUN node scripts/vendor-deps.mjs
+
+FROM node:22-slim AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-
-# Full-context installs: plugin packages (plugins/*) declare their own deps
-# (e.g. @fastify/multipart), so every workspace manifest must be present at
-# install time and every package's node_modules must reach the runtime.
-# The pnpm store cache mount keeps repeated installs fast despite COPY . .
-# invalidating the layer on any source change.
-FROM base AS deps
-COPY . .
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
-
-FROM base AS prod-deps
-COPY . .
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-	pnpm install --frozen-lockfile --prod
-
-FROM deps AS build
-RUN pnpm --filter twodb-api typecheck
-RUN pnpm --filter twodb-web-app build
-
-FROM node:22-alpine AS runtime
+COPY --from=build /repo/apps/api/dist/server.mjs ./server.mjs
+COPY --from=build /repo/apps/web/dist ./web-dist
+COPY --from=build /repo/apps/api/vendor ./vendor
+COPY --from=build /repo/plugins/auth/.build ./plugins/auth/.build
+COPY --from=build /repo/plugins/workspace/.build ./plugins/workspace/.build
+COPY --from=build /repo/plugins/llm/.build ./plugins/llm/.build
+COPY --from=build /repo/plugins/node/.build ./plugins/node/.build
+COPY --from=build /repo/plugins/code/.build ./plugins/code/.build
+COPY <<'EOF' /app/entrypoint.mjs
+process.env.TWODB_STATIC_DIR ??= "/app/web-dist";
+process.env.TWODB_VENDOR_DIR ??= "/app/vendor";
+process.env.TWODB_PLUGINS_DIR ??= "/app/plugins";
+await import("./server.mjs");
+EOF
 ENV NODE_ENV=production
-ENV PORT=3001
-ENV STATIC_DIR=../../../apps/web/dist
-# Api-owned sqlite db lives here; mount a volume to persist it:
-#   docker run -v twodb-data:/data ...
-ENV TWO_DB_WORK_DIR=/data
-WORKDIR /app
-# prod-deps already contains the full workspace sources + prod node_modules
-# for every package (root, apps, packages, plugins).
-COPY --from=prod-deps /app ./
-COPY --from=build /app/apps/web/dist ./apps/web/dist
+ENV TWODB_WORK_DIR=/data
+RUN mkdir -p /data && chown node:node /data
+USER node
+VOLUME /data
 EXPOSE 3001
-WORKDIR /app/apps/api
-# The api's start script (tsx src/index.ts), invoked directly: running via
-# `pnpm --filter twodb-api start` would reconcile the partial workspace
-# (auto-install) on every boot — tsx needs neither pnpm nor network.
-CMD ["./node_modules/.bin/tsx", "src/index.ts"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS http://localhost:3001/health/ready || exit 1
+ENTRYPOINT ["node", "/app/entrypoint.mjs"]

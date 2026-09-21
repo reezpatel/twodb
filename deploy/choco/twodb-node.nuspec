@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>twodb-node</id>
+    <!-- Placeholder: CI stamps the release tag over __VERSION__ before choco pack. -->
+    <version>__VERSION__</version>
+    <title>TwoDB Node Agent</title>
+    <authors>reezpatel</authors>
+    <owners>reezpatel</owners>
+    <summary>TwoDB node agent service</summary>
+    <description>TwoDB node agent. Installs the agent binary and a WinSW-managed Windows service that connects to a TwoDB server.</description>
+    <tags>twodb agent service</tags>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

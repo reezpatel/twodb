@@ -3,6 +3,7 @@ import { config } from "./config";
 import { getStream, post } from "./http";
 import { killCommand, runCommand } from "./exec";
 import { applyPatch } from "./patch";
+import { runServiceCommand } from "./service";
 import type { TwodbAgentEvent } from "@twodb/contracts";
 
 const MAX_BACKOFF_MS = 30_000;
@@ -73,6 +74,10 @@ process.once("SIGINT", shutdown);
 process.once("SIGTERM", shutdown);
 
 async function main(): Promise<void> {
+  if (process.argv[2] === "service") {
+    process.exit(runServiceCommand(process.argv[3] ?? ""));
+  }
+
   if (!config.token) {
     console.warn("[node] TWODB_NODE_TOKEN is not set — agent idling.");
     console.warn("[node] create a machine in workspace settings, then set the token to enable it.");

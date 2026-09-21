@@ -120,18 +120,11 @@ const service = await context({
   platform: "node",
   format: "esm",
   target: "node20",
+  banner: {
+    js: "import { createRequire as __cr } from \"node:module\";const require=__cr(import.meta.url);",
+  },
   sourcemap: "inline",
-  plugins: [
-    {
-      name: "externalize-bare-imports",
-      setup(b) {
-        b.onResolve({ filter: /^[^./]/ }, (args) => ({
-          path: args.path,
-          external: true,
-        }));
-      },
-    },
-  ],
+  external: ["pg-native"],
 });
 
 // View: self-contained except react/react-dom (and the shared-frontend

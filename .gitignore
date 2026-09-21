@@ -11,3 +11,4 @@ workbench/
 result
 result-*
 .build/
+apps/api/vendor/

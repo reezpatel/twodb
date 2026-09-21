@@ -5,7 +5,9 @@ declare module "fastify" {
   interface FastifyInstance {
     config: {
       TWODB_PORT: number;
-      STATIC_DIR: string;
+      TWODB_STATIC_DIR: string;
+      TWODB_VENDOR_DIR: string;
+      TWODB_PLUGINS_DIR: string;
       TWODB_WORK_DIR: string;
 
       TWODB_ADMIN_RP_ID: string;

@@ -95,6 +95,29 @@ function pluginViewServe(): Plugin {
 // must be a hostname (IPs are rejected). Browse via the hostname and set
 // TWODB_ADMIN_RP_ID / TWODB_ADMIN_ORIGIN in .env to match.
 
+// Production import map: plugin view bundles keep react/react-query/
+// shared-frontend external; in the built app they resolve through this map
+// to the vendored single-file ESMs the api serves at /vendor — one module
+// instance for shell and plugins alike, exactly like the dev transform
+// pipeline guarantees.
+function prodImportMap(): Plugin {
+  return {
+    name: "twodb-prod-import-map",
+    apply: "build",
+    transformIndexHtml(html) {
+      const mapPath = path.resolve(import.meta.dirname, "../api/vendor/import-map.json");
+      let map: string;
+      try {
+        map = fs.readFileSync(mapPath, "utf8").trim();
+      } catch {
+        console.warn("[vite] apps/api/vendor/import-map.json missing — run node scripts/vendor-deps.mjs before building");
+        map = JSON.stringify({ imports: {} });
+      }
+      return html.replace("</head>", `<script type="importmap">${map}</script></head>`);
+    },
+  };
+}
+
 const certsDir = path.resolve(import.meta.dirname, "../../.work/certs");
 const certPath = path.join(certsDir, "dev.crt");
 const keyPath = path.join(certsDir, "dev.key");
@@ -140,6 +163,7 @@ if (useHttps) await ensureDevCert();
 export default defineConfig({
   plugins: [
     pluginViewServe(),
+    prodImportMap(),
     react({
       babel: {
         // styled-jsx: scoped component styles via `<style jsx>` / css``.
