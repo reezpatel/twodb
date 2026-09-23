@@ -17,11 +17,13 @@ import react from "@vitejs/plugin-react";
 const PLUGIN_VIEW_URL_PREFIX = "/@twodb-plugin-view/";
 
 function pluginViewServe(): Plugin {
-  const repoRoot = path.resolve(import.meta.dirname, "../..");
   const byIdentifier = new Map<string, string>();
 
-  const scan = () => {
-    const pluginsDir = path.join(repoRoot, "plugins");
+  // NOTE: import.meta.dirname is unreliable here — vite transpiles the config
+  // and the value can point elsewhere. Anchor on server.config.root (= apps/web)
+  // which is always correct.
+  const scan = (webRoot: string) => {
+    const pluginsDir = path.resolve(webRoot, "../../plugins");
     let groups: string[];
     try {
       groups = fs.readdirSync(pluginsDir);
@@ -52,13 +54,20 @@ function pluginViewServe(): Plugin {
     name: "twodb-plugin-view-serve",
     apply: "serve",
     configureServer(server) {
+      const webRoot = server.config.root;
       server.middlewares.use(async (req, res, next) => {
-        const match = new RegExp(`^${PLUGIN_VIEW_URL_PREFIX}(.+)/main.js$`).exec(decodeURIComponent(req.url ?? ""));
+        const url = decodeURIComponent(req.url ?? "").split("?")[0];
+        const match = new RegExp(`^${PLUGIN_VIEW_URL_PREFIX}(.+)/main\\.js$`).exec(url);
         if (!match) return next();
 
-        if (byIdentifier.size === 0) scan();
+        // Plugin .build dirs are deleted and rewritten by their watchers, so a
+        // map built at boot can go stale — rescan on a miss before giving up.
         const identifier = match[1];
-        const buildDir = byIdentifier.get(identifier);
+        let buildDir = byIdentifier.get(identifier);
+        if (!buildDir || !fs.existsSync(path.join(buildDir, "view", "main.js"))) {
+          scan(webRoot);
+          buildDir = byIdentifier.get(identifier);
+        }
         const entry = buildDir ? path.join(buildDir, "view", "main.js") : null;
         if (!entry || !fs.existsSync(entry)) {
           res.statusCode = 404;
