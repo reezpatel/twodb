@@ -64,6 +64,9 @@ for (const target of TARGETS) {
   if (target.spec === "react") {
     const names = Object.keys(nodeRequire("react"));
     contents = `import d from "react";\nexport default d;\nexport const { ${names.join(", ")} } = d;\n`;
+  } else if (target.spec === "react/jsx-runtime" || target.spec === "react/jsx-dev-runtime") {
+    const names = Object.keys(nodeRequire(target.spec));
+    contents = `import d from ${JSON.stringify(target.spec)};\nexport default d;\nexport const { ${names.join(", ")} } = d;\n`;
   } else {
     contents = target.withDefault
       ? `import d from ${JSON.stringify(target.spec)};\nexport default d;\nexport * from ${JSON.stringify(target.spec)};\n`
@@ -80,6 +83,7 @@ for (const target of TARGETS) {
     outfile: path.join(outdir, target.file),
     external: Object.keys(target.external),
     plugins: [dropFonts, styledJsx],
+    define: target.spec === "react/jsx-dev-runtime" ? { "process.env.NODE_ENV": '"development"' } : undefined,
     minify: true,
     logLevel: "warning",
   });

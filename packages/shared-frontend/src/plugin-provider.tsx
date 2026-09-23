@@ -41,9 +41,7 @@ const getViewPlugin = async (id: string): Promise<{ view: ViewPlugin; styles: st
     // IS the production marker. Dev has none and loads plugin views through
     // vite's transform middleware instead, which owns module identity.
     const hasImportMap = typeof document !== "undefined" && document.querySelector('script[type="importmap"]') !== null;
-    const viewUrl = hasImportMap
-      ? `/api/v1/plugins/${encodeURIComponent(id)}/view/main.js`
-      : `/@twodb-plugin-view/${encodeURIComponent(id)}/main.js`;
+    const viewUrl = hasImportMap ? `/api/v1/plugins/${encodeURIComponent(id)}/view/main.js` : `/@twodb-plugin-view/${encodeURIComponent(id)}/main.js`;
     const m = (await import(/* @vite-ignore */ viewUrl)) as {
       default?: ViewPlugin;
     };
