@@ -6,9 +6,7 @@ const readTokenFile = (): string => {
   try {
     return fs.readFileSync(file, "utf8").trim();
   } catch (error) {
-    console.error(
-      `[node] cannot read TWODB_NODE_TOKEN_FILE (${file}): ${error instanceof Error ? error.message : String(error)}`,
-    );
+    console.error(`[node] cannot read TWODB_NODE_TOKEN_FILE (${file}): ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 };
