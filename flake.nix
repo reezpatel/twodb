@@ -70,7 +70,8 @@
                 TWODB_STATIC_DIR = "${cfg.package}/share/twodb/web-dist";
                 TWODB_VENDOR_DIR = "${cfg.package}/share/twodb/vendor";
                 TWODB_PLUGINS_DIR = "${cfg.package}/share/twodb/plugins";
-              } // cfg.extraEnvironment;
+              }
+              // cfg.extraEnvironment;
               serviceConfig = {
                 ExecStart = "${cfg.package}/bin/twodb-server";
                 DynamicUser = true;
