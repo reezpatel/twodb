@@ -88,7 +88,7 @@
         version = "0.0.9";
         serverSrc = pkgs.fetchurl {
           url = "https://github.com/reezpatel/twodb/releases/download/v${version}/twodb-server-v${version}.tar.gz";
-          sha256 = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          sha256 = "0p06ip4ajhfxxf9ym29zbjwswsn5d8z47vlknycdca1axqa82bv0";
         };
         nodeAsset =
           {
@@ -100,10 +100,10 @@
           .${system} or (throw "twodb-node: unsupported system ${system}");
         nodeHash =
           {
-            "x86_64-linux" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-            "aarch64-linux" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-            "x86_64-darwin" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-            "aarch64-darwin" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+            "x86_64-linux" = "1ah6bxf9sifi7gjhwk1lrk0bipy23hi21rl9vl9paar2jvq4zz12";
+            "aarch64-linux" = "0is3fyvac8yplii63acdxl1mvqx4r7kr6piisxq3qpch338njkcn";
+            "x86_64-darwin" = "0y6px4ymdwiy5rfqamydx151cncyc80kc9ggb41iqjrrh4yjcq3r";
+            "aarch64-darwin" = "1qbalksdbk15khq4li4x90zpnk6l035ljlxj95j8y9s6fs7j269h";
           }
           .${system} or (throw "twodb-node: unsupported system ${system}");
         nodeSrc = pkgs.fetchurl {
