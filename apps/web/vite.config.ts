@@ -170,17 +170,24 @@ const useHttps = process.env.TWODB_WEB_HTTPS === "1" || rootEnv.TWODB_WEB_HTTPS 
 if (useHttps) await ensureDevCert();
 
 // The app build keeps the shared runtime set external so app and plugin
-// bundles resolve the SAME modules through the import map (one react for
-// everyone — mixed instances crash hooks with null dispatchers).
-const SHARED_EXTERNALS = [
-  "react",
-  "react/jsx-runtime",
-  "react/jsx-dev-runtime",
-  "react-dom",
-  "react-dom/client",
-  "@tanstack/react-query",
-  "@twodb/shared-frontend",
-];
+// bundles resolve the SAME modules through the import map (one react, one
+// router for everyone — mixed instances crash hooks with null dispatchers
+// and duplicate router contexts). Function form so subpaths and pre-resolved
+// absolute ids cannot slip through.
+const sharedExternal = (id: string) =>
+  id === "react" ||
+  id.startsWith("react/") ||
+  id === "react-dom" ||
+  id.startsWith("react-dom/") ||
+  id === "@tanstack/react-query" ||
+  id === "react-router" ||
+  id.startsWith("react-router/") ||
+  id === "@twodb/shared-frontend" ||
+  id.includes("/node_modules/react/") ||
+  id.includes("/node_modules/react-dom/") ||
+  id.includes("/node_modules/react-router/") ||
+  id.includes("/node_modules/@tanstack/react-query/") ||
+  id.includes("/node_modules/@twodb/shared-frontend/");
 
 export default defineConfig({
   plugins: [
@@ -196,7 +203,7 @@ export default defineConfig({
   ],
   build: {
     rollupOptions: {
-      external: SHARED_EXTERNALS,
+      external: sharedExternal,
       output: {
         format: "esm",
       },
