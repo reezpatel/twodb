@@ -169,6 +169,19 @@ const rootEnv = loadEnv("development", path.resolve(import.meta.dirname, "../.."
 const useHttps = process.env.TWODB_WEB_HTTPS === "1" || rootEnv.TWODB_WEB_HTTPS === "1";
 if (useHttps) await ensureDevCert();
 
+// The app build keeps the shared runtime set external so app and plugin
+// bundles resolve the SAME modules through the import map (one react for
+// everyone — mixed instances crash hooks with null dispatchers).
+const SHARED_EXTERNALS = [
+  "react",
+  "react/jsx-runtime",
+  "react/jsx-dev-runtime",
+  "react-dom",
+  "react-dom/client",
+  "@tanstack/react-query",
+  "@twodb/shared-frontend",
+];
+
 export default defineConfig({
   plugins: [
     pluginViewServe(),
@@ -181,6 +194,14 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      external: SHARED_EXTERNALS,
+      output: {
+        format: "esm",
+      },
+    },
+  },
   server: {
     port: 5173,
     strictPort: true,

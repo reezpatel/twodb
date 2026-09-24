@@ -15,16 +15,30 @@ const REACT_EXTERNAL = {
   "react/jsx-dev-runtime": "react/jsx-dev-runtime",
 };
 
+const REQUIRE_SHIM =
+  'import * as __vendor_react from "react";const require=(id)=>{if(id==="react")return __vendor_react;throw new Error("vendor: unexpected require "+id)};';
+
 const TARGETS = [
   { spec: "react", file: "react.js", withDefault: true, external: {} },
   { spec: "react/jsx-runtime", file: "react-jsx-runtime.js", withDefault: false, external: {} },
   { spec: "react/jsx-dev-runtime", file: "react-jsx-dev-runtime.js", withDefault: false, external: {} },
-  { spec: "@tanstack/react-query", file: "tanstack-react-query.js", withDefault: false, external: REACT_EXTERNAL },
+  { spec: "react-dom", file: "react-dom.js", withDefault: true, external: REACT_EXTERNAL, banner: REQUIRE_SHIM },
+  { spec: "react-dom/client", file: "react-dom-client.js", withDefault: true, external: { ...REACT_EXTERNAL, "react-dom": "react-dom" }, banner: REQUIRE_SHIM },
+  { spec: "@tanstack/react-query", file: "tanstack-react-query.js", withDefault: false, external: REACT_EXTERNAL, banner: REQUIRE_SHIM },
+  { spec: "react-router", file: "react-router.js", withDefault: false, external: REACT_EXTERNAL, banner: REQUIRE_SHIM },
+  {
+    spec: "react-router/dom",
+    file: "react-router-dom.js",
+    withDefault: false,
+    external: { ...REACT_EXTERNAL, "react-router": "react-router" },
+    banner: REQUIRE_SHIM,
+  },
   {
     spec: "@twodb/shared-frontend",
     file: "twodb-shared-frontend.js",
     withDefault: false,
     external: { ...REACT_EXTERNAL, "@tanstack/react-query": "@tanstack/react-query" },
+    banner: REQUIRE_SHIM,
     resolveDir: path.join(root, "../packages/shared-frontend"),
   },
 ];
@@ -83,6 +97,7 @@ for (const target of TARGETS) {
     outfile: path.join(outdir, target.file),
     external: Object.keys(target.external),
     plugins: [dropFonts, styledJsx],
+    banner: target.banner ? { js: target.banner } : undefined,
     define: target.spec === "react/jsx-dev-runtime" ? { "process.env.NODE_ENV": '"development"' } : undefined,
     minify: true,
     logLevel: "warning",
@@ -94,7 +109,11 @@ const importMap = {
     react: "/vendor/react.js",
     "react/jsx-runtime": "/vendor/react-jsx-runtime.js",
     "react/jsx-dev-runtime": "/vendor/react-jsx-dev-runtime.js",
+    "react-dom": "/vendor/react-dom.js",
+    "react-dom/client": "/vendor/react-dom-client.js",
     "@tanstack/react-query": "/vendor/tanstack-react-query.js",
+    "react-router": "/vendor/react-router.js",
+    "react-router/dom": "/vendor/react-router-dom.js",
     "@twodb/shared-frontend": "/vendor/twodb-shared-frontend.js",
   },
 };
