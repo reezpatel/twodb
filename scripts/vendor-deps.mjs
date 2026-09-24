@@ -78,7 +78,12 @@ for (const target of TARGETS) {
   if (target.spec === "react") {
     const names = Object.keys(nodeRequire("react"));
     contents = `import d from "react";\nexport default d;\nexport const { ${names.join(", ")} } = d;\n`;
-  } else if (target.spec === "react/jsx-runtime" || target.spec === "react/jsx-dev-runtime") {
+  } else if (
+    target.spec === "react/jsx-runtime" ||
+    target.spec === "react/jsx-dev-runtime" ||
+    target.spec === "react-dom" ||
+    target.spec === "react-dom/client"
+  ) {
     const names = Object.keys(nodeRequire(target.spec));
     contents = `import d from ${JSON.stringify(target.spec)};\nexport default d;\nexport const { ${names.join(", ")} } = d;\n`;
   } else {
