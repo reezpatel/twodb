@@ -89,7 +89,7 @@
         version = "0.0.14";
         serverSrc = pkgs.fetchurl {
           url = "https://github.com/reezpatel/twodb/releases/download/v${version}/twodb-server-v${version}.tar.gz";
-          sha256 = "0swr8lkr9d5y5x0nwxcwp0zg2f088swjfvlz2ypvbqipdbmsrp6n";
+          sha256 = "0xh9wd5ils1agc77jrm1vb7wrcavm19gjrbq4s1zls4xfgikw2xm";
         };
         nodeAsset =
           {
