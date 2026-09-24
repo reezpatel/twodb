@@ -23,16 +23,9 @@ const TARGETS = [
   { spec: "react/jsx-runtime", file: "react-jsx-runtime.js", withDefault: false, external: {} },
   { spec: "react/jsx-dev-runtime", file: "react-jsx-dev-runtime.js", withDefault: false, external: {} },
   { spec: "react-dom", file: "react-dom.js", withDefault: true, external: REACT_EXTERNAL, banner: REQUIRE_SHIM },
-  { spec: "react-dom/client", file: "react-dom-client.js", withDefault: true, external: { ...REACT_EXTERNAL, "react-dom": "react-dom" }, banner: REQUIRE_SHIM },
+  { spec: "react-dom/client", file: "react-dom-client.js", withDefault: true, external: REACT_EXTERNAL, banner: REQUIRE_SHIM },
   { spec: "@tanstack/react-query", file: "tanstack-react-query.js", withDefault: false, external: REACT_EXTERNAL, banner: REQUIRE_SHIM },
   { spec: "react-router", file: "react-router.js", withDefault: false, external: REACT_EXTERNAL, banner: REQUIRE_SHIM },
-  {
-    spec: "react-router/dom",
-    file: "react-router-dom.js",
-    withDefault: false,
-    external: { ...REACT_EXTERNAL, "react-router": "react-router" },
-    banner: REQUIRE_SHIM,
-  },
   {
     spec: "@twodb/shared-frontend",
     file: "twodb-shared-frontend.js",
@@ -94,7 +87,7 @@ for (const target of TARGETS) {
   const entry = contents;
 
   await build({
-    stdin: { contents: entry, resolveDir: target.resolveDir ?? path.join(root, "../apps/api"), loader: "js" },
+    stdin: { contents: entry, resolveDir: target.resolveDir ?? path.join(root, "../apps/web"), loader: "js" },
     bundle: true,
     format: "esm",
     platform: "browser",
@@ -124,6 +117,14 @@ const importMap = {
 };
 
 await fs.writeFile(path.join(outdir, "import-map.json"), `${JSON.stringify(importMap, null, 2)}\n`);
+
+// react-router/dom as a static re-export of the bundled react-router root —
+// bundling it via esbuild self-externalizes (external "react-router" covers
+// subpaths). Everything the app uses (RouterProvider et al.) is in the root.
+await fs.writeFile(
+  path.join(outdir, "react-router-dom.js"),
+  'export * from "react-router";\n',
+);
 
 const sizes = await Promise.all(
   (await fs.readdir(outdir)).map(async (file) => `${file} (${((await fs.stat(path.join(outdir, file))).size / 1024).toFixed(1)} kB)`),
