@@ -30,7 +30,12 @@ const TARGETS = [
     spec: "@twodb/shared-frontend",
     file: "twodb-shared-frontend.js",
     withDefault: false,
-    external: { ...REACT_EXTERNAL, "@tanstack/react-query": "@tanstack/react-query" },
+    external: {
+      ...REACT_EXTERNAL,
+      "@tanstack/react-query": "@tanstack/react-query",
+      "react-router": "react-router",
+      "react-router/dom": "react-router/dom",
+    },
     banner: REQUIRE_SHIM,
     resolveDir: path.join(root, "../packages/shared-frontend"),
   },
@@ -121,10 +126,7 @@ await fs.writeFile(path.join(outdir, "import-map.json"), `${JSON.stringify(impor
 // react-router/dom as a static re-export of the bundled react-router root —
 // bundling it via esbuild self-externalizes (external "react-router" covers
 // subpaths). Everything the app uses (RouterProvider et al.) is in the root.
-await fs.writeFile(
-  path.join(outdir, "react-router-dom.js"),
-  'export * from "react-router";\n',
-);
+await fs.writeFile(path.join(outdir, "react-router-dom.js"), 'export * from "react-router";\n');
 
 const sizes = await Promise.all(
   (await fs.readdir(outdir)).map(async (file) => `${file} (${((await fs.stat(path.join(outdir, file))).size / 1024).toFixed(1)} kB)`),
