@@ -102,19 +102,37 @@ async function collectZai(connection: LlmConnectionTable): Promise<QuotaSnapshot
     const limit = asRecord(raw);
     if (!limit) continue;
     const percentage = finite(limit.percentage);
-    if (percentage === undefined) continue;
     const type = typeof limit.type === "string" ? limit.type : "";
     const unitCode = finite(limit.unit);
     let quotaType: string | null = null;
-    if (type === "TOKENS_LIMIT") {
+    if (type === "TOKENS_LIMIT" || type === "CREDIT_LIMIT") {
       if (unitCode === 3) quotaType = "5h";
       else if (unitCode === 4) quotaType = "daily";
-      else if (unitCode === 6) quotaType = "weekly";
+      else if (unitCode === 6) quotaType = type === "CREDIT_LIMIT" ? "monthly" : "weekly";
     } else if (type === "TIME_LIMIT") {
       quotaType = "monthly";
     }
     if (!quotaType) continue;
     const resetMs = finite(limit.nextResetTime);
+
+    if (type === "CREDIT_LIMIT") {
+      // credit plans report real values: usage = credits per window, currentValue = consumed
+      const total = finite(limit.usage);
+      const used = finite(limit.currentValue) ?? finite(limit.used);
+      if (total !== undefined && used !== undefined) {
+        snap.push({
+          quotaType,
+          groupName: "default",
+          unit: "credits",
+          quotaTotal: total,
+          quotaUsed: Math.max(0, used),
+          resetAt: resetMs && resetMs > 0 ? new Date(resetMs) : null,
+        });
+        continue;
+      }
+    }
+
+    if (percentage === undefined) continue;
     snap.push({
       quotaType,
       groupName: "default",
