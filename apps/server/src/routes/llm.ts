@@ -359,7 +359,7 @@ async function collectCline(connection: LlmConnectionTable): Promise<QuotaSnapsh
     authorization: `Bearer ${key}`,
   });
   const data = asRecord(asRecord(json)?.data) ?? asRecord(json);
-  if (!data) throw new Error(`unrecognized usage payload (keys: ${Object.keys(json ?? {}).join(",") || "(empty)"})`);
+  if (!data) throw new Error(`unrecognized usage payload: ${JSON.stringify(json).slice(0, 250)}`);
 
   const snap: QuotaSnapshot[] = [];
 
@@ -401,7 +401,7 @@ async function collectCline(connection: LlmConnectionTable): Promise<QuotaSnapsh
     }
   }
 
-  if (snap.length === 0) throw new Error(`unrecognized usage payload (keys: ${Object.keys(data).join(",")})`);
+  if (snap.length === 0) throw new Error(`unrecognized usage payload: ${JSON.stringify(data).slice(0, 250)}`);
   return snap;
 }
 
