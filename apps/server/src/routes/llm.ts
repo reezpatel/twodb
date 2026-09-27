@@ -330,7 +330,7 @@ async function collectKilo(connection: LlmConnectionTable): Promise<QuotaSnapsho
   const apiKey = config.api_key ?? config.apiKey;
   if (!apiKey) throw new Error("missing API key");
 
-  const json = (await fetchJson("https://api.kilo.ai/api/profile/balance", {
+  const json = (await fetchJson("https://app.kilo.ai/api/profile/balance", {
     authorization: `Bearer ${apiKey}`,
   })) as { balance?: unknown; isDepleted?: unknown };
 
