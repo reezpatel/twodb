@@ -195,6 +195,14 @@ CREATE TABLE IF NOT EXISTS llm_model (
     thinking boolean DEFAULT false NOT NULL,
     input text[] DEFAULT '{}'::text[] NOT NULL,
     "thinkingLevel" text[] DEFAULT '{}'::text[] NOT NULL,
+    temperature boolean DEFAULT false NOT NULL,
+    "limitContext" integer,
+    "limitInput" integer,
+    "limitOutput" integer,
+    "costInput" double precision,
+    "costOutput" double precision,
+    "costCacheRead" double precision,
+    output text[] DEFAULT '{}'::text[] NOT NULL,
     "createdAt" timestamp with time zone NOT NULL
 );
 CREATE TABLE IF NOT EXISTS llm_usage_event (
@@ -577,13 +585,24 @@ ALTER TABLE ONLY storage_bucket
     ADD CONSTRAINT "storage_bucket_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
 ALTER TABLE ONLY storage_entry
     ADD CONSTRAINT "storage_entry_bucketId_fkey" FOREIGN KEY ("bucketId") REFERENCES storage_bucket(id) ON DELETE CASCADE;
+ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS temperature boolean DEFAULT false NOT NULL;
+ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "limitContext" integer;
+ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "limitInput" integer;
+ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "limitOutput" integer;
+ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "costInput" double precision;
+ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "costOutput" double precision;
+ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "costCacheRead" double precision;
+ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS output text[] DEFAULT '{}'::text[] NOT NULL;
+
 `;
 
 const TOLERATED_CODES = new Set(["42P06", "42P07", "42P16", "42701", "42710"]);
 
 export async function ensureSchema(db: Kysely<Database>): Promise<void> {
   await sql`CREATE SCHEMA IF NOT EXISTS twodb`.execute(db);
-  for (const statement of SCHEMA_SQL.split(";\n").map((s) => s.trim()).filter(Boolean)) {
+  for (const statement of SCHEMA_SQL.split(";\n")
+    .map((s) => s.trim())
+    .filter(Boolean)) {
     try {
       await sql.raw(statement).execute(db);
     } catch (e) {

@@ -272,6 +272,14 @@ export interface LlmModelTable {
   thinking: boolean;
   input: ("text" | "image" | "video")[];
   thinkingLevel: string[];
+  temperature: boolean;
+  limitContext: number | null;
+  limitInput: number | null;
+  limitOutput: number | null;
+  costInput: number | null;
+  costOutput: number | null;
+  costCacheRead: number | null;
+  output: string[];
   createdAt: Date;
 }
 

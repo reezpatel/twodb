@@ -1,6 +1,7 @@
 import { db } from "../auth";
 import type { LlmConnectionTable } from "../plugins/db";
 import { getProvider, providerAuthHeaders, providerBaseUrl } from "./llm-providers";
+import { modelsDevCatalog, modelsDevLookup, type ModelsDevModel } from "./models-dev";
 
 interface FetchedModel {
   modelId: string;
@@ -9,6 +10,39 @@ interface FetchedModel {
   thinking: boolean;
   input: ("text" | "image" | "video")[];
   thinkingLevel: string[];
+  temperature: boolean;
+  limitContext: number | null;
+  limitInput: number | null;
+  limitOutput: number | null;
+  costInput: number | null;
+  costOutput: number | null;
+  costCacheRead: number | null;
+  output: string[];
+}
+
+const MODALITIES = new Set(["text", "image", "video"]);
+
+function enrich(base: FetchedModel, meta: ModelsDevModel | undefined): FetchedModel {
+  if (!meta) return base;
+  const reasoning = meta.reasoning;
+  const thinking = reasoning === true || (meta.reasoning_options?.some((o) => (o.values?.length ?? 0) > 0) ?? false);
+  const thinkingLevel = (meta.reasoning_options ?? []).flatMap((o) => o.values ?? []).filter((v) => typeof v === "string");
+  return {
+    ...base,
+    displayName: base.displayName ?? (typeof meta.name === "string" && meta.name ? meta.name : null),
+    contextWindow: base.contextWindow ?? meta.limit?.context ?? null,
+    thinking: base.thinking || thinking,
+    input: base.input.length > 0 ? base.input : (meta.modalities?.input ?? []).filter((m): m is "text" | "image" | "video" => MODALITIES.has(m)),
+    thinkingLevel: thinkingLevel.length > 0 ? thinkingLevel : base.thinkingLevel,
+    temperature: meta.temperature === true,
+    limitContext: meta.limit?.context ?? null,
+    limitInput: meta.limit?.input ?? null,
+    limitOutput: meta.limit?.output ?? null,
+    costInput: meta.cost?.input ?? null,
+    costOutput: meta.cost?.output ?? null,
+    costCacheRead: meta.cost?.cache_read ?? null,
+    output: meta.modalities?.output ?? [],
+  };
 }
 
 async function fetchProviderModels(connection: LlmConnectionTable): Promise<FetchedModel[]> {
@@ -51,23 +85,31 @@ async function fetchProviderModels(connection: LlmConnectionTable): Promise<Fetc
       thinking: false,
       input: [] as ("text" | "image" | "video")[],
       thinkingLevel: [] as string[],
+      temperature: false,
+      limitContext: null,
+      limitInput: null,
+      limitOutput: null,
+      costInput: null,
+      costOutput: null,
+      costCacheRead: null,
+      output: [] as string[],
     }));
 }
 
 /**
- * Refreshes a connection's model list from the provider. Falls back to the
- * provider's static model list when the API is unreachable or unimplemented,
- * so dropdowns are never empty for known providers.
+ * Refreshes a connection's model list from the provider, enriched with
+ * models.dev metadata (limits, costs, modalities, temperature support).
+ * Falls back to the provider's static list so dropdowns are never empty.
  */
 export async function refreshConnectionModels(connection: LlmConnectionTable): Promise<{ count: number; warning?: string }> {
   const provider = getProvider(connection.provider);
   let models: FetchedModel[] = [];
-  let warning: string | undefined;
+  const warnings: string[] = [];
 
   try {
     models = await fetchProviderModels(connection);
   } catch (e) {
-    warning = (e as Error).message;
+    warnings.push((e as Error).message);
   }
 
   if (models.length === 0 && provider && provider.models.length > 0) {
@@ -78,7 +120,22 @@ export async function refreshConnectionModels(connection: LlmConnectionTable): P
       thinking: false,
       input: [] as ("text" | "image" | "video")[],
       thinkingLevel: [] as string[],
+      temperature: false,
+      limitContext: null,
+      limitInput: null,
+      limitOutput: null,
+      costInput: null,
+      costOutput: null,
+      costCacheRead: null,
+      output: [] as string[],
     }));
+  }
+
+  const catalog = await modelsDevCatalog();
+  if (catalog) {
+    models = models.map((m) => enrich(m, modelsDevLookup(catalog, connection.provider, m.modelId)));
+  } else if (models.length > 0) {
+    warnings.push("models.dev metadata unavailable");
   }
 
   const now = new Date();
@@ -97,11 +154,19 @@ export async function refreshConnectionModels(connection: LlmConnectionTable): P
           thinking: m.thinking,
           input: m.input,
           thinkingLevel: m.thinkingLevel,
+          temperature: m.temperature,
+          limitContext: m.limitContext,
+          limitInput: m.limitInput,
+          limitOutput: m.limitOutput,
+          costInput: m.costInput,
+          costOutput: m.costOutput,
+          costCacheRead: m.costCacheRead,
+          output: m.output,
           createdAt: now,
         })),
       )
       .execute();
   }
 
-  return { count: models.length, warning };
+  return { count: models.length, warning: warnings.length > 0 ? warnings.join("; ") : undefined };
 }
