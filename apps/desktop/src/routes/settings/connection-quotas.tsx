@@ -51,9 +51,7 @@ export function ConnectionQuotas({ connectionId, provider }: { connectionId: str
         return (
           <div key={q.id} className="flex items-center gap-2">
             <span className="text-muted-foreground w-12 shrink-0 text-[11px] font-medium">{q.quotaType}</span>
-            {pct !== null && (
-              <Progress value={pct} className="h-1.5 w-20 shrink-0" aria-label={`${q.quotaType} quota ${pct}%`} />
-            )}
+            {pct !== null && <Progress value={pct} className="h-1.5 w-20 shrink-0" aria-label={`${q.quotaType} quota ${pct}%`} />}
             <span
               className={cn(
                 "text-[11px]",

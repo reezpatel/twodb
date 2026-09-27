@@ -71,6 +71,17 @@ export function useLlm() {
     mutationFn: (id: string) => api<ConnectionTestResult>(`/api/llm/connections/${id}/test`, { method: "POST", body: "{}" }),
   });
 
+  const refreshAllQuotas = useMutation({
+    mutationFn: async () => {
+      const list = connections.data ?? [];
+      const results = await Promise.allSettled(
+        list.map((connection) => api(`/api/llm/connections/${connection.id}/refresh-quotas`, { method: "POST", body: "{}" })),
+      );
+      return { total: list.length, refreshed: results.filter((r) => r.status === "fulfilled").length };
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["llm", "quotas"] }),
+  });
+
   const remove = useMutation({
     mutationFn: (id: string) => api(`/api/llm/connections/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
@@ -99,6 +110,7 @@ export function useLlm() {
     toggle,
     refreshAll,
     refreshOne,
+    refreshAllQuotas,
     testConnection,
     actionError,
     onSaved,

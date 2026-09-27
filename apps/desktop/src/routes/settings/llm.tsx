@@ -1,4 +1,4 @@
-import { FlaskConical, Loader2, RotateCw, Table2 } from "lucide-react";
+import { FlaskConical, Gauge, Loader2, RotateCw, Table2 } from "lucide-react";
 import { useState } from "react";
 import { ConnectionForm } from "./connection-form";
 import { ConnectionModelsDialog } from "./connection-models-dialog";
@@ -23,6 +23,7 @@ export function LlmSection() {
     toggle,
     refreshAll,
     refreshOne,
+    refreshAllQuotas,
     testConnection,
     actionError,
     onSaved,
@@ -49,6 +50,16 @@ export function LlmSection() {
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">LLM connections</h3>
           <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Collect quota/limit windows (Claude Code) for all connections"
+              onClick={() => refreshAllQuotas.mutate()}
+              disabled={refreshAllQuotas.isPending || (connections.data ?? []).length === 0}
+            >
+              {refreshAllQuotas.isPending ? <Loader2 className="animate-spin" /> : <Gauge />}
+              Refresh quotas
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => refreshAll.mutate()} disabled={refreshAll.isPending}>
               {refreshAll.isPending ? <Loader2 className="animate-spin" /> : <RotateCw />}
               Refresh all models
