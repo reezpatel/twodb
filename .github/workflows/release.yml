@@ -278,6 +278,53 @@ jobs:
           git -C tap commit -m "twodb ${GITHUB_REF_NAME}"
           git -C tap push origin HEAD:main
 
+  server-bundles:
+    needs: check
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-24.04
+            arch: x64
+          - platform: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4 # zizmor: ignore[unpinned-uses]
+
+      - name: Set up Node
+        uses: actions/setup-node@v4 # zizmor: ignore[unpinned-uses,cache-poisoning]
+        with:
+          node-version: 22
+
+      - name: Deploy server with dependencies and web UI
+        run: |
+          pnpm install --frozen-lockfile --filter @twodb/server --filter @twodb/desktop
+          pnpm --filter @twodb/desktop build
+          pnpm --filter @twodb/server deploy --legacy stage/twodb-server
+          cp -r apps/desktop/dist stage/twodb-server/public
+          cp -r apps/server/src stage/twodb-server/src
+          cp -r apps/server/scripts stage/twodb-server/scripts
+          cp -r apps/server/migrations stage/twodb-server/migrations
+          mkdir -p stage/twodb-server/bin
+          printf '#!/bin/sh\nDIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"\nexec node "$DIR/node_modules/tsx/dist/cli.mjs" "$DIR/src/index.ts" "$@"\n' > stage/twodb-server/bin/twodb-server
+          printf '#!/bin/sh\nDIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"\nexec node "$DIR/node_modules/tsx/dist/cli.mjs" "$DIR/scripts/migrate.ts" "$@"\n' > stage/twodb-server/bin/twodb-migrate
+          chmod +x stage/twodb-server/bin/twodb-server stage/twodb-server/bin/twodb-migrate
+          tar -czf "twodb-server_${GITHUB_REF_NAME#v}_linux-${{ matrix.arch }}.tar.gz" -C stage twodb-server
+
+      - name: Upload bundle to release
+        uses: softprops/action-gh-release@v2 # zizmor: ignore[unpinned-uses]
+        with:
+          files: twodb-server_*
+
   runner-bundles:
     needs: check
     permissions:
