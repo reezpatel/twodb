@@ -17,3 +17,8 @@ README.md
 DESIGN.md
 PRODUCT.md
 plan.md
+
+# rust / build artifacts
+result
+result-*
+**/target

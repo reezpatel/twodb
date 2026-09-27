@@ -1,19 +1,14 @@
 packages:
   - "apps/*"
-  - "packages/*"
-  - "plugins/*"
-  - "plugins/identity/view"
-  - "plugins/agent-providers/*"
-  - "plugins/llm-adapters/*"
-  - "stack/*"
-  - "libs/*"
 
 onlyBuiltDependencies:
   - esbuild
 allowBuilds:
   "@google/genai": false
+  "@prisma/client": false
   better-sqlite3: true
   esbuild: true
+  node-pty: true
   protobufjs: false
 minimumReleaseAgeExclude:
   - pg-protocol@1.16.0

@@ -1,0 +1,471 @@
+/* Issue Kanban mock — drag-and-drop issues board */
+
+.mock-kanban {
+  /* curated teal for the Done phase */
+  --mk-done: #3ecfae;
+
+  display: flex;
+  width: 100%;
+  height: 780px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+/* ==================== RAIL ==================== */
+
+.mock-kanban__brand {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1.5px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 999px;
+  color: var(--color-foreground);
+}
+
+.mock-kanban__brand svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+}
+
+.mock-kanban__railspacer {
+  flex: 1;
+}
+
+/* ==================== HEADER ==================== */
+
+.mock-kanban__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mock-kanban__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 32px 32px 16px;
+}
+
+.mock-kanban__crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-kanban__crumbs svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.8;
+}
+
+.mock-kanban__crumbs-here {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.mock-kanban__head h1 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+/* ==================== TOOLBAR ==================== */
+
+.mock-kanban__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 32px 16px;
+}
+
+.mock-kanban__toolbar button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.mock-kanban__menu-tick {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+}
+
+.mock-kanban__summary {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==================== BOARD ==================== */
+
+.mock-kanban__board {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(230px, 1fr));
+  gap: 16px;
+  padding: 0 32px 24px;
+  min-height: 0;
+  overflow-x: auto;
+}
+
+.mock-kanban__col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.mock-kanban__col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 10px;
+}
+
+.mock-kanban__col-head [data-slot="button"] {
+  margin-left: auto;
+}
+
+.mock-kanban__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.mock-kanban__dot--todo {
+  background: var(--color-muted-foreground);
+}
+
+.mock-kanban__dot--week {
+  background: var(--color-magenta-300);
+}
+
+.mock-kanban__dot--progress {
+  background: var(--color-primary);
+}
+
+.mock-kanban__dot--done {
+  background: var(--mk-done);
+}
+
+.mock-kanban__col-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mock-kanban__col-count {
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.mock-kanban__col-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 2px 8px;
+  border-radius: 10px;
+  transition: background 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-kanban__col.is-drop .mock-kanban__col-body {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+}
+
+/* ==================== ADD ZONE / COMPOSER ==================== */
+
+.mock-kanban__add {
+  display: grid;
+  place-items: center;
+  min-height: 46px;
+  border: 1.5px dashed color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  transition:
+    border-color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-kanban__add:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+}
+
+.mock-kanban__add svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+}
+
+.mock-kanban__add--editing {
+  display: flex;
+  padding: 0 12px;
+  border-color: var(--color-primary);
+  cursor: text;
+}
+
+.mock-kanban__add--editing input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-foreground);
+  outline: none;
+}
+
+.mock-kanban__add--editing input::placeholder {
+  color: var(--color-muted-foreground);
+}
+
+/* ==================== CARD ==================== */
+
+.mock-kanban__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mock-kanban__tilt {
+  transition:
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-kanban__tilt.is-dragging {
+  transform: rotate(2.5deg);
+  opacity: 0.45;
+}
+
+.mock-kanban__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-card);
+  cursor: grab;
+  transition:
+    border-color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-kanban__card:hover {
+  border-color: color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  box-shadow: 0 14px 32px -10px rgb(0 0 0 / 0.5);
+}
+
+.mock-kanban__card:active {
+  cursor: grabbing;
+}
+
+.mock-kanban__card.is-selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-ring);
+}
+
+.mock-kanban__card.is-done {
+  opacity: 0.72;
+}
+
+.mock-kanban__card.is-done:hover {
+  opacity: 1;
+}
+
+.mock-kanban__card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* pills */
+.mock-kanban__pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.mock-kanban__cat {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mock-kanban__cat--admin {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+}
+
+.mock-kanban__cat--design {
+  background: color-mix(in oklab, var(--color-magenta-400) 14%, transparent);
+  color: var(--color-magenta-300);
+}
+
+.mock-kanban__cat--devops {
+  background: var(--color-magenta-300);
+  color: #121218;
+}
+
+.mock-kanban__cat--research {
+  background: var(--color-muted);
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+/* subtasks */
+.mock-kanban__subtasks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--color-card);
+}
+
+.mock-kanban__subtask label {
+  font-size: 14px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+.mock-kanban__subtask.is-done label {
+  text-decoration: line-through;
+  color: var(--color-muted-foreground);
+}
+
+/* card footer */
+.mock-kanban__card-foot {
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.mock-kanban__stack {
+  display: flex;
+  align-items: center;
+}
+
+.mock-kanban__stack [data-slot="avatar"] {
+  margin-left: -7px;
+  border: 2px solid var(--color-card);
+}
+
+.mock-kanban__stack [data-slot="avatar"]:first-child {
+  margin-left: 0;
+}
+
+.mock-kanban__stack--head [data-slot="avatar"] {
+  border-color: var(--color-background);
+}
+
+.mock-kanban__meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-muted-foreground);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mock-kanban__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mock-kanban__meta-item svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: 1.8;
+}
+
+/* ==================== GROUPS (Done) ==================== */
+
+.mock-kanban__group-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mock-kanban__group-wrap + .mock-kanban__group-wrap {
+  margin-top: 6px;
+}
+
+.mock-kanban__group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+.mock-kanban__group::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.mock-kanban__group-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==================== DROP INDICATOR ==================== */
+
+.mock-kanban__drop-line {
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-ring);
+}
+
+/* ==================== RESPONSIVE ==================== */
+
+@media (max-width: 720px) {
+  .mock-kanban__head {
+    padding: 16px 16px 12px;
+  }
+
+  .mock-kanban__toolbar {
+    padding: 0 16px 12px;
+  }
+
+  .mock-kanban__board {
+    padding: 0 16px 16px;
+    grid-template-columns: repeat(4, minmax(240px, 1fr));
+  }
+
+  .mock-kanban__summary {
+    display: none;
+  }
+}

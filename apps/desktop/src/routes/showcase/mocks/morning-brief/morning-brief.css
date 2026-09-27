@@ -1,0 +1,212 @@
+/* Morning Brief mock — extracted from the old ui-library index.css */
+
+.mock-brief {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 24px 0 32px;
+}
+
+.mock-brief .tw-cue {
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+.mock-brief__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mock-brief__head h2 {
+  font-family: inherit;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-foreground);
+  margin: 0;
+}
+
+.mock-brief__meta {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-brief__today {
+  font-size: 16px;
+  color: var(--color-muted-foreground);
+  padding-top: 2px;
+}
+
+.mock-brief__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mock-brief__cue {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mock-brief__stack {
+  background: var(--color-card);
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.mock-brief__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mock-brief__groupsep {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mock-brief__row--task {
+  transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-brief__row--task.is-done .mock-brief__title {
+  color: var(--color-muted-foreground);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklab, var(--color-foreground) 30%, transparent);
+}
+
+.mock-brief__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: var(--color-muted);
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+.mock-brief__icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mock-brief__icon--rose {
+  background: color-mix(in oklab, var(--color-magenta-400) 14%, transparent);
+  color: var(--color-magenta-300);
+}
+
+.mock-brief__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mock-brief__title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+
+.mock-brief__sub {
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-brief__time {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--color-muted);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  white-space: nowrap;
+}
+
+.mock-brief__time svg {
+  width: 12px;
+  height: 12px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-brief__actions {
+  display: inline-flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-brief__row--task:hover .mock-brief__actions,
+.mock-brief__row--task:focus-within .mock-brief__actions {
+  opacity: 1;
+}
+
+.mock-brief__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--color-card);
+}
+
+.mock-brief__count {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-brief__onething {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 14px;
+  background: var(--color-card);
+}
+
+.mock-brief__onething .tw-cue {
+  color: var(--color-magenta-300);
+}
+
+.mock-brief__signoff {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-brief__signoff svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-width: 640px) {
+  .mock-brief__row {
+    flex-wrap: wrap;
+  }
+
+  .mock-brief__actions {
+    opacity: 1;
+  }
+}

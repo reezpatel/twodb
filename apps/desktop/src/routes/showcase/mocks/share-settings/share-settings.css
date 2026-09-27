@@ -1,0 +1,434 @@
+/* Share settings mock — permission dialog and search-result state */
+
+.mock-share {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(430px, 1fr));
+  gap: 38px;
+  place-items: center;
+  width: min(1120px, 100%);
+  min-height: 640px;
+  overflow: hidden;
+  padding: 76px 54px 64px;
+  border: 1px solid var(--color-border);
+  border-radius: 22px;
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.mock-share__wash,
+.mock-share__stage-note {
+  position: absolute;
+  pointer-events: none;
+}
+
+.mock-share__wash {
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+}
+
+.mock-share__wash--a {
+  top: -310px;
+  left: -220px;
+  width: 760px;
+  height: 760px;
+}
+
+.mock-share__wash--b {
+  right: -180px;
+  bottom: -270px;
+  width: 640px;
+  height: 640px;
+}
+
+.mock-share__stage-note {
+  top: 34px;
+  z-index: 1;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+.mock-share__stage-note--left {
+  left: calc(25% - 42px);
+}
+
+.mock-share__stage-note--right {
+  right: calc(25% - 44px);
+}
+
+.mock-share__dialog {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 430px;
+  max-width: 470px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 18px;
+  background: var(--color-card);
+  box-shadow: 0 14px 32px -10px rgb(0 0 0 / 0.5);
+}
+
+.mock-share__dialog--search {
+  transform: translateY(8px);
+}
+
+.mock-share__head {
+  padding: 30px 30px 18px;
+}
+
+.mock-share__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.mock-share__eyebrow svg,
+.mock-share__controls svg,
+.mock-share__permission svg,
+.mock-share__copy svg,
+.mock-share__remove svg,
+.mock-share__chev,
+.mock-share__group-icon svg,
+.mock-share__foot-note svg,
+.mock-share__result > svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.9;
+}
+
+.mock-share__head h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.mock-share__head p {
+  max-width: 48ch;
+  margin: 8px 0 0;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.mock-share__content {
+  position: relative;
+  min-height: 236px;
+}
+
+.mock-share__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 66px 72px;
+  gap: 8px;
+  padding: 0 30px 14px;
+}
+
+.mock-share__controls label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 10px;
+  background: var(--color-card);
+  color: var(--color-muted-foreground);
+}
+
+.mock-share__controls--open label {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-ring);
+}
+
+.mock-share__controls input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-foreground);
+}
+
+.mock-share__permission {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 6px;
+  background: var(--color-card);
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.mock-share__access {
+  display: grid;
+  gap: 6px;
+  padding: 0 30px 18px;
+  transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-share__access.is-subdued {
+  opacity: 0.42;
+}
+
+.mock-share__label {
+  padding: 0 0 6px;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+.mock-share__row,
+.mock-share__result {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+}
+
+.mock-share__row {
+  grid-template-columns: 18px 30px minmax(0, 1fr) auto 18px;
+  min-height: 50px;
+  padding: 2px 0;
+  border-radius: 10px;
+}
+
+.mock-share__row:hover {
+  background: var(--color-card);
+}
+
+.mock-share__remove {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-muted-foreground);
+}
+
+.mock-share__remove:hover {
+  background: color-mix(in oklab, var(--color-destructive) 15%, transparent);
+  color: var(--color-destructive);
+}
+
+.mock-share__avatar,
+.mock-share__group-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mock-share__avatar--owner,
+.mock-share__group-icon--owner {
+  background: color-mix(in oklab, #d24bff 12%, transparent);
+  color: var(--color-magenta-300);
+}
+
+.mock-share__avatar--person,
+.mock-share__group-icon--person {
+  background: color-mix(in oklab, #4fae64 12%, transparent);
+  color: #299045;
+}
+
+.mock-share__group-icon--group {
+  background: color-mix(in oklab, #0a2bff 12%, transparent);
+  color: var(--color-primary);
+}
+
+.mock-share__group-icon--product {
+  background: color-mix(in oklab, #e8c47a 12%, transparent);
+  color: var(--color-warning);
+}
+
+.mock-share__identity {
+  min-width: 0;
+}
+
+.mock-share__identity strong,
+.mock-share__identity em {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mock-share__identity strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mock-share__identity em {
+  margin-top: 2px;
+  color: var(--color-muted-foreground);
+  font-size: 10.5px;
+  font-style: normal;
+  letter-spacing: 0.02em;
+}
+
+.mock-share__chev {
+  color: var(--color-muted-foreground);
+}
+
+.mock-share__results {
+  position: absolute;
+  z-index: 3;
+  left: 30px;
+  right: 30px;
+  top: 42px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 10px;
+  background: var(--color-card);
+  box-shadow: 0 14px 32px -10px rgb(0 0 0 / 0.5);
+}
+
+.mock-share__results .mock-share__label {
+  display: block;
+  padding: 11px 14px 7px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-card);
+}
+
+.mock-share__result {
+  grid-template-columns: 30px minmax(0, 1fr) 18px;
+  width: 100%;
+  min-height: 58px;
+  padding: 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
+.mock-share__result:last-child {
+  border-bottom: 0;
+}
+
+.mock-share__result:hover {
+  background: var(--color-card);
+}
+
+.mock-share__result > svg {
+  color: var(--color-primary);
+}
+
+.mock-share__foot {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: auto;
+  padding: 12px 18px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-card);
+}
+
+.mock-share__copy,
+.mock-share__foot-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.mock-share__copy {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mock-share__foot-note {
+  color: var(--color-muted-foreground);
+  font-size: 11px;
+}
+
+.mock-share__foot-note svg {
+  color: var(--color-primary);
+}
+
+@media (max-width: 1040px) {
+  .mock-share {
+    grid-template-columns: 1fr;
+    padding: 54px 22px 38px;
+  }
+
+  .mock-share__dialog--search {
+    transform: none;
+  }
+
+  .mock-share__stage-note--left,
+  .mock-share__stage-note--right {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .mock-share__head,
+  .mock-share__access {
+    padding-inline: 18px;
+  }
+
+  .mock-share__controls {
+    grid-template-columns: 1fr;
+    padding-inline: 18px;
+  }
+
+  .mock-share__results {
+    left: 18px;
+    right: 18px;
+    top: 118px;
+  }
+
+  .mock-share__row {
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+  }
+
+  .mock-share__remove,
+  .mock-share__chev {
+    display: none;
+  }
+
+  .mock-share__foot {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mock-share__copy,
+  .mock-share__foot-note {
+    grid-column: 1 / -1;
+  }
+}

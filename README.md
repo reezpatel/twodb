@@ -1,128 +1,99 @@
 # twodb
 
-Turborepo monorepo managed with pnpm workspaces.
+pnpm-workspace monorepo: a Tauri 2 desktop app, a Hono server, and an outbound runner.
 
 ## Projects
 
-| Path                | Name               | Description                                              | Port |
-| ------------------- | ------------------ | -------------------------------------------------------- | ---- |
-| `apps/web`          | `twodb-web-app`    | Main React + Vite web app                                | 5173 |
-| `apps/ui-library`   | `twodb-ui-library` | Storybook-like showcase for UI components                | 5174 |
-| `apps/api`          | `twodb-api`        | Fastify (TS) backend — Postgres + Memgraph + sqlite      | 3001 |
-| `packages/ui`       | `@twodb/ui`        | Shared React component library                           | —    |
-| `packages/contracts`| `@twodb/contracts` | Shared DTOs + event maps (pure types)                    | —    |
-| `packages/shared-*` | `@twodb/shared-*`  | Frontend/backend plugin kits                             | —    |
-| `plugins/*`         | `@twodb/*`         | Feature plugins (view + service). Not mounted at boot —  | —    |
-|                     |                    | will be loaded via the admin plugin registry             |      |
+| Path           | Name             | Description                                            | Port |
+| -------------- | ---------------- | ------------------------------------------------------ | ---- |
+| `apps/desktop` | `@twodb/desktop` | Tauri 2 + React 19 + Vite app (shadcn/ui, Tailwind v4) | 5173 |
+| `apps/server`  | `@twodb/server`  | Hono backend — Postgres (Kysely), Memgraph, MinIO      | 3001 |
+| `apps/runner`  | `@twodb/runner`  | Outbound runner agent (dials home over WebSocket)      | —    |
+
+Apps currently shipping in the desktop shell: Overview, Email, Calendar,
+Notes, Chat, Code, Assistant, Meetings, Automations, Files, Settings.
 
 ## Getting started
 
 ```sh
 pnpm install
-pnpm --filter twodb-api db:up   # postgres + memgraph (+ s3) via docker compose
-pnpm dev                        # runs all apps in parallel via turbo
+pnpm db:up        # postgres + memgraph via docker compose
+pnpm db:migrate   # apply Kysely migrations
+pnpm local        # desktop (:5173) + server (:3001)
 ```
 
-Run a single app:
+Run pieces individually:
 
 ```sh
-pnpm --filter twodb-web-app dev
-pnpm --filter twodb-ui-library dev
-pnpm --filter twodb-api dev
+pnpm --filter @twodb/desktop dev          # vite
+pnpm --filter @twodb/desktop tauri:dev    # full Tauri shell
+pnpm --filter @twodb/server dev           # server with watch
+pnpm --filter @twodb/runner dev           # runner agent
 ```
 
-## Admin
+## LLM providers
 
-`/admin` is a standalone surface (outside the app shell) backed by
-`/api/admin/*` on the api. Highlights:
-
-- **Passkey-only auth** (WebAuthn) — no emails or passwords. When zero
-  passkeys exist, registration is open (bootstrap); afterwards everything
-  requires an admin session. The last passkey can never be deleted.
-- **Instance** — one row identifying the deployment (`inst-…` id via
-  `newId`), created at first boot.
-- **Plugin registry** — plugins are registered by identifier
-  (`git:<url>` or `npm:<name>`); fetching/loading lands later.
-
-State lives in an api-owned sqlite database at
-`$TWO_DB_WORK_DIR/db-v1.sqlite` (default `../../../.work`, resolved from
-`apps/api/src`). Migrations are Kysely modules in
-`apps/api/src/db/migrations/`, registered in `index.ts`, applied at boot.
-
-See `apps/api/src/admin/plan.md` for the design.
-
-### HTTPS dev (WebAuthn over LAN)
-
-Passkeys need a secure context: `http://localhost` works, LAN IPs/hostnames
-over plain http don't. To browse from another machine:
-
-```sh
-TWODB_WEB_HTTPS=1 pnpm --filter twodb-web-app dev
-```
-
-A self-signed cert (SANs: localhost, hostname, hostname.local, LAN IPs) is
-generated into `.work/certs/`. Set `TWODB_ADMIN_RP_ID` (must be a hostname,
-not an IP) and `TWODB_ADMIN_ORIGIN` in `.env` to match the URL you browse,
-e.g. `divine.local` / `https://divine.local:5173`. Delete `.work/certs/` if
-your LAN IP changes.
+Connections are managed in Settings → LLM. The server keeps a declarative
+provider registry (`apps/server/src/lib/llm-providers.ts`) — Anthropic,
+OpenAI (incl. Codex), Claude Code, Gemini, Kimi, GLM, MiniMax, Cline, Kilo
+Code, Ollama (self-hosted + cloud), OpenRouter, DeepSeek, Groq, Mistral,
+Together, xAI, Cerebras, Fireworks, Cloudflare Workers AI, and anything
+OpenAI-compatible. Chat runs server-side over three wire protocols
+(anthropic / openai / responses) with streaming and tool use; OAuth token
+refresh is built in for Claude Code and Codex. Adding a provider is one
+registry entry.
 
 ## Docker
 
-CI (`.github/workflows/docker-image.yaml`) builds and pushes two images to
-GHCR on every push to `main`:
+CI (`.github/workflows/docker-image.yaml` on every push to `main`, plus tag
+builds in `release.yml`) builds and pushes two images to GHCR:
 
-- `ghcr.io/<repo>` — server (api + web), from the root `Dockerfile`
-- `ghcr.io/<repo>-node-agent` — node agent, from `apps/node/Dockerfile`
+- `ghcr.io/<owner>/twodb` — server with the built desktop app baked in: the UI
+  is served at `/` and the API under `/api` (migrations run on start)
+- `ghcr.io/<owner>/twodb-runner` — runner agent, from `apps/runner/Dockerfile`
 
-Run the server:
+Run the server (needs postgres + memgraph reachable):
 
 ```sh
-docker run -p 3001:3001 -v twodb-data:/data \
-  -e DATABASE_URL=postgres://twodb:twodb@host:5432/twodb \
+docker run -p 3001:3001 \
+  -e TWODB_DATABASE_URL=postgres://twodb:twodb@host:5432/twodb \
   -e MEMGRAPH_URL=bolt://host:7687 \
+  -e BETTER_AUTH_SECRET=change-me \
+  -e BETTER_AUTH_URL=http://your-host:3001 \
   ghcr.io/reezpatel/twodb:latest
 ```
 
-`/data` holds the sqlite admin database — mount a volume to keep it.
+Run a runner next to it (`docker-compose.runner.yaml` does the same):
+
+```sh
+docker run -d --network host \
+  -e TWODB_SERVER_URL=http://your-host:3001 \
+  -e TWODB_RUNNER_KEY=twr_… \
+  ghcr.io/reezpatel/twodb-runner:latest
+```
+
+Desktop bundles (.deb/.AppImage/.rpm) are attached to each release tag
+(`release.yml` → `desktop` job, via tauri-action).
 
 ## Nix
 
-The repo ships a flake with a package and a NixOS module:
+The repo ships a flake with a package and a NixOS module — see `NIXOS.md`
+for the full module reference. Short version:
 
 ```nix
-# in your NixOS configuration flake
 inputs.twodb.url = "github:reezpatel/twodb";
 
-# configuration
-imports = [ inputs.twodb.nixosModules.default ];
 services.twodb = {
   enable = true;
   environment = {
     DATABASE_URL = "postgres://twodb:twodb@localhost:5432/twodb";
     MEMGRAPH_URL = "bolt://localhost:7687";
-    TWODB_ADMIN_RP_ID = "divine.local";
-    TWODB_ADMIN_ORIGIN = "https://divine.local:5173";
   };
 };
 ```
 
-State lives in `/var/lib/twodb` (systemd `StateDirectory`). Also available:
-`nix build .#twodb`, `nix develop` (node + pnpm shell).
-
 Note: when `pnpm-lock.yaml` changes, regenerate the `pnpmDeps` hash in
 `nix/package.nix` (build once and copy the `got:` hash from the error).
-
-## Using UI components
-
-Both `apps/web` and `apps/ui-library` consume components from `@twodb/ui`:
-
-```tsx
-import { Button, Card, Input, Badge } from "@twodb/ui";
-```
-
-Add a new component in `packages/ui/src/components/`, export it from
-`packages/ui/src/index.ts`, and register a showcase entry in
-`apps/ui-library/src/registry.tsx`.
 
 ---
 

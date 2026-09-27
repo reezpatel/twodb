@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,158 +28,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build plugins
-        run: |
-          for dir in plugins/auth plugins/workspace plugins/llm plugins/node plugins/code plugins/llm-adapters/*; do
-            (cd "$dir" && node build.mjs)
-          done
+      - name: Typecheck
+        run: pnpm --filter @twodb/server build && pnpm --filter @twodb/runner build && pnpm --filter @twodb/desktop build
 
-      - name: Build web
-        working-directory: apps/web
-        run: npx vite build
-
-      - name: Build api
-        working-directory: apps/api
-        run: node build.mjs
-
-      - name: Vendor browser deps
-        run: node scripts/vendor-deps.mjs
-
-  docker-image:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
-        with:
-          persist-credentials: false
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3 # zizmor: ignore[unpinned-uses]
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3 # zizmor: ignore[unpinned-uses]
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3 # zizmor: ignore[unpinned-uses]
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Build and push image
-        uses: docker/build-push-action@v6 # zizmor: ignore[unpinned-uses]
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/twodb-server:${{ github.ref_name }}
-            ghcr.io/${{ github.repository_owner }}/twodb-server:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  publish-plugins:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
-        with:
-          persist-credentials: false
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4 # zizmor: ignore[unpinned-uses]
-
-      - name: Set up Node
-        uses: actions/setup-node@v4 # zizmor: ignore[unpinned-uses]
-        with:
-          node-version: 22
-          cache: pnpm
-          registry-url: https://registry.npmjs.org/
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build plugins
-        run: |
-          for dir in plugins/auth plugins/workspace plugins/llm plugins/node plugins/code plugins/llm-adapters/*; do
-            (cd "$dir" && node build.mjs)
-          done
-
-      - name: Publish plugins to npm
-        continue-on-error: false
-        run: |
-          npm install -g npm@latest
-          node scripts/publish-plugins.mjs --yes --stage
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  agent-binaries:
-    needs: build
-    runs-on: ubuntu-latest
+  desktop:
+    needs: check
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - target: bun-linux-x64
-            outfile: twodb-node-linux-x64
-          - target: bun-linux-arm64
-            outfile: twodb-node-linux-arm64
-          - target: bun-darwin-arm64
-            outfile: twodb-node-darwin-arm64
-          - target: bun-darwin-x64
-            outfile: twodb-node-darwin-x64
-          - target: bun-windows-x64
-            outfile: twodb-node-windows-x64.exe
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
-        with:
-          persist-credentials: false
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2 # zizmor: ignore[unpinned-uses]
-
-      - name: Compile agent
-        working-directory: apps/node
-        env:
-          BUN_TARGET: ${{ matrix.target }}
-          OUTFILE: ${{ matrix.outfile }}
-        run: bun build --compile --target="$BUN_TARGET" src/index.ts --outfile "dist/$OUTFILE"
-
-      - name: Make executable
-        env:
-          OUTFILE: ${{ matrix.outfile }}
-        run: chmod +x "apps/node/dist/$OUTFILE"
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4 # zizmor: ignore[unpinned-uses]
-        with:
-          name: ${{ matrix.outfile }}
-          path: apps/node/dist/${{ matrix.outfile }}
-          if-no-files-found: error
-
-      # Homebrew formula prep stays manual: fill deploy/homebrew/twodb-node.rb, push to tap by hand.
-      - name: Attach binary to release
-        uses: softprops/action-gh-release@v2 # zizmor: ignore[unpinned-uses]
-        with:
-          files: apps/node/dist/${{ matrix.outfile }}
-
-  server-tarball:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    env:
-      RELEASE_TAG: ${{ github.ref_name }}
+          - platform: macos-latest
+            args: --target aarch64
+            rust-targets: aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64
+            rust-targets: x86_64-apple-darwin
+          - platform: windows-latest
+          - platform: ubuntu-24.04
+    runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
@@ -190,52 +58,453 @@ jobs:
         uses: pnpm/action-setup@v4 # zizmor: ignore[unpinned-uses]
 
       - name: Set up Node
-        uses: actions/setup-node@v4 # zizmor: ignore[unpinned-uses]
+        uses: actions/setup-node@v4 # zizmor: ignore[unpinned-uses,cache-poisoning]
         with:
           node-version: 22
           cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build server tarball
-        run: node scripts/make-server-tarball.mjs "$RELEASE_TAG"
-
-      - name: Attach tarball to release
-        uses: softprops/action-gh-release@v2 # zizmor: ignore[unpinned-uses]
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable # zizmor: ignore[unpinned-uses]
         with:
-          files: twodb-server-${{ env.RELEASE_TAG }}.tar.gz
+          targets: ${{ matrix.rust-targets }}
 
-  choco-pack:
-    needs: agent-binaries
-    runs-on: ubuntu-latest
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2 # zizmor: ignore[unpinned-uses,cache-poisoning]
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Install Tauri system dependencies
+        if: matrix.platform == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter @twodb/desktop
+
+      - name: Build desktop bundles
+        uses: tauri-apps/tauri-action@v0 # zizmor: ignore[unpinned-uses]
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: "twodb ${{ github.ref_name }}"
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  android:
+    needs: check
     permissions:
-      contents: read
+      contents: write
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
         with:
           persist-credentials: false
 
-      - name: Download Windows binary
-        uses: actions/download-artifact@v4 # zizmor: ignore[unpinned-uses]
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4 # zizmor: ignore[unpinned-uses]
+
+      - name: Set up Node
+        uses: actions/setup-node@v4 # zizmor: ignore[unpinned-uses,cache-poisoning]
         with:
-          name: twodb-node-windows-x64.exe
-          path: deploy/choco/tools/
+          node-version: 22
+          cache: pnpm
 
-      - name: Download WinSW
-        run: curl -fsSL -o deploy/choco/tools/WinSW.exe https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe
-
-      - name: Stamp version
-        run: sed -i "s/__VERSION__/${GITHUB_REF_NAME#v}/g" deploy/choco/twodb-node.nuspec
-
-      - name: Choco pack
-        run: docker run --rm -v "$PWD/deploy/choco:/choco" -w /choco chocolatey/choco choco pack twodb-node.nuspec
-
-      # Choco push is manual: choco push nupkg --source https://push.chocolatey.org/ -k $CHOCO_API_KEY
-      - name: Upload choco package
-        uses: actions/upload-artifact@v4 # zizmor: ignore[unpinned-uses]
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable # zizmor: ignore[unpinned-uses]
         with:
-          name: choco-package
-          path: deploy/choco/*.nupkg
-          if-no-files-found: error
+          targets: aarch64-linux-android
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2 # zizmor: ignore[unpinned-uses,cache-poisoning]
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Set up Java
+        uses: actions/setup-java@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3 # zizmor: ignore[unpinned-uses]
+
+      - name: Install Android NDK
+        run: sdkmanager "ndk;27.0.12077973"
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter @twodb/desktop
+
+      - name: Init Android project
+        run: pnpm --filter @twodb/desktop exec tauri android init
+
+      - name: Build Android APK
+        run: pnpm --filter @twodb/desktop exec tauri android build --target aarch64 --apk
+
+      - name: Collect APK
+        run: |
+          apk=$(find apps/desktop/src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | head -1)
+          cp "$apk" "twodb_${GITHUB_REF_NAME#v}_android-arm64.apk"
+
+      - name: Upload APK to release
+        uses: softprops/action-gh-release@v2 # zizmor: ignore[unpinned-uses]
+        with:
+          files: twodb_${{ github.ref_name }}_android-arm64.apk
+
+  choco:
+    needs: desktop
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download Windows installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --pattern '*x64-setup.exe'
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $setup = (Get-ChildItem '*x64-setup.exe').Name
+          New-Item -ItemType Directory -Force -Path tools | Out-Null
+          Move-Item $setup tools\twodb_x64-setup.exe
+          @'
+          <?xml version="1.0"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+            <metadata>
+              <id>twodb</id>
+              <version>__VERSION__</version>
+              <title>twodb</title>
+              <authors>twodb</authors>
+              <projectUrl>https://github.com/__REPO__</projectUrl>
+              <packageSourceUrl>https://github.com/__REPO__</packageSourceUrl>
+              <description>twodb desktop app — agent workbench with runners, LLM connections, notes and files.</description>
+            </metadata>
+          </package>
+          '@ -replace '__VERSION__', $version -replace '__REPO__', $env:GITHUB_REPOSITORY | Set-Content twodb.nuspec
+          @'
+          $ErrorActionPreference = 'Stop'
+          $packageArgs = @{
+            packageName   = 'twodb'
+            fileType      = 'exe'
+            file          = Join-Path $toolsDir 'twodb_x64-setup.exe'
+            silentArgs    = '/S'
+            validExitCodes= @(0)
+          }
+          Install-ChocolateyInstallPackage @packageArgs
+          '@ | Set-Content tools\chocolateyinstall.ps1
+          choco pack twodb.nuspec
+
+      - name: Push to Chocolatey
+        if: env.CHOCO_API_KEY != ''
+        env:
+          CHOCO_API_KEY: ${{ secrets.CHOCO_API_KEY }}
+        run: choco push twodb.*.nupkg --source https://push.chocolatey.org/ --api-key $env:CHOCO_API_KEY
+
+  brew:
+    needs: desktop
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download macOS installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern '*aarch64.dmg' --pattern '*x64.dmg'
+
+      - name: Build cask
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          repo="$GITHUB_REPOSITORY"
+          arm_sha=$(sha256sum twodb_"$version"_aarch64.dmg | cut -d' ' -f1)
+          intel_sha=$(sha256sum twodb_"$version"_x64.dmg | cut -d' ' -f1)
+          cat > twodb.rb <<RUBY
+          cask "twodb" do
+            version "$version"
+            on_arm do
+              url "https://github.com/$repo/releases/download/${GITHUB_REF_NAME}/twodb_${version}_aarch64.dmg",
+                  verified: "github.com/$repo/"
+              sha256 "$arm_sha"
+            end
+            on_intel do
+              url "https://github.com/$repo/releases/download/${GITHUB_REF_NAME}/twodb_${version}_x64.dmg",
+                  verified: "github.com/$repo/"
+              sha256 "$intel_sha"
+            end
+            name "twodb"
+            desc "twodb desktop app"
+            homepage "https://github.com/$repo"
+            app "twodb.app"
+          end
+          RUBY
+
+      - name: Push to homebrew tap
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          owner="${GITHUB_REPOSITORY%%/*}"
+          repo_url="https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${owner}/homebrew-tap.git"
+          git clone "$repo_url" tap 2>/dev/null || {
+            git init tap
+            git -C tap remote add origin "$repo_url"
+            git -C tap config user.name "release-bot"
+            git -C tap config user.email "bot@users.noreply.github.com"
+            git -C tap commit --allow-empty -m "init"
+          }
+          mkdir -p tap/Casks
+          cp twodb.rb tap/Casks/twodb.rb
+          git -C tap config user.name "release-bot"
+          git -C tap config user.email "bot@users.noreply.github.com"
+          git -C tap add Casks/twodb.rb
+          git -C tap commit -m "twodb ${GITHUB_REF_NAME}"
+          git -C tap push origin HEAD:main
+
+  runner-bundles:
+    needs: check
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-24.04
+            os: linux
+            arch: x64
+          - platform: ubuntu-24.04-arm
+            os: linux
+            arch: arm64
+          - platform: macos-15-intel
+            os: macos
+            arch: x64
+          - platform: macos-latest
+            os: macos
+            arch: arm64
+          - platform: windows-latest
+            os: windows
+            arch: x64
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4 # zizmor: ignore[unpinned-uses]
+
+      - name: Set up Node
+        uses: actions/setup-node@v4 # zizmor: ignore[unpinned-uses,cache-poisoning]
+        with:
+          node-version: 22
+
+      - name: Deploy runner with dependencies
+        run: |
+          pnpm install --frozen-lockfile --filter @twodb/runner
+          pnpm --filter @twodb/runner deploy --legacy stage/twodb-runner
+
+      - name: Add launcher and archive (unix)
+        if: matrix.os != 'windows'
+        run: |
+          mkdir -p stage/twodb-runner/bin
+          cp -r apps/runner/src stage/twodb-runner/src
+          printf '#!/bin/sh\nDIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"\nexec node "$DIR/node_modules/tsx/dist/cli.mjs" "$DIR/src/index.ts" "$@"\n' > stage/twodb-runner/bin/twodb-runner
+          chmod +x stage/twodb-runner/bin/twodb-runner
+          tar -czf "twodb-runner_${GITHUB_REF_NAME#v}_${{ matrix.os }}-${{ matrix.arch }}.tar.gz" -C stage twodb-runner
+
+      - name: Add launcher and archive (windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path stage/twodb-runner/bin, stage/twodb-runner/src | Out-Null
+          Copy-Item apps/runner/src/* stage/twodb-runner/src -Recurse
+          Set-Content stage/twodb-runner/bin/twodb-runner.cmd "@echo off`r`nset DIR=%~dp0..`r`nnode `"%DIR%\node_modules\tsx\dist\cli.mjs`" `"%DIR%\src\index.ts`" %*`r`n"
+          $ver = $env:GITHUB_REF_NAME.TrimStart('v')
+          Compress-Archive -Path stage/twodb-runner -DestinationPath "twodb-runner_${ver}_${{ matrix.os }}-${{ matrix.arch }}.zip"
+
+      - name: Upload bundle to release
+        uses: softprops/action-gh-release@v2 # zizmor: ignore[unpinned-uses]
+        with:
+          files: twodb-runner_*
+
+  runner-choco:
+    needs: runner-bundles
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download runner bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --pattern 'twodb-runner_*windows-x64.zip'
+          Expand-Archive twodb-runner_*windows-x64.zip -DestinationPath pkg/tools
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          Move-Item pkg/tools/twodb-runner pkg/tools/runner
+          @'
+          $ErrorActionPreference = 'Stop'
+          Generate-BinFile "twodb-runner" "$PSScriptRoot\runner\bin\twodb-runner.cmd"
+          '@ | Set-Content pkg/tools/chocolateyinstall.ps1
+          @'
+          $ErrorActionPreference = 'Stop'
+          Uninstall-BinFile "twodb-runner"
+          '@ | Set-Content pkg/tools/chocolateyuninstall.ps1
+          @'
+          <?xml version="1.0"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+            <metadata>
+              <id>twodb-runner</id>
+              <version>__VERSION__</version>
+              <title>twodb runner</title>
+              <authors>twodb</authors>
+              <projectUrl>https://github.com/__REPO__</projectUrl>
+              <description>twodb runner agent — dials home to a twodb server and executes jobs.</description>
+              <dependencies>
+                <dependency id="nodejs" version="[22,23)" />
+              </dependencies>
+            </metadata>
+          </package>
+          '@ -replace '__VERSION__', $version -replace '__REPO__', $env:GITHUB_REPOSITORY | Set-Content pkg/twodb-runner.nuspec
+          choco pack pkg/twodb-runner.nuspec --outputdirectory .
+
+      - name: Push to Chocolatey
+        if: env.CHOCO_API_KEY != ''
+        env:
+          CHOCO_API_KEY: ${{ secrets.CHOCO_API_KEY }}
+        run: choco push twodb-runner.*.nupkg --source https://push.chocolatey.org/ --api-key $env:CHOCO_API_KEY
+
+  runner-brew:
+    needs: runner-bundles
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download runner bundles
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern 'twodb-runner_*macos-*.tar.gz'
+
+      - name: Build formula
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          repo="$GITHUB_REPOSITORY"
+          arm_sha=$(sha256sum twodb-runner_"$version"_macos-arm64.tar.gz | cut -d' ' -f1)
+          intel_sha=$(sha256sum twodb-runner_"$version"_macos-x64.tar.gz | cut -d' ' -f1)
+          cat > twodb-runner.rb <<RUBY
+          class TwodbRunner < Formula
+            desc "twodb runner agent"
+            homepage "https://github.com/$repo"
+            version "$version"
+            on_arm do
+              url "https://github.com/$repo/releases/download/${GITHUB_REF_NAME}/twodb-runner_${version}_macos-arm64.tar.gz"
+              sha256 "$arm_sha"
+            end
+            on_intel do
+              url "https://github.com/$repo/releases/download/${GITHUB_REF_NAME}/twodb-runner_${version}_macos-x64.tar.gz"
+              sha256 "$intel_sha"
+            end
+            depends_on "node@22"
+
+            def install
+              libexec.install Dir["twodb-runner/*"]
+              (bin / "twodb-runner").write_env_script libexec / "bin" / "twodb-runner", PATH: "#{Formula["node@22"].opt_bin}:#{ENV["PATH"]}"
+            end
+
+            service do
+              run [opt_bin / "twodb-runner"]
+              keep_alive false
+            end
+          end
+          RUBY
+
+      - name: Push to homebrew tap
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          owner="${GITHUB_REPOSITORY%%/*}"
+          repo_url="https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${owner}/homebrew-tap.git"
+          git clone "$repo_url" tap 2>/dev/null || {
+            git init tap
+            git -C tap remote add origin "$repo_url"
+            git -C tap config user.name "release-bot"
+            git -C tap config user.email "bot@users.noreply.github.com"
+            git -C tap commit --allow-empty -m "init"
+          }
+          mkdir -p tap/Formula
+          cp twodb-runner.rb tap/Formula/twodb-runner.rb
+          git -C tap config user.name "release-bot"
+          git -C tap config user.email "bot@users.noreply.github.com"
+          git -C tap add Formula/twodb-runner.rb
+          git -C tap commit -m "twodb-runner ${GITHUB_REF_NAME}"
+          git -C tap push origin HEAD:main
+
+  images:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: twodb
+            dockerfile: Dockerfile
+          - name: twodb-runner
+            dockerfile: apps/runner/Dockerfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          persist-credentials: false
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3 # zizmor: ignore[unpinned-uses]
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5 # zizmor: ignore[unpinned-uses]
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Build and push
+        uses: docker/build-push-action@v6 # zizmor: ignore[unpinned-uses]
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

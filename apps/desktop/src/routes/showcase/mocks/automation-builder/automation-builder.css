@@ -1,0 +1,601 @@
+/* AutomationBuilder mock — visual path builder on React Flow
+   (reference anatomy, Cyclorama grammar: hairlines, flat cobalt, IBM Plex Sans cues) */
+
+.mock-ab {
+  display: flex;
+  width: 100%;
+  height: 780px;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--color-background);
+}
+
+/* --- slim app rail --- */
+
+.mock-ab__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 64px;
+  flex: none;
+  padding: 12px 0;
+  background: var(--color-card);
+  border-right: 1px solid var(--color-border);
+}
+
+.mock-ab__logo {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.mock-ab__railitem {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-ab__railitem:hover {
+  background: var(--color-muted);
+  color: var(--color-foreground);
+}
+
+.mock-ab__railitem--active,
+.mock-ab__railitem--active:hover {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+}
+
+.mock-ab__railspacer {
+  flex: 1;
+}
+
+/* --- main column --- */
+
+.mock-ab__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mock-ab__topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mock-ab__title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.mock-ab__title strong {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mock-ab__title span {
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+}
+
+/* segmented tabs, centered */
+.mock-ab__tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 auto;
+}
+
+.mock-ab__tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-muted-foreground);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  transition:
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-ab__tab:hover {
+  color: var(--color-foreground);
+  background: var(--color-muted);
+}
+
+.mock-ab__tab--active,
+.mock-ab__tab--active:hover {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.mock-ab__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.mock-ab__tabs + .mock-ab__actions {
+  margin-left: 0;
+}
+
+/* --- canvas --- */
+
+.mock-ab__canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.mock-ab__search {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 6;
+  width: 230px;
+}
+
+.mock-ab__people {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  box-shadow: 0 4px 14px -8px rgb(5 5 6 / 0.18);
+}
+
+.mock-ab__faces {
+  display: flex;
+  align-items: center;
+  padding-left: 4px;
+}
+
+.mock-ab__faces > * {
+  margin-left: -8px;
+  border: 2px solid var(--color-card);
+  border-radius: 999px;
+}
+
+/* --- React Flow skinning --- */
+
+.mock-ab .react-flow {
+  background: var(--color-card);
+}
+
+.mock-ab .react-flow__handle {
+  width: 8px;
+  height: 8px;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  background: transparent;
+}
+
+.mock-ab .react-flow__node:focus {
+  outline: none;
+}
+
+.mock-ab .react-flow__node.is-dim {
+  opacity: 0.3;
+  filter: saturate(0.4);
+  transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-ab__edgepath {
+  stroke: color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+/* edge mid-tools: label chip + insert button */
+.mock-ab__edgetools {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: all;
+}
+
+.mock-ab__edgelabel {
+  padding: 3px 10px;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 999px;
+  background: var(--color-card);
+  font-family: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  box-shadow: 0 2px 8px -4px rgb(5 5 6 / 0.16);
+}
+
+.mock-ab__edgeadd {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 999px;
+  background: var(--color-card);
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  transition:
+    border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-ab__edgeadd:hover {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+/* --- step cards --- */
+
+.mock-ab__node {
+  width: 320px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: 0 10px 24px -16px rgb(5 5 6 / 0.22);
+  transition:
+    border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-ab .react-flow__node.selected .mock-ab__node {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-ring);
+}
+
+.mock-ab__node--paths {
+  width: 300px;
+}
+
+.mock-ab__nodehead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px 12px;
+}
+
+.mock-ab__tile {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--color-muted);
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+.mock-ab__tile--brand {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+}
+
+.mock-ab__nodetext {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.mock-ab__nodetext strong {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mock-ab__nodetext em {
+  font-style: normal;
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mock-ab__nodefoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.mock-ab__tag {
+  padding: 3px 10px;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 999px;
+  font-size: 13px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+.mock-ab__status {
+  margin-left: auto;
+}
+
+/* --- launch pill --- */
+
+.mock-ab__launch {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 34px;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 999px;
+  background: var(--color-card);
+  font-family: inherit;
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  box-shadow: 0 4px 12px -8px rgb(5 5 6 / 0.24);
+}
+
+/* --- terminal add node --- */
+
+.mock-ab__add {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 999px;
+  background: var(--color-card);
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  transition:
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-ab__add:hover {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+/* --- zoom bar --- */
+
+.mock-ab__zoom {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px -8px rgb(5 5 6 / 0.2);
+}
+
+.mock-ab__zoom button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  cursor: pointer;
+  transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-ab__zoom button:hover {
+  background: var(--color-muted);
+}
+
+.mock-ab__zoom span {
+  min-width: 44px;
+  text-align: center;
+  font-size: 14px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+/* --- placeholder tabs --- */
+
+.mock-ab__placeholder {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-muted-foreground);
+  font-size: 15px;
+  text-align: center;
+  padding: 32px;
+}
+
+/* --- Add Integration panel --- */
+
+.mock-ab__panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  background: var(--color-card);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -18px 0 36px -24px rgb(5 5 6 / 0.28);
+  transform: translateX(102%);
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-ab__panel--open {
+  transform: none;
+}
+
+.mock-ab__panelhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mock-ab__panelhead h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.mock-ab__paneltools {
+  display: flex;
+  gap: 2px;
+}
+
+.mock-ab__panelbody {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.mock-ab__group {
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+  margin-top: 8px;
+}
+
+.mock-ab__group:first-child {
+  margin-top: 0;
+}
+
+.mock-ab__integ {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-card);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-ab__integ:hover {
+  border-color: color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  background: var(--color-card);
+}
+
+.mock-ab__integ--picked,
+.mock-ab__integ--picked:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-ring);
+  background: var(--color-card);
+}
+
+.mock-ab__more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  transition:
+    color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-ab__more:hover {
+  color: var(--color-foreground);
+  background: var(--color-muted);
+}
+
+.mock-ab__panelfoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* old .tw-cue / .tw-tnum utilities, scoped locally */
+.mock-ab__cue {
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+.mock-ab__tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}

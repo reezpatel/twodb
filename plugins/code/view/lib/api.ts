@@ -1,5 +1,5 @@
 import { ApiClient } from "@twodb/shared-frontend";
-import type { TwodbNodeInfo } from "@twodb/node/shared/api";
+export type TwodbNodeInfo = { id: string; name: string; online: boolean };
 import type { CodeSession, CreateSessionRequest, StoredMessage } from "../../shared/api";
 
 const api = new ApiClient("io.twodb.code");

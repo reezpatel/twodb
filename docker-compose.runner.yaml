@@ -1,0 +1,41 @@
+# twodb runner container.
+#
+# Standalone (default): the runner connects OUTBOUND to a server running on
+# the docker host via host.docker.internal.
+#
+#   docker compose -f docker-compose.runner.yaml up -d
+#
+# Alongside the full stack (docker-compose.all.yaml): the server container is
+# named twodb-server on the twodb-net network, so set in .env:
+#
+#   TWODB_SERVER_URL=http://twodb-server:3001
+#
+# and uncomment the two `networks` blocks below before starting this compose.
+
+name: twodb-runner
+
+services:
+  runner:
+    build:
+      context: .
+      dockerfile: apps/runner/Dockerfile
+    image: twodb-runner:local
+    container_name: twodb-runner
+    restart: unless-stopped
+    # Host networking: the runner shares the host stack so it can reach a
+    # server running on the host (e.g. `pnpm dev` in apps/server). The
+    # default bridge is often blocked by host firewalls for host-process
+    # ports. For remote servers, drop network_mode and set TWODB_SERVER_URL
+    # to the server's address.
+    network_mode: host
+    environment:
+      TWODB_SERVER_URL: ${TWODB_SERVER_URL:-http://host.docker.internal:3001}
+      TWODB_RUNNER_KEY: ${TWODB_RUNNER_KEY:?set TWODB_RUNNER_KEY in .env — create it in Settings → Runners}
+      TWODB_RUNNER_NAME: ${TWODB_RUNNER_NAME:-docker-runner}
+    # networks:
+    #   - twodb-net
+
+# networks:
+#   twodb-net:
+#     external: true
+#     name: twodb-net

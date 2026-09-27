@@ -29,7 +29,6 @@
   "dependencies": {
     "@twodb/contracts": "workspace:*",
     "@twodb/llm": "workspace:*",
-    "@twodb/node": "workspace:*",
     "@twodb/shared-backend": "workspace:*",
     "@twodb/shared-frontend": "workspace:*",
     "@twodb/ui": "workspace:*",

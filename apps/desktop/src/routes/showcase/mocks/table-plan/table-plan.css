@@ -1,0 +1,363 @@
+/* Table plan mock — hotel table management (extracted from the old
+   prodex-dashboard stylesheet, tokens converted to the new theme) */
+
+.mock-tp {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 24px;
+  width: 100%;
+  align-items: start;
+}
+
+.mock-tp__side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--color-card);
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 14px;
+}
+
+.mock-tp__filters {
+  display: flex;
+  gap: 6px;
+}
+
+.mock-tp__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-tp__filter.is-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+}
+
+.mock-tp__fcount {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
+}
+
+.mock-tp__filter.is-active .mock-tp__fcount {
+  background: rgb(255 255 255 / 0.22);
+  color: #fff;
+}
+
+.mock-tp__date {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+
+.mock-tp__search {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.mock-tp__search > :first-child {
+  flex: 1;
+}
+
+.mock-tp__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+.mock-tp__card {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-card);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition:
+    border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-tp__card:hover {
+  border-color: var(--color-muted-foreground);
+}
+
+.mock-tp__card.is-selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-ring);
+}
+
+.mock-tp__time {
+  flex-shrink: 0;
+  width: 52px;
+  border-radius: 6px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  line-height: 1.35;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px;
+}
+
+.mock-tp__time--dinner {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+}
+
+.mock-tp__time--on-dine {
+  background: color-mix(in oklab, var(--color-magenta-400) 14%, transparent);
+  color: var(--color-magenta-300);
+}
+
+.mock-tp__time--unpaid {
+  background: color-mix(in oklab, var(--color-warning) 14%, transparent);
+  color: var(--color-warning);
+}
+
+.mock-tp__time--free {
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
+}
+
+.mock-tp__cardbody {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mock-tp__cardhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mock-tp__name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+
+.mock-tp__cardmeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-tp__cardmeta svg {
+  width: 12px;
+  height: 12px;
+}
+
+.mock-tp__add {
+  width: 100%;
+  justify-content: center;
+}
+
+/* floor plan */
+
+.mock-tp__main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.mock-tp__mainhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mock-tp__mainhead h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.mock-tp__zones {
+  display: flex;
+  gap: 6px;
+}
+
+.mock-tp__zone {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  cursor: pointer;
+  transition:
+    border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-tp__zone.is-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+}
+
+.mock-tp__legend {
+  display: flex;
+  gap: 16px;
+}
+
+.mock-tp__leg {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+.mock-tp__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.mock-tp__dot--available {
+  background: var(--color-muted-foreground);
+}
+
+.mock-tp__dot--reserved {
+  background: var(--color-primary);
+}
+
+.mock-tp__dot--dine {
+  background: var(--color-magenta-300);
+}
+
+.mock-tp__floor {
+  position: relative;
+  height: 620px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.mock-tp__table {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-tp__table--available {
+  background: var(--color-card);
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+.mock-tp__table--reserved {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.mock-tp__table--dine {
+  background: color-mix(in oklab, var(--color-magenta-400) 14%, transparent);
+  border-color: var(--color-magenta-300);
+  color: var(--color-magenta-300);
+}
+
+.mock-tp__table.is-selected {
+  box-shadow: 0 0 0 3px var(--color-ring);
+}
+
+.mock-tp__chair {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  transform: translate(-50%, 0);
+  background: color-mix(in oklab, var(--color-foreground) 30%, transparent);
+}
+
+.mock-tp__table--reserved .mock-tp__chair {
+  background: var(--color-primary);
+}
+
+.mock-tp__table--dine .mock-tp__chair {
+  background: var(--color-magenta-300);
+}
+
+.mock-tp__tlabel {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mock-tp__tseats {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.mock-tp__tseats svg {
+  width: 11px;
+  height: 11px;
+}
+
+@media (max-width: 900px) {
+  .mock-tp {
+    grid-template-columns: 1fr;
+  }
+
+  .mock-tp__floor {
+    height: 440px;
+  }
+}

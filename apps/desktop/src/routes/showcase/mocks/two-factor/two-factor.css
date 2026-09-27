@@ -1,0 +1,186 @@
+/* Two-factor mock — extracted from the old ui-library index.css, retokened */
+
+.mock-2fa {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.mock-2fa .tw-tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.mock-2fa__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 520px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 24px;
+}
+
+.mock-2fa__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mock-2fa__head h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.mock-2fa__shield {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.mock-2fa__desc {
+  margin: 0;
+  font-size: 15px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  line-height: 1.55;
+}
+
+.mock-2fa__step {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mock-2fa__step-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.mock-2fa__step-pill {
+  padding: 2px 9px;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  background: var(--color-card);
+}
+
+.mock-2fa__qr-row {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  margin-top: 8px;
+}
+
+.mock-2fa__qr-frame {
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  align-self: flex-start;
+}
+
+/* the shim QRCode renders a currentColor svg; keep it scannable on white */
+.mock-2fa__qr-frame svg {
+  width: 168px;
+  height: 168px;
+  background: #ffffff;
+  color: #111111;
+}
+
+.mock-2fa__qr-side {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: color-mix(in oklab, var(--color-foreground) 6%, transparent);
+  border-radius: 10px;
+}
+
+.mock-2fa__side-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.mock-2fa__side-sub {
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-2fa__secret {
+  padding: 8px 12px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--color-foreground);
+  margin: 2px 0 6px;
+}
+
+.mock-2fa__error {
+  font-size: 14px;
+  color: var(--color-destructive);
+}
+
+.mock-2fa__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mock-2fa__foot--end {
+  justify-content: flex-end;
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+}
+
+.mock-2fa__codes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.mock-2fa__codes code {
+  padding: 8px 4px;
+  text-align: center;
+  background: color-mix(in oklab, var(--color-foreground) 6%, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12.5px;
+  color: var(--color-foreground);
+}
+
+.mock-2fa__hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+@media (max-width: 560px) {
+  .mock-2fa__qr-row {
+    flex-direction: column;
+  }
+
+  .mock-2fa__codes {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

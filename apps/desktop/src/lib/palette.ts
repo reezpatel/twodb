@@ -1,0 +1,40 @@
+/** Oldworld theme colors — mirrors src/index.css tokens (VSCode theme port). */
+export const OLDWORLD = {
+  bg: "#161617",
+  fg: "#c9c7cd",
+  lavender: "#aca1cf",
+  magenta: "#e29eca",
+  orange: "#d19a66",
+  green: "#90b99f",
+  blue: "#92a2d5",
+  red: "#ea83a5",
+  peach: "#e6b99d",
+  cyan: "#85b5ba",
+  gray: "#b4b1ba",
+  dark: "#131314",
+} as const;
+
+/** xterm.js theme matching the Oldworld terminal colors. */
+export const OLDWORLD_XTERM = {
+  background: OLDWORLD.bg,
+  foreground: OLDWORLD.fg,
+  cursor: OLDWORLD.fg,
+  cursorAccent: OLDWORLD.dark,
+  selectionBackground: "#c9c7cd40",
+  black: "#27272a",
+  red: OLDWORLD.red,
+  green: OLDWORLD.green,
+  yellow: OLDWORLD.peach,
+  blue: OLDWORLD.blue,
+  magenta: OLDWORLD.magenta,
+  cyan: OLDWORLD.cyan,
+  white: OLDWORLD.gray,
+  brightBlack: "#666666",
+  brightRed: OLDWORLD.red,
+  brightGreen: OLDWORLD.green,
+  brightYellow: OLDWORLD.peach,
+  brightBlue: OLDWORLD.blue,
+  brightMagenta: OLDWORLD.magenta,
+  brightCyan: OLDWORLD.cyan,
+  brightWhite: OLDWORLD.fg,
+} as const;

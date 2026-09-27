@@ -1,0 +1,365 @@
+/* Employee Panel mock — extracted from the old ui-library index.css */
+
+.mock-emp {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  background: var(--color-card);
+  border-radius: 10px;
+}
+
+.mock-emp__panel {
+  display: flex;
+  flex-direction: column;
+  width: 400px;
+  max-width: 100%;
+  max-height: 720px;
+  background: var(--color-card);
+  border-left: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 0 10px 10px 0;
+  box-shadow: 0 14px 32px -10px rgb(0 0 0 / 0.5);
+}
+
+.mock-emp__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mock-emp__bar h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 650;
+}
+
+.mock-emp__bar-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.mock-emp__scroll {
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.mock-emp__profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mock-emp__avatar {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.mock-emp__online {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  border: 2px solid var(--color-card);
+}
+
+.mock-emp__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mock-emp__who strong {
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--color-foreground);
+}
+
+.mock-emp__who span {
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-emp__info {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mock-emp__info div {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 12px;
+}
+
+.mock-emp__info dt {
+  font-size: 15px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-emp__info dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 550;
+  color: var(--color-foreground);
+}
+
+.mock-emp__section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mock-emp__section h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--color-foreground);
+}
+
+.mock-emp__note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mock-emp__note-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mock-emp__note-head strong {
+  font-size: 15px;
+  color: var(--color-foreground);
+}
+
+.mock-emp__note-head > button {
+  margin-left: auto;
+}
+
+.mock-emp__note-date {
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-emp__note p {
+  margin: 0;
+  font-size: 15px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  line-height: 1.5;
+}
+
+.mock-emp__files {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mock-emp__file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-card);
+  min-width: 0;
+}
+
+.mock-emp__file-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.mock-emp__file-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mock-emp__file-meta strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mock-emp__file-meta span {
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-emp__comp {
+  display: flex;
+  flex-direction: column;
+}
+
+.mock-emp__comp-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 10px 0 10px 12px;
+  border-left: 1px solid var(--color-primary);
+}
+
+.mock-emp__comp-row--past {
+  border-left-color: color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  opacity: 0.55;
+}
+
+.mock-emp__comp-label {
+  font-size: 15px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-emp__comp-from {
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-emp__comp-row strong {
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--color-foreground);
+}
+
+.mock-emp__reopen {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 240px;
+}
+
+/* ---------- utilities (scoped) ---------- */
+
+.mock-emp .tw-tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ---------- DayTimeline (ported from @twodb/ui chart styles) ---------- */
+
+.mock-emp .tw-dayline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mock-emp .tw-dayline__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mock-emp .tw-dayline__title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--color-foreground);
+}
+
+.mock-emp .tw-dayline__date {
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+  font-weight: 400;
+}
+
+.mock-emp .tw-dayline__tracking {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+.mock-emp .tw-dayline__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-muted-foreground);
+}
+
+.mock-emp .tw-dayline__dot--on {
+  background: var(--color-primary);
+}
+
+.mock-emp .tw-dayline__bar {
+  position: relative;
+  height: 20px;
+  background: var(--color-muted);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mock-emp .tw-dayline__seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.mock-emp .tw-dayline__axis {
+  position: relative;
+  height: 16px;
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-emp .tw-dayline__axis span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.mock-emp .tw-dayline__axis span:first-child {
+  transform: none;
+}
+
+.mock-emp .tw-dayline__axis span:last-child {
+  transform: translateX(-100%);
+}
+
+.mock-emp .tw-dayline__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.mock-emp .tw-dayline__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+.mock-emp .tw-dayline__legend-item i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.mock-emp .tw-dayline__legend-item b {
+  font-weight: 650;
+  color: var(--color-foreground);
+}

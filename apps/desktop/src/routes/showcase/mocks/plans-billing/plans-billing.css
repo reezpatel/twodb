@@ -1,0 +1,508 @@
+/* Plans & Billing mock — retokened for the desktop dark theme */
+
+.mock-pb {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  width: 100%;
+  min-height: 780px;
+  border: 1px solid color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  border-radius: 14px;
+  background: var(--color-background);
+  overflow: hidden;
+}
+
+/* --- Sidebar --- */
+
+.mock-pb__sidebar {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-card);
+}
+
+/* Brand */
+.mock-pb__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mock-pb__brand-icon {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--color-foreground);
+  letter-spacing: -0.05em;
+}
+
+.mock-pb__brand-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+/* Navigation */
+.mock-pb__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 8px;
+}
+
+.mock-pb__nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-pb__nav-item svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-muted-foreground);
+  flex-shrink: 0;
+}
+
+.mock-pb__nav-item:hover {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: var(--color-foreground);
+}
+
+.mock-pb__nav-item.is-active {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: var(--color-foreground);
+  font-weight: 500;
+}
+
+.mock-pb__nav-item.is-active svg {
+  color: var(--color-primary);
+}
+
+/* Browser Section */
+.mock-pb__browser {
+  flex: 1;
+  padding: 0 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mock-pb__browser-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 8px 8px;
+}
+
+.mock-pb__browser-label {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+.mock-pb__browser-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+}
+
+.mock-pb__browser-more:hover {
+  background: var(--color-border);
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+.mock-pb__folder-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  cursor: pointer;
+  text-align: left;
+}
+
+.mock-pb__folder-row:hover {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: var(--color-foreground);
+}
+
+.mock-pb__folder-row svg {
+  width: 14px;
+  height: 14px;
+  color: var(--color-muted-foreground);
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-pb__folder-row svg.is-expanded {
+  transform: rotate(90deg);
+}
+
+.mock-pb__folder-children {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-left: 14px;
+  padding-left: 12px;
+  border-left: 1px solid var(--color-border);
+}
+
+.mock-pb__folder-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  text-align: left;
+}
+
+.mock-pb__folder-item:hover {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+.mock-pb__folder-item svg {
+  width: 14px;
+  height: 14px;
+  color: var(--color-muted-foreground);
+  flex-shrink: 0;
+}
+
+/* Sidebar Footer */
+.mock-pb__sidebar-footer {
+  margin-top: auto;
+  padding: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.mock-pb__docs-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-background);
+  font: inherit;
+  font-size: 14px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  cursor: pointer;
+  transition:
+    border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-pb__docs-btn:hover {
+  border-color: color-mix(in oklab, var(--color-foreground) 30%, transparent);
+  background: var(--color-card);
+}
+
+.mock-pb__docs-btn svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-muted-foreground);
+}
+
+/* --- Main Content --- */
+
+.mock-pb__main {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 24px;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Header */
+.mock-pb__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mock-pb__header-left h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.mock-pb__header-left p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.mock-pb__header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mock-pb__upgrade-btn {
+  gap: 6px;
+}
+
+.mock-pb__upgrade-btn svg {
+  color: #f59e0b;
+}
+
+/* Plans Section */
+.mock-pb__plans {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mock-pb__plan {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-card);
+  transition: border-color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-pb__plan:hover {
+  border-color: color-mix(in oklab, var(--color-foreground) 30%, transparent);
+}
+
+.mock-pb__plan--current {
+  border-color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+}
+
+.mock-pb__plan-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mock-pb__plan-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mock-pb__slashes {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--color-primary);
+  letter-spacing: -0.08em;
+}
+
+.mock-pb__plan-title h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.mock-pb__plan-price {
+  margin-left: auto;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+}
+
+.mock-pb__plan-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mock-pb__plan-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  line-height: 1.4;
+}
+
+.mock-pb__plan-features li svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-primary);
+}
+
+.mock-pb__plan-btn {
+  margin-top: auto;
+  width: 100%;
+}
+
+/* Invoices Section */
+.mock-pb__invoices {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mock-pb__invoices h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.mock-pb__invoices-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mock-pb__invoices-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mock-pb__search {
+  width: 180px;
+}
+
+.mock-pb__invoices-table {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-card);
+  overflow: hidden;
+}
+
+.mock-pb__invoices-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.mock-pb__invoices-table tr {
+  border-bottom: 1px solid var(--color-border);
+  transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mock-pb__invoices-table tr:last-child {
+  border-bottom: 0;
+}
+
+.mock-pb__invoices-table tr:hover {
+  background: color-mix(in oklab, var(--color-foreground) 4%, transparent);
+}
+
+.mock-pb__invoices-table tr.is-selected {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+}
+
+.mock-pb__invoices-table td {
+  padding: 12px 14px;
+  font-size: 14px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  vertical-align: middle;
+}
+
+.mock-pb__check-col {
+  width: 44px;
+}
+
+.mock-pb__invoice-num {
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+
+.mock-pb__invoice-date {
+  color: var(--color-muted-foreground);
+  width: 120px;
+}
+
+.mock-pb__invoice-plan {
+  color: var(--color-muted-foreground);
+  width: 100px;
+}
+
+.mock-pb__invoice-amount {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  width: 100px;
+}
+
+.mock-pb__invoice-action {
+  width: 44px;
+  text-align: right;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .mock-pb {
+    grid-template-columns: 1fr;
+  }
+
+  .mock-pb__sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .mock-pb__plans {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .mock-pb__header {
+    flex-direction: column;
+  }
+
+  .mock-pb__invoices-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mock-pb__invoices-actions {
+    flex-wrap: wrap;
+  }
+
+  .mock-pb__search {
+    width: 100%;
+  }
+}

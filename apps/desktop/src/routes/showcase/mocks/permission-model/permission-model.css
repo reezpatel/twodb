@@ -1,0 +1,182 @@
+/* Permission Model Dialog — retokened for the desktop dark theme */
+
+.mock-pm__backdrop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 600px;
+  padding: 24px;
+  background: var(--color-card);
+  border-radius: 14px;
+}
+
+.mock-pm__dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.4),
+    0 2px 4px -2px rgba(0, 0, 0, 0.4);
+}
+
+.mock-pm__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+/* App Icons */
+.mock-pm__icons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.mock-pm__app-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+/* icon strokes are hardcoded white, so the tile stays dark */
+.mock-pm__app-icon--dark {
+  background: #101014;
+}
+
+.mock-pm__app-icon--gradient {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+.mock-pm__arrows {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted-foreground);
+}
+
+/* Title & Description */
+.mock-pm__title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-foreground);
+  text-align: center;
+}
+
+.mock-pm__desc {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  text-align: center;
+  line-height: 1.5;
+  max-width: 340px;
+}
+
+/* Permissions Section */
+.mock-pm__permissions {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.mock-pm__section-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.mock-pm__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mock-pm__list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  line-height: 1.4;
+}
+
+.mock-pm__list li svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-muted-foreground);
+}
+
+/* URL Field */
+.mock-pm__url-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 8px 10px 14px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.mock-pm__url {
+  font-size: 14px;
+  color: color-mix(in oklab, var(--color-foreground) 80%, var(--color-muted-foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Footer Actions */
+.mock-pm__footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.mock-pm__docs-btn {
+  gap: 8px;
+}
+
+/* Closed State */
+.mock-pm__closed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 24px;
+  background: var(--color-card);
+  border-radius: 14px;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .mock-pm__dialog {
+    padding: 16px;
+  }
+
+  .mock-pm__footer {
+    flex-direction: column;
+  }
+
+  .mock-pm__footer button {
+    width: 100%;
+  }
+}

@@ -2,6 +2,9 @@
   "name": "twodb",
   "private": true,
   "scripts": {
+    "local": "pnpm --parallel --filter @twodb/desktop --filter @twodb/server dev",
+    "runner": "pnpm --filter @twodb/runner dev",
+    "db:migrate": "pnpm --filter @twodb/server db:migrate",
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",

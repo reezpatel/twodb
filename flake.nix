@@ -1,5 +1,5 @@
 {
-  description = "TwoDB server and node agent release packaging";
+  description = "TwoDB — server, runner and desktop app";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -17,68 +17,102 @@
         {
           config,
           lib,
-          pkgs,
           ...
         }:
         let
-          cfg = config.services.twodb-server;
+          serverCfg = config.services.twodb-server;
+          runnerCfg = config.services.twodb-runner;
         in
         {
           options.services.twodb-server = {
-            enable = lib.mkEnableOption "twodb-server";
+            enable = lib.mkEnableOption "twodb server (API + web UI container)";
 
-            package = lib.mkOption {
-              type = lib.types.package;
-              default = self.packages.${pkgs.system}.twodb-server;
-              description = "twodb-server package to run.";
+            image = lib.mkOption {
+              type = lib.types.str;
+              default = "ghcr.io/reezpatel/twodb:latest";
+              description = "Server image to run.";
             };
 
             port = lib.mkOption {
               type = lib.types.port;
               default = 3001;
-              description = "TCP port the server listens on.";
+              description = "Host port for the web UI + API.";
             };
 
-            databaseUrl = lib.mkOption {
-              type = lib.types.str;
-              description = "PostgreSQL connection string.";
-            };
-
-            workDir = lib.mkOption {
-              type = lib.types.str;
-              default = "/var/lib/twodb";
-              description = "Runtime data directory.";
-            };
-
-            extraEnvironment = lib.mkOption {
+            environment = lib.mkOption {
               type = lib.types.attrsOf lib.types.str;
               default = { };
-              description = "Extra environment variables for the service (e.g. TWODB_ADMIN_RP_ID, TWODB_ADMIN_ORIGIN).";
+              description = ''
+                Environment for the server container, e.g. TWODB_DATABASE_URL,
+                MEMGRAPH_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL.
+              '';
+            };
+
+            environmentFile = lib.mkOption {
+              type = lib.types.nullOr lib.types.path;
+              default = null;
+              description = "File with secrets (TWODB_DATABASE_URL, BETTER_AUTH_SECRET, …) loaded into the container.";
             };
           };
 
-          config = lib.mkIf cfg.enable {
-            systemd.services.twodb-server = {
-              description = "TwoDB server";
-              after = [ "network-online.target" ];
-              wants = [ "network-online.target" ];
-              wantedBy = [ "multi-user.target" ];
-              environment = {
-                TWODB_DATABASE_URL = cfg.databaseUrl;
-                TWODB_PORT = toString cfg.port;
-                TWODB_WORK_DIR = cfg.workDir;
-                TWODB_STATIC_DIR = "${cfg.package}/share/twodb/web-dist";
-                TWODB_VENDOR_DIR = "${cfg.package}/share/twodb/vendor";
-                TWODB_PLUGINS_DIR = "${cfg.package}/share/twodb/plugins";
-              }
-              // cfg.extraEnvironment;
-              serviceConfig = {
-                ExecStart = "${cfg.package}/bin/twodb-server";
-                DynamicUser = true;
-                StateDirectory = "twodb";
-                Restart = "on-failure";
-              };
+          options.services.twodb-runner = {
+            enable = lib.mkEnableOption "twodb runner (outbound agent container)";
+
+            image = lib.mkOption {
+              type = lib.types.str;
+              default = "ghcr.io/reezpatel/twodb-runner:latest";
+              description = "Runner image to run.";
             };
+
+            serverUrl = lib.mkOption {
+              type = lib.types.str;
+              default = "http://localhost:3001";
+              description = "Server the runner connects to (outbound WebSocket).";
+            };
+
+            runnerName = lib.mkOption {
+              type = lib.types.str;
+              default = config.networking.hostName;
+              description = "Runner name shown in Settings → Runners.";
+            };
+
+            environmentFile = lib.mkOption {
+              type = lib.types.nullOr lib.types.path;
+              default = null;
+              description = "File containing TWODB_RUNNER_KEY (from Settings → Runners).";
+            };
+          };
+
+          config = {
+            virtualisation.oci-containers.containers = lib.mkMerge [
+              (lib.mkIf serverCfg.enable {
+                twodb-server = {
+                  image = serverCfg.image;
+                  ports = [ "${toString serverCfg.port}:3001" ];
+                  environment = serverCfg.environment;
+                  environmentFiles = lib.optional (serverCfg.environmentFile != null) serverCfg.environmentFile;
+                  autoStart = true;
+                  extraOptions = [ "--health-cmd=curl -fsS http://localhost:3001/api/health || exit 1" ];
+                };
+              })
+
+              (lib.mkIf runnerCfg.enable {
+                twodb-runner = {
+                  image = runnerCfg.image;
+                  # Host networking so the runner can reach a server on the host
+                  # (or anywhere) without NAT/firewalls in the way.
+                  extraOptions = [
+                    "--network=host"
+                  ];
+                  environment = {
+                    TWODB_SERVER_URL = runnerCfg.serverUrl;
+                    TWODB_RUNNER_NAME = runnerCfg.runnerName;
+                  };
+                  environmentFiles = lib.optional (runnerCfg.environmentFile != null) runnerCfg.environmentFile;
+                  autoStart = true;
+                };
+              })
+            ];
           };
         };
     }
@@ -86,76 +120,69 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        version = "0.0.16";
-        serverSrc = pkgs.fetchurl {
-          url = "https://github.com/reezpatel/twodb/releases/download/v${version}/twodb-server-v${version}.tar.gz";
-          sha256 = "080kkaik9nibi49xkk8ggk46a298scp5j88r9kv5dj2pzqal418f";
-        };
-        nodeAsset =
-          {
-            "x86_64-linux" = "twodb-node-linux-x64";
-            "aarch64-linux" = "twodb-node-linux-arm64";
-            "x86_64-darwin" = "twodb-node-darwin-x64";
-            "aarch64-darwin" = "twodb-node-darwin-arm64";
-          }
-          .${system} or (throw "twodb-node: unsupported system ${system}");
-        nodeHash =
-          {
-            "x86_64-linux" = "1ah6bxf9sifi7gjhwk1lrk0bipy23hi21rl9vl9paar2jvq4zz12";
-            "aarch64-linux" = "0is3fyvac8yplii63acdxl1mvqx4r7kr6piisxq3qpch338njkcn";
-            "x86_64-darwin" = "0y6px4ymdwiy5rfqamydx151cncyc80kc9ggb41iqjrrh4yjcq3r";
-            "aarch64-darwin" = "1qbalksdbk15khq4li4x90zpnk6l035ljlxj95j8y9s6fs7j269h";
-          }
-          .${system} or (throw "twodb-node: unsupported system ${system}");
-        nodeSrc = pkgs.fetchurl {
-          url = "https://github.com/reezpatel/twodb/releases/download/v${version}/${nodeAsset}";
-          name = "twodb-node";
-          sha256 = nodeHash;
-        };
+
+        # Native runner package built from the release tarball (node-pty is a
+        # native module, so each platform's tarball carries its own build).
+        # Bump runnerVersion -- and the hashes, which `nix build` prints -- per release.
+        runnerVersion = "0.0.0";
+        runnerTarball =
+          arch:
+          pkgs.fetchurl {
+            url = "https://github.com/reezpatel/twodb/releases/download/v${runnerVersion}/twodb-runner_${runnerVersion}_linux-${arch}.tar.gz";
+            hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          };
+        runnerPackage =
+          src:
+          pkgs.stdenv.mkDerivation {
+            pname = "twodb-runner";
+            version = runnerVersion;
+            inherit src;
+
+            nativeBuildInputs = [ pkgs.makeWrapper ];
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p $out/libexec $out/bin
+              cp -r twodb-runner/* $out/libexec/
+              makeWrapper ${pkgs.nodejs_22}/bin/node $out/bin/twodb-runner \
+                --add-flags "$out/libexec/node_modules/tsx/dist/cli.mjs" \
+                --add-flags "$out/libexec/src/index.ts"
+              runHook postInstall
+            '';
+
+            meta.mainProgram = "twodb-runner";
+          };
       in
       {
         packages = {
-          twodb-server = pkgs.stdenv.mkDerivation {
-            pname = "twodb-server";
-            inherit version;
-            src = serverSrc;
-            dontConfigure = true;
-            dontBuild = true;
-            unpackPhase = ''
-              sourceRoot=unpacked
-              mkdir $sourceRoot
-              tar -xzf $src -C $sourceRoot
-            '';
-            installPhase = ''
-              mkdir -p $out/share/twodb $out/bin
-              cp -R server.mjs web-dist vendor plugins $out/share/twodb/
-              cat > $out/bin/twodb-server <<EOF
-              #!/bin/sh
-              export TWODB_STATIC_DIR="$out/share/twodb/web-dist"
-              export TWODB_VENDOR_DIR="$out/share/twodb/vendor"
-              export TWODB_PLUGINS_DIR="$out/share/twodb/plugins"
-              exec ${pkgs.nodejs_22}/bin/node $out/share/twodb/server.mjs
-              EOF
-              chmod +x $out/bin/twodb-server
-            '';
-          };
+          twodb-runner = runnerPackage (runnerTarball "x64");
+          twodb-runner-aarch64 = runnerPackage (runnerTarball "arm64");
+        };
 
-          twodb-node = pkgs.stdenv.mkDerivation {
-            pname = "twodb-node";
-            inherit version;
-            src = nodeSrc;
-            dontUnpack = true;
-            dontConfigure = true;
-            dontBuild = true;
-            dontStrip = true;
-            installPhase = ''
-              mkdir -p $out/bin
-              install -m 0755 $src $out/bin/twodb-node
-            ''
-            + pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
-              patchelf --set-interpreter ${pkgs.stdenv.cc.bintools.dynamicLinker} $out/bin/twodb-node || true
-            '';
-          };
+        devShells.default = pkgs.mkShell {
+          packages = with pkgs; [
+            nodejs_22
+            pnpm
+            cargo
+            rustc
+            pkg-config
+            gobject-introspection
+            glib
+            gtk3
+            gdk-pixbuf
+            cairo
+            pango
+            atk
+            libsoup_3
+            webkitgtk_4_1
+            openssl
+            glib-networking
+            librsvg
+            dbus
+          ];
+          shellHook = ''
+            export XDG_DATA_DIRS="$GSETTINGS_SCHEMAS_PATH:$XDG_DATA_DIRS"
+          '';
         };
       }
     );
