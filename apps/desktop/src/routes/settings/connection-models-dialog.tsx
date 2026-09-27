@@ -48,7 +48,7 @@ export function ConnectionModelsDialog({
               <TableRow>
                 <TableHead className="w-64">Model</TableHead>
                 <TableHead>Context</TableHead>
-                <TableHead>In / Out</TableHead>
+                <TableHead>Max In / Out</TableHead>
                 <TableHead>Temp</TableHead>
                 <TableHead>Thinking</TableHead>
                 <TableHead>Modalities</TableHead>
