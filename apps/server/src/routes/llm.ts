@@ -324,12 +324,38 @@ async function collectMinimax(connection: LlmConnectionTable): Promise<QuotaSnap
   return snap;
 }
 
+/** Kilo Code: profile balance (pay-as-you-go credit pool, USD). */
+async function collectKilo(connection: LlmConnectionTable): Promise<QuotaSnapshot[]> {
+  const config = connection.config as Record<string, string>;
+  const apiKey = config.api_key ?? config.apiKey;
+  if (!apiKey) throw new Error("missing API key");
+
+  const json = (await fetchJson("https://api.kilo.ai/api/profile/balance", {
+    authorization: `Bearer ${apiKey}`,
+  })) as { balance?: unknown; isDepleted?: unknown };
+
+  const balance = finite(json.balance);
+  if (balance === undefined) throw new Error("invalid kilo balance response");
+
+  return [
+    {
+      quotaType: "credits",
+      groupName: "default",
+      unit: "usd",
+      quotaTotal: null, // pay-as-you-go: no fixed cap, show remaining only
+      quotaUsed: Number(balance.toFixed(4)),
+      resetAt: null,
+    },
+  ];
+}
+
 const QUOTA_COLLECTORS: Record<string, QuotaCollector> = {
   "claude-code": collectClaudeCode,
   zai: collectZai,
   kimi: collectKimi,
   "ollama-cloud": collectOllamaCloud,
   minimax: collectMinimax,
+  "kilo-code": collectKilo,
 };
 
 export const llmRoutes = new Hono()
