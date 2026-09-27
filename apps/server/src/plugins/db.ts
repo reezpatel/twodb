@@ -239,6 +239,19 @@ export interface CodeSessionMessageTable {
   createdAt: Date;
 }
 
+export interface LlmQuotaTable {
+  id: string;
+  organizationId: string;
+  connectionId: string;
+  quotaType: string;
+  groupName: string;
+  unit: string;
+  quotaTotal: number | null;
+  quotaUsed: number;
+  capturedAt: Date;
+  resetAt: Date | null;
+}
+
 export interface LlmUsageEventTable {
   id: string;
   organizationId: string;
@@ -467,6 +480,7 @@ export interface Database {
   agent: AgentTable;
   instruction: InstructionTable;
   memory: MemoryTable;
+  llm_quota: LlmQuotaTable;
   llm_usage_event: LlmUsageEventTable;
   llm_model: LlmModelTable;
   storage_backend: StorageBackendTable;

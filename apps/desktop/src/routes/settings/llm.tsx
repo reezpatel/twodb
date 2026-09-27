@@ -2,6 +2,7 @@ import { FlaskConical, Loader2, RotateCw, Table2 } from "lucide-react";
 import { useState } from "react";
 import { ConnectionForm } from "./connection-form";
 import { ConnectionModelsDialog } from "./connection-models-dialog";
+import { ConnectionQuotas } from "./connection-quotas";
 import { ConnectionUsage } from "./connection-usage";
 import { AgentsPanel, InstructionsPanel, MemoriesPanel, SkillsPanel } from "./workspace-panels";
 import { useLlm, type ConnectionTestResult } from "./use-llm";
@@ -14,7 +15,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 export function LlmSection() {
-  const { providers, connections, modal, setModal, toggle, refreshAll, refreshOne, testConnection, actionError, onSaved, onDelete, modelsFor, setModelsFor, connectionModels } = useLlm();
+  const {
+    providers,
+    connections,
+    modal,
+    setModal,
+    toggle,
+    refreshAll,
+    refreshOne,
+    testConnection,
+    actionError,
+    onSaved,
+    onDelete,
+    modelsFor,
+    setModelsFor,
+    connectionModels,
+  } = useLlm();
   const [testResults, setTestResults] = useState<Record<string, ConnectionTestResult | "pending">>({});
 
   const providerLabel = (id: string) => providers.find((p) => p.id === id)?.label ?? id;
@@ -68,6 +84,7 @@ export function LlmSection() {
                     </div>
                     <div className="text-muted-foreground text-xs">{providerLabel(connection.provider)}</div>
                     <ConnectionUsage connectionId={connection.id} />
+                    <ConnectionQuotas connectionId={connection.id} provider={connection.provider} />
                     {testResult === "pending" && (
                       <p className="text-muted-foreground mt-1 flex items-center gap-1 text-xs">
                         <Loader2 size={11} className="animate-spin" /> testing…
@@ -101,7 +118,13 @@ export function LlmSection() {
                     <Table2 />
                     Models
                   </Button>
-                  <Button variant="ghost" size="sm" title="Refresh models from provider" onClick={() => refreshOne.mutate(connection.id)} disabled={refreshOne.isPending}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    title="Refresh models from provider"
+                    onClick={() => refreshOne.mutate(connection.id)}
+                    disabled={refreshOne.isPending}
+                  >
                     {refreshOne.isPending ? <Loader2 className="animate-spin" /> : <RotateCw />}
                     Sync
                   </Button>

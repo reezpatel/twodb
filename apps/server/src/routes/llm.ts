@@ -3,6 +3,8 @@ import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
 import { getProvider, LLM_PROVIDERS } from "../lib/llm-providers";
 import { refreshConnectionModels } from "../lib/refresh-models";
+import { runAgentRound, type AgentMessage } from "../lib/agent";
+import { ensureFreshTokens } from "../lib/token-refresh";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -112,6 +114,210 @@ export const llmRoutes = new Hono()
       .executeTakeFirst();
     if (!row) return c.json({ error: "connection_not_found" }, 404);
     return c.json({ ok: true });
+  })
+
+  .get("/connections/:id/quotas", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+
+    const connection = await db
+      .selectFrom("llm_connection")
+      .select("id")
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!connection) return c.json({ error: "connection_not_found" }, 404);
+
+    const rows = await db
+      .selectFrom("llm_quota")
+      .selectAll()
+      .where("connectionId", "=", connection.id)
+      .orderBy("quotaType", "asc")
+      .execute();
+    return c.json(rows);
+  })
+
+  /** Upsert a quota snapshot (manual or collector-fed). */
+  .post("/connections/:id/quotas", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+
+    const connection = await db
+      .selectFrom("llm_connection")
+      .select("id")
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!connection) return c.json({ error: "connection_not_found" }, 404);
+
+    const body = await c.req.json().catch(() => null);
+    const quotaType = typeof body?.quotaType === "string" ? body.quotaType.trim() : "";
+    if (!quotaType) return c.json({ error: "invalid_quota_type" }, 400);
+    const groupName = typeof body?.groupName === "string" && body.groupName.trim() ? body.groupName.trim() : "default";
+    const unit = typeof body?.unit === "string" && body.unit.trim() ? body.unit.trim() : "tokens";
+    if (typeof body?.quotaUsed !== "number" || !Number.isFinite(body.quotaUsed) || body.quotaUsed < 0) {
+      return c.json({ error: "invalid_quota_used" }, 400);
+    }
+    let quotaTotal: number | null = null;
+    if (body?.quotaTotal !== undefined && body?.quotaTotal !== null) {
+      if (typeof body.quotaTotal !== "number" || !Number.isFinite(body.quotaTotal) || body.quotaTotal < 0) {
+        return c.json({ error: "invalid_quota_total" }, 400);
+      }
+      quotaTotal = body.quotaTotal;
+    }
+    let resetAt: Date | null = null;
+    if (typeof body?.resetAt === "string" && body.resetAt) {
+      const parsed = new Date(body.resetAt);
+      if (Number.isNaN(parsed.getTime())) return c.json({ error: "invalid_reset_at" }, 400);
+      resetAt = parsed;
+    }
+
+    const existing = await db
+      .selectFrom("llm_quota")
+      .select("id")
+      .where("connectionId", "=", connection.id)
+      .where("quotaType", "=", quotaType)
+      .where("groupName", "=", groupName)
+      .executeTakeFirst();
+
+    const now = new Date();
+    if (existing) {
+      const row = await db
+        .updateTable("llm_quota")
+        .set({ unit, quotaTotal, quotaUsed: body.quotaUsed, capturedAt: now, resetAt })
+        .where("id", "=", existing.id)
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      return c.json(row);
+    }
+
+    const row = await db
+      .insertInto("llm_quota")
+      .values({ id: crypto.randomUUID(), organizationId: s.organizationId, connectionId: connection.id, quotaType, groupName, unit, quotaTotal, quotaUsed: body.quotaUsed, capturedAt: now, resetAt })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    return c.json(row, 201);
+  })
+
+  /** Provider quota collection — currently Claude Code (5h + weekly windows). */
+  .post("/connections/:id/refresh-quotas", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+
+    const connection = await db
+      .selectFrom("llm_connection")
+      .selectAll()
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!connection) return c.json({ error: "connection_not_found" }, 404);
+    if (connection.provider !== "claude-code") {
+      return c.json({ error: "quota_refresh_not_supported", provider: connection.provider }, 400);
+    }
+
+    const config = await ensureFreshTokens(connection);
+    const token = config.access_token;
+    if (!token) return c.json({ error: "missing_access_token" }, 400);
+
+    let json: unknown;
+    try {
+      const res = await fetch("https://api.anthropic.com/api/oauth/usage", {
+        headers: { authorization: `Bearer ${token}`, "anthropic-beta": "oauth-2025-04-20", accept: "application/json" },
+      });
+      const text = await res.text();
+      if (!res.ok) return c.json({ error: `usage_error_${res.status}`, detail: text.slice(0, 200) }, 502);
+      json = JSON.parse(text);
+    } catch (e) {
+      return c.json({ error: "usage_fetch_failed", detail: (e as Error).message }, 502);
+    }
+
+    const roots = [json, (json as { data?: unknown })?.data, (json as { usage?: unknown })?.usage].filter((r) => typeof r === "object" && r !== null);
+    const asWindow = (v: unknown): { usedPercent: number; resetIso?: string } | null => {
+      if (typeof v !== "object" || v === null) return null;
+      const used = (v as { usedPercent?: unknown }).usedPercent ?? (v as { used_percent?: unknown }).used_percent;
+      if (typeof used !== "number") return null;
+      const reset = (v as { resetIso?: unknown }).resetIso ?? (v as { resets_at?: unknown }).resets_at ?? (v as { ends_at?: unknown }).ends_at;
+      return { usedPercent: used, resetIso: typeof reset === "string" ? reset : undefined };
+    };
+
+    let fiveHour: { usedPercent: number; resetIso?: string } | null = null;
+    let sevenDay: { usedPercent: number; resetIso?: string } | null = null;
+    for (const root of roots as Record<string, unknown>[]) {
+      fiveHour = fiveHour ?? asWindow(root.five_hour ?? root.fiveHour);
+      sevenDay = sevenDay ?? asWindow(root.seven_day ?? root.sevenDay);
+    }
+    if (!fiveHour && !sevenDay) return c.json({ error: "usage_parse_failed" }, 502);
+
+    const now = new Date();
+    const upsert = async (quotaType: string, window: { usedPercent: number; resetIso?: string }) => {
+      const existing = await db
+        .selectFrom("llm_quota")
+        .select("id")
+        .where("connectionId", "=", connection.id)
+        .where("quotaType", "=", quotaType)
+        .where("groupName", "=", "default")
+        .executeTakeFirst();
+      const values = {
+        unit: "percent",
+        quotaTotal: 100,
+        quotaUsed: window.usedPercent,
+        capturedAt: now,
+        resetAt: window.resetIso ? new Date(window.resetIso) : null,
+      };
+      if (existing) {
+        await db.updateTable("llm_quota").set(values).where("id", "=", existing.id).execute();
+      } else {
+        await db
+          .insertInto("llm_quota")
+          .values({ id: crypto.randomUUID(), organizationId: s.organizationId, connectionId: connection.id, quotaType, groupName: "default", ...values })
+          .execute();
+      }
+    };
+    if (fiveHour) await upsert("5h", fiveHour);
+    if (sevenDay) await upsert("weekly", sevenDay);
+
+    const rows = await db.selectFrom("llm_quota").selectAll().where("connectionId", "=", connection.id).orderBy("quotaType", "asc").execute();
+    return c.json(rows);
+  })
+
+  /** One tiny round-trip per connection — proves credentials + wire + model. */
+  .post("/connections/:id/test", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+
+    const connection = await db
+      .selectFrom("llm_connection")
+      .selectAll()
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!connection) return c.json({ error: "connection_not_found" }, 404);
+
+    const stored = await db
+      .selectFrom("llm_model")
+      .select("modelId")
+      .where("connectionId", "=", connection.id)
+      .orderBy("createdAt", "asc")
+      .limit(1)
+      .executeTakeFirst();
+    const provider = getProvider(connection.provider);
+    const model = stored?.modelId ?? provider?.models[0];
+    if (!model) return c.json({ error: "no_model_available" }, 400);
+
+    const started = Date.now();
+    try {
+      const messages: AgentMessage[] = [{ role: "user", content: "Reply with exactly: OK", meta: null }];
+      const result = await runAgentRound(connection, model, messages, []);
+      return c.json({
+        ok: true,
+        model,
+        ms: Date.now() - started,
+        reply: (result.content ?? "").trim().slice(0, 200),
+        usage: result.usage,
+      });
+    } catch (e) {
+      return c.json({ ok: false, model, ms: Date.now() - started, error: (e as Error).message.slice(0, 300) });
+    }
   })
 
   .get("/connections/:id/usage", async (c) => {

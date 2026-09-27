@@ -205,6 +205,22 @@ CREATE TABLE IF NOT EXISTS llm_model (
     output text[] DEFAULT '{}'::text[] NOT NULL,
     "createdAt" timestamp with time zone NOT NULL
 );
+CREATE TABLE IF NOT EXISTS llm_quota (
+    id text NOT NULL,
+    "organizationId" text NOT NULL,
+    "connectionId" text NOT NULL,
+    "quotaType" text NOT NULL,
+    "groupName" text DEFAULT 'default'::text NOT NULL,
+    unit text DEFAULT 'tokens'::text NOT NULL,
+    "quotaTotal" double precision,
+    "quotaUsed" double precision NOT NULL,
+    "capturedAt" timestamp with time zone NOT NULL,
+    "resetAt" timestamp with time zone,
+    CONSTRAINT llm_quota_connection_type_group_unique UNIQUE ("connectionId", "quotaType", "groupName")
+);
+CREATE INDEX IF NOT EXISTS llm_quota_connection_idx ON llm_quota("connectionId");
+ALTER TABLE llm_quota ADD CONSTRAINT llm_quota_organizationId_fkey FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
+ALTER TABLE llm_quota ADD CONSTRAINT llm_quota_connectionId_fkey FOREIGN KEY ("connectionId") REFERENCES llm_connection(id) ON DELETE CASCADE;
 CREATE TABLE IF NOT EXISTS llm_usage_event (
     id text NOT NULL,
     "organizationId" text NOT NULL,
