@@ -35,13 +35,13 @@ function enrich(base: FetchedModel, meta: ModelsDevModel | undefined): FetchedMo
     input: base.input.length > 0 ? base.input : (meta.modalities?.input ?? []).filter((m): m is "text" | "image" | "video" => MODALITIES.has(m)),
     thinkingLevel: thinkingLevel.length > 0 ? thinkingLevel : base.thinkingLevel,
     temperature: meta.temperature === true,
-    limitContext: meta.limit?.context ?? null,
-    limitInput: meta.limit?.input ?? null,
-    limitOutput: meta.limit?.output ?? null,
-    costInput: meta.cost?.input ?? null,
-    costOutput: meta.cost?.output ?? null,
-    costCacheRead: meta.cost?.cache_read ?? null,
-    output: meta.modalities?.output ?? [],
+    limitContext: base.limitContext ?? meta.limit?.context ?? null,
+    limitInput: base.limitInput ?? meta.limit?.input ?? null,
+    limitOutput: base.limitOutput ?? meta.limit?.output ?? null,
+    costInput: base.costInput ?? meta.cost?.input ?? null,
+    costOutput: base.costOutput ?? meta.cost?.output ?? null,
+    costCacheRead: base.costCacheRead ?? meta.cost?.cache_read ?? null,
+    output: base.output.length > 0 ? base.output : (meta.modalities?.output ?? []),
   };
 }
 
@@ -67,7 +67,12 @@ async function fetchProviderModels(connection: LlmConnectionTable): Promise<Fetc
     data?: {
       id?: unknown;
       display_name?: unknown;
+      name?: unknown;
       context_window?: unknown;
+      context_length?: unknown;
+      per_request_limits?: { prompt_tokens?: unknown; completion_tokens?: unknown } | null;
+      pricing?: { prompt?: unknown; completion?: unknown; input_cache_read?: unknown };
+      architecture?: { input_modalities?: unknown; output_modalities?: unknown };
     }[];
   };
   try {
@@ -75,24 +80,36 @@ async function fetchProviderModels(connection: LlmConnectionTable): Promise<Fetc
   } catch {
     throw new Error("provider returned invalid JSON");
   }
+
+  const num = (v: unknown): number | null =>
+    typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : null;
+  // providers quote per-token prices ("0.0000016"); our columns are per-million
+  const perM = (v: unknown): number | null => {
+    const n = num(v);
+    // <= 0 is a provider sentinel (-1 = "dynamic pricing", 0 = free) — treat as unknown
+    if (n === null || n <= 0) return null;
+    return Number((n * 1_000_000).toFixed(6));
+  };
+  const strArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+
   const data = Array.isArray(json.data) ? json.data : [];
   return data
     .filter((m) => typeof m.id === "string" && m.id)
     .map((m) => ({
       modelId: m.id as string,
-      displayName: typeof m.display_name === "string" ? m.display_name : null,
-      contextWindow: typeof m.context_window === "number" ? m.context_window : null,
+      displayName: typeof m.display_name === "string" ? m.display_name : typeof m.name === "string" ? m.name : null,
+      contextWindow: num(m.context_window) ?? num(m.context_length),
       thinking: false,
-      input: [] as ("text" | "image" | "video")[],
+      input: strArr(m.architecture?.input_modalities).filter((x): x is "text" | "image" | "video" => MODALITIES.has(x)),
       thinkingLevel: [] as string[],
       temperature: false,
-      limitContext: null,
-      limitInput: null,
-      limitOutput: null,
-      costInput: null,
-      costOutput: null,
-      costCacheRead: null,
-      output: [] as string[],
+      limitContext: num(m.context_length),
+      limitInput: num(m.per_request_limits?.prompt_tokens),
+      limitOutput: num(m.per_request_limits?.completion_tokens),
+      costInput: perM(m.pricing?.prompt),
+      costOutput: perM(m.pricing?.completion),
+      costCacheRead: perM(m.pricing?.input_cache_read),
+      output: strArr(m.architecture?.output_modalities),
     }));
 }
 
