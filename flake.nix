@@ -67,12 +67,19 @@
           };
 
           options.services.twodb-runner = {
-            enable = lib.mkEnableOption "twodb runner (outbound agent container)";
+            enable = lib.mkEnableOption "twodb runner (outbound agent)";
+
+            package = lib.mkOption {
+              type = lib.types.nullOr lib.types.package;
+              default = self.packages.${config.nixpkgs.hostPlatform.system}.twodb-runner;
+              defaultText = "flake twodb-runner for this system";
+              description = "Native runner package — runs as a systemd service. Set to null for the container.";
+            };
 
             image = lib.mkOption {
               type = lib.types.str;
               default = "ghcr.io/reezpatel/twodb-runner:latest";
-              description = "Runner image to run.";
+              description = "Runner image to run (container mode; ignored when package is set).";
             };
 
             serverUrl = lib.mkOption {
@@ -116,6 +123,27 @@
               };
             };
 
+            systemd.services.twodb-runner = lib.mkIf (runnerCfg.enable && runnerCfg.package != null) {
+              description = "twodb runner (native)";
+              wantedBy = [ "multi-user.target" ];
+              after = [ "network-online.target" ];
+              wants = [ "network-online.target" ];
+
+              environment = {
+                TWODB_SERVER_URL = runnerCfg.serverUrl;
+                TWODB_RUNNER_NAME = runnerCfg.runnerName;
+              };
+
+              serviceConfig = {
+                ExecStart = "${runnerCfg.package}/bin/twodb-runner";
+                DynamicUser = true;
+                Restart = "always";
+                RestartSec = "10s";
+              } // lib.optionalAttrs (runnerCfg.environmentFile != null) {
+                EnvironmentFile = [ "${runnerCfg.environmentFile}" ];
+              };
+            };
+
             virtualisation.oci-containers.containers = lib.mkMerge [
               (lib.mkIf (serverCfg.enable && serverCfg.package == null) {
                 twodb-server = {
@@ -128,7 +156,7 @@
                 };
               })
 
-              (lib.mkIf runnerCfg.enable {
+              (lib.mkIf (runnerCfg.enable && runnerCfg.package == null) {
                 twodb-runner = {
                   image = runnerCfg.image;
                   # Host networking so the runner can reach a server on the host
@@ -147,6 +175,89 @@
             ];
           };
         };
+
+      # nix-darwin: native runner via launchd (packages.twodb-runner).
+      darwinModules.default =
+        {
+          config,
+          lib,
+          ...
+        }:
+        let
+          cfg = config.services.twodb-runner;
+          parseEnvFile =
+            file:
+            lib.listToAttrs (
+              map
+                (l: (
+                  let
+                    parts = lib.splitString "=" l;
+                  in
+                  {
+                    name = builtins.head parts;
+                    value = lib.concatStringsSep "=" (builtins.tail parts);
+                  }
+                ))
+                (builtins.filter (l: l != "" && !lib.startsWith "#" l) (
+                  lib.splitString "\n" (builtins.readFile file)
+                ))
+            );
+        in
+        {
+          options.services.twodb-runner = {
+            enable = lib.mkEnableOption "twodb runner (launchd)";
+
+            package = lib.mkOption {
+              type = lib.types.package;
+              default = self.packages.${config.nixpkgs.hostPlatform.system}.twodb-runner;
+              defaultText = "flake twodb-runner for this system";
+              description = "Runner package from the twodb flake.";
+            };
+
+            serverUrl = lib.mkOption {
+              type = lib.types.str;
+              default = "http://localhost:3001";
+              description = "Server the runner connects to (outbound WebSocket).";
+            };
+
+            runnerName = lib.mkOption {
+              type = lib.types.str;
+              default = config.networking.hostName;
+              description = "Runner name shown in Settings → Runners.";
+            };
+
+            environment = lib.mkOption {
+              type = lib.types.attrsOf lib.types.str;
+              default = { };
+              description = "Extra environment for the runner.";
+            };
+
+            environmentFile = lib.mkOption {
+              type = lib.types.nullOr lib.types.path;
+              default = null;
+              description = "KEY=VALUE file with secrets (TWODB_RUNNER_KEY).";
+            };
+          };
+
+          config = lib.mkIf cfg.enable {
+            launchd.daemons.twodb-runner = {
+              serviceConfig = {
+                ProgramArguments = [ "${cfg.package}/bin/twodb-runner" ];
+                RunAtLoad = true;
+                KeepAlive = true;
+                EnvironmentVariables =
+                  cfg.environment
+                  // {
+                    TWODB_SERVER_URL = cfg.serverUrl;
+                    TWODB_RUNNER_NAME = cfg.runnerName;
+                  }
+                  // lib.optionalAttrs (cfg.environmentFile != null) (parseEnvFile cfg.environmentFile);
+                StandardOutPath = "/var/log/twodb-runner.log";
+                StandardErrorPath = "/var/log/twodb-runner.log";
+              };
+            };
+          };
+        };
     }
     // flake-utils.lib.eachDefaultSystem (
       system:
@@ -157,13 +268,36 @@
         # native module, so each platform's tarball carries its own build).
         # Bump runnerVersion -- and the hashes, which `nix build` prints -- per release.
         runnerVersion = "0.1.1";
-        runnerTarball =
-          arch:
+        # node-pty is a native module — each system needs its platform tarball.
+        runnerTarballFor =
+          sys:
+          let
+            src = {
+              x86_64-linux = {
+                os = "linux";
+                arch = "x64";
+                hash = "sha256-pQslGHHpv0q8e9RSahALAXeR/Z5bT3QV8aEvOsM+w1Q=";
+              };
+              aarch64-linux = {
+                os = "linux";
+                arch = "arm64";
+                hash = "sha256-y8JeH+Ouuw/mcHPqT4CACXqM5tn55DP1deHkmTAxQcM=";
+              };
+              aarch64-darwin = {
+                os = "macos";
+                arch = "arm64";
+                hash = "sha256-ax+mB0XxeSCe1mfzjPczVngbgJr4q/PO3CNYQpho/cg=";
+              };
+              x86_64-darwin = {
+                os = "macos";
+                arch = "x64";
+                hash = "sha256-tJQ8OJdQd71iYxPVaUAmoeG67ZYiuqLpY3EFF9nlnjI=";
+              };
+            }.${sys};
+          in
           pkgs.fetchurl {
-            url = "https://github.com/reezpatel/twodb/releases/download/v${runnerVersion}/twodb-runner_${runnerVersion}_linux-${arch}.tar.gz";
-            hash =
-              if arch == "x64" then "sha256-pQslGHHpv0q8e9RSahALAXeR/Z5bT3QV8aEvOsM+w1Q="
-              else "sha256-y8JeH+Ouuw/mcHPqT4CACXqM5tn55DP1deHkmTAxQcM=";
+            url = "https://github.com/reezpatel/twodb/releases/download/v${runnerVersion}/twodb-runner_${runnerVersion}_${src.os}-${src.arch}.tar.gz";
+            inherit (src) hash;
           };
         runnerPackage =
           src:
@@ -189,14 +323,14 @@
           };
 
         # Same tarball pattern for the server (ships the web UI in public/).
-        serverTarball =
-          arch:
-          pkgs.fetchurl {
-            url = "https://github.com/reezpatel/twodb/releases/download/v${runnerVersion}/twodb-server_${runnerVersion}_linux-${arch}.tar.gz";
-            hash =
-              if arch == "x64" then "sha256-9IvYaVNhYU6e5TZxNw29rmAPT69lDrSEI6FOER3qOq0="
-              else "sha256-6hkp7AZBVlJYUKHYmzA3QvY6tx2juL7SIRJyN7s1TMA=";
-          };
+        # The server bundle is pure JS (no native modules) — the linux tarball
+        # of the matching arch runs everywhere, darwin included.
+        serverTarballFor = pkgs.fetchurl {
+          url = "https://github.com/reezpatel/twodb/releases/download/v${runnerVersion}/twodb-server_${runnerVersion}_linux-${if pkgs.stdenv.hostPlatform.isAarch64 then "arm64" else "x64"}.tar.gz";
+          hash =
+            if pkgs.stdenv.hostPlatform.isAarch64 then "sha256-6hkp7AZBVlJYUKHYmzA3QvY6tx2juL7SIRJyN7s1TMA="
+            else "sha256-9IvYaVNhYU6e5TZxNw29rmAPT69lDrSEI6FOER3qOq0=";
+        };
         serverPackage =
           src:
           pkgs.stdenv.mkDerivation {
@@ -223,10 +357,8 @@
       in
       {
         packages = {
-          twodb-runner = runnerPackage (runnerTarball "x64");
-          twodb-runner-aarch64 = runnerPackage (runnerTarball "arm64");
-          twodb-server = serverPackage (serverTarball "x64");
-          twodb-server-aarch64 = serverPackage (serverTarball "arm64");
+          twodb-runner = runnerPackage (runnerTarballFor system);
+          twodb-server = serverPackage serverTarballFor;
         };
 
         devShells.default = pkgs.mkShell {
