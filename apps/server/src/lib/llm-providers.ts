@@ -247,7 +247,7 @@ export const LLM_PROVIDERS: LlmProvider[] = [
     id: "ollama-cloud",
     label: "Ollama Cloud",
     fields: [
-    { key: "apiKey", label: "API key (ollama.com/keys)", secret: true, placeholder: "sk-…" },
+      { key: "api_key", label: "API key (ollama.com/keys)", secret: true, placeholder: "sk-…" },
       opt({ key: "base_url", label: "Base URL", placeholder: "https://ollama.com/v1" }),
     ],
     api: "openai",
@@ -288,7 +288,8 @@ export function getProvider(id: string): LlmProvider | undefined {
 
 export function providerAuthHeaders(provider: LlmProvider, config: Record<string, string>): Record<string, string> {
   if (provider.auth === "x-api-key") {
-    return config.api_key ? { "x-api-key": config.api_key } : {};
+    const key = config.api_key ?? config.apiKey;
+    return key ? { "x-api-key": key } : {};
   }
   if (provider.auth === "claude-oauth") {
     const token = config[provider.authKey ?? "access_token"];
@@ -301,7 +302,7 @@ export function providerAuthHeaders(provider: LlmProvider, config: Record<string
     return config.api_key ? { "x-api-key": config.api_key } : {};
   }
   // bearer
-  const credential = config[provider.authKey ?? "api_key"] ?? config.api_key;
+  const credential = config[provider.authKey ?? "api_key"] ?? config.api_key ?? config.apiKey;
   const headers: Record<string, string> = credential ? { authorization: `Bearer ${credential}` } : {};
   if (provider.id === "openai" && config.org) {
     headers["OpenAI-Organization"] = config.org;
