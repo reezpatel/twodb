@@ -32,6 +32,17 @@ export interface LlmModel {
   modelId: string;
   displayName: string | null;
   contextWindow: number | null;
+  thinking: boolean;
+  input: string[];
+  thinkingLevel: string[];
+  temperature: boolean;
+  limitContext: number | null;
+  limitInput: number | null;
+  limitOutput: number | null;
+  costInput: number | null;
+  costOutput: number | null;
+  costCacheRead: number | null;
+  output: string[];
 }
 
 export interface LlmUsage {

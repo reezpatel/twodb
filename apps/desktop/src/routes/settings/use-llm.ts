@@ -1,14 +1,24 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
-import type { LlmConnection, LlmProvider } from "../../lib/llm";
+import type { LlmConnection, LlmModel, LlmProvider } from "../../lib/llm";
 
 export type ConnectionModal = { mode: "closed" } | { mode: "create" } | { mode: "edit"; connection: LlmConnection };
+
+export interface ConnectionTestResult {
+  ok: boolean;
+  model: string;
+  ms: number;
+  reply?: string;
+  usage?: { inputTokens: number; outputTokens: number; cachedTokens: number };
+  error?: string;
+}
 
 export function useLlm() {
   const queryClient = useQueryClient();
   const [modal, setModal] = useState<ConnectionModal>({ mode: "closed" });
   const [actionError, setActionError] = useState<string | null>(null);
+  const [modelsFor, setModelsFor] = useState<LlmConnection | null>(null);
 
   const providers = useQuery({
     queryKey: ["llm", "providers"],
@@ -19,6 +29,12 @@ export function useLlm() {
   const connections = useQuery({
     queryKey: ["llm", "connections"],
     queryFn: () => api<LlmConnection[]>("/api/llm/connections"),
+  });
+
+  const connectionModels = useQuery({
+    queryKey: ["llm", "connection-models", modelsFor?.id],
+    queryFn: () => api<LlmModel[]>(`/api/llm/connections/${modelsFor!.id}/models`),
+    enabled: !!modelsFor,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["llm", "connections"] });
@@ -51,6 +67,10 @@ export function useLlm() {
     onError: (e) => setActionError(e.message),
   });
 
+  const testConnection = useMutation({
+    mutationFn: (id: string) => api<ConnectionTestResult>(`/api/llm/connections/${id}/test`, { method: "POST", body: "{}" }),
+  });
+
   const remove = useMutation({
     mutationFn: (id: string) => api(`/api/llm/connections/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
@@ -79,8 +99,12 @@ export function useLlm() {
     toggle,
     refreshAll,
     refreshOne,
+    testConnection,
     actionError,
     onSaved,
     onDelete,
+    modelsFor,
+    setModelsFor,
+    connectionModels,
   };
 }
