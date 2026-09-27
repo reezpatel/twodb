@@ -349,6 +349,62 @@ async function collectKilo(connection: LlmConnectionTable): Promise<QuotaSnapsho
   ];
 }
 
+/** Cline: plan usage-limits endpoint (needs the account API key, not the gateway OAuth token). */
+async function collectCline(connection: LlmConnectionTable): Promise<QuotaSnapshot[]> {
+  const config = connection.config as Record<string, string>;
+  const key = config.api_key ?? config.apiKey ?? config.access_token;
+  if (!key) throw new Error("missing API key — generate one in your Cline account settings and set it on the connection");
+
+  const json = await fetchJson("https://api.cline.bot/api/v1/users/me/plan/usage-limits", {
+    authorization: `Bearer ${key}`,
+  });
+  const data = asRecord(asRecord(json)?.data) ?? asRecord(json);
+  if (!data) throw new Error(`unrecognized usage payload (keys: ${Object.keys(json ?? {}).join(",") || "(empty)"})`);
+
+  const snap: QuotaSnapshot[] = [];
+
+  // anthropic-style percent windows
+  for (const [key2, type] of [
+    ["five_hour", "5h"],
+    ["seven_day", "weekly"],
+  ] as const) {
+    const win = asRecord(data[key2] ?? data[key2 === "five_hour" ? "fiveHour" : "sevenDay"]);
+    const used = win ? finite(win.usedPercent ?? win.used_percent ?? win.percent ?? win.percentage) : undefined;
+    if (used === undefined) continue;
+    snap.push({ quotaType: type, groupName: "default", unit: "percent", quotaTotal: 100, quotaUsed: Math.max(0, Math.min(100, used)), resetAt: null });
+  }
+
+  // kimi-style usage object + limits array (used/limit counts)
+  const pushWindow = (rec: Record<string, unknown>, fallbackLabel: string) => {
+    const limit = finite(rec.limit);
+    let used = finite(rec.used);
+    if (used === undefined) {
+      const remaining = finite(rec.remaining);
+      if (remaining !== undefined && limit !== undefined) used = limit - remaining;
+    }
+    if (used === undefined && limit === undefined) return;
+    const label =
+      (typeof rec.name === "string" && rec.name.trim() ? rec.name : typeof rec.title === "string" && rec.title.trim() ? rec.title : null) ?? fallbackLabel;
+    const l = label.toLowerCase();
+    const quotaType = l.includes("5h") || l.includes("5 h") ? "5h" : l.includes("week") || l.includes("7d") ? "weekly" : l.includes("month") || l.includes("30d") ? "monthly" : "daily";
+    if (snap.some((x) => x.quotaType === quotaType)) return;
+    snap.push({ quotaType, groupName: "default", unit: limit && limit > 0 ? "Tk" : "percent", quotaTotal: limit && limit > 0 ? limit : 100, quotaUsed: Math.max(0, used ?? 0), resetAt: null });
+  };
+
+  const usage = asRecord(data.usage);
+  if (usage) pushWindow(usage, "Weekly limit");
+  if (Array.isArray(data.limits)) {
+    for (const raw of data.limits) {
+      const item = asRecord(raw);
+      if (!item) continue;
+      pushWindow(asRecord(item.detail) ?? item, typeof item.scope === "string" ? item.scope : "Limit");
+    }
+  }
+
+  if (snap.length === 0) throw new Error(`unrecognized usage payload (keys: ${Object.keys(data).join(",")})`);
+  return snap;
+}
+
 const QUOTA_COLLECTORS: Record<string, QuotaCollector> = {
   "claude-code": collectClaudeCode,
   zai: collectZai,
@@ -356,6 +412,7 @@ const QUOTA_COLLECTORS: Record<string, QuotaCollector> = {
   "ollama-cloud": collectOllamaCloud,
   minimax: collectMinimax,
   "kilo-code": collectKilo,
+  cline: collectCline,
 };
 
 export const llmRoutes = new Hono()
