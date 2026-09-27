@@ -12,3 +12,4 @@ result-*
 .build/
 apps/api/vendor/
 deploy/choco/tools/*.exe
+scratch_pad/
