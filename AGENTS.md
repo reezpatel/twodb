@@ -15,8 +15,8 @@ over WebSockets. There is no plugin system anymore.
   Every screen lives in `src/routes/<app>/` as `<app>-scene.tsx` plus a
   `use-<app>-scene.ts` hook. Nav rail entries come from `src/lib/apps.ts`.
 - `apps/server` — Hono backend (:3001). REST + WS routes in `src/routes/`,
-  domain logic in `src/lib/`. Postgres via Kysely; migrations in
-  `apps/server/migrations/`.
+  domain logic in `src/lib/`. Postgres via Kysely — the server bootstraps its
+  `twodb` schema on startup (`lib/schema.ts`, idempotent DDL).
 - `apps/runner` — outbound runner agent; dials home to the server over WS
   (never the reverse) and executes jobs.
 
@@ -87,7 +87,7 @@ import from it.
 
 - `pnpm local` — desktop (:5173) + server (:3001) in parallel.
 - `pnpm --filter @twodb/desktop dev|tauri:dev|build` — vite / Tauri shell.
-- `pnpm --filter @twodb/server dev|start|db:migrate` — server + migrations.
+- `pnpm --filter @twodb/server dev|start` — server (schema auto-ensured on boot).
 - `pnpm --filter @twodb/runner dev` — runner agent.
 - `pnpm db:up` / `db:down` — postgres + memgraph via `docker-compose.db.yaml`.
 - `pnpm build` — turbo; every `build` runs `tsc --noEmit` first — keep it green.

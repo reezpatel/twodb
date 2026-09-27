@@ -475,10 +475,14 @@ export interface Database {
   notification: NotificationTable;
 }
 
+export const dbSchema = process.env.TWODB_DB_SCHEMA ?? "twodb";
+
 export function createDb(connectionString: string): Kysely<Database> {
   return new Kysely<Database>({
     dialect: new PostgresDialect({
-      pool: new Pool({ connectionString }),
+      // All unqualified names — including the dynamic notes tables — resolve
+      // into the twodb schema; public stays on the path for extensions.
+      pool: new Pool({ connectionString, options: `-c search_path=${dbSchema},public` }),
     }),
   });
 }

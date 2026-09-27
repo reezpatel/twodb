@@ -3,7 +3,7 @@
 The flake ships a NixOS module that runs the GHCR containers from CI:
 
 - `services.twodb-server` — the server container: built desktop app served at
-  `/`, API under `/api`, migrations run on start
+  `/`, API under `/api`, twodb schema ensured on start
 - `services.twodb-runner` — the runner agent container (outbound WebSocket to
   the server, executes terminal + agent commands)
 

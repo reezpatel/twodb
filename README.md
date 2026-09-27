@@ -18,7 +18,6 @@ Notes, Chat, Code, Assistant, Meetings, Automations, Files, Settings.
 ```sh
 pnpm install
 pnpm db:up        # postgres + memgraph via docker compose
-pnpm db:migrate   # apply Kysely migrations
 pnpm local        # desktop (:5173) + server (:3001)
 ```
 
@@ -49,7 +48,7 @@ CI (`.github/workflows/docker-image.yaml` on every push to `main`, plus tag
 builds in `release.yml`) builds and pushes two images to GHCR:
 
 - `ghcr.io/<owner>/twodb` — server with the built desktop app baked in: the UI
-  is served at `/` and the API under `/api` (migrations run on start)
+  is served at `/` and the API under `/api` (twodb schema ensured on start)
 - `ghcr.io/<owner>/twodb-runner` — runner agent, from `apps/runner/Dockerfile`
 
 Run the server (needs postgres + memgraph reachable):

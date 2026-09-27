@@ -310,14 +310,12 @@ jobs:
           pnpm install --frozen-lockfile --filter @twodb/server --filter @twodb/desktop
           pnpm --filter @twodb/desktop build
           pnpm --filter @twodb/server deploy --legacy stage/twodb-server
+          rm -rf stage/twodb-server/node_modules/@twodb stage/twodb-server/node_modules/.pnpm/node_modules/@twodb
           cp -r apps/desktop/dist stage/twodb-server/public
           cp -r apps/server/src stage/twodb-server/src
-          cp -r apps/server/scripts stage/twodb-server/scripts
-          cp -r apps/server/migrations stage/twodb-server/migrations
           mkdir -p stage/twodb-server/bin
           printf '#!/bin/sh\nDIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"\nexec node "$DIR/node_modules/tsx/dist/cli.mjs" "$DIR/src/index.ts" "$@"\n' > stage/twodb-server/bin/twodb-server
-          printf '#!/bin/sh\nDIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"\nexec node "$DIR/node_modules/tsx/dist/cli.mjs" "$DIR/scripts/migrate.ts" "$@"\n' > stage/twodb-server/bin/twodb-migrate
-          chmod +x stage/twodb-server/bin/twodb-server stage/twodb-server/bin/twodb-migrate
+          chmod +x stage/twodb-server/bin/twodb-server
           tar -czf "twodb-server_${GITHUB_REF_NAME#v}_linux-${{ matrix.arch }}.tar.gz" -C stage twodb-server
 
       - name: Upload bundle to release
@@ -367,6 +365,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile --filter @twodb/runner
           pnpm --filter @twodb/runner deploy --legacy stage/twodb-runner
+          rm -rf stage/twodb-runner/node_modules/@twodb stage/twodb-runner/node_modules/.pnpm/node_modules/@twodb
 
       - name: Add launcher and archive (unix)
         if: matrix.os != 'windows'

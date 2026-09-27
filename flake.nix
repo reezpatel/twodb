@@ -106,12 +106,12 @@
               };
 
               serviceConfig = {
-                ExecStartPre = "${serverCfg.package}/bin/twodb-migrate";
                 ExecStart = "${serverCfg.package}/bin/twodb-server";
                 DynamicUser = true;
                 Restart = "on-failure";
                 RestartSec = "5s";
-              } // lib.optionalAttrs (serverCfg.environmentFile != null) {
+              }
+              // lib.optionalAttrs (serverCfg.environmentFile != null) {
                 EnvironmentFile = [ "${serverCfg.environmentFile}" ];
               };
             };
@@ -156,12 +156,14 @@
         # Native runner package built from the release tarball (node-pty is a
         # native module, so each platform's tarball carries its own build).
         # Bump runnerVersion -- and the hashes, which `nix build` prints -- per release.
-        runnerVersion = "0.0.0";
+        runnerVersion = "0.1.1";
         runnerTarball =
           arch:
           pkgs.fetchurl {
             url = "https://github.com/reezpatel/twodb/releases/download/v${runnerVersion}/twodb-runner_${runnerVersion}_linux-${arch}.tar.gz";
-            hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+            hash =
+              if arch == "x64" then "sha256-pQslGHHpv0q8e9RSahALAXeR/Z5bT3QV8aEvOsM+w1Q="
+              else "sha256-y8JeH+Ouuw/mcHPqT4CACXqM5tn55DP1deHkmTAxQcM=";
           };
         runnerPackage =
           src:
@@ -175,10 +177,11 @@
             installPhase = ''
               runHook preInstall
               mkdir -p $out/libexec $out/bin
-              cp -r twodb-runner/* $out/libexec/
+              cp -r . "$out/libexec"
               makeWrapper ${pkgs.nodejs_22}/bin/node $out/bin/twodb-runner \
                 --add-flags "$out/libexec/node_modules/tsx/dist/cli.mjs" \
                 --add-flags "$out/libexec/src/index.ts"
+              find "$out" -xtype l -delete
               runHook postInstall
             '';
 
@@ -190,7 +193,9 @@
           arch:
           pkgs.fetchurl {
             url = "https://github.com/reezpatel/twodb/releases/download/v${runnerVersion}/twodb-server_${runnerVersion}_linux-${arch}.tar.gz";
-            hash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
+            hash =
+              if arch == "x64" then "sha256-9IvYaVNhYU6e5TZxNw29rmAPT69lDrSEI6FOER3qOq0="
+              else "sha256-6hkp7AZBVlJYUKHYmzA3QvY6tx2juL7SIRJyN7s1TMA=";
           };
         serverPackage =
           src:
@@ -204,14 +209,12 @@
             installPhase = ''
               runHook preInstall
               mkdir -p $out/libexec $out/bin
-              cp -r twodb-server/* $out/libexec/
+              cp -r . "$out/libexec"
               makeWrapper ${pkgs.nodejs_22}/bin/node $out/bin/twodb-server \
                 --set TWODB_STATIC_DIR "$out/libexec/public" \
                 --add-flags "$out/libexec/node_modules/tsx/dist/cli.mjs" \
                 --add-flags "$out/libexec/src/index.ts"
-              makeWrapper ${pkgs.nodejs_22}/bin/node $out/bin/twodb-migrate \
-                --add-flags "$out/libexec/node_modules/tsx/dist/cli.mjs" \
-                --add-flags "$out/libexec/scripts/migrate.ts"
+              find "$out" -xtype l -delete
               runHook postInstall
             '';
 

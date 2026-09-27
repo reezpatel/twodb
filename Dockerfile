@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # twodb server — serves the built desktop app (static SPA) with the API under
 # /api. Requires postgres + memgraph reachable via TWODB_DATABASE_URL /
-# MEMGRAPH_URL. Migrations run automatically on start.
+# MEMGRAPH_URL. The server bootstraps its twodb schema automatically on start.
 
 FROM node:22-slim AS build
 RUN corepack enable
@@ -23,20 +23,12 @@ WORKDIR /app
 COPY --from=build /out/node_modules ./node_modules
 COPY --from=build /out/package.json ./package.json
 COPY --from=build /repo/apps/server/src ./src
-COPY --from=build /repo/apps/server/scripts ./scripts
-COPY --from=build /repo/apps/server/migrations ./migrations
 COPY --from=build /repo/apps/desktop/dist ./public
 COPY <<'EOF' /app/entrypoint.mjs
 import { spawn } from "node:child_process";
 const tsx = new URL("./node_modules/tsx/dist/cli.mjs", import.meta.url).pathname;
-const run = (args) =>
-  new Promise((resolve) => {
-    const child = spawn(process.execPath, [tsx, ...args], { stdio: "inherit" });
-    child.on("exit", (code) => resolve(code ?? 0));
-  });
-const migrated = await run(["scripts/migrate.ts"]);
-if (migrated !== 0) process.exit(migrated);
-await run(["src/index.ts"]);
+const child = spawn(process.execPath, [tsx, "src/index.ts"], { stdio: "inherit" });
+child.on("exit", (code) => process.exit(code ?? 0));
 EOF
 ENV NODE_ENV=production TWODB_STATIC_DIR=/app/public
 USER node

@@ -21,6 +21,7 @@ import { storageAdminRoutes } from "./routes/storage-admin";
 import { serverSettingsRoutes } from "./routes/server-settings";
 import { apiKeyRoutes } from "./routes/api-keys";
 import { getServerSettings } from "./lib/server-settings";
+import { ensureSchema } from "./lib/schema";
 import { assistantRoutes } from "./routes/assistant";
 import { registerAssistantWs } from "./routes/assistant-ws";
 import { notesRoutes } from "./routes/notes";
@@ -90,6 +91,8 @@ if (env.staticDir) {
   app.use("*", serveStatic({ root: webRoot }));
   app.get("*", serveStatic({ root: webRoot, path: "index.html" }));
 }
+
+await ensureSchema(db);
 
 const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`server listening on http://localhost:${info.port}`);
