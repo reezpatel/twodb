@@ -108,7 +108,7 @@ async function collectZai(connection: LlmConnectionTable): Promise<QuotaSnapshot
     if (type === "TOKENS_LIMIT" || type === "CREDIT_LIMIT") {
       if (unitCode === 3) quotaType = "5h";
       else if (unitCode === 4) quotaType = "daily";
-      else if (unitCode === 6) quotaType = type === "CREDIT_LIMIT" ? "monthly" : "weekly";
+      else if (unitCode === 6) quotaType = "weekly";
     } else if (type === "TIME_LIMIT") {
       quotaType = "monthly";
     }
@@ -238,10 +238,98 @@ async function collectKimi(connection: LlmConnectionTable): Promise<QuotaSnapsho
   }));
 }
 
+/** Ollama Cloud: scrapes the settings page with the browser session cookie. */
+async function collectOllamaCloud(connection: LlmConnectionTable): Promise<QuotaSnapshot[]> {
+  const config = connection.config as Record<string, string>;
+  const session = config.session_token?.trim();
+  if (!session) throw new Error("missing session token — set it on the connection (ollama.com __Secure-session cookie)");
+
+  const res = await fetch("https://ollama.com/settings", {
+    headers: { cookie: `__Secure-session=${session}`, "user-agent": "twodb/1.0", accept: "text/html" },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`ollama.com returned ${res.status}`);
+  const html = await res.text();
+
+  const resets = [...html.matchAll(/class="[^"]*local-time[^"]*"\s*\n?\s*data-time="([^"]+)"/g)].map((m) => m[1]);
+  const usedPercent = (label: string): number | undefined => {
+    const m = html.match(new RegExp(`aria-label="${label} usage\\s+(\\d+(?:\\.\\d+)?)%\\s+used"`));
+    const value = m?.[1] ? Number(m[1]) : undefined;
+    return value !== undefined && Number.isFinite(value) ? value : undefined;
+  };
+
+  const snap: QuotaSnapshot[] = [];
+  const five = usedPercent("Session");
+  if (five !== undefined) {
+    snap.push({ quotaType: "5h", groupName: "default", unit: "percent", quotaTotal: 100, quotaUsed: Math.max(0, Math.min(100, five)), resetAt: resets[0] ? new Date(resets[0]) : null });
+  }
+  const weekly = usedPercent("Weekly");
+  if (weekly !== undefined) {
+    snap.push({ quotaType: "weekly", groupName: "default", unit: "percent", quotaTotal: 100, quotaUsed: Math.max(0, Math.min(100, weekly)), resetAt: resets[1] ? new Date(resets[1]) : null });
+  }
+  return snap;
+}
+
+/** MiniMax coding plan: remains endpoint with 5h + weekly count windows. */
+async function collectMinimax(connection: LlmConnectionTable): Promise<QuotaSnapshot[]> {
+  const config = connection.config as Record<string, string>;
+  const token = config.api_key ?? config.apiKey;
+  if (!token) throw new Error("missing API key");
+
+  const json = (await fetchJson("https://api.minimax.io/v1/api/openplatform/coding_plan/remains", {
+    authorization: `Bearer ${token}`,
+  })) as { base_resp?: { status_code?: number; status_msg?: string }; model_remains?: unknown };
+
+  const status = json.base_resp?.status_code;
+  if (status !== undefined && status !== 0) {
+    throw new Error(`minimax error ${status}: ${json.base_resp?.status_msg ?? "unknown"}`);
+  }
+  if (!Array.isArray(json.model_remains)) throw new Error("invalid minimax remains response");
+
+  const general = json.model_remains
+    .map(asRecord)
+    .find((r) => typeof r?.model_name === "string" && r.model_name.trim().toLowerCase() === "general");
+  if (!general) return [];
+
+  const finite2 = finite;
+  const build = (
+    quotaType: string,
+    totalKey: string,
+    usedKey: string,
+    remainingKey: string,
+    resetKey: string,
+  ): QuotaSnapshot | null => {
+    const total = finite2(general[totalKey]);
+    const used = finite2(general[usedKey]);
+    const remainingPercent = finite2(general[remainingKey]);
+    if (remainingPercent === undefined && (total === undefined || used === undefined)) return null;
+    const resolvedUsed = used ?? (remainingPercent !== undefined ? 100 - Math.max(0, Math.min(100, remainingPercent)) : 0);
+    const resolvedTotal = total && total > 0 ? total : 100;
+    const resetMs = finite2(general[resetKey]);
+    return {
+      quotaType,
+      groupName: "default",
+      unit: total && total > 0 ? "Tk" : "percent",
+      quotaTotal: resolvedTotal,
+      quotaUsed: Math.max(0, resolvedUsed),
+      resetAt: resetMs && resetMs > 0 ? new Date(resetMs) : null,
+    };
+  };
+
+  const snap: QuotaSnapshot[] = [];
+  const five = build("5h", "current_interval_total_count", "current_interval_usage_count", "current_interval_remaining_percent", "end_time");
+  if (five) snap.push(five);
+  const weekly = build("weekly", "current_weekly_total_count", "current_weekly_usage_count", "current_weekly_remaining_percent", "weekly_end_time");
+  if (weekly) snap.push(weekly);
+  return snap;
+}
+
 const QUOTA_COLLECTORS: Record<string, QuotaCollector> = {
   "claude-code": collectClaudeCode,
   zai: collectZai,
   kimi: collectKimi,
+  "ollama-cloud": collectOllamaCloud,
+  minimax: collectMinimax,
 };
 
 export const llmRoutes = new Hono()
@@ -477,6 +565,14 @@ export const llmRoutes = new Hono()
           .execute();
       }
     }
+
+    const freshTypes = [...new Set(snapshots.map((snap) => snap.quotaType))];
+    await db
+      .deleteFrom("llm_quota")
+      .where("connectionId", "=", connection.id)
+      .where("groupName", "=", "default")
+      .where("quotaType", "not in", freshTypes)
+      .execute();
 
     const rows = await db.selectFrom("llm_quota").selectAll().where("connectionId", "=", connection.id).orderBy("quotaType", "asc").execute();
     return c.json(rows);
