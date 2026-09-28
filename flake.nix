@@ -267,7 +267,7 @@
         # Native runner package built from the release tarball (node-pty is a
         # native module, so each platform's tarball carries its own build).
         # Bump runnerVersion -- and the hashes, which `nix build` prints -- per release.
-        runnerVersion = "0.1.1";
+        runnerVersion = "0.1.2";
         # node-pty is a native module — each system needs its platform tarball.
         runnerTarballFor =
           sys:
@@ -276,22 +276,22 @@
               x86_64-linux = {
                 os = "linux";
                 arch = "x64";
-                hash = "sha256-pQslGHHpv0q8e9RSahALAXeR/Z5bT3QV8aEvOsM+w1Q=";
+                hash = "sha256-Uxv153ctuVKYmPyFouN2/6N5WwpI+FJ49+XWUWAwAnA=";
               };
               aarch64-linux = {
                 os = "linux";
                 arch = "arm64";
-                hash = "sha256-y8JeH+Ouuw/mcHPqT4CACXqM5tn55DP1deHkmTAxQcM=";
+                hash = "sha256-cniCsPOACiXJfFAUJ4fI9h7DDIwQDAKiTQJr/2yHbPY=";
               };
               aarch64-darwin = {
                 os = "macos";
                 arch = "arm64";
-                hash = "sha256-ax+mB0XxeSCe1mfzjPczVngbgJr4q/PO3CNYQpho/cg=";
+                hash = "sha256-PhFcD07yq08hob0z7/bdMuAGWBNXfpWF2Eh2/ZoHxTs=";
               };
               x86_64-darwin = {
                 os = "macos";
                 arch = "x64";
-                hash = "sha256-tJQ8OJdQd71iYxPVaUAmoeG67ZYiuqLpY3EFF9nlnjI=";
+                hash = "sha256-vNL1VVdWzQBl4lPEpqjdZR1sO8asHJHy1n5WcPV+u0s=";
               };
             }.${sys};
           in
@@ -328,8 +328,8 @@
         serverTarballFor = pkgs.fetchurl {
           url = "https://github.com/reezpatel/twodb/releases/download/v${runnerVersion}/twodb-server_${runnerVersion}_linux-${if pkgs.stdenv.hostPlatform.isAarch64 then "arm64" else "x64"}.tar.gz";
           hash =
-            if pkgs.stdenv.hostPlatform.isAarch64 then "sha256-6hkp7AZBVlJYUKHYmzA3QvY6tx2juL7SIRJyN7s1TMA="
-            else "sha256-9IvYaVNhYU6e5TZxNw29rmAPT69lDrSEI6FOER3qOq0=";
+            if pkgs.stdenv.hostPlatform.isAarch64 then "sha256-dNzSzmPhCcjgXTkkIuP5LT0BkXYEmqVhmuYWqpTOCVc="
+            else "sha256-A7npDp1vCyaE/w//bqD1v7IR4Z2ON94MSnhsqq6CxGk=";
         };
         serverPackage =
           src:
