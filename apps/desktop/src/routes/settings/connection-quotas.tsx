@@ -50,7 +50,7 @@ export function ConnectionQuotas({ connectionId, provider }: { connectionId: str
         const countdown = until(q.resetAt);
         return (
           <div key={q.id} className="flex items-center gap-2">
-            <span className="text-muted-foreground w-12 shrink-0 text-[11px] font-medium">{q.quotaType}</span>
+            <span className="text-muted-foreground w-18 shrink-0 text-[11px] font-medium">{q.quotaType}</span>
             {pct !== null && <Progress value={pct} className="h-1.5 w-20 shrink-0" aria-label={`${q.quotaType} quota ${pct}%`} />}
             <span
               className={cn(
@@ -65,7 +65,7 @@ export function ConnectionQuotas({ connectionId, provider }: { connectionId: str
           </div>
         );
       })}
-      {provider === "claude-code" && (
+      {(provider === "claude-code" || provider === "codex") && (
         <Button variant="ghost" size="sm" className="h-5 w-fit px-1.5 text-[11px]" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
           <Gauge size={11} />
           {refresh.isPending ? "checking…" : "refresh quotas"}

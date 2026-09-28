@@ -36,7 +36,7 @@ export const LLM_PROVIDERS: LlmProvider[] = [
     api: "anthropic",
     auth: "x-api-key",
     defaultBaseUrl: "https://api.anthropic.com",
-    models: ["claude-sonnet-4.6", "claude-opus-4.6", "claude-haiku-4.5"],
+    models: ["claude-sonnet-4-6", "claude-opus-4-8", "claude-haiku-4-5"],
   },
   {
     id: "openai",
@@ -88,7 +88,7 @@ export const LLM_PROVIDERS: LlmProvider[] = [
     auth: "claude-oauth",
     authKey: "access_token",
     defaultBaseUrl: "https://api.anthropic.com",
-    models: ["claude-sonnet-4.6", "claude-opus-4.6", "claude-haiku-4.5"],
+    models: ["claude-sonnet-4-6", "claude-opus-4-8", "claude-haiku-4-5"],
   },
   {
     id: "codex",
@@ -102,7 +102,9 @@ export const LLM_PROVIDERS: LlmProvider[] = [
     auth: "bearer",
     authKey: "access_token",
     defaultBaseUrl: "https://chatgpt.com/backend-api/codex",
-    models: ["gpt-5.2-codex", "gpt-5.2-codex-mini"],
+    // chatgpt backend has no model-listing endpoint — this static list IS the catalog
+    // (spark last: it is plan-gated and rejected on many ChatGPT accounts)
+    models: ["gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-luna", "gpt-6-sol", "gpt-5.3-codex-spark"],
   },
   {
     id: "kimi",
@@ -319,25 +321,34 @@ export function getProvider(id: string): LlmProvider | undefined {
 }
 
 export function providerAuthHeaders(provider: LlmProvider, config: Record<string, string>): Record<string, string> {
+  let headers: Record<string, string>;
   if (provider.auth === "x-api-key") {
     const key = config.api_key ?? config.apiKey;
-    return key ? { "x-api-key": key } : {};
-  }
-  if (provider.auth === "claude-oauth") {
+    headers = key ? { "x-api-key": key } : {};
+  } else if (provider.auth === "claude-oauth") {
     const token = config[provider.authKey ?? "access_token"];
     if (token) {
-      return {
+      // Claude Code identity headers — without them Anthropic treats OAuth
+      // traffic as balance-billed API usage instead of subscription usage.
+      headers = {
         authorization: `Bearer ${token}`,
-        "anthropic-beta": "oauth-2025-04-20",
+        "anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
+        "user-agent": "claude-cli/2.1.280 (external, cli)",
+        "x-app": "cli",
       };
+    } else {
+      headers = config.api_key ? { "x-api-key": config.api_key } : {};
     }
-    return config.api_key ? { "x-api-key": config.api_key } : {};
+  } else {
+    // bearer
+    const credential = config[provider.authKey ?? "api_key"] ?? config.api_key ?? config.apiKey;
+    headers = credential ? { authorization: `Bearer ${credential}` } : {};
+    if (provider.id === "openai" && config.org) {
+      headers["OpenAI-Organization"] = config.org;
+    }
   }
-  // bearer
-  const credential = config[provider.authKey ?? "api_key"] ?? config.api_key ?? config.apiKey;
-  const headers: Record<string, string> = credential ? { authorization: `Bearer ${credential}` } : {};
-  if (provider.id === "openai" && config.org) {
-    headers["OpenAI-Organization"] = config.org;
+  if (provider.api === "anthropic") {
+    headers["anthropic-version"] = "2023-06-01";
   }
   return headers;
 }

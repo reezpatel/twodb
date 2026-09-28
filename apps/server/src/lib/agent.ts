@@ -114,6 +114,13 @@ async function anthropicRound(
   const baseUrl = providerBaseUrl(provider, config);
   const { system, messages: mapped } = anthropicMessages(messages);
 
+  // OAuth (Claude Code subscription) requests must lead with the Claude Code
+  // identity block or Anthropic bills them against API balance.
+  const systemParam =
+    provider.auth === "claude-oauth"
+      ? [{ type: "text", text: "You are Claude Code, Anthropic's official CLI for Claude." }, ...(system ? [{ type: "text", text: system }] : [])]
+      : system || undefined;
+
   const res = await fetch(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
@@ -125,7 +132,7 @@ async function anthropicRound(
       model,
       max_tokens: 8192,
       stream: true,
-      ...(system ? { system } : {}),
+      ...(systemParam ? { system: systemParam } : {}),
       messages: mapped,
       ...(tools.length
         ? {
@@ -367,13 +374,19 @@ async function responsesRound(
     method: "POST",
     headers: {
       "content-type": "application/json",
+      accept: "text/event-stream",
+      "OpenAI-Beta": "responses=experimental",
+      originator: "twodb",
       authorization: `Bearer ${config[provider.authKey ?? "access_token"] ?? ""}`,
       ...(config.account_id ? { "chatgpt-account-id": config.account_id } : {}),
     },
     body: JSON.stringify({
       model,
       stream: true,
-      ...(instructions ? { instructions } : {}),
+      store: false,
+      // chatgpt backend requires instructions + encrypted reasoning when store=false
+      instructions: instructions || "You are a helpful assistant.",
+      include: ["reasoning.encrypted_content"],
       input,
       ...(tools.length
         ? {

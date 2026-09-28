@@ -123,10 +123,13 @@ export async function refreshConnectionModels(connection: LlmConnectionTable): P
   let models: FetchedModel[] = [];
   const warnings: string[] = [];
 
-  try {
-    models = await fetchProviderModels(connection);
-  } catch (e) {
-    warnings.push((e as Error).message);
+  // responses-wire providers (codex) have no listing endpoint — static list is the catalog
+  if (provider?.api === "anthropic" || provider?.api === "openai") {
+    try {
+      models = await fetchProviderModels(connection);
+    } catch (e) {
+      warnings.push((e as Error).message);
+    }
   }
 
   if (models.length === 0 && provider && provider.models.length > 0) {

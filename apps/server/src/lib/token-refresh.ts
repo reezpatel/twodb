@@ -3,14 +3,15 @@ import type { LlmConnectionTable } from "../plugins/db";
 
 // OAuth refresh endpoints for token-exchange providers. Public client ids
 // used by the first-party CLIs; tokens come from the user's own login.
-const OAUTH: Record<string, { url: string; clientId: string }> = {
+const OAUTH: Record<string, { url: string; clientId: string; form?: boolean }> = {
   "claude-code": {
     url: "https://console.anthropic.com/v1/oauth/token",
     clientId: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
   },
   codex: {
     url: "https://auth.openai.com/oauth/token",
-    clientId: "app_EMoamEEZ73f0CkXaXp7hrannb6rUvynP",
+    clientId: "app_EMoamEEZ73f0CkXaXp7hrann",
+    form: true,
   },
 };
 
@@ -49,14 +50,15 @@ export async function ensureFreshTokens(connection: LlmConnectionTable): Promise
     throw new Error(`token endpoint host not allowed: ${tokenUrl.host}`);
   }
 
+  const payload = {
+    grant_type: "refresh_token",
+    refresh_token: config.refresh_token,
+    client_id: oauth.clientId,
+  };
   const res = await fetch(tokenUrl, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      grant_type: "refresh_token",
-      refresh_token: config.refresh_token,
-      client_id: oauth.clientId,
-    }),
+    headers: { "content-type": oauth.form ? "application/x-www-form-urlencoded" : "application/json" },
+    body: oauth.form ? new URLSearchParams(payload) : JSON.stringify(payload),
   });
   if (!res.ok) {
     const body = await res.text();

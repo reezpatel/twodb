@@ -12,6 +12,7 @@ export interface ConnectionTestResult {
   reply?: string;
   usage?: { inputTokens: number; outputTokens: number; cachedTokens: number };
   error?: string;
+  tried?: { model: string; error: string }[];
 }
 
 export function useLlm() {

@@ -104,8 +104,15 @@ export function LlmSection() {
                     {testResult && testResult !== "pending" && (
                       <p className={cn("mt-1 truncate text-xs", testResult.ok ? "text-success" : "text-destructive")}>
                         {testResult.ok
-                          ? `✓ ${testResult.ms}ms · ${testResult.model} · “${testResult.reply || "(empty)"}”`
-                          : `✗ ${testResult.error ?? "test failed"}`}
+                          ? `✓ ${testResult.ms}ms · ${testResult.model}${testResult.tried?.length ? ` · after ${testResult.tried.map((t) => t.model).join(", ")} failed` : ""} · “${testResult.reply || "(empty)"}”`
+                          : `✗ ${testResult.error ?? "test failed"}${
+                              testResult.tried && testResult.tried.length > 1
+                                ? ` · also failed: ${testResult.tried
+                                    .slice(0, -1)
+                                    .map((t) => t.model)
+                                    .join(", ")}`
+                                : ""
+                            }`}
                       </p>
                     )}
                   </div>

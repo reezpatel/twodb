@@ -6,6 +6,8 @@ import { refreshConnectionModels } from "../lib/refresh-models";
 import type { LlmConnectionTable } from "../plugins/db";
 import { runAgentRound, type AgentMessage } from "../lib/agent";
 import { ensureFreshTokens } from "../lib/token-refresh";
+import { completeClaudeOAuth, pollClaudeOAuth, startClaudeOAuth } from "../lib/claude-oauth";
+import { completeCodexOAuth, pollCodexOAuth, startCodexOAuth } from "../lib/codex-oauth";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -45,7 +47,7 @@ const finite = (v: unknown): number | undefined => {
 const asRecord = (v: unknown): Record<string, unknown> | null =>
   typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 
-/** Claude Code: oauth usage endpoint with 5h + weekly percent windows. */
+/** Claude Code: oauth usage endpoint — 5h/weekly percent windows, per-model weeklies, extra-usage pool. */
 async function collectClaudeCode(connection: LlmConnectionTable): Promise<QuotaSnapshot[]> {
   const config = await ensureFreshTokens(connection);
   const token = config.access_token;
@@ -62,12 +64,15 @@ async function collectClaudeCode(connection: LlmConnectionTable): Promise<QuotaS
     for (const [key, type] of [
       ["five_hour", "5h"],
       ["seven_day", "weekly"],
+      ["seven_day_opus", "weekly-opus"],
+      ["seven_day_sonnet", "weekly-sonnet"],
     ] as const) {
-      const win = asRecord(root[key] ?? root[key === "five_hour" ? "fiveHour" : "sevenDay"]);
+      if (snap.some((s) => s.quotaType === type)) continue;
+      const win = asRecord(root[key]);
       if (!win) continue;
-      const used = finite(win.usedPercent ?? win.used_percent);
+      const used = finite(win.utilization ?? win.usedPercent ?? win.used_percent);
       if (used === undefined) continue;
-      const resetRaw = win.resetIso ?? win.resets_at ?? win.ends_at;
+      const resetRaw = win.resets_at ?? win.resetIso ?? win.ends_at;
       const resetMs = finite(win.resetAt ?? win.reset_at);
       snap.push({
         quotaType: type,
@@ -78,7 +83,25 @@ async function collectClaudeCode(connection: LlmConnectionTable): Promise<QuotaS
         resetAt: typeof resetRaw === "string" && resetRaw ? new Date(resetRaw) : resetMs && resetMs > 0 ? new Date(resetMs) : null,
       });
     }
+
+    // pay-as-you-go overage pool on top of the subscription windows
+    if (snap.some((s) => s.quotaType === "extra")) continue;
+    const extra = asRecord(root.extra_usage);
+    if (extra?.is_enabled !== true) continue;
+    const limit = finite(extra.monthly_limit);
+    const usedCredits = finite(extra.used_credits);
+    const pct = finite(extra.utilization);
+    if (limit === undefined && usedCredits === undefined && pct === undefined) continue;
+    snap.push({
+      quotaType: "extra",
+      groupName: "default",
+      unit: limit !== undefined && limit > 0 ? "credits" : "percent",
+      quotaTotal: limit !== undefined && limit > 0 ? limit : 100,
+      quotaUsed: Math.max(0, usedCredits ?? Math.min(100, pct ?? 0)),
+      resetAt: null,
+    });
   }
+  if (snap.length === 0) throw new Error(`unrecognized usage payload: ${JSON.stringify(json).slice(0, 250)}`);
   return snap;
 }
 
@@ -195,7 +218,8 @@ async function collectKimi(connection: LlmConnectionTable): Promise<QuotaSnapsho
       if (remaining !== undefined && limit !== undefined) used = limit - remaining;
     }
     if (used === undefined && limit === undefined) return;
-    const label = (typeof rec.name === "string" && rec.name.trim() ? rec.name : typeof rec.title === "string" && rec.title.trim() ? rec.title : null) ?? fallbackLabel;
+    const label =
+      (typeof rec.name === "string" && rec.name.trim() ? rec.name : typeof rec.title === "string" && rec.title.trim() ? rec.title : null) ?? fallbackLabel;
     windows.push({ label, used: used ?? 0, limit: limit ?? 0, resetAt: parseReset(rec) });
   };
 
@@ -261,11 +285,25 @@ async function collectOllamaCloud(connection: LlmConnectionTable): Promise<Quota
   const snap: QuotaSnapshot[] = [];
   const five = usedPercent("Session");
   if (five !== undefined) {
-    snap.push({ quotaType: "5h", groupName: "default", unit: "percent", quotaTotal: 100, quotaUsed: Math.max(0, Math.min(100, five)), resetAt: resets[0] ? new Date(resets[0]) : null });
+    snap.push({
+      quotaType: "5h",
+      groupName: "default",
+      unit: "percent",
+      quotaTotal: 100,
+      quotaUsed: Math.max(0, Math.min(100, five)),
+      resetAt: resets[0] ? new Date(resets[0]) : null,
+    });
   }
   const weekly = usedPercent("Weekly");
   if (weekly !== undefined) {
-    snap.push({ quotaType: "weekly", groupName: "default", unit: "percent", quotaTotal: 100, quotaUsed: Math.max(0, Math.min(100, weekly)), resetAt: resets[1] ? new Date(resets[1]) : null });
+    snap.push({
+      quotaType: "weekly",
+      groupName: "default",
+      unit: "percent",
+      quotaTotal: 100,
+      quotaUsed: Math.max(0, Math.min(100, weekly)),
+      resetAt: resets[1] ? new Date(resets[1]) : null,
+    });
   }
   return snap;
 }
@@ -286,19 +324,11 @@ async function collectMinimax(connection: LlmConnectionTable): Promise<QuotaSnap
   }
   if (!Array.isArray(json.model_remains)) throw new Error("invalid minimax remains response");
 
-  const general = json.model_remains
-    .map(asRecord)
-    .find((r) => typeof r?.model_name === "string" && r.model_name.trim().toLowerCase() === "general");
+  const general = json.model_remains.map(asRecord).find((r) => typeof r?.model_name === "string" && r.model_name.trim().toLowerCase() === "general");
   if (!general) return [];
 
   const finite2 = finite;
-  const build = (
-    quotaType: string,
-    totalKey: string,
-    usedKey: string,
-    remainingKey: string,
-    resetKey: string,
-  ): QuotaSnapshot | null => {
+  const build = (quotaType: string, totalKey: string, usedKey: string, remainingKey: string, resetKey: string): QuotaSnapshot | null => {
     const total = finite2(general[totalKey]);
     const used = finite2(general[usedKey]);
     const remainingPercent = finite2(general[remainingKey]);
@@ -386,10 +416,46 @@ async function collectCline(connection: LlmConnectionTable): Promise<QuotaSnapsh
     const label =
       (typeof rec.name === "string" && rec.name.trim() ? rec.name : typeof rec.title === "string" && rec.title.trim() ? rec.title : null) ?? fallbackLabel;
     const l = label.toLowerCase();
-    const quotaType = l.includes("5h") || l.includes("5 h") ? "5h" : l.includes("week") || l.includes("7d") ? "weekly" : l.includes("month") || l.includes("30d") ? "monthly" : "daily";
+    const quotaType =
+      l.includes("5h") || l.includes("5 h")
+        ? "5h"
+        : l.includes("week") || l.includes("7d")
+          ? "weekly"
+          : l.includes("month") || l.includes("30d")
+            ? "monthly"
+            : "daily";
     if (snap.some((x) => x.quotaType === quotaType)) return;
-    snap.push({ quotaType, groupName: "default", unit: limit && limit > 0 ? "Tk" : "percent", quotaTotal: limit && limit > 0 ? limit : 100, quotaUsed: Math.max(0, used ?? 0), resetAt: null });
+    snap.push({
+      quotaType,
+      groupName: "default",
+      unit: limit && limit > 0 ? "Tk" : "percent",
+      quotaTotal: limit && limit > 0 ? limit : 100,
+      quotaUsed: Math.max(0, used ?? 0),
+      resetAt: null,
+    });
   };
+
+  // cline-style flat array: [{type: "five_hour"|"weekly"|"monthly", percentUsed}]
+  if (Array.isArray(data.limits)) {
+    for (const raw of data.limits) {
+      const item = asRecord(raw);
+      if (!item) continue;
+      const itemType = typeof item.type === "string" ? item.type.toLowerCase() : "";
+      const quotaType =
+        itemType === "five_hour" || itemType === "5h"
+          ? "5h"
+          : itemType === "weekly"
+            ? "weekly"
+            : itemType === "monthly"
+              ? "monthly"
+              : itemType === "daily"
+                ? "daily"
+                : null;
+      const used = finite(item.percentUsed ?? item.percentage);
+      if (!quotaType || used === undefined) continue;
+      snap.push({ quotaType, groupName: "default", unit: "percent", quotaTotal: 100, quotaUsed: Math.max(0, Math.min(100, used)), resetAt: null });
+    }
+  }
 
   const usage = asRecord(data.usage);
   if (usage) pushWindow(usage, "Weekly limit");
@@ -405,8 +471,49 @@ async function collectCline(connection: LlmConnectionTable): Promise<QuotaSnapsh
   return snap;
 }
 
+/** Codex (ChatGPT): wham usage endpoint — primary (5h) + secondary (weekly) percent windows. */
+async function collectCodex(connection: LlmConnectionTable): Promise<QuotaSnapshot[]> {
+  const config = await ensureFreshTokens(connection);
+  const token = config.access_token;
+  if (!token) throw new Error("missing OAuth access token");
+
+  const json = await fetchJson("https://chatgpt.com/backend-api/wham/usage", {
+    authorization: `Bearer ${token}`,
+    ...(config.account_id ? { "chatgpt-account-id": config.account_id } : {}),
+  });
+
+  const rateLimit = asRecord(asRecord(json)?.rate_limit) ?? asRecord(json);
+  if (!rateLimit) throw new Error(`unrecognized usage payload: ${JSON.stringify(json).slice(0, 250)}`);
+
+  const typeFor = (seconds: number | undefined, fallback: string): string =>
+    seconds === 18000 ? "5h" : seconds === 86400 ? "daily" : seconds === 604800 ? "weekly" : fallback;
+
+  const snap: QuotaSnapshot[] = [];
+  for (const [key, fallback] of [
+    ["primary_window", "5h"],
+    ["secondary_window", "weekly"],
+  ] as const) {
+    const win = asRecord(rateLimit[key]);
+    if (!win) continue;
+    const used = finite(win.used_percent ?? win.usedPercent);
+    if (used === undefined) continue;
+    const resetSec = finite(win.reset_at);
+    snap.push({
+      quotaType: typeFor(finite(win.limit_window_seconds), fallback),
+      groupName: "default",
+      unit: "percent",
+      quotaTotal: 100,
+      quotaUsed: Math.max(0, Math.min(100, used)),
+      resetAt: resetSec && resetSec > 0 ? new Date(resetSec * 1000) : null,
+    });
+  }
+  if (snap.length === 0) throw new Error(`unrecognized usage payload: ${JSON.stringify(json).slice(0, 250)}`);
+  return snap;
+}
+
 const QUOTA_COLLECTORS: Record<string, QuotaCollector> = {
   "claude-code": collectClaudeCode,
+  codex: collectCodex,
   zai: collectZai,
   kimi: collectKimi,
   "ollama-cloud": collectOllamaCloud,
@@ -417,6 +524,70 @@ const QUOTA_COLLECTORS: Record<string, QuotaCollector> = {
 
 export const llmRoutes = new Hono()
   .get("/providers", (c) => c.json(LLM_PROVIDERS))
+
+  .post("/claude-code/oauth/start", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+
+    try {
+      return c.json(await startClaudeOAuth());
+    } catch (e) {
+      return c.json({ error: "oauth_start_failed", detail: (e as Error).message }, 502);
+    }
+  })
+
+  /** Manual completion when the local callback is unreachable (firewalls, remote browsers). */
+  .post("/claude-code/oauth/complete", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+
+    const body = await c.req.json().catch(() => null);
+    const input = typeof body?.input === "string" ? body.input : "";
+    if (!input.trim()) return c.json({ error: "invalid_input" }, 400);
+    return c.json(await completeClaudeOAuth(input));
+  })
+
+  .post("/claude-code/oauth/poll", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+
+    const body = await c.req.json().catch(() => null);
+    const state = typeof body?.state === "string" ? body.state : "";
+    if (!state) return c.json({ error: "invalid_state" }, 400);
+    return c.json(pollClaudeOAuth(state));
+  })
+
+  .post("/codex/oauth/start", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+
+    try {
+      return c.json(await startCodexOAuth());
+    } catch (e) {
+      return c.json({ error: "oauth_start_failed", detail: (e as Error).message }, 502);
+    }
+  })
+
+  /** Manual completion when the local callback is unreachable (firewalls, remote browsers). */
+  .post("/codex/oauth/complete", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+
+    const body = await c.req.json().catch(() => null);
+    const input = typeof body?.input === "string" ? body.input : "";
+    if (!input.trim()) return c.json({ error: "invalid_input" }, 400);
+    return c.json(await completeCodexOAuth(input));
+  })
+
+  .post("/codex/oauth/poll", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+
+    const body = await c.req.json().catch(() => null);
+    const state = typeof body?.state === "string" ? body.state : "";
+    if (!state) return c.json({ error: "invalid_state" }, 400);
+    return c.json(pollCodexOAuth(state));
+  })
 
   .get("/connections", async (c) => {
     const s = await requireOrgSession(c);
@@ -533,12 +704,7 @@ export const llmRoutes = new Hono()
       .executeTakeFirst();
     if (!connection) return c.json({ error: "connection_not_found" }, 404);
 
-    const rows = await db
-      .selectFrom("llm_quota")
-      .selectAll()
-      .where("connectionId", "=", connection.id)
-      .orderBy("quotaType", "asc")
-      .execute();
+    const rows = await db.selectFrom("llm_quota").selectAll().where("connectionId", "=", connection.id).orderBy("quotaType", "asc").execute();
     return c.json(rows);
   })
 
@@ -598,7 +764,18 @@ export const llmRoutes = new Hono()
 
     const row = await db
       .insertInto("llm_quota")
-      .values({ id: crypto.randomUUID(), organizationId: s.organizationId, connectionId: connection.id, quotaType, groupName, unit, quotaTotal, quotaUsed: body.quotaUsed, capturedAt: now, resetAt })
+      .values({
+        id: crypto.randomUUID(),
+        organizationId: s.organizationId,
+        connectionId: connection.id,
+        quotaType,
+        groupName,
+        unit,
+        quotaTotal,
+        quotaUsed: body.quotaUsed,
+        capturedAt: now,
+        resetAt,
+      })
       .returningAll()
       .executeTakeFirstOrThrow();
     return c.json(row, 201);
@@ -640,7 +817,11 @@ export const llmRoutes = new Hono()
         .where("groupName", "=", snap.groupName)
         .executeTakeFirst();
       if (existing) {
-        await db.updateTable("llm_quota").set({ ...snap, capturedAt: now }).where("id", "=", existing.id).execute();
+        await db
+          .updateTable("llm_quota")
+          .set({ ...snap, capturedAt: now })
+          .where("id", "=", existing.id)
+          .execute();
       } else {
         await db
           .insertInto("llm_quota")
@@ -674,31 +855,35 @@ export const llmRoutes = new Hono()
       .executeTakeFirst();
     if (!connection) return c.json({ error: "connection_not_found" }, 404);
 
-    const stored = await db
-      .selectFrom("llm_model")
-      .select("modelId")
-      .where("connectionId", "=", connection.id)
-      .orderBy("createdAt", "asc")
-      .limit(1)
-      .executeTakeFirst();
+    const storedRows = await db.selectFrom("llm_model").select("modelId").where("connectionId", "=", connection.id).orderBy("createdAt", "asc").execute();
     const provider = getProvider(connection.provider);
-    const model = stored?.modelId ?? provider?.models[0];
-    if (!model) return c.json({ error: "no_model_available" }, 400);
+    const candidates = [...new Set(storedRows.length > 0 ? storedRows.map((r) => r.modelId) : (provider?.models ?? []))];
+    if (candidates.length === 0) return c.json({ error: "no_model_available" }, 400);
 
+    // Some models are plan-gated (e.g. codex spark) — walk the list until one works.
     const started = Date.now();
-    try {
-      const messages: AgentMessage[] = [{ role: "user", content: "Reply with exactly: OK", meta: null }];
-      const result = await runAgentRound(connection, model, messages, []);
-      return c.json({
-        ok: true,
-        model,
-        ms: Date.now() - started,
-        reply: (result.content ?? "").trim().slice(0, 200),
-        usage: result.usage,
-      });
-    } catch (e) {
-      return c.json({ ok: false, model, ms: Date.now() - started, error: (e as Error).message.slice(0, 300) });
+    const tried: { model: string; error: string }[] = [];
+    const messages: AgentMessage[] = [{ role: "user", content: "Reply with exactly: OK", meta: null }];
+    for (const model of candidates) {
+      try {
+        const result = await runAgentRound(connection, model, messages, []);
+        return c.json({
+          ok: true,
+          model,
+          ms: Date.now() - started,
+          reply: (result.content ?? "").trim().slice(0, 200),
+          usage: result.usage,
+          ...(tried.length > 0 ? { tried } : {}),
+        });
+      } catch (e) {
+        const message = (e as Error).message.slice(0, 200);
+        tried.push({ model, error: message });
+        // credential failures won't heal by switching models
+        if (/returned 40[13]/.test(message)) break;
+      }
     }
+    const last = tried[tried.length - 1];
+    return c.json({ ok: false, model: last.model, ms: Date.now() - started, error: last.error, tried });
   })
 
   .get("/connections/:id/usage", async (c) => {
