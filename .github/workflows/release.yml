@@ -510,6 +510,48 @@ jobs:
           git -C tap commit -m "twodb-runner ${GITHUB_REF_NAME}"
           git -C tap push origin HEAD:main
 
+  # After the bundles land on the release, bump flake.nix (runnerVersion +
+  # tarball hashes) and open a PR — merging it is what makes the Nix flake
+  # packages actually serve the new version.
+  flake-bump:
+    needs: [server-bundles, runner-bundles]
+    if: always() && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+
+      - name: Download release tarballs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'twodb-server_*.tar.gz' --pattern 'twodb-runner_*.tar.gz' \
+            --dir tarballs
+
+      - name: Bump flake.nix
+        run: node scripts/flake-release-bump.mjs "${GITHUB_REF_NAME#v}" tarballs
+
+      - name: Open flake bump PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          branch="flake-bump/v${version}"
+          git config user.name "release-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add flake.nix
+          git commit -m "flake: v${version} tarballs (runner + server hashes)"
+          git push -u origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "flake: v${version} tarballs" \
+            --body "Automated flake.nix bump for the ${GITHUB_REF_NAME} release tarballs. Merge, then run \`nix flake update twodb\` in infra and deploy." \
+            || echo "PR for $branch already exists"
+
   images:
     needs: check
     runs-on: ubuntu-latest
