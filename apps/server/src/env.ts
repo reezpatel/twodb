@@ -23,4 +23,5 @@ export const env = {
   },
   webOrigin: process.env.TWODB_WEB_ORIGIN ?? "http://localhost:5173",
   staticDir: process.env.TWODB_STATIC_DIR,
+  skipAutoMigration: ["1", "true", "yes"].includes((process.env.TWO_DB_SKIP_AUTO_MIGRATION ?? "").toLowerCase()),
 };

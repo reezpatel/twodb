@@ -1,9 +1,8 @@
 import { sql, type Kysely } from "kysely";
-import type { Database } from "../plugins/db";
 
-// Final-state DDL, generated from the consolidated schema. Idempotent: every
-// statement tolerates already-exists so the server can bootstrap a fresh
-// database into the twodb schema on startup.
+// Baseline: the full twodb schema as of the migration reintroduction.
+// Databases created by the old self-bootstrapping DDL are seeded past this
+// migration at startup (see lib/migrate.ts), so it only runs on fresh databases.
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS account (
@@ -167,14 +166,6 @@ CREATE TABLE IF NOT EXISTS invitation (
     "createdAt" timestamp with time zone NOT NULL,
     "inviterId" text NOT NULL
 );
-CREATE TABLE IF NOT EXISTS kysely_migration (
-    name character varying(255) NOT NULL,
-    "timestamp" character varying(255) NOT NULL
-);
-CREATE TABLE IF NOT EXISTS kysely_migration_lock (
-    id character varying(255) NOT NULL,
-    is_locked integer DEFAULT 0 NOT NULL
-);
 CREATE TABLE IF NOT EXISTS llm_connection (
     id text NOT NULL,
     "organizationId" text NOT NULL,
@@ -219,8 +210,6 @@ CREATE TABLE IF NOT EXISTS llm_quota (
     CONSTRAINT llm_quota_connection_type_group_unique UNIQUE ("connectionId", "quotaType", "groupName")
 );
 CREATE INDEX IF NOT EXISTS llm_quota_connection_idx ON llm_quota("connectionId");
-ALTER TABLE llm_quota ADD CONSTRAINT llm_quota_organizationId_fkey FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE llm_quota ADD CONSTRAINT llm_quota_connectionId_fkey FOREIGN KEY ("connectionId") REFERENCES llm_connection(id) ON DELETE CASCADE;
 CREATE TABLE IF NOT EXISTS llm_usage_event (
     id text NOT NULL,
     "organizationId" text NOT NULL,
@@ -435,10 +424,6 @@ ALTER TABLE ONLY instruction
     ADD CONSTRAINT instruction_scope_path_unique UNIQUE NULLS NOT DISTINCT ("organizationId", "codeDirectoryId", "instructionPath");
 ALTER TABLE ONLY invitation
     ADD CONSTRAINT invitation_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY kysely_migration_lock
-    ADD CONSTRAINT kysely_migration_lock_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY kysely_migration
-    ADD CONSTRAINT kysely_migration_pkey PRIMARY KEY (name);
 ALTER TABLE ONLY llm_connection
     ADD CONSTRAINT llm_connection_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY llm_model
@@ -559,6 +544,10 @@ ALTER TABLE ONLY llm_model
     ADD CONSTRAINT "llm_model_connectionId_fkey" FOREIGN KEY ("connectionId") REFERENCES llm_connection(id) ON DELETE CASCADE;
 ALTER TABLE ONLY llm_model
     ADD CONSTRAINT "llm_model_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
+ALTER TABLE ONLY llm_quota
+    ADD CONSTRAINT "llm_quota_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
+ALTER TABLE ONLY llm_quota
+    ADD CONSTRAINT "llm_quota_connectionId_fkey" FOREIGN KEY ("connectionId") REFERENCES llm_connection(id) ON DELETE CASCADE;
 ALTER TABLE ONLY llm_usage_event
     ADD CONSTRAINT "llm_usage_event_connectionId_fkey" FOREIGN KEY ("connectionId") REFERENCES llm_connection(id) ON DELETE CASCADE;
 ALTER TABLE ONLY llm_usage_event
@@ -609,21 +598,12 @@ ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "costInput" double precision;
 ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "costOutput" double precision;
 ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "costCacheRead" double precision;
 ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS output text[] DEFAULT '{}'::text[] NOT NULL;
-
 `;
 
-const TOLERATED_CODES = new Set(["42P06", "42P07", "42P16", "42701", "42710"]);
-
-export async function ensureSchema(db: Kysely<Database>): Promise<void> {
-  await sql`CREATE SCHEMA IF NOT EXISTS twodb`.execute(db);
+export async function up(db: Kysely<unknown>): Promise<void> {
   for (const statement of SCHEMA_SQL.split(";\n")
     .map((s) => s.trim())
     .filter(Boolean)) {
-    try {
-      await sql.raw(statement).execute(db);
-    } catch (e) {
-      const code = (e as { code?: string }).code;
-      if (!TOLERATED_CODES.has(code ?? "")) throw e;
-    }
+    await sql.raw(statement).execute(db);
   }
 }

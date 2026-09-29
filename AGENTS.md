@@ -15,8 +15,9 @@ over WebSockets. There is no plugin system anymore.
   Every screen lives in `src/routes/<app>/` as `<app>-scene.tsx` plus a
   `use-<app>-scene.ts` hook. Nav rail entries come from `src/lib/apps.ts`.
 - `apps/server` — Hono backend (:3001). REST + WS routes in `src/routes/`,
-  domain logic in `src/lib/`. Postgres via Kysely — the server bootstraps its
-  `twodb` schema on startup (`lib/schema.ts`, idempotent DDL).
+  domain logic in `src/lib/`. Postgres via Kysely — migrations in
+  `src/migrations/` run automatically on startup (`lib/migrate.ts`) unless
+  `TWO_DB_SKIP_AUTO_MIGRATION` is set.
 - `apps/runner` — outbound runner agent; dials home to the server over WS
   (never the reverse) and executes jobs.
 

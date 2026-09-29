@@ -21,7 +21,7 @@ import { storageAdminRoutes } from "./routes/storage-admin";
 import { serverSettingsRoutes } from "./routes/server-settings";
 import { apiKeyRoutes } from "./routes/api-keys";
 import { getServerSettings } from "./lib/server-settings";
-import { ensureSchema } from "./lib/schema";
+import { runMigrations } from "./lib/migrate";
 import { assistantRoutes } from "./routes/assistant";
 import { registerAssistantWs } from "./routes/assistant-ws";
 import { notesRoutes } from "./routes/notes";
@@ -92,7 +92,16 @@ if (env.staticDir) {
   app.get("*", serveStatic({ root: webRoot, path: "index.html" }));
 }
 
-await ensureSchema(db);
+if (env.skipAutoMigration) {
+  console.log("TWO_DB_SKIP_AUTO_MIGRATION set — skipping database migrations");
+} else {
+  try {
+    await runMigrations(db);
+  } catch (error) {
+    console.error("database migration failed:", error);
+    process.exit(1);
+  }
+}
 
 const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`server listening on http://localhost:${info.port}`);
