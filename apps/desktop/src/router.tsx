@@ -1,20 +1,25 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import { RequireAuth } from "./components/require-auth";
 import { AppLayout } from "./components/app-layout";
-import { LoginPage } from "./routes/login/login";
-import { RegisterPage } from "./routes/register/register";
-import { ForgotPasswordPage } from "./routes/forgot-password/forgot-password";
-import { ResetPasswordPage } from "./routes/reset-password/reset-password";
+import { LoginPage } from "./routes/auth/login/login";
+import { RegisterPage } from "./routes/auth/register/register";
+import { ForgotPasswordPage } from "./routes/auth/forgot-password/forgot-password";
+import { ResetPasswordPage } from "./routes/auth/reset-password/reset-password";
 import { OrgPickerPage } from "./routes/orgs/org-picker";
 import { HomePage } from "./routes/home/home";
 import { AppPage } from "./routes/apps/app-page";
 import { CodeScene } from "./routes/code/code-scene";
 import { SettingsLayout } from "./routes/settings/settings-layout";
-import { GeneralSection } from "./routes/settings/general";
-import { AdministratorSection } from "./routes/settings/administrator";
-import { LlmSection } from "./routes/settings/llm";
-import { RunnersSection } from "./routes/settings/runners";
-import { StorageSection } from "./routes/settings/storage";
+import { GeneralSection } from "./routes/settings/general/general";
+import { AdministratorSection } from "./routes/settings/administrator/administrator";
+import { LlmLayout } from "./routes/settings/llm/llm";
+import { ConnectionsSection } from "./routes/settings/llm/connections/connections";
+import { SkillsSection } from "./routes/settings/llm/skills/skills";
+import { AgentsSection } from "./routes/settings/llm/agents/agents";
+import { MemoriesSection } from "./routes/settings/llm/memories/memories";
+import { InstructionsSection } from "./routes/settings/llm/instructions/instructions";
+import { RunnersSection } from "./routes/settings/runners/runners";
+import { StorageSection } from "./routes/settings/storage/storage";
 import { FilesScene } from "./routes/files/files-scene";
 import { AssistantScene } from "./routes/assistant/assistant-scene";
 import { NotesScene } from "./routes/notes/notes-scene";
@@ -54,7 +59,18 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="general" replace /> },
           { path: "general", Component: GeneralSection },
           { path: "administrator", Component: AdministratorSection },
-          { path: "llm", Component: LlmSection },
+          {
+            path: "llm",
+            Component: LlmLayout,
+            children: [
+              { index: true, element: <Navigate to="connections" replace /> },
+              { path: "connections", Component: ConnectionsSection },
+              { path: "skills", Component: SkillsSection },
+              { path: "agents", Component: AgentsSection },
+              { path: "memories", Component: MemoriesSection },
+              { path: "instructions", Component: InstructionsSection },
+            ],
+          },
           { path: "runners", Component: RunnersSection },
           { path: "storage", Component: StorageSection },
         ],

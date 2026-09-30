@@ -37,23 +37,27 @@ export function useOrgPicker() {
     }
   };
 
+  const createOrg = async (name: string) => {
+    setError(null);
+    const { data, error } = await authClient.organization.create({
+      name,
+      slug: slugify(name),
+    });
+    if (error) {
+      setError(error.message ?? "Could not create organization");
+      return false;
+    }
+    await queryClient.invalidateQueries({ queryKey: ["organizations"] });
+    if (data) await selectOrg(data.id);
+    return true;
+  };
+
   const createForm = useForm({
     defaultValues: { name: "" },
     onSubmit: async ({ value, formApi }) => {
-      setError(null);
-      const { data, error } = await authClient.organization.create({
-        name: value.name,
-        slug: slugify(value.name),
-      });
-      if (error) {
-        setError(error.message ?? "Could not create organization");
-        return;
-      }
-      formApi.reset();
-      await queryClient.invalidateQueries({ queryKey: ["organizations"] });
-      if (data) await selectOrg(data.id);
+      if (await createOrg(value.name)) formApi.reset();
     },
   });
 
-  return { orgs, error, selectOrg, createForm };
+  return { orgs, error, selectOrg, createOrg, createForm };
 }

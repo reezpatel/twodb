@@ -37,6 +37,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SideNav, SideNavFooter, SideNavGroup, SideNavHeader, SideNavItem } from "@/components/side-nav";
 import { cn } from "@/lib/utils";
 import type { EmailMessage, EmailThread } from "./use-email-scene";
 import { useEmailScene } from "./use-email-scene";
@@ -340,8 +341,8 @@ export function EmailScene() {
 
   return (
     <div className="bg-background relative grid h-full min-h-0 grid-cols-1 overflow-hidden lg:grid-cols-[220px_330px_1fr]">
-      <aside className="bg-muted/20 flex flex-col gap-3 border-r p-4 px-3">
-        <div className="flex items-center gap-2 px-1">
+      <SideNav>
+        <SideNavHeader>
           <Avatar size="lg">
             <AvatarFallback className="text-xs">{initials("Uxerflow")}</AvatarFallback>
           </Avatar>
@@ -349,50 +350,25 @@ export function EmailScene() {
             <strong className="truncate text-sm font-semibold">Uxerflow</strong>
             <span className="text-muted-foreground truncate text-xs">uxerflow@gmail.design</span>
           </div>
-        </div>
+        </SideNavHeader>
         <Button onClick={() => email.setComposeOpen(true)}>
           <Pencil size={14} /> Compose
         </Button>
-        <nav className="flex flex-col gap-0.5">
-          {FOLDERS.map((f) => {
-            const Icon = f.icon;
-            const isActive = f.id === email.folder;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                className={cn(
-                  "hover:bg-accent/50 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors",
-                  isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground",
-                )}
-                onClick={() => email.setFolder(f.id)}
-              >
-                <Icon size={15} className="shrink-0" />
-                <span className="flex-1 text-left">{f.label}</span>
-                {f.count ? <span className="text-xs tabular-nums">{f.count}</span> : null}
-              </button>
-            );
-          })}
-        </nav>
-        <div className="flex flex-col gap-0.5 border-t pt-2">
-          <span className="text-muted-foreground/70 px-2 pb-1.5 text-[11px] font-semibold tracking-wider uppercase">Labels</span>
-          {email.labels.map((l) => (
-            <span key={l.id} className="text-muted-foreground flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
-              <i className={cn("size-2 shrink-0 rounded-sm", l.dotClass)} />
-              {l.label}
-              <b className="ml-auto text-xs font-medium tabular-nums">{l.count}</b>
-            </span>
+        <SideNavGroup>
+          {FOLDERS.map((f) => (
+            <SideNavItem key={f.id} label={f.label} icon={f.icon} count={f.count} active={f.id === email.folder} onSelect={() => email.setFolder(f.id)} />
           ))}
-        </div>
-        <div className="mt-auto flex flex-col gap-0.5">
-          <button type="button" className="text-muted-foreground hover:bg-accent/50 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors">
-            <Sparkles size={15} /> Settings
-          </button>
-          <button type="button" className="text-muted-foreground hover:bg-accent/50 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors">
-            <Bell size={15} /> Help Center
-          </button>
-        </div>
-      </aside>
+        </SideNavGroup>
+        <SideNavGroup label="Labels" separated>
+          {email.labels.map((l) => (
+            <SideNavItem key={l.id} label={l.label} dotClassName={l.dotClass} count={l.count} />
+          ))}
+        </SideNavGroup>
+        <SideNavFooter>
+          <SideNavItem label="Settings" icon={Sparkles} />
+          <SideNavItem label="Help Center" icon={Bell} />
+        </SideNavFooter>
+      </SideNav>
 
       <section className="flex min-w-0 flex-col gap-3 border-r p-4 px-3">
         <header className="flex items-baseline gap-2">

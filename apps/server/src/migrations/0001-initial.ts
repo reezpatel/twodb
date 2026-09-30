@@ -4,606 +4,636 @@ import { sql, type Kysely } from "kysely";
 // Databases created by the old self-bootstrapping DDL are seeded past this
 // migration at startup (see lib/migrate.ts), so it only runs on fresh databases.
 
-const SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS account (
-    id text NOT NULL,
-    "accountId" text NOT NULL,
-    "providerId" text NOT NULL,
-    "userId" text NOT NULL,
-    "accessToken" text,
-    "refreshToken" text,
-    "idToken" text,
-    "accessTokenExpiresAt" timestamp with time zone,
-    "refreshTokenExpiresAt" timestamp with time zone,
-    scope text,
-    password text,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS agent (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "codeDirectoryId" text,
-    provider text NOT NULL,
-    model text NOT NULL,
-    description text,
-    instruction text NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS api_key (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "userId" text NOT NULL,
-    name text NOT NULL,
-    prefix text NOT NULL,
-    hash text NOT NULL,
-    "lastUsedAt" timestamp with time zone,
-    "revokedAt" timestamp with time zone,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS apikey (
-    id text NOT NULL,
-    "configId" text DEFAULT 'default'::text NOT NULL,
-    name text,
-    start text,
-    "referenceId" text NOT NULL,
-    prefix text,
-    key text NOT NULL,
-    "refillInterval" integer,
-    "refillAmount" integer,
-    "lastRefillAt" timestamp with time zone,
-    enabled boolean DEFAULT true,
-    "rateLimitEnabled" boolean DEFAULT true,
-    "rateLimitTimeWindow" integer DEFAULT 86400000,
-    "rateLimitMax" integer DEFAULT 10,
-    "requestCount" integer DEFAULT 0,
-    remaining integer,
-    "lastRequest" timestamp with time zone,
-    "expiresAt" timestamp with time zone,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL,
-    permissions text,
-    metadata text
-);
-CREATE TABLE IF NOT EXISTS assistant_artifact (
-    id text NOT NULL,
-    "threadId" text NOT NULL,
-    "organizationId" text NOT NULL,
-    title text NOT NULL,
-    type text NOT NULL,
-    content text NOT NULL,
-    "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS assistant_message (
-    id text NOT NULL,
-    "threadId" text NOT NULL,
-    role text NOT NULL,
-    content text NOT NULL,
-    meta jsonb,
-    "createdAt" timestamp without time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS assistant_thread (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    title text NOT NULL,
-    "connectionId" text,
-    model text,
-    "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS code_directory (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "runnerId" text NOT NULL,
-    cwd text NOT NULL,
-    "displayName" text NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS code_session (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    title text NOT NULL,
-    "connectionId" text,
-    model text,
-    "codeDirectoryId" text,
-    type text DEFAULT 'main_agent'::text NOT NULL,
-    "parentSessionId" text,
-    "agentId" text,
-    mode jsonb,
-    "runtimeState" jsonb,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS code_session_message (
-    id text NOT NULL,
-    "sessionId" text NOT NULL,
-    role text NOT NULL,
-    content text NOT NULL,
-    meta jsonb,
-    "createdAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS code_session_usage_event (
-    id text NOT NULL,
-    "sessionId" text NOT NULL,
-    "connectionId" text NOT NULL,
-    model text NOT NULL,
-    "inputTokens" integer DEFAULT 0 NOT NULL,
-    "outputTokens" integer DEFAULT 0 NOT NULL,
-    "cachedInputTokens" integer DEFAULT 0 NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS device (
-    id text NOT NULL,
-    "userId" text NOT NULL,
-    name text DEFAULT ''::text NOT NULL,
-    platform text NOT NULL,
-    token text NOT NULL,
-    "lastSeenAt" timestamp with time zone NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS instruction (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "codeDirectoryId" text,
-    instruction text NOT NULL,
-    "instructionPath" text NOT NULL,
-    hash text NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS invitation (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    email text NOT NULL,
-    role text,
-    status text DEFAULT 'pending'::text NOT NULL,
-    "expiresAt" timestamp with time zone NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL,
-    "inviterId" text NOT NULL
-);
-CREATE TABLE IF NOT EXISTS llm_connection (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    provider text NOT NULL,
-    name text NOT NULL,
-    config jsonb DEFAULT '{}'::jsonb NOT NULL,
-    enabled boolean DEFAULT true NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS llm_model (
-    id text NOT NULL,
-    "connectionId" text NOT NULL,
-    "organizationId" text NOT NULL,
-    "modelId" text NOT NULL,
-    "displayName" text,
-    "contextWindow" integer,
-    thinking boolean DEFAULT false NOT NULL,
-    input text[] DEFAULT '{}'::text[] NOT NULL,
-    "thinkingLevel" text[] DEFAULT '{}'::text[] NOT NULL,
-    temperature boolean DEFAULT false NOT NULL,
-    "limitContext" integer,
-    "limitInput" integer,
-    "limitOutput" integer,
-    "costInput" double precision,
-    "costOutput" double precision,
-    "costCacheRead" double precision,
-    output text[] DEFAULT '{}'::text[] NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS llm_quota (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "connectionId" text NOT NULL,
-    "quotaType" text NOT NULL,
-    "groupName" text DEFAULT 'default'::text NOT NULL,
-    unit text DEFAULT 'tokens'::text NOT NULL,
-    "quotaTotal" double precision,
-    "quotaUsed" double precision NOT NULL,
-    "capturedAt" timestamp with time zone NOT NULL,
-    "resetAt" timestamp with time zone,
-    CONSTRAINT llm_quota_connection_type_group_unique UNIQUE ("connectionId", "quotaType", "groupName")
-);
-CREATE INDEX IF NOT EXISTS llm_quota_connection_idx ON llm_quota("connectionId");
-CREATE TABLE IF NOT EXISTS llm_usage_event (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "connectionId" text NOT NULL,
-    "correlationId" text,
-    model text NOT NULL,
-    "inputTokens" integer DEFAULT 0 NOT NULL,
-    "outputTokens" integer DEFAULT 0 NOT NULL,
-    "cachedInputTokens" integer DEFAULT 0 NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS member (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "userId" text NOT NULL,
-    role text DEFAULT 'member'::text NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS memory (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "codeDirectoryId" text,
-    "scopeId" text,
-    tags text[] DEFAULT '{}'::text[] NOT NULL,
-    content text NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS note_item (
-    id text NOT NULL,
-    "nodeId" text NOT NULL,
-    title text DEFAULT ''::text NOT NULL,
-    content jsonb DEFAULT '{}'::jsonb NOT NULL,
-    preview text DEFAULT ''::text NOT NULL,
-    "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS note_node (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "parentId" text,
-    kind text NOT NULL,
-    name text NOT NULL,
-    "position" integer DEFAULT 0 NOT NULL,
-    "isFavorite" boolean DEFAULT false NOT NULL,
-    metadata jsonb,
-    "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS notification (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "userId" text NOT NULL,
-    title text NOT NULL,
-    body text DEFAULT ''::text NOT NULL,
-    data jsonb,
-    "readAt" timestamp with time zone,
-    "createdAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS organization (
-    id text NOT NULL,
-    name text NOT NULL,
-    slug text NOT NULL,
-    logo text,
-    "createdAt" timestamp with time zone NOT NULL,
-    metadata text
-);
-CREATE TABLE IF NOT EXISTS passkey (
-    id text NOT NULL,
-    name text,
-    "publicKey" text NOT NULL,
-    "userId" text NOT NULL,
-    "credentialID" text NOT NULL,
-    counter integer NOT NULL,
-    "deviceType" text NOT NULL,
-    "backedUp" boolean NOT NULL,
-    transports text,
-    "createdAt" timestamp with time zone,
-    aaguid text
-);
-CREATE TABLE IF NOT EXISTS runner (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "accessKeyId" text NOT NULL,
-    name text NOT NULL,
-    hostname text,
-    "lastSeenAt" timestamp with time zone NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL,
-    "deletedAt" timestamp with time zone
-);
-CREATE TABLE IF NOT EXISTS runner_access_key (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    name text NOT NULL,
-    key text NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL,
-    "revokedAt" timestamp with time zone
-);
-CREATE TABLE IF NOT EXISTS server_setting (
-    key text NOT NULL,
-    value jsonb NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS session (
-    id text NOT NULL,
-    "expiresAt" timestamp with time zone NOT NULL,
-    token text NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL,
-    "ipAddress" text,
-    "userAgent" text,
-    "userId" text NOT NULL,
-    "impersonatedBy" text,
-    "activeOrganizationId" text
-);
-CREATE TABLE IF NOT EXISTS skill (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "codeDirectoryId" text,
-    name text NOT NULL,
-    description text NOT NULL,
-    content text NOT NULL,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS storage_backend (
-    id text NOT NULL,
-    name text NOT NULL,
-    type text NOT NULL,
-    config jsonb DEFAULT '{}'::jsonb NOT NULL,
-    enabled boolean DEFAULT true NOT NULL,
-    "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS storage_bucket (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "backendId" text NOT NULL,
-    name text NOT NULL,
-    type text DEFAULT 'default'::text NOT NULL,
-    "isInternal" boolean DEFAULT false NOT NULL,
-    "storageLimit" bigint,
-    "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS storage_entry (
-    id text NOT NULL,
-    "organizationId" text NOT NULL,
-    "bucketId" text NOT NULL,
-    path text NOT NULL,
-    type text NOT NULL,
-    size bigint DEFAULT 0 NOT NULL,
-    "mimeType" text,
-    "previewType" text,
-    "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS "user" (
-    id text NOT NULL,
-    name text NOT NULL,
-    email text NOT NULL,
-    "emailVerified" boolean NOT NULL,
-    image text,
-    role text,
-    banned boolean DEFAULT false,
-    "banReason" text,
-    "banExpires" timestamp with time zone,
-    "createdAt" timestamp with time zone NOT NULL,
-    "updatedAt" timestamp with time zone NOT NULL
-);
-CREATE TABLE IF NOT EXISTS verification (
-    id text NOT NULL,
-    identifier text NOT NULL,
-    value text NOT NULL,
-    "expiresAt" timestamp with time zone NOT NULL,
-    "createdAt" timestamp with time zone,
-    "updatedAt" timestamp with time zone
-);
-ALTER TABLE ONLY account
-    ADD CONSTRAINT account_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY agent
-    ADD CONSTRAINT agent_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY api_key
-    ADD CONSTRAINT api_key_hash_key UNIQUE (hash);
-ALTER TABLE ONLY api_key
-    ADD CONSTRAINT api_key_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY apikey
-    ADD CONSTRAINT apikey_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY assistant_artifact
-    ADD CONSTRAINT assistant_artifact_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY assistant_artifact
-    ADD CONSTRAINT assistant_artifact_unique_title UNIQUE ("threadId", title);
-ALTER TABLE ONLY assistant_message
-    ADD CONSTRAINT assistant_message_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY assistant_thread
-    ADD CONSTRAINT assistant_thread_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY code_directory
-    ADD CONSTRAINT code_directory_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY code_session_message
-    ADD CONSTRAINT code_session_message_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY code_session
-    ADD CONSTRAINT code_session_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY code_session_usage_event
-    ADD CONSTRAINT code_session_usage_event_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY device
-    ADD CONSTRAINT device_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY device
-    ADD CONSTRAINT device_token_key UNIQUE (token);
-ALTER TABLE ONLY instruction
-    ADD CONSTRAINT instruction_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY instruction
-    ADD CONSTRAINT instruction_scope_path_unique UNIQUE NULLS NOT DISTINCT ("organizationId", "codeDirectoryId", "instructionPath");
-ALTER TABLE ONLY invitation
-    ADD CONSTRAINT invitation_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY llm_connection
-    ADD CONSTRAINT llm_connection_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY llm_model
-    ADD CONSTRAINT llm_model_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY llm_usage_event
-    ADD CONSTRAINT llm_usage_event_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY member
-    ADD CONSTRAINT member_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY memory
-    ADD CONSTRAINT memory_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY note_item
-    ADD CONSTRAINT note_item_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY note_node
-    ADD CONSTRAINT note_node_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY notification
-    ADD CONSTRAINT notification_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY organization
-    ADD CONSTRAINT organization_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY organization
-    ADD CONSTRAINT organization_slug_key UNIQUE (slug);
-ALTER TABLE ONLY passkey
-    ADD CONSTRAINT passkey_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY runner_access_key
-    ADD CONSTRAINT runner_access_key_key_key UNIQUE (key);
-ALTER TABLE ONLY runner_access_key
-    ADD CONSTRAINT runner_access_key_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY runner
-    ADD CONSTRAINT runner_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY server_setting
-    ADD CONSTRAINT server_setting_pkey PRIMARY KEY (key);
-ALTER TABLE ONLY session
-    ADD CONSTRAINT session_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY session
-    ADD CONSTRAINT session_token_key UNIQUE (token);
-ALTER TABLE ONLY skill
-    ADD CONSTRAINT skill_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY skill
-    ADD CONSTRAINT skill_scope_name_unique UNIQUE NULLS NOT DISTINCT ("organizationId", "codeDirectoryId", name);
-ALTER TABLE ONLY storage_backend
-    ADD CONSTRAINT storage_backend_name_key UNIQUE (name);
-ALTER TABLE ONLY storage_backend
-    ADD CONSTRAINT storage_backend_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY storage_bucket
-    ADD CONSTRAINT storage_bucket_org_name_unique UNIQUE ("organizationId", name);
-ALTER TABLE ONLY storage_bucket
-    ADD CONSTRAINT storage_bucket_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY storage_entry
-    ADD CONSTRAINT storage_entry_bucket_path_unique UNIQUE ("bucketId", path);
-ALTER TABLE ONLY storage_entry
-    ADD CONSTRAINT storage_entry_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY "user"
-    ADD CONSTRAINT user_email_key UNIQUE (email);
-ALTER TABLE ONLY "user"
-    ADD CONSTRAINT user_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY verification
-    ADD CONSTRAINT verification_pkey PRIMARY KEY (id);
-CREATE INDEX IF NOT EXISTS agent_organization_idx ON agent USING btree ("organizationId");
-CREATE INDEX IF NOT EXISTS api_key_org_idx ON api_key USING btree ("organizationId");
-CREATE INDEX IF NOT EXISTS code_directory_organization_idx ON code_directory USING btree ("organizationId");
-CREATE INDEX IF NOT EXISTS code_session_agent_idx ON code_session USING btree ("agentId");
-CREATE INDEX IF NOT EXISTS code_session_directory_idx ON code_session USING btree ("codeDirectoryId");
-CREATE INDEX IF NOT EXISTS code_session_message_session_idx ON code_session_message USING btree ("sessionId");
-CREATE INDEX IF NOT EXISTS code_session_organization_idx ON code_session USING btree ("organizationId");
-CREATE INDEX IF NOT EXISTS code_session_parent_idx ON code_session USING btree ("parentSessionId");
-CREATE INDEX IF NOT EXISTS code_session_usage_event_session_idx ON code_session_usage_event USING btree ("sessionId");
-CREATE INDEX IF NOT EXISTS device_user_idx ON device USING btree ("userId");
-CREATE INDEX IF NOT EXISTS instruction_organization_idx ON instruction USING btree ("organizationId");
-CREATE INDEX IF NOT EXISTS llm_connection_organization_idx ON llm_connection USING btree ("organizationId");
-CREATE INDEX IF NOT EXISTS llm_model_connection_idx ON llm_model USING btree ("connectionId");
-CREATE INDEX IF NOT EXISTS llm_usage_event_connection_idx ON llm_usage_event USING btree ("connectionId");
-CREATE INDEX IF NOT EXISTS memory_organization_idx ON memory USING btree ("organizationId");
-CREATE INDEX IF NOT EXISTS note_item_node_idx ON note_item USING btree ("nodeId");
-CREATE INDEX IF NOT EXISTS note_node_org_parent_idx ON note_node USING btree ("organizationId", "parentId");
-CREATE INDEX IF NOT EXISTS notification_org_idx ON notification USING btree ("organizationId");
-CREATE INDEX IF NOT EXISTS notification_user_idx ON notification USING btree ("userId", "createdAt");
-CREATE INDEX IF NOT EXISTS runner_organization_idx ON runner USING btree ("organizationId");
-CREATE INDEX IF NOT EXISTS storage_bucket_org_idx ON storage_bucket USING btree ("organizationId", "backendId");
-CREATE INDEX IF NOT EXISTS storage_entry_bucket_idx ON storage_entry USING btree ("organizationId", "bucketId");
-ALTER TABLE ONLY account
-    ADD CONSTRAINT "account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"(id) ON DELETE CASCADE;
-ALTER TABLE ONLY agent
-    ADD CONSTRAINT "agent_codeDirectoryId_fkey" FOREIGN KEY ("codeDirectoryId") REFERENCES code_directory(id) ON DELETE CASCADE;
-ALTER TABLE ONLY agent
-    ADD CONSTRAINT "agent_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY api_key
-    ADD CONSTRAINT "api_key_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY api_key
-    ADD CONSTRAINT "api_key_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"(id) ON DELETE CASCADE;
-ALTER TABLE ONLY code_directory
-    ADD CONSTRAINT "code_directory_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY code_session
-    ADD CONSTRAINT "code_session_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES agent(id) ON DELETE SET NULL;
-ALTER TABLE ONLY code_session
-    ADD CONSTRAINT "code_session_codeDirectoryId_fkey" FOREIGN KEY ("codeDirectoryId") REFERENCES code_directory(id) ON DELETE SET NULL;
-ALTER TABLE ONLY code_session_message
-    ADD CONSTRAINT "code_session_message_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES code_session(id) ON DELETE CASCADE;
-ALTER TABLE ONLY code_session
-    ADD CONSTRAINT "code_session_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY code_session
-    ADD CONSTRAINT "code_session_parentSessionId_fkey" FOREIGN KEY ("parentSessionId") REFERENCES code_session(id) ON DELETE CASCADE;
-ALTER TABLE ONLY code_session_usage_event
-    ADD CONSTRAINT "code_session_usage_event_connectionId_fkey" FOREIGN KEY ("connectionId") REFERENCES llm_connection(id) ON DELETE CASCADE;
-ALTER TABLE ONLY code_session_usage_event
-    ADD CONSTRAINT "code_session_usage_event_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES code_session(id) ON DELETE CASCADE;
-ALTER TABLE ONLY device
-    ADD CONSTRAINT "device_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"(id) ON DELETE CASCADE;
-ALTER TABLE ONLY instruction
-    ADD CONSTRAINT "instruction_codeDirectoryId_fkey" FOREIGN KEY ("codeDirectoryId") REFERENCES code_directory(id) ON DELETE CASCADE;
-ALTER TABLE ONLY instruction
-    ADD CONSTRAINT "instruction_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY invitation
-    ADD CONSTRAINT "invitation_inviterId_fkey" FOREIGN KEY ("inviterId") REFERENCES "user"(id);
-ALTER TABLE ONLY invitation
-    ADD CONSTRAINT "invitation_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id);
-ALTER TABLE ONLY llm_connection
-    ADD CONSTRAINT "llm_connection_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY llm_model
-    ADD CONSTRAINT "llm_model_connectionId_fkey" FOREIGN KEY ("connectionId") REFERENCES llm_connection(id) ON DELETE CASCADE;
-ALTER TABLE ONLY llm_model
-    ADD CONSTRAINT "llm_model_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY llm_quota
-    ADD CONSTRAINT "llm_quota_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY llm_quota
-    ADD CONSTRAINT "llm_quota_connectionId_fkey" FOREIGN KEY ("connectionId") REFERENCES llm_connection(id) ON DELETE CASCADE;
-ALTER TABLE ONLY llm_usage_event
-    ADD CONSTRAINT "llm_usage_event_connectionId_fkey" FOREIGN KEY ("connectionId") REFERENCES llm_connection(id) ON DELETE CASCADE;
-ALTER TABLE ONLY llm_usage_event
-    ADD CONSTRAINT "llm_usage_event_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY member
-    ADD CONSTRAINT "member_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id);
-ALTER TABLE ONLY member
-    ADD CONSTRAINT "member_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"(id);
-ALTER TABLE ONLY memory
-    ADD CONSTRAINT "memory_codeDirectoryId_fkey" FOREIGN KEY ("codeDirectoryId") REFERENCES code_directory(id) ON DELETE CASCADE;
-ALTER TABLE ONLY memory
-    ADD CONSTRAINT "memory_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY note_item
-    ADD CONSTRAINT "note_item_nodeId_fkey" FOREIGN KEY ("nodeId") REFERENCES note_node(id) ON DELETE CASCADE;
-ALTER TABLE ONLY note_node
-    ADD CONSTRAINT "note_node_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY note_node
-    ADD CONSTRAINT "note_node_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES note_node(id) ON DELETE CASCADE;
-ALTER TABLE ONLY notification
-    ADD CONSTRAINT "notification_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY notification
-    ADD CONSTRAINT "notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"(id) ON DELETE CASCADE;
-ALTER TABLE ONLY passkey
-    ADD CONSTRAINT "passkey_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"(id);
-ALTER TABLE ONLY runner
-    ADD CONSTRAINT "runner_accessKeyId_fkey" FOREIGN KEY ("accessKeyId") REFERENCES runner_access_key(id);
-ALTER TABLE ONLY runner_access_key
-    ADD CONSTRAINT "runner_access_key_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY runner
-    ADD CONSTRAINT "runner_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY session
-    ADD CONSTRAINT "session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"(id) ON DELETE CASCADE;
-ALTER TABLE ONLY skill
-    ADD CONSTRAINT "skill_codeDirectoryId_fkey" FOREIGN KEY ("codeDirectoryId") REFERENCES code_directory(id) ON DELETE CASCADE;
-ALTER TABLE ONLY skill
-    ADD CONSTRAINT "skill_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY storage_bucket
-    ADD CONSTRAINT "storage_bucket_backendId_fkey" FOREIGN KEY ("backendId") REFERENCES storage_backend(id) ON DELETE CASCADE;
-ALTER TABLE ONLY storage_bucket
-    ADD CONSTRAINT "storage_bucket_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES organization(id) ON DELETE CASCADE;
-ALTER TABLE ONLY storage_entry
-    ADD CONSTRAINT "storage_entry_bucketId_fkey" FOREIGN KEY ("bucketId") REFERENCES storage_bucket(id) ON DELETE CASCADE;
-ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS temperature boolean DEFAULT false NOT NULL;
-ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "limitContext" integer;
-ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "limitInput" integer;
-ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "limitOutput" integer;
-ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "costInput" double precision;
-ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "costOutput" double precision;
-ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "costCacheRead" double precision;
-ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS output text[] DEFAULT '{}'::text[] NOT NULL;
-`;
-
 export async function up(db: Kysely<unknown>): Promise<void> {
-  for (const statement of SCHEMA_SQL.split(";\n")
-    .map((s) => s.trim())
-    .filter(Boolean)) {
-    await sql.raw(statement).execute(db);
-  }
+  const timestamptz = "timestamptz" as const;
+  const timestamp = "timestamp" as const;
+  const jsonb = "jsonb" as const;
+  const text = "text" as const;
+  const integer = "integer" as const;
+  const boolean = "boolean" as const;
+  const doublePrecision = "double precision" as const;
+  const bigint = "bigint" as const;
+  const textArray = sql`text[]`;
+
+  await db.schema
+    .createTable("account")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("accountId", text, (c) => c.notNull())
+    .addColumn("providerId", text, (c) => c.notNull())
+    .addColumn("userId", text, (c) => c.notNull())
+    .addColumn("accessToken", text)
+    .addColumn("refreshToken", text)
+    .addColumn("idToken", text)
+    .addColumn("accessTokenExpiresAt", timestamptz)
+    .addColumn("refreshTokenExpiresAt", timestamptz)
+    .addColumn("scope", text)
+    .addColumn("password", text)
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("account_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("agent")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("codeDirectoryId", text)
+    .addColumn("provider", text, (c) => c.notNull())
+    .addColumn("model", text, (c) => c.notNull())
+    .addColumn("description", text)
+    .addColumn("instruction", text, (c) => c.notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("agent_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("api_key")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("userId", text, (c) => c.notNull())
+    .addColumn("name", text, (c) => c.notNull())
+    .addColumn("prefix", text, (c) => c.notNull())
+    .addColumn("hash", text, (c) => c.notNull())
+    .addColumn("lastUsedAt", timestamptz)
+    .addColumn("revokedAt", timestamptz)
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("api_key_pkey", ["id"])
+    .addUniqueConstraint("api_key_hash_key", ["hash"])
+    .execute();
+
+  await db.schema
+    .createTable("apikey")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("configId", text, (c) => c.defaultTo("default").notNull())
+    .addColumn("name", text)
+    .addColumn("start", text)
+    .addColumn("referenceId", text, (c) => c.notNull())
+    .addColumn("prefix", text)
+    .addColumn("key", text, (c) => c.notNull())
+    .addColumn("refillInterval", integer)
+    .addColumn("refillAmount", integer)
+    .addColumn("lastRefillAt", timestamptz)
+    .addColumn("enabled", boolean, (c) => c.defaultTo(true))
+    .addColumn("rateLimitEnabled", boolean, (c) => c.defaultTo(true))
+    .addColumn("rateLimitTimeWindow", integer, (c) => c.defaultTo(86400000))
+    .addColumn("rateLimitMax", integer, (c) => c.defaultTo(10))
+    .addColumn("requestCount", integer, (c) => c.defaultTo(0))
+    .addColumn("remaining", integer)
+    .addColumn("lastRequest", timestamptz)
+    .addColumn("expiresAt", timestamptz)
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addColumn("permissions", text)
+    .addColumn("metadata", text)
+    .addPrimaryKeyConstraint("apikey_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("assistant_artifact")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("threadId", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("title", text, (c) => c.notNull())
+    .addColumn("type", text, (c) => c.notNull())
+    .addColumn("content", text, (c) => c.notNull())
+    .addColumn("createdAt", timestamp, (c) => c.notNull())
+    .addColumn("updatedAt", timestamp, (c) => c.notNull())
+    .addPrimaryKeyConstraint("assistant_artifact_pkey", ["id"])
+    .addUniqueConstraint("assistant_artifact_unique_title", ["threadId", "title"])
+    .execute();
+
+  await db.schema
+    .createTable("assistant_message")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("threadId", text, (c) => c.notNull())
+    .addColumn("role", text, (c) => c.notNull())
+    .addColumn("content", text, (c) => c.notNull())
+    .addColumn("meta", jsonb)
+    .addColumn("createdAt", timestamp, (c) => c.notNull())
+    .addPrimaryKeyConstraint("assistant_message_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("assistant_thread")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("title", text, (c) => c.notNull())
+    .addColumn("connectionId", text)
+    .addColumn("model", text)
+    .addColumn("createdAt", timestamp, (c) => c.notNull())
+    .addColumn("updatedAt", timestamp, (c) => c.notNull())
+    .addPrimaryKeyConstraint("assistant_thread_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("code_directory")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("runnerId", text, (c) => c.notNull())
+    .addColumn("cwd", text, (c) => c.notNull())
+    .addColumn("displayName", text, (c) => c.notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("code_directory_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("code_session")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("title", text, (c) => c.notNull())
+    .addColumn("connectionId", text)
+    .addColumn("model", text)
+    .addColumn("codeDirectoryId", text)
+    .addColumn("type", text, (c) => c.defaultTo("main_agent").notNull())
+    .addColumn("parentSessionId", text)
+    .addColumn("agentId", text)
+    .addColumn("mode", jsonb)
+    .addColumn("runtimeState", jsonb)
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("code_session_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("code_session_message")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("sessionId", text, (c) => c.notNull())
+    .addColumn("role", text, (c) => c.notNull())
+    .addColumn("content", text, (c) => c.notNull())
+    .addColumn("meta", jsonb)
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("code_session_message_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("code_session_usage_event")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("sessionId", text, (c) => c.notNull())
+    .addColumn("connectionId", text, (c) => c.notNull())
+    .addColumn("model", text, (c) => c.notNull())
+    .addColumn("inputTokens", integer, (c) => c.defaultTo(0).notNull())
+    .addColumn("outputTokens", integer, (c) => c.defaultTo(0).notNull())
+    .addColumn("cachedInputTokens", integer, (c) => c.defaultTo(0).notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("code_session_usage_event_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("device")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("userId", text, (c) => c.notNull())
+    .addColumn("name", text, (c) => c.defaultTo("").notNull())
+    .addColumn("platform", text, (c) => c.notNull())
+    .addColumn("token", text, (c) => c.notNull())
+    .addColumn("lastSeenAt", timestamptz, (c) => c.notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("device_pkey", ["id"])
+    .addUniqueConstraint("device_token_key", ["token"])
+    .execute();
+
+  await db.schema
+    .createTable("instruction")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("codeDirectoryId", text)
+    .addColumn("instruction", text, (c) => c.notNull())
+    .addColumn("instructionPath", text, (c) => c.notNull())
+    .addColumn("hash", text, (c) => c.notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("instruction_pkey", ["id"])
+    .addUniqueConstraint("instruction_scope_path_unique", ["organizationId", "codeDirectoryId", "instructionPath"], (c) => c.nullsNotDistinct())
+    .execute();
+
+  await db.schema
+    .createTable("invitation")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("email", text, (c) => c.notNull())
+    .addColumn("role", text)
+    .addColumn("status", text, (c) => c.defaultTo("pending").notNull())
+    .addColumn("expiresAt", timestamptz, (c) => c.notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("inviterId", text, (c) => c.notNull())
+    .addPrimaryKeyConstraint("invitation_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("llm_connection")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("provider", text, (c) => c.notNull())
+    .addColumn("name", text, (c) => c.notNull())
+    .addColumn("config", jsonb, (c) => c.defaultTo(sql`'{}'::jsonb`).notNull())
+    .addColumn("enabled", boolean, (c) => c.defaultTo(true).notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("llm_connection_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("llm_model")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("connectionId", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("modelId", text, (c) => c.notNull())
+    .addColumn("displayName", text)
+    .addColumn("contextWindow", integer)
+    .addColumn("thinking", boolean, (c) => c.defaultTo(false).notNull())
+    .addColumn("input", textArray, (c) => c.defaultTo(sql`'{}'::text[]`).notNull())
+    .addColumn("thinkingLevel", textArray, (c) => c.defaultTo(sql`'{}'::text[]`).notNull())
+    .addColumn("temperature", boolean, (c) => c.defaultTo(false).notNull())
+    .addColumn("limitContext", integer)
+    .addColumn("limitInput", integer)
+    .addColumn("limitOutput", integer)
+    .addColumn("costInput", doublePrecision)
+    .addColumn("costOutput", doublePrecision)
+    .addColumn("costCacheRead", doublePrecision)
+    .addColumn("output", textArray, (c) => c.defaultTo(sql`'{}'::text[]`).notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("llm_model_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("llm_quota")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("connectionId", text, (c) => c.notNull())
+    .addColumn("quotaType", text, (c) => c.notNull())
+    .addColumn("groupName", text, (c) => c.defaultTo("default").notNull())
+    .addColumn("unit", text, (c) => c.defaultTo("tokens").notNull())
+    .addColumn("quotaTotal", doublePrecision)
+    .addColumn("quotaUsed", doublePrecision, (c) => c.notNull())
+    .addColumn("capturedAt", timestamptz, (c) => c.notNull())
+    .addColumn("resetAt", timestamptz)
+    .addUniqueConstraint("llm_quota_connection_type_group_unique", ["connectionId", "quotaType", "groupName"])
+    .execute();
+
+  await db.schema.createIndex("llm_quota_connection_idx").ifNotExists().on("llm_quota").column("connectionId").execute();
+
+  await db.schema
+    .createTable("llm_usage_event")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("connectionId", text, (c) => c.notNull())
+    .addColumn("correlationId", text)
+    .addColumn("model", text, (c) => c.notNull())
+    .addColumn("inputTokens", integer, (c) => c.defaultTo(0).notNull())
+    .addColumn("outputTokens", integer, (c) => c.defaultTo(0).notNull())
+    .addColumn("cachedInputTokens", integer, (c) => c.defaultTo(0).notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("llm_usage_event_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("member")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("userId", text, (c) => c.notNull())
+    .addColumn("role", text, (c) => c.defaultTo("member").notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("member_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("memory")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("codeDirectoryId", text)
+    .addColumn("scopeId", text)
+    .addColumn("tags", textArray, (c) => c.defaultTo(sql`'{}'::text[]`).notNull())
+    .addColumn("content", text, (c) => c.notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("memory_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("note_item")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("nodeId", text, (c) => c.notNull())
+    .addColumn("title", text, (c) => c.defaultTo("").notNull())
+    .addColumn("content", jsonb, (c) => c.defaultTo(sql`'{}'::jsonb`).notNull())
+    .addColumn("preview", text, (c) => c.defaultTo("").notNull())
+    .addColumn("createdAt", timestamp, (c) => c.notNull())
+    .addColumn("updatedAt", timestamp, (c) => c.notNull())
+    .addPrimaryKeyConstraint("note_item_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("note_node")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("parentId", text)
+    .addColumn("kind", text, (c) => c.notNull())
+    .addColumn("name", text, (c) => c.notNull())
+    .addColumn("position", integer, (c) => c.defaultTo(0).notNull())
+    .addColumn("isFavorite", boolean, (c) => c.defaultTo(false).notNull())
+    .addColumn("metadata", jsonb)
+    .addColumn("createdAt", timestamp, (c) => c.notNull())
+    .addColumn("updatedAt", timestamp, (c) => c.notNull())
+    .addPrimaryKeyConstraint("note_node_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("notification")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("userId", text, (c) => c.notNull())
+    .addColumn("title", text, (c) => c.notNull())
+    .addColumn("body", text, (c) => c.defaultTo("").notNull())
+    .addColumn("data", jsonb)
+    .addColumn("readAt", timestamptz)
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("notification_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("organization")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("name", text, (c) => c.notNull())
+    .addColumn("slug", text, (c) => c.notNull())
+    .addColumn("logo", text)
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("metadata", text)
+    .addPrimaryKeyConstraint("organization_pkey", ["id"])
+    .addUniqueConstraint("organization_slug_key", ["slug"])
+    .execute();
+
+  await db.schema
+    .createTable("passkey")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("name", text)
+    .addColumn("publicKey", text, (c) => c.notNull())
+    .addColumn("userId", text, (c) => c.notNull())
+    .addColumn("credentialID", text, (c) => c.notNull())
+    .addColumn("counter", integer, (c) => c.notNull())
+    .addColumn("deviceType", text, (c) => c.notNull())
+    .addColumn("backedUp", boolean, (c) => c.notNull())
+    .addColumn("transports", text)
+    .addColumn("createdAt", timestamptz)
+    .addColumn("aaguid", text)
+    .addPrimaryKeyConstraint("passkey_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("runner")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("accessKeyId", text, (c) => c.notNull())
+    .addColumn("name", text, (c) => c.notNull())
+    .addColumn("hostname", text)
+    .addColumn("lastSeenAt", timestamptz, (c) => c.notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("deletedAt", timestamptz)
+    .addPrimaryKeyConstraint("runner_pkey", ["id"])
+    .execute();
+
+  await db.schema
+    .createTable("runner_access_key")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("name", text, (c) => c.notNull())
+    .addColumn("key", text, (c) => c.notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("revokedAt", timestamptz)
+    .addPrimaryKeyConstraint("runner_access_key_pkey", ["id"])
+    .addUniqueConstraint("runner_access_key_key_key", ["key"])
+    .execute();
+
+  await db.schema
+    .createTable("server_setting")
+    .ifNotExists()
+    .addColumn("key", text, (c) => c.notNull())
+    .addColumn("value", jsonb, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("server_setting_pkey", ["key"])
+    .execute();
+
+  await db.schema
+    .createTable("session")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("expiresAt", timestamptz, (c) => c.notNull())
+    .addColumn("token", text, (c) => c.notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addColumn("ipAddress", text)
+    .addColumn("userAgent", text)
+    .addColumn("userId", text, (c) => c.notNull())
+    .addColumn("impersonatedBy", text)
+    .addColumn("activeOrganizationId", text)
+    .addPrimaryKeyConstraint("session_pkey", ["id"])
+    .addUniqueConstraint("session_token_key", ["token"])
+    .execute();
+
+  await db.schema
+    .createTable("skill")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("codeDirectoryId", text)
+    .addColumn("name", text, (c) => c.notNull())
+    .addColumn("description", text, (c) => c.notNull())
+    .addColumn("content", text, (c) => c.notNull())
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("skill_pkey", ["id"])
+    .addUniqueConstraint("skill_scope_name_unique", ["organizationId", "codeDirectoryId", "name"], (c) => c.nullsNotDistinct())
+    .execute();
+
+  await db.schema
+    .createTable("storage_backend")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("name", text, (c) => c.notNull())
+    .addColumn("type", text, (c) => c.notNull())
+    .addColumn("config", jsonb, (c) => c.defaultTo(sql`'{}'::jsonb`).notNull())
+    .addColumn("enabled", boolean, (c) => c.defaultTo(true).notNull())
+    .addColumn("createdAt", timestamp, (c) => c.notNull())
+    .addColumn("updatedAt", timestamp, (c) => c.notNull())
+    .addPrimaryKeyConstraint("storage_backend_pkey", ["id"])
+    .addUniqueConstraint("storage_backend_name_key", ["name"])
+    .execute();
+
+  await db.schema
+    .createTable("storage_bucket")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("backendId", text, (c) => c.notNull())
+    .addColumn("name", text, (c) => c.notNull())
+    .addColumn("type", text, (c) => c.defaultTo("default").notNull())
+    .addColumn("isInternal", boolean, (c) => c.defaultTo(false).notNull())
+    .addColumn("storageLimit", bigint)
+    .addColumn("createdAt", timestamp, (c) => c.notNull())
+    .addColumn("updatedAt", timestamp, (c) => c.notNull())
+    .addPrimaryKeyConstraint("storage_bucket_pkey", ["id"])
+    .addUniqueConstraint("storage_bucket_org_name_unique", ["organizationId", "name"])
+    .execute();
+
+  await db.schema
+    .createTable("storage_entry")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("organizationId", text, (c) => c.notNull())
+    .addColumn("bucketId", text, (c) => c.notNull())
+    .addColumn("path", text, (c) => c.notNull())
+    .addColumn("type", text, (c) => c.notNull())
+    .addColumn("size", bigint, (c) => c.defaultTo(0).notNull())
+    .addColumn("mimeType", text)
+    .addColumn("previewType", text)
+    .addColumn("createdAt", timestamp, (c) => c.notNull())
+    .addColumn("updatedAt", timestamp, (c) => c.notNull())
+    .addPrimaryKeyConstraint("storage_entry_pkey", ["id"])
+    .addUniqueConstraint("storage_entry_bucket_path_unique", ["bucketId", "path"])
+    .execute();
+
+  await db.schema
+    .createTable("user")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("name", text, (c) => c.notNull())
+    .addColumn("email", text, (c) => c.notNull())
+    .addColumn("emailVerified", boolean, (c) => c.notNull())
+    .addColumn("image", text)
+    .addColumn("role", text)
+    .addColumn("banned", boolean, (c) => c.defaultTo(false))
+    .addColumn("banReason", text)
+    .addColumn("banExpires", timestamptz)
+    .addColumn("createdAt", timestamptz, (c) => c.notNull())
+    .addColumn("updatedAt", timestamptz, (c) => c.notNull())
+    .addPrimaryKeyConstraint("user_pkey", ["id"])
+    .addUniqueConstraint("user_email_key", ["email"])
+    .execute();
+
+  await db.schema
+    .createTable("verification")
+    .ifNotExists()
+    .addColumn("id", text, (c) => c.notNull())
+    .addColumn("identifier", text, (c) => c.notNull())
+    .addColumn("value", text, (c) => c.notNull())
+    .addColumn("expiresAt", timestamptz, (c) => c.notNull())
+    .addColumn("createdAt", timestamptz)
+    .addColumn("updatedAt", timestamptz)
+    .addPrimaryKeyConstraint("verification_pkey", ["id"])
+    .execute();
+
+  const index = (name: string, table: string, columns: string[]) => db.schema.createIndex(name).ifNotExists().on(table).columns(columns).execute();
+
+  await index("agent_organization_idx", "agent", ["organizationId"]);
+  await index("api_key_org_idx", "api_key", ["organizationId"]);
+  await index("code_directory_organization_idx", "code_directory", ["organizationId"]);
+  await index("code_session_agent_idx", "code_session", ["agentId"]);
+  await index("code_session_directory_idx", "code_session", ["codeDirectoryId"]);
+  await index("code_session_message_session_idx", "code_session_message", ["sessionId"]);
+  await index("code_session_organization_idx", "code_session", ["organizationId"]);
+  await index("code_session_parent_idx", "code_session", ["parentSessionId"]);
+  await index("code_session_usage_event_session_idx", "code_session_usage_event", ["sessionId"]);
+  await index("device_user_idx", "device", ["userId"]);
+  await index("instruction_organization_idx", "instruction", ["organizationId"]);
+  await index("llm_connection_organization_idx", "llm_connection", ["organizationId"]);
+  await index("llm_model_connection_idx", "llm_model", ["connectionId"]);
+  await index("llm_usage_event_connection_idx", "llm_usage_event", ["connectionId"]);
+  await index("memory_organization_idx", "memory", ["organizationId"]);
+  await index("note_item_node_idx", "note_item", ["nodeId"]);
+  await index("note_node_org_parent_idx", "note_node", ["organizationId", "parentId"]);
+  await index("notification_org_idx", "notification", ["organizationId"]);
+  await index("notification_user_idx", "notification", ["userId", "createdAt"]);
+  await index("runner_organization_idx", "runner", ["organizationId"]);
+  await index("storage_bucket_org_idx", "storage_bucket", ["organizationId", "backendId"]);
+  await index("storage_entry_bucket_idx", "storage_entry", ["organizationId", "bucketId"]);
+
+  const foreignKey = (table: string, name: string, columns: string[], refTable: string, onDelete?: "cascade" | "set null") =>
+    db.schema
+      .alterTable(table)
+      .addForeignKeyConstraint(name, columns, refTable, ["id"], (c) => (onDelete ? c.onDelete(onDelete) : c))
+      .execute();
+
+  await foreignKey("account", "account_userId_fkey", ["userId"], "user", "cascade");
+  await foreignKey("agent", "agent_codeDirectoryId_fkey", ["codeDirectoryId"], "code_directory", "cascade");
+  await foreignKey("agent", "agent_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("api_key", "api_key_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("api_key", "api_key_userId_fkey", ["userId"], "user", "cascade");
+  await foreignKey("code_directory", "code_directory_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("code_session", "code_session_agentId_fkey", ["agentId"], "agent", "set null");
+  await foreignKey("code_session", "code_session_codeDirectoryId_fkey", ["codeDirectoryId"], "code_directory", "set null");
+  await foreignKey("code_session_message", "code_session_message_sessionId_fkey", ["sessionId"], "code_session", "cascade");
+  await foreignKey("code_session", "code_session_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("code_session", "code_session_parentSessionId_fkey", ["parentSessionId"], "code_session", "cascade");
+  await foreignKey("code_session_usage_event", "code_session_usage_event_connectionId_fkey", ["connectionId"], "llm_connection", "cascade");
+  await foreignKey("code_session_usage_event", "code_session_usage_event_sessionId_fkey", ["sessionId"], "code_session", "cascade");
+  await foreignKey("device", "device_userId_fkey", ["userId"], "user", "cascade");
+  await foreignKey("instruction", "instruction_codeDirectoryId_fkey", ["codeDirectoryId"], "code_directory", "cascade");
+  await foreignKey("instruction", "instruction_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("invitation", "invitation_inviterId_fkey", ["inviterId"], "user");
+  await foreignKey("invitation", "invitation_organizationId_fkey", ["organizationId"], "organization");
+  await foreignKey("llm_connection", "llm_connection_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("llm_model", "llm_model_connectionId_fkey", ["connectionId"], "llm_connection", "cascade");
+  await foreignKey("llm_model", "llm_model_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("llm_quota", "llm_quota_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("llm_quota", "llm_quota_connectionId_fkey", ["connectionId"], "llm_connection", "cascade");
+  await foreignKey("llm_usage_event", "llm_usage_event_connectionId_fkey", ["connectionId"], "llm_connection", "cascade");
+  await foreignKey("llm_usage_event", "llm_usage_event_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("member", "member_organizationId_fkey", ["organizationId"], "organization");
+  await foreignKey("member", "member_userId_fkey", ["userId"], "user");
+  await foreignKey("memory", "memory_codeDirectoryId_fkey", ["codeDirectoryId"], "code_directory", "cascade");
+  await foreignKey("memory", "memory_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("note_item", "note_item_nodeId_fkey", ["nodeId"], "note_node", "cascade");
+  await foreignKey("note_node", "note_node_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("note_node", "note_node_parentId_fkey", ["parentId"], "note_node", "cascade");
+  await foreignKey("notification", "notification_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("notification", "notification_userId_fkey", ["userId"], "user", "cascade");
+  await foreignKey("passkey", "passkey_userId_fkey", ["userId"], "user");
+  await foreignKey("runner", "runner_accessKeyId_fkey", ["accessKeyId"], "runner_access_key");
+  await foreignKey("runner_access_key", "runner_access_key_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("runner", "runner_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("session", "session_userId_fkey", ["userId"], "user", "cascade");
+  await foreignKey("skill", "skill_codeDirectoryId_fkey", ["codeDirectoryId"], "code_directory", "cascade");
+  await foreignKey("skill", "skill_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("storage_bucket", "storage_bucket_backendId_fkey", ["backendId"], "storage_backend", "cascade");
+  await foreignKey("storage_bucket", "storage_bucket_organizationId_fkey", ["organizationId"], "organization", "cascade");
+  await foreignKey("storage_entry", "storage_entry_bucketId_fkey", ["bucketId"], "storage_bucket", "cascade");
+
+  // No-ops on fresh databases (the columns are in the CREATE TABLE above);
+  // kept verbatim from the original migration.
+  await sql`ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS temperature boolean DEFAULT false NOT NULL`.execute(db);
+  await sql`ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "limitContext" integer`.execute(db);
+  await sql`ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "limitInput" integer`.execute(db);
+  await sql`ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "limitOutput" integer`.execute(db);
+  await sql`ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "costInput" double precision`.execute(db);
+  await sql`ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "costOutput" double precision`.execute(db);
+  await sql`ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS "costCacheRead" double precision`.execute(db);
+  await sql`ALTER TABLE llm_model ADD COLUMN IF NOT EXISTS output text[] DEFAULT '{}'::text[] NOT NULL`.execute(db);
 }

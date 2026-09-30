@@ -1,4 +1,18 @@
-import { Calendar, CodeXml, Folder, LayoutGrid, Mail, MessageSquare, NotebookPen, Settings, Sparkles, Sunrise, Video, Zap, type LucideIcon } from "lucide-react";
+import {
+  Bot,
+  Calendar,
+  CodeXml,
+  Folder,
+  LayoutDashboard,
+  LayoutGrid,
+  Mail,
+  MessageSquare,
+  Settings,
+  StickyNote,
+  Video,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 
 export interface AppEntry {
   id: string;
@@ -7,13 +21,13 @@ export interface AppEntry {
 }
 
 export const APPS: AppEntry[] = [
-  { id: "overview", label: "Overview", icon: Sunrise },
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "email", label: "Email", icon: Mail },
   { id: "calendar", label: "Calendar", icon: Calendar },
-  { id: "notes", label: "Notes", icon: NotebookPen },
+  { id: "notes", label: "Notes", icon: StickyNote },
   { id: "chat", label: "Chat", icon: MessageSquare },
   { id: "code", label: "Code", icon: CodeXml },
-  { id: "assistant", label: "Assistant", icon: Sparkles },
+  { id: "assistant", label: "Assistant", icon: Bot },
   { id: "meetings", label: "Meetings", icon: Video },
   { id: "automations", label: "Automations", icon: Zap },
   { id: "showcase", label: "Showcase", icon: LayoutGrid },
