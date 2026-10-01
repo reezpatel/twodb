@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../lib/api";
-import type { CodeMessage, CodeSession } from "./use-session-list";
+import type { CodeMessage, CodeSession } from "../sidenav/use-session-list";
+import { api } from "@/lib/api";
 
 export type SessionDetail = CodeSession & {
   messages: CodeMessage[];
@@ -28,7 +28,6 @@ interface StreamFrame {
   stream?: "stdout" | "stderr";
   data?: string;
   output?: string;
-  runners?: RunnerOption[];
   tools?: ToolEvent[];
   status?: string | null;
   thinking?: string;
@@ -47,23 +46,6 @@ export interface ToolEvent {
   done: boolean;
 }
 
-export interface RunnerOption {
-  id: string;
-  name: string;
-  hostname: string | null;
-  online: boolean;
-}
-
-export interface CodeDirectory {
-  id: string;
-  organizationId: string;
-  runnerId: string;
-  cwd: string;
-  displayName: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export type WsStatus = "connecting" | "open" | "closed";
 
 function wsUrl(sessionId: string) {
@@ -78,7 +60,6 @@ export function useChatPanel(sessionId: string | null) {
   const [liveTools, setLiveTools] = useState<ToolEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [wsStatus, setWsStatus] = useState<WsStatus>("closed");
-  const [runners, setRunners] = useState<RunnerOption[]>([]);
   const [statusText, setStatusText] = useState<string | null>(null);
   const [round, setRound] = useState<number | null>(null);
   const [thinking, setThinking] = useState<string | null>(null);
@@ -104,12 +85,6 @@ export function useChatPanel(sessionId: string | null) {
     enabled: !!sessionId,
   });
 
-  const directories = useQuery({
-    queryKey: ["code", "directories"],
-    queryFn: () => api<CodeDirectory[]>("/api/code/directories"),
-    enabled: !!sessionId,
-  });
-
   const setDirectory = useMutation({
     mutationFn: (codeDirectoryId: string | null) =>
       api(`/api/code/sessions/${sessionId}`, {
@@ -119,15 +94,6 @@ export function useChatPanel(sessionId: string | null) {
     onSuccess: () =>
       void queryClient.invalidateQueries({
         queryKey: ["code", "session", sessionId],
-      }),
-  });
-
-  const createDirectory = useMutation({
-    mutationFn: (input: { runnerId: string; cwd: string; displayName: string }) =>
-      api<CodeDirectory>("/api/code/directories", { method: "POST", body: JSON.stringify(input) }),
-    onSuccess: () =>
-      void queryClient.invalidateQueries({
-        queryKey: ["code", "directories"],
       }),
   });
 
@@ -222,8 +188,6 @@ export function useChatPanel(sessionId: string | null) {
       invalidateAfterRun();
     } else if (frame.type === "status") {
       setStatusText(frame.text ?? null);
-    } else if (frame.type === "runners") {
-      setRunners(frame.runners ?? []);
     } else if (frame.type === "session_updated") {
       void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
     } else if (frame.type === "done") {
@@ -354,8 +318,6 @@ export function useChatPanel(sessionId: string | null) {
     liveTools,
     error,
     wsStatus,
-    runners,
-    directories,
     statusText,
     round,
     thinking,
@@ -363,7 +325,6 @@ export function useChatPanel(sessionId: string | null) {
     optimistic,
     stats,
     setDirectory,
-    createDirectory,
     send,
     stop,
   };

@@ -2,11 +2,11 @@ import { useMemo, useState } from "react";
 import { Copy, FileText, Loader2, Plus, Search, Send, SquarePen } from "lucide-react";
 import { useAssistantScene, type AssistantThread } from "./use-assistant-scene";
 import { useAssistantChat } from "./use-assistant-chat";
-import { useConnectionPicker } from "../code/use-connection-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { useConnectionPicker } from "@/lib/use-connection-picker";
 import { cn } from "@/lib/utils";
 
 const selectClasses =

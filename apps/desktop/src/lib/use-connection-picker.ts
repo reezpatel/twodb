@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../../lib/api";
-import type { LlmConnection, LlmModel, LlmProvider } from "../../lib/llm";
+import { api } from "./api";
+import type { LlmConnection, LlmModel, LlmProvider } from "./llm";
 
 export function useConnectionPicker(connectionId: string, model: string) {
   const connections = useQuery({

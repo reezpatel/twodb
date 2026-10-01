@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUp, AtSign, Brain, FolderPlus, Loader2, Paperclip, Square, Wrench } from "lucide-react";
+import { ArrowUp, AtSign, Brain, Loader2, Paperclip, Square, Wrench } from "lucide-react";
 import type { useChatPanel, SessionStats } from "./use-chat-panel";
-import { useConnectionPicker } from "./use-connection-picker";
-import { TOOL_SCREENS, BranchScreen, TerminalScreen, CheckpointsScreen, ChangesScreen, type ScreenId } from "./mock-screens";
+import { TOOL_SCREENS, BranchScreen, TerminalScreen, CheckpointsScreen, ChangesScreen, type ScreenId } from "./screens/mock-screens";
+import { NewDirectoryDialog } from "../directories/new-directory-dialog";
+import { useCodeDirectories } from "../directories/use-code-directories";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { useConnectionPicker } from "@/lib/use-connection-picker";
 import { cn } from "@/lib/utils";
 
 const selectClasses =
@@ -119,8 +119,6 @@ export function ChatPanel({ sessionId, chat }: { sessionId: string | null; chat:
     liveTools,
     error,
     wsStatus,
-    runners,
-    directories,
     statusText,
     round,
     thinking,
@@ -128,14 +126,11 @@ export function ChatPanel({ sessionId, chat }: { sessionId: string | null; chat:
     optimistic,
     stats,
     setDirectory,
-    createDirectory,
     send,
     stop,
   } = chat;
   const [newDirOpen, setNewDirOpen] = useState(false);
-  const [dirName, setDirName] = useState("");
-  const [dirCwd, setDirCwd] = useState("");
-  const [dirRunner, setDirRunner] = useState("");
+  const { directories } = useCodeDirectories();
 
   const [connectionId, setConnectionId] = useState("");
   const [model, setModel] = useState("");
@@ -353,49 +348,7 @@ export function ChatPanel({ sessionId, chat }: { sessionId: string | null; chat:
               </select>
             </div>
 
-            <Dialog open={newDirOpen} onOpenChange={setNewDirOpen}>
-              <DialogContent className="sm:max-w-sm">
-                <DialogHeader>
-                  <DialogTitle>New working directory</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <Input placeholder="Display name (e.g. twodb repo)" value={dirName} onChange={(e) => setDirName(e.target.value)} />
-                  <Input placeholder="Working directory (e.g. /home/dev/twodb)" value={dirCwd} onChange={(e) => setDirCwd(e.target.value)} />
-                  <select className={cn(selectClasses, "w-full")} value={dirRunner} onChange={(e) => setDirRunner(e.target.value)}>
-                    <option value="">Select runner…</option>
-                    {runners.map((runner) => (
-                      <option key={runner.id} value={runner.id} disabled={!runner.online}>
-                        {runner.name}
-                        {runner.online ? "" : " (offline)"}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <DialogFooter>
-                  <Button
-                    size="sm"
-                    disabled={!dirName.trim() || !dirCwd.trim() || !dirRunner || createDirectory.isPending}
-                    onClick={() =>
-                      createDirectory.mutate(
-                        { displayName: dirName.trim(), cwd: dirCwd.trim(), runnerId: dirRunner },
-                        {
-                          onSuccess: (row) => {
-                            setNewDirOpen(false);
-                            setDirName("");
-                            setDirCwd("");
-                            setDirRunner("");
-                            setDirectory.mutate(row.id);
-                          },
-                        },
-                      )
-                    }
-                  >
-                    {createDirectory.isPending ? <Loader2 size={14} className="animate-spin" /> : <FolderPlus size={14} />}
-                    Create
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <NewDirectoryDialog open={newDirOpen} onOpenChange={setNewDirOpen} onCreated={(dir) => setDirectory.mutate(dir.id)} />
 
             <StatsRow stats={stats} contextWindow={contextWindow} />
 

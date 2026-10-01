@@ -1,6 +1,11 @@
+import { useState } from "react";
 import { Loader2, Plus, Search } from "lucide-react";
-import { useSessionList } from "./use-session-list";
-import type { CodeSession } from "./use-session-list";
+import type { UseMutationResult } from "@tanstack/react-query";
+import { NewSessionDialog } from "./new-session-dialog";
+import { useSessionList, groupSessionsByDirectory } from "./use-session-list";
+import type { SessionDirectoryGroup } from "./use-session-list";
+import { useCodeDirectories } from "../directories/use-code-directories";
+import type { CodeDirectory } from "../directories/use-code-directories";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -9,16 +14,6 @@ interface SidenavProps {
   selectedId: string | null;
   onSelect: (id: string) => void;
   activeStreaming: boolean;
-}
-
-function groupLabel(updatedAt: string) {
-  const date = new Date(updatedAt);
-  const today = new Date();
-  if (date.toDateString() === today.toDateString()) return "Today";
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return "Earlier";
 }
 
 function relativeTime(updatedAt: string) {
@@ -31,16 +26,66 @@ function relativeTime(updatedAt: string) {
   return `${Math.floor(hours / 24)}d`;
 }
 
+function DirectoryGroupHeader({
+  group,
+  rename,
+}: {
+  group: SessionDirectoryGroup;
+  rename: UseMutationResult<CodeDirectory, Error, { id: string; displayName: string }>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+
+  const commit = () => {
+    setEditing(false);
+    const trimmed = value.trim();
+    if (group.id && trimmed && trimmed !== group.label) rename.mutate({ id: group.id, displayName: trimmed });
+  };
+
+  if (group.id === null) {
+    return <div className="text-muted-foreground/70 px-3 pb-1 pt-3 text-[11px] font-semibold">{group.label}</div>;
+  }
+
+  if (editing) {
+    return (
+      <div className="px-3 pb-1 pt-3">
+        <input
+          autoFocus
+          aria-label="Directory name"
+          className="bg-accent h-5 w-full rounded-sm px-1 text-[11px] font-semibold outline-none"
+          value={value}
+          onFocus={(e) => e.target.select()}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") setEditing(false);
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="text-muted-foreground/70 px-3 pb-1 pt-3 text-[11px] font-semibold"
+      title={`${group.cwd} — double-click to rename`}
+      onDoubleClick={() => {
+        setValue(group.label);
+        setEditing(true);
+      }}
+    >
+      {group.label}
+    </div>
+  );
+}
+
 export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps) {
   const { sessions, create, remove } = useSessionList(onSelect);
+  const { directories, renameDirectory } = useCodeDirectories();
+  const [newSessionOpen, setNewSessionOpen] = useState(false);
 
-  const groups = new Map<string, CodeSession[]>();
-  for (const session of sessions.data ?? []) {
-    const label = groupLabel(session.updatedAt);
-    const bucket = groups.get(label) ?? [];
-    bucket.push(session);
-    groups.set(label, bucket);
-  }
+  const directoryGroups = groupSessionsByDirectory(sessions.data ?? [], directories.data ?? []);
 
   return (
     <aside className="bg-card border-r flex h-full w-60 shrink-0 flex-col border-r">
@@ -49,8 +94,8 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
         <div className="flex gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" onClick={() => create.mutate()} disabled={create.isPending}>
-                {create.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
+              <Button variant="ghost" size="icon-sm" onClick={() => setNewSessionOpen(true)}>
+                <Plus />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">New session</TooltipContent>
@@ -72,10 +117,10 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
             <Loader2 className="text-muted-foreground size-4 animate-spin" />
           </div>
         )}
-        {[...groups.entries()].map(([label, items]) => (
-          <div key={label}>
-            <div className="text-muted-foreground/70 px-3 pb-1 pt-3 text-[11px] font-semibold tracking-wide uppercase">{label}</div>
-            {items.map((session) => (
+        {directoryGroups.map((group) => (
+          <div key={group.id ?? "none"}>
+            <DirectoryGroupHeader group={group} rename={renameDirectory} />
+            {group.sessions.map((session) => (
               <div
                 key={session.id}
                 className={cn(
@@ -119,6 +164,8 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
           Skills &amp; tools
         </Button>
       </div>
+
+      <NewSessionDialog open={newSessionOpen} onOpenChange={setNewSessionOpen} create={create} />
     </aside>
   );
 }
