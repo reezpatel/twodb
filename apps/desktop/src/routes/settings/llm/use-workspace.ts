@@ -8,6 +8,7 @@ export interface Skill {
   name: string;
   description: string;
   content: string;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -20,6 +21,7 @@ export interface Agent {
   model: string;
   description: string | null;
   instruction: string;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -40,10 +42,16 @@ export interface Instruction {
   organizationId: string;
   codeDirectoryId: string | null;
   instruction: string;
-  instructionPath: string;
+  instructionPath: string | null;
   hash: string;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+/** Shared tag suggestion list across skills, agents, memories and instructions. */
+export function useTagSuggestions() {
+  return useQuery({ queryKey: ["workspace", "llm-tags"], queryFn: () => api<string[]>("/api/llm-tags") });
 }
 
 export async function sha256Hex(text: string): Promise<string> {
@@ -60,7 +68,10 @@ function useResource<T extends { id: string }>(resource: string) {
     queryKey: ["workspace", resource],
     queryFn: () => api<T[]>(`/api/${resource}`),
   });
-  const invalidate = () => void queryClient.invalidateQueries({ queryKey: ["workspace", resource] });
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ["workspace", resource] });
+    void queryClient.invalidateQueries({ queryKey: ["workspace", "llm-tags"] });
+  };
 
   const save = useMutation({
     mutationFn: (input: Partial<T> & { id?: string }) =>

@@ -6,7 +6,9 @@ const TABS = ["connections", "skills", "agents", "memories", "instructions"] as 
 export function LlmLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const active = pathname.split("/").pop() ?? "connections";
+  const segments = pathname.split("/");
+  const section = segments[segments.indexOf("llm") + 1];
+  const active = (TABS as readonly string[]).includes(section) ? section : "connections";
 
   return (
     <div>

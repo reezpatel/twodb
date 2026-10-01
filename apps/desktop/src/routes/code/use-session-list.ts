@@ -7,6 +7,7 @@ export interface CodeSession {
   connectionId: string | null;
   model: string | null;
   codeDirectoryId: string | null;
+  thinkingLevel: string | null;
   createdAt: string;
   updatedAt: string;
 }

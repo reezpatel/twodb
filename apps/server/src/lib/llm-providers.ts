@@ -128,10 +128,12 @@ export const LLM_PROVIDERS: LlmProvider[] = [
     id: "zai",
     label: "GLM (z.ai)",
     fields: [API_KEY],
-    api: "anthropic",
-    auth: "x-api-key",
-    defaultBaseUrl: "https://api.z.ai/api/anthropic",
-    models: ["glm-4.7", "glm-4.7-air"],
+    // OpenAI wire on the coding-plan endpoint (same setup as pi's zai provider):
+    // streams reasoning as reasoning_content; thinking toggled via a param.
+    api: "openai",
+    auth: "bearer",
+    defaultBaseUrl: "https://api.z.ai/api/coding/paas/v4",
+    models: ["glm-4.7", "glm-5-turbo", "glm-5.2", "glm-5.2-highspeed", "glm-5.3", "glm-5.3-flash", "glm-5.3-highspeed"],
   },
   {
     id: "minimax",

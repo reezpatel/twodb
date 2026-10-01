@@ -180,6 +180,8 @@ export interface CodeSessionTable {
   parentSessionId: string | null;
   agentId: string | null;
   mode: ColumnType<CodeSessionMode | null, string | null, string | null>;
+  /** off | low | medium | high — null means medium. */
+  thinkingLevel: string | null;
   runtimeState: ColumnType<Record<string, unknown> | null, string | null, string | null>;
   createdAt: Date;
   updatedAt: Date;
@@ -192,6 +194,7 @@ export interface SkillTable {
   name: string;
   description: string;
   content: string;
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -204,6 +207,7 @@ export interface AgentTable {
   model: string;
   description: string | null;
   instruction: string;
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -213,8 +217,9 @@ export interface InstructionTable {
   organizationId: string;
   codeDirectoryId: string | null;
   instruction: string;
-  instructionPath: string;
+  instructionPath: string | null;
   hash: string;
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -226,6 +231,14 @@ export interface MemoryTable {
   scopeId: string | null;
   tags: string[];
   content: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LlmTagTable {
+  id: string;
+  organizationId: string;
+  name: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -480,6 +493,7 @@ export interface Database {
   agent: AgentTable;
   instruction: InstructionTable;
   memory: MemoryTable;
+  llm_tag: LlmTagTable;
   llm_quota: LlmQuotaTable;
   llm_usage_event: LlmUsageEventTable;
   llm_model: LlmModelTable;

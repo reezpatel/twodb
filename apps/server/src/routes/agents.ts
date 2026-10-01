@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
 import { resolveScope } from "../lib/code-directory";
+import { parseTags, syncLlmTags } from "../lib/llm-tags";
 
 export const agentRoutes = new Hono()
   .get("/", async (c) => {
@@ -30,6 +31,8 @@ export const agentRoutes = new Hono()
       return c.json({ error: "invalid_description" }, 400);
     }
     if (typeof body?.instruction !== "string") return c.json({ error: "invalid_instruction" }, 400);
+    const tags = parseTags(body?.tags);
+    if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
 
     const scope = await resolveScope(db, s.organizationId, body?.codeDirectoryId);
     if (!scope.ok) return c.json({ error: scope.error }, scope.error === "directory_not_found" ? 404 : 400);
@@ -45,11 +48,13 @@ export const agentRoutes = new Hono()
         model: body.model.trim(),
         description: typeof body.description === "string" && body.description ? body.description : null,
         instruction: body.instruction,
+        tags: tags ?? [],
         createdAt: now,
         updatedAt: now,
       })
       .returningAll()
       .executeTakeFirstOrThrow();
+    await syncLlmTags(s.organizationId, row.tags);
     return c.json(row, 201);
   })
 
@@ -75,7 +80,7 @@ export const agentRoutes = new Hono()
     if (!existing) return c.json({ error: "agent_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ provider: string; model: string; description: string | null; instruction: string }> = {};
+    const patch: Partial<{ provider: string; model: string; description: string | null; instruction: string; tags: string[] }> = {};
     if (body?.provider !== undefined) {
       if (typeof body.provider !== "string" || !body.provider.trim()) return c.json({ error: "invalid_provider" }, 400);
       patch.provider = body.provider.trim();
@@ -94,6 +99,11 @@ export const agentRoutes = new Hono()
       if (typeof body.instruction !== "string") return c.json({ error: "invalid_instruction" }, 400);
       patch.instruction = body.instruction;
     }
+    if (body?.tags !== undefined) {
+      const tags = parseTags(body.tags);
+      if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
+      patch.tags = tags ?? [];
+    }
     if (Object.keys(patch).length === 0) return c.json({ error: "empty_update" }, 400);
 
     const row = await db
@@ -102,6 +112,7 @@ export const agentRoutes = new Hono()
       .where("id", "=", existing.id)
       .returningAll()
       .executeTakeFirstOrThrow();
+    await syncLlmTags(s.organizationId, row.tags);
     return c.json(row);
   })
 

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
 import { resolveScope } from "../lib/code-directory";
+import { parseTags, syncLlmTags } from "../lib/llm-tags";
 
 export const skillRoutes = new Hono()
   .get("/", async (c) => {
@@ -24,9 +25,12 @@ export const skillRoutes = new Hono()
     if (!s) return c.json({ error: "unauthorized" }, 401);
 
     const body = await c.req.json().catch(() => null);
+    if (body?.id !== undefined && (typeof body.id !== "string" || !body.id.trim() || body.id.length > 64)) return c.json({ error: "invalid_id" }, 400);
     if (typeof body?.name !== "string" || !body.name.trim()) return c.json({ error: "invalid_name" }, 400);
     if (typeof body?.description !== "string") return c.json({ error: "invalid_description" }, 400);
     if (typeof body?.content !== "string") return c.json({ error: "invalid_content" }, 400);
+    const tags = parseTags(body?.tags);
+    if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
 
     const scope = await resolveScope(db, s.organizationId, body?.codeDirectoryId);
     if (!scope.ok) return c.json({ error: scope.error }, scope.error === "directory_not_found" ? 404 : 400);
@@ -35,17 +39,19 @@ export const skillRoutes = new Hono()
     const row = await db
       .insertInto("skill")
       .values({
-        id: crypto.randomUUID(),
+        id: typeof body?.id === "string" && body.id.trim() ? body.id.trim() : crypto.randomUUID(),
         organizationId: s.organizationId,
         codeDirectoryId: scope.codeDirectoryId,
         name: body.name.trim(),
         description: body.description,
         content: body.content,
+        tags: tags ?? [],
         createdAt: now,
         updatedAt: now,
       })
       .returningAll()
       .executeTakeFirstOrThrow();
+    await syncLlmTags(s.organizationId, row.tags);
     return c.json(row, 201);
   })
 
@@ -71,7 +77,7 @@ export const skillRoutes = new Hono()
     if (!existing) return c.json({ error: "skill_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ name: string; description: string; content: string }> = {};
+    const patch: Partial<{ name: string; description: string; content: string; tags: string[] }> = {};
     if (body?.name !== undefined) {
       if (typeof body.name !== "string" || !body.name.trim()) return c.json({ error: "invalid_name" }, 400);
       patch.name = body.name.trim();
@@ -84,6 +90,11 @@ export const skillRoutes = new Hono()
       if (typeof body.content !== "string") return c.json({ error: "invalid_content" }, 400);
       patch.content = body.content;
     }
+    if (body?.tags !== undefined) {
+      const tags = parseTags(body.tags);
+      if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
+      patch.tags = tags ?? [];
+    }
     if (Object.keys(patch).length === 0) return c.json({ error: "empty_update" }, 400);
 
     const row = await db
@@ -92,6 +103,7 @@ export const skillRoutes = new Hono()
       .where("id", "=", existing.id)
       .returningAll()
       .executeTakeFirstOrThrow();
+    await syncLlmTags(s.organizationId, row.tags);
     return c.json(row);
   })
 

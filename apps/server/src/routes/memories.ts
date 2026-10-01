@@ -3,12 +3,7 @@ import { sql, type SqlBool } from "kysely";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
 import { resolveScope } from "../lib/code-directory";
-
-function parseTags(value: unknown): string[] | "invalid" | undefined {
-  if (value === undefined) return undefined;
-  if (!Array.isArray(value) || value.some((v) => typeof v !== "string" || !v.trim())) return "invalid";
-  return value.map((v) => v.trim());
-}
+import { parseTags, syncLlmTags } from "../lib/llm-tags";
 
 export const memoryRoutes = new Hono()
   .get("/", async (c) => {
@@ -72,6 +67,7 @@ export const memoryRoutes = new Hono()
       })
       .returningAll()
       .executeTakeFirstOrThrow();
+    await syncLlmTags(s.organizationId, row.tags);
     return c.json(row, 201);
   })
 
@@ -121,6 +117,7 @@ export const memoryRoutes = new Hono()
       .where("id", "=", existing.id)
       .returningAll()
       .executeTakeFirstOrThrow();
+    await syncLlmTags(s.organizationId, row.tags);
     return c.json(row);
   })
 

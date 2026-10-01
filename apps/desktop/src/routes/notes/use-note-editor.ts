@@ -47,7 +47,7 @@ export function useNoteEditor(note: NoteRecord, update: NotesViewHook["updateNot
       slash.extension,
     ],
     content: toTiptapDoc(note.content),
-    editorProps: { attributes: { class: "note-prose", spellcheck: "true" } },
+    editorProps: { attributes: { class: "tiptap-prose", spellcheck: "true" } },
     onUpdate: ({ editor: current }) => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => persist(current), 800);

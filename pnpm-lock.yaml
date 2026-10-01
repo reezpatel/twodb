@@ -117,6 +117,9 @@ importers:
       '@tiptap/extensions':
         specifier: ^3.30.2
         version: 3.30.2(@tiptap/core@3.30.2(@tiptap/pm@3.30.2))(@tiptap/pm@3.30.2)
+      '@tiptap/markdown':
+        specifier: ^3.31.3
+        version: 3.31.3(@tiptap/core@3.30.2(@tiptap/pm@3.30.2))(@tiptap/pm@3.30.2)
       '@tiptap/react':
         specifier: ^3.30.2
         version: 3.30.2(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.2(@tiptap/pm@3.30.2))(@tiptap/pm@3.30.2)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -165,6 +168,9 @@ importers:
       lucide-react:
         specifier: ^1.29.0
         version: 1.29.0(react@19.2.8)
+      overtype:
+        specifier: ^2.5.0
+        version: 2.5.0
       radix-ui:
         specifier: ^1.6.7
         version: 1.6.7(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -208,6 +214,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^4.5.0
         version: 4.7.0(vite@6.4.3(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(tsx@4.23.12)(yaml@2.9.0))
+      prettier:
+        specifier: ^3.9.9
+        version: 3.9.9
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
@@ -3010,6 +3019,12 @@ packages:
       '@tiptap/core': 3.30.2
       '@tiptap/pm': 3.30.2
 
+  '@tiptap/markdown@3.31.3':
+    resolution: {integrity: sha512-rBbYSxasseUoaBo15C8Yoaqafo7mJJzxwAwV9Z1OpLBvOroW9nQ0EbOdqaSYRw3/d9pP71B/3LNSzKyfyy+dpQ==}
+    peerDependencies:
+      '@tiptap/core': 3.31.3
+      '@tiptap/pm': 3.31.3
+
   '@tiptap/pm@3.30.2':
     resolution: {integrity: sha512-BJN8tUx4ppFN3R3cV/FJfrJbJkvo1lj4uciq+nwpjwzdRvFzqIuglWf+HLcJ6CwlYpLOHp7ArgkBg4Q5e60Gog==}
 
@@ -4188,6 +4203,14 @@ packages:
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
+  markdown-actions@1.1.2:
+    resolution: {integrity: sha512-U7rmgTvUP3neh3XaVblikslRWWhfpzF2SiI1A6z3az7IpYuAiVvdqtZrFCArV22TSj2Ht+r0ResohlsJ8/ntbw==}
+
+  marked@17.0.6:
+    resolution: {integrity: sha512-gB0gkNafnonOw0obSTEGZTT86IuhILt2Wfx0mWH/1Au83kybTayroZ/V6nS25mN7u8ASy+5fMhgB3XPNrOZdmA==}
+    engines: {node: '>= 20'}
+    hasBin: true
+
   marked@18.0.5:
     resolution: {integrity: sha512-S6GcvALHg6K4ohtu4E7x0a1AqhAjp6cV8KhLSyN9qVapnzJkusVBxZRcIU9AeYsbe6P1hKDusSbEOzGyyuce6w==}
     engines: {node: '>= 20'}
@@ -4291,6 +4314,9 @@ packages:
 
   orderedmap@2.1.1:
     resolution: {integrity: sha512-TvAWxi0nDe1j/rtMcWcIj94+Ffe6n7zhow33h40SKxmsmozs6dz/e+EajymfoFcHd7sxNn8yHM8839uixMOV6g==}
+
+  overtype@2.5.0:
+    resolution: {integrity: sha512-qf1cG3RIOeXr1s1+N5vrZf55KjsahtjoePnxgMlgUwiZFFd0W6hq1zfLqqABlYDBZf1QsBWk/pm7/uzU4X2j8Q==}
 
   own-keys@1.0.2:
     resolution: {integrity: sha512-19YVAg7T+WTrxggPukVq7DjTv6+PJ867TmhCvBsYwmbFCsZd344rq2Ld1p0wo8f8Qrrhgp82c6FJRqdXWtSEhg==}
@@ -4398,6 +4424,11 @@ packages:
   postgres-interval@1.2.0:
     resolution: {integrity: sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==}
     engines: {node: '>=0.10.0'}
+
+  prettier@3.9.9:
+    resolution: {integrity: sha512-Z/CJHIkdujO/OtN7nXUii0Rf3VT5SRuhjBA82Xvu2XhBUgX3nhP67T0LHceBdQLex7OOFGTox+Q5Yg8Jk2Qivg==}
+    engines: {node: '>=14'}
+    hasBin: true
 
   pretty-bytes@5.6.0:
     resolution: {integrity: sha512-FFw039TmrBqFK8ma/7OL3sDz/VytdtJr044/QUJtH0wK9lb9jLq9tJyIxUwtQJHwar2BqtiA4iCWSwo9JLkzFg==}
@@ -8151,6 +8182,12 @@ snapshots:
       '@tiptap/core': 3.30.2(@tiptap/pm@3.30.2)
       '@tiptap/pm': 3.30.2
 
+  '@tiptap/markdown@3.31.3(@tiptap/core@3.30.2(@tiptap/pm@3.30.2))(@tiptap/pm@3.30.2)':
+    dependencies:
+      '@tiptap/core': 3.30.2(@tiptap/pm@3.30.2)
+      '@tiptap/pm': 3.30.2
+      marked: 17.0.6
+
   '@tiptap/pm@3.30.2':
     dependencies:
       prosemirror-changeset: 2.4.1
@@ -9473,6 +9510,10 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  markdown-actions@1.1.2: {}
+
+  marked@17.0.6: {}
+
   marked@18.0.5: {}
 
   math-intrinsics@1.1.0: {}
@@ -9556,6 +9597,11 @@ snapshots:
       zod: 4.5.2
 
   orderedmap@2.1.1: {}
+
+  overtype@2.5.0:
+    dependencies:
+      '@floating-ui/dom': 1.8.0
+      markdown-actions: 1.1.2
 
   own-keys@1.0.2:
     dependencies:
@@ -9664,6 +9710,8 @@ snapshots:
   postgres-interval@1.2.0:
     dependencies:
       xtend: 4.0.2
+
+  prettier@3.9.9: {}
 
   pretty-bytes@5.6.0: {}
 

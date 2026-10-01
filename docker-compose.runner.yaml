@@ -32,6 +32,9 @@ services:
       TWODB_SERVER_URL: ${TWODB_SERVER_URL:-http://host.docker.internal:3001}
       TWODB_RUNNER_KEY: ${TWODB_RUNNER_KEY:?set TWODB_RUNNER_KEY in .env — create it in Settings → Runners}
       TWODB_RUNNER_NAME: ${TWODB_RUNNER_NAME:-docker-runner}
+      # Local terminal port — host networking shares the host stack, so pick a
+      # free port when a native runner already holds 4700.
+      RUNNER_PORT: ${RUNNER_PORT:-4700}
     # networks:
     #   - twodb-net
 

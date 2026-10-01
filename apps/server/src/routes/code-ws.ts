@@ -14,6 +14,7 @@ interface ClientMessage {
   content?: string;
   connectionId?: string;
   model?: string;
+  thinkingLevel?: string;
 }
 
 function parseMessage(data: unknown): ClientMessage | null {
@@ -27,6 +28,111 @@ function parseMessage(data: unknown): ClientMessage | null {
 interface CodeSocket {
   ws: WSContext;
   organizationId: string;
+}
+
+interface LiveTool {
+  id: string;
+  name: string;
+  args?: Record<string, unknown>;
+  output: string;
+  done: boolean;
+}
+
+/**
+ * A running agent loop, keyed by session id. Frames accumulate replay state so
+ * a socket that connects mid-run can catch up, and every subscribed socket
+ * receives the live stream — the loop is owned by the server, not the socket
+ * that started it.
+ */
+interface ActiveRun {
+  /** Aborted by the client's stop message; the loop unwinds gracefully. */
+  controller: AbortController;
+  sockets: Set<WSContext>;
+  round: number;
+  text: string;
+  thinking: string;
+  thinkingOpen: boolean;
+  tools: LiveTool[];
+  status: string | null;
+}
+
+const activeRuns = new Map<string, ActiveRun>();
+
+function accumulate(run: ActiveRun, frame: AgentFrame) {
+  switch (frame.type) {
+    case "round_start":
+      // Snapshot tracks only the in-flight round; earlier rounds are committed
+      // to the DB and refetched over REST by clients.
+      run.round = frame.round;
+      run.text = "";
+      run.tools = [];
+      run.thinking = "";
+      run.thinkingOpen = false;
+      break;
+    case "thinking_start":
+      run.thinking = "";
+      run.thinkingOpen = true;
+      break;
+    case "thinking_delta":
+      run.thinking += frame.text;
+      break;
+    case "thinking_end":
+      run.thinkingOpen = false;
+      break;
+    case "delta":
+      run.text += frame.text;
+      break;
+    case "tool_start":
+      run.tools.push({ id: frame.id, name: frame.name, args: frame.args, output: "", done: false });
+      break;
+    case "tool_output": {
+      const tool = run.tools.find((t) => t.id === frame.id);
+      if (tool) tool.output += frame.data;
+      break;
+    }
+    case "tool_result": {
+      const tool = run.tools.find((t) => t.id === frame.id);
+      if (tool) {
+        tool.output = frame.output;
+        tool.done = true;
+      }
+      break;
+    }
+    case "status":
+      run.status = frame.text;
+      break;
+  }
+}
+
+function broadcast(run: ActiveRun, frame: AgentFrame) {
+  const data = JSON.stringify(frame);
+  for (const target of run.sockets) {
+    try {
+      target.send(data);
+    } catch {
+      run.sockets.delete(target);
+    }
+  }
+}
+
+/** Snapshot a late-joining socket can use to render the run as if it had been watching from the start. */
+function sendRunState(run: ActiveRun, ws: WSContext) {
+  try {
+    ws.send(
+      JSON.stringify({
+        type: "run_state",
+        active: true,
+        round: run.round,
+        text: run.text,
+        thinking: run.thinking,
+        thinkingOpen: run.thinkingOpen,
+        tools: run.tools,
+        status: run.status,
+      }),
+    );
+  } catch {
+    // socket gone; cleanup happens in onClose
+  }
 }
 
 async function runnersForOrg(organizationId: string) {
@@ -88,10 +194,25 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
           socket = { ws, organizationId };
           sockets.add(socket);
           await pushRunners([...sockets], socket);
+          const run = activeRuns.get(sessionId);
+          if (run) {
+            run.sockets.add(ws);
+            sendRunState(run, ws);
+          } else {
+            // No run in flight — lets clients that missed `done` drop stale transient state.
+            try {
+              ws.send(JSON.stringify({ type: "run_state", active: false }));
+            } catch {
+              // socket gone; cleanup happens in onClose
+            }
+          }
         },
 
         onClose() {
-          if (socket) sockets.delete(socket);
+          if (socket) {
+            sockets.delete(socket);
+            for (const run of activeRuns.values()) run.sockets.delete(socket.ws);
+          }
         },
 
         async onMessage(evt: { data: unknown }, ws: WSContext) {
@@ -105,11 +226,20 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
             return;
           }
 
+          if (msg.type === "stop") {
+            activeRuns.get(sessionId)?.controller.abort();
+            return;
+          }
+
           if (msg.type !== "send") return;
           try {
             const content = (msg.content ?? "").trim();
             const connectionId = msg.connectionId ?? "";
             const model = (msg.model ?? "").trim();
+            const thinkingLevel =
+              msg.thinkingLevel === "off" || msg.thinkingLevel === "low" || msg.thinkingLevel === "medium" || msg.thinkingLevel === "high"
+                ? msg.thinkingLevel
+                : null;
             if (!content || !connectionId || !model) {
               ws.send(JSON.stringify({ type: "error", message: "connection_and_model_required" }));
               return;
@@ -126,15 +256,24 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               return;
             }
 
+            const existingRun = activeRuns.get(session.id);
+            if (existingRun) {
+              existingRun.sockets.add(ws);
+              sendRunState(existingRun, ws);
+              ws.send(JSON.stringify({ type: "busy" }));
+              return;
+            }
+
             const directory = session.codeDirectoryId
               ? await db
                   .selectFrom("code_directory")
-                  .select("runnerId")
+                  .select(["runnerId", "cwd"])
                   .where("id", "=", session.codeDirectoryId)
                   .where("organizationId", "=", organizationId)
                   .executeTakeFirst()
               : undefined;
             const runnerId = directory?.runnerId ?? null;
+            const cwd = directory?.cwd ?? null;
 
             const connection = await db
               .selectFrom("llm_connection")
@@ -171,6 +310,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               .set({
                 connectionId,
                 model,
+                thinkingLevel,
                 updatedAt: now,
                 ...(isFirstMessage ? { title: content.slice(0, 60) } : {}),
               })
@@ -180,30 +320,45 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               ws.send(JSON.stringify({ type: "session_updated" }));
             }
 
+            const run: ActiveRun = {
+              controller: new AbortController(),
+              sockets: new Set([ws]),
+              round: 0,
+              text: "",
+              thinking: "",
+              thinkingOpen: false,
+              tools: [],
+              status: null,
+            };
+            activeRuns.set(session.id, run);
             const emit = (frame: AgentFrame) => {
-              try {
-                ws.send(JSON.stringify(frame));
-              } catch {
-                // client gone mid-loop; keep persisting
-              }
+              accumulate(run, frame);
+              broadcast(run, frame);
             };
 
-            await runAgentLoop(
-              {
-                session,
-                connection,
-                model,
-                runnerId,
-                history: history.map((m) => ({
-                  role: m.role as AgentMessage["role"],
-                  content: m.content,
-                  meta: (m.meta as AgentMessage["meta"]) ?? null,
-                })),
-                userContent: content,
-                organizationId,
-              },
-              emit,
-            );
+            try {
+              await runAgentLoop(
+                {
+                  session,
+                  connection,
+                  model,
+                  runnerId,
+                  cwd,
+                  signal: run.controller.signal,
+                  thinkingLevel: thinkingLevel ?? undefined,
+                  history: history.map((m) => ({
+                    role: m.role as AgentMessage["role"],
+                    content: m.content,
+                    meta: (m.meta as AgentMessage["meta"]) ?? null,
+                  })),
+                  userContent: content,
+                  organizationId,
+                },
+                emit,
+              );
+            } finally {
+              activeRuns.delete(session.id);
+            }
           } catch (e) {
             console.error("[code-ws] send failed:", e);
             try {

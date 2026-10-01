@@ -18,6 +18,7 @@ export interface SessionStats {
 
 interface StreamFrame {
   type: string;
+  active?: boolean;
   round?: number;
   text?: string;
   message?: string;
@@ -28,6 +29,11 @@ interface StreamFrame {
   data?: string;
   output?: string;
   runners?: RunnerOption[];
+  tools?: ToolEvent[];
+  status?: string | null;
+  thinking?: string;
+  thinkingOpen?: boolean;
+  stopped?: boolean;
   durationMs?: number;
   usage?: { inputTokens: number; outputTokens: number; cachedTokens: number };
   contextTokens?: number;
@@ -74,6 +80,9 @@ export function useChatPanel(sessionId: string | null) {
   const [wsStatus, setWsStatus] = useState<WsStatus>("closed");
   const [runners, setRunners] = useState<RunnerOption[]>([]);
   const [statusText, setStatusText] = useState<string | null>(null);
+  const [round, setRound] = useState<number | null>(null);
+  const [thinking, setThinking] = useState<string | null>(null);
+  const [thinkingLive, setThinkingLive] = useState(false);
   const [optimistic, setOptimistic] = useState<CodeMessage | null>(null);
   const [stats, setStats] = useState<SessionStats>({
     inputTokens: 0,
@@ -83,6 +92,7 @@ export function useChatPanel(sessionId: string | null) {
     tokPerSec: null,
   });
   const liveDeltaRef = useRef({ count: 0, startedAt: 0 });
+  const lastSentRef = useRef("");
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -151,8 +161,24 @@ export function useChatPanel(sessionId: string | null) {
         const tokPerSec = Math.round((live.count / elapsed) * 1000 * 10) / 10;
         setStats((prev) => ({ ...prev, tokPerSec }));
       }
+    } else if (frame.type === "thinking_start") {
+      setThinking("");
+      setThinkingLive(true);
+    } else if (frame.type === "thinking_delta") {
+      setThinking((prev) => (prev ?? "") + (frame.text ?? ""));
+    } else if (frame.type === "thinking_end") {
+      setThinkingLive(false);
     } else if (frame.type === "round_start") {
       liveDeltaRef.current = { count: 0, startedAt: 0 };
+      // Round boundary: everything up to the previous round (incl. tool
+      // results) is committed — refetch it and keep only the new round's
+      // transient state.
+      setRound(frame.round ?? null);
+      setStreaming("");
+      setLiveTools([]);
+      setThinking(null);
+      setThinkingLive(false);
+      void queryClient.invalidateQueries({ queryKey: ["code", "session", sessionId] });
     } else if (frame.type === "round_done" && frame.usage && frame.durationMs) {
       const tokPerSec = frame.usage.outputTokens > 0 ? Math.round((frame.usage.outputTokens / frame.durationMs) * 1000 * 10) / 10 : null;
       setStats((prev) => ({
@@ -168,6 +194,27 @@ export function useChatPanel(sessionId: string | null) {
       setLiveTools((prev) => prev.map((t) => (t.id === frame.id ? { ...t, output: t.output + (frame.data ?? "") } : t)));
     } else if (frame.type === "tool_result") {
       setLiveTools((prev) => prev.map((t) => (t.id === frame.id ? { ...t, output: frame.output ?? t.output, done: true } : t)));
+    } else if (frame.type === "run_state") {
+      if (frame.active === false) {
+        // No run in flight — drop stale transient state (the run finished while we were disconnected).
+        setStreaming(null);
+        setLiveTools([]);
+        setStatusText(null);
+        setRound(null);
+      } else {
+        // Resumed a run that was already in progress (reconnect or second viewer).
+        setRound(frame.round ?? null);
+        setStreaming(frame.text ?? "");
+        setLiveTools(frame.tools ?? []);
+        setStatusText(frame.status ?? null);
+        setThinking(frame.thinking || null);
+        setThinkingLive(Boolean(frame.thinkingOpen));
+      }
+    } else if (frame.type === "busy") {
+      // Server rejected the send — a run is already live on this session.
+      setOptimistic(null);
+      setDraft(lastSentRef.current);
+      setError("The agent is already working on this session — your message wasn't sent.");
     } else if (frame.type === "error") {
       setError(frame.message ?? "stream error");
       setOptimistic(null);
@@ -184,6 +231,9 @@ export function useChatPanel(sessionId: string | null) {
       setLiveTools([]);
       setOptimistic(null);
       setStatusText(null);
+      setRound(null);
+      setThinking(null);
+      setThinkingLive(false);
       if (frame.usage) {
         setStats((prev) => ({
           ...prev,
@@ -194,6 +244,13 @@ export function useChatPanel(sessionId: string | null) {
       invalidateAfterRun();
     }
   };
+
+  // Drop the optimistic user message once the committed history contains it.
+  useEffect(() => {
+    if (!optimistic) return;
+    const committed = session.data?.messages ?? [];
+    if (committed.some((m) => m.role === "user" && m.content === optimistic.content)) setOptimistic(null);
+  }, [session.data, optimistic]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -210,6 +267,8 @@ export function useChatPanel(sessionId: string | null) {
 
       ws.onopen = () => {
         if (disposed) return;
+        // A reconnect may have missed a `done` frame — refresh persisted state.
+        if (attemptRef.current > 0) invalidateAfterRun();
         attemptRef.current = 0;
         setWsStatus("open");
         setError(null);
@@ -244,11 +303,14 @@ export function useChatPanel(sessionId: string | null) {
       wsRef.current?.close();
       setStreaming(null);
       setLiveTools([]);
+      setRound(null);
+      setThinking(null);
+      setThinkingLive(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  const send = (sendConnectionId: string | undefined, sendModel: string | undefined) => {
+  const send = (sendConnectionId: string | undefined, sendModel: string | undefined, thinkingLevel?: string) => {
     const content = draft.trim();
     const ws = wsRef.current;
     if (!content || streaming !== null) return;
@@ -263,6 +325,7 @@ export function useChatPanel(sessionId: string | null) {
 
     setError(null);
     setDraft("");
+    lastSentRef.current = content;
     setStreaming("");
     setLiveTools([]);
     setStatusText(null);
@@ -273,7 +336,14 @@ export function useChatPanel(sessionId: string | null) {
       meta: null,
       createdAt: new Date().toISOString(),
     });
-    ws.send(JSON.stringify({ type: "send", content, connectionId: sendConnectionId, model: sendModel }));
+    ws.send(JSON.stringify({ type: "send", content, connectionId: sendConnectionId, model: sendModel, thinkingLevel }));
+  };
+
+  const stop = () => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN || streaming === null) return;
+    ws.send(JSON.stringify({ type: "stop" }));
+    setStatusText("stopping…");
   };
 
   return {
@@ -287,10 +357,14 @@ export function useChatPanel(sessionId: string | null) {
     runners,
     directories,
     statusText,
+    round,
+    thinking,
+    thinkingLive,
     optimistic,
     stats,
     setDirectory,
     createDirectory,
     send,
+    stop,
   };
 }

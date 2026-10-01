@@ -20,6 +20,12 @@ export interface AgentToolCall {
   arguments: Record<string, unknown>;
 }
 
+export interface AgentThinking {
+  text: string;
+  /** Anthropic signs thinking blocks; required when replaying them into history. */
+  signature?: string;
+}
+
 /**
  * History entries understood by the agent layer. "assistant" entries may carry
  * toolCalls in meta; "tool" entries carry the result for meta.toolCallId.
@@ -31,16 +37,31 @@ export interface AgentMessage {
     toolCalls?: AgentToolCall[];
     toolCallId?: string;
     name?: string;
+    thinking?: AgentThinking[];
+    stopped?: boolean;
   } | null;
 }
 
 export interface AgentRoundResult {
   content: string | null;
   toolCalls: AgentToolCall[];
+  thinking?: AgentThinking[];
   usage: { inputTokens: number; outputTokens: number; cachedTokens: number };
 }
 
 export type DeltaSink = (text: string) => void;
+
+/** Reasoning effort level; "off" disables thinking where the provider allows it. */
+export type ThinkingLevel = "off" | "low" | "medium" | "high";
+
+/** Optional per-round extras: cancellation + reasoning/thinking stream. */
+export interface RoundEvents {
+  signal?: AbortSignal;
+  thinkingLevel?: ThinkingLevel;
+  onThinkingStart?: () => void;
+  onThinkingDelta?: DeltaSink;
+  onThinkingEnd?: () => void;
+}
 
 function safeJson(data: string): Record<string, unknown> | null {
   try {
@@ -77,13 +98,18 @@ function anthropicMessages(messages: AgentMessage[]) {
   const out: unknown[] = [];
   for (const m of messages) {
     if (m.role === "system") continue;
-    if (m.role === "assistant" && m.meta?.toolCalls?.length) {
+    if (m.role === "assistant") {
       const blocks: unknown[] = [];
+      // Signed thinking blocks must lead the assistant turn when tool_use
+      // follows (Anthropic requirement); unsigned ones can't be replayed.
+      for (const t of m.meta?.thinking ?? []) {
+        if (t.signature) blocks.push({ type: "thinking", thinking: t.text, signature: t.signature });
+      }
       if (m.content) blocks.push({ type: "text", text: m.content });
-      for (const tc of m.meta.toolCalls) {
+      for (const tc of m.meta?.toolCalls ?? []) {
         blocks.push({ type: "tool_use", id: tc.id, name: tc.name, input: tc.arguments });
       }
-      out.push({ role: "assistant", content: blocks });
+      out.push(blocks.length ? { role: "assistant", content: blocks } : { role: "assistant", content: m.content });
     } else if (m.role === "tool") {
       out.push({
         role: "user",
@@ -108,11 +134,15 @@ async function anthropicRound(
   messages: AgentMessage[],
   tools: AgentTool[],
   onDelta: DeltaSink,
+  events: RoundEvents,
 ): Promise<AgentRoundResult> {
   const provider = getProvider(connection.provider)!;
   const config = await ensureFreshTokens(connection);
   const baseUrl = providerBaseUrl(provider, config);
   const { system, messages: mapped } = anthropicMessages(messages);
+  // Extended thinking exists on Claude 3.7+; older models reject the param.
+  const supportsThinking = /claude-(?:3-7|[4-9])/.test(model);
+  const budgetTokens = supportsThinking ? { off: 0, low: 1024, medium: 4096, high: 16384 }[events.thinkingLevel ?? "medium"] : 0;
 
   // OAuth (Claude Code subscription) requests must lead with the Claude Code
   // identity block or Anthropic bills them against API balance.
@@ -130,8 +160,10 @@ async function anthropicRound(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 8192,
+      // max_tokens must exceed the thinking budget.
+      max_tokens: budgetTokens >= 8192 ? budgetTokens * 2 : 8192,
       stream: true,
+      ...(budgetTokens ? { thinking: { type: "enabled", budget_tokens: budgetTokens } } : {}),
       ...(systemParam ? { system: systemParam } : {}),
       messages: mapped,
       ...(tools.length
@@ -144,6 +176,7 @@ async function anthropicRound(
           }
         : {}),
     }),
+    signal: events.signal,
   });
 
   if (!res.ok || !res.body) {
@@ -151,7 +184,7 @@ async function anthropicRound(
     throw new Error(`provider returned ${res.status}: ${body.slice(0, 300)}`);
   }
 
-  const blocks = new Map<number, { type: string; text: string; id: string; name: string; json: string }>();
+  const blocks = new Map<number, { type: string; text: string; id: string; name: string; json: string; signature: string }>();
   const usage = { inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
 
   for await (const data of sseData(res)) {
@@ -177,7 +210,9 @@ async function anthropicRound(
         id: String(block.id ?? ""),
         name: String(block.name ?? ""),
         json: "",
+        signature: "",
       });
+      if (block.type === "thinking") events.onThinkingStart?.();
     } else if (type === "content_block_delta") {
       const delta = (evt.delta ?? {}) as Record<string, unknown>;
       const block = blocks.get(Number(evt.index));
@@ -185,9 +220,16 @@ async function anthropicRound(
       if (delta.type === "text_delta" && typeof delta.text === "string") {
         block.text += delta.text;
         onDelta(delta.text);
+      } else if (delta.type === "thinking_delta" && typeof delta.thinking === "string") {
+        block.text += delta.thinking;
+        events.onThinkingDelta?.(delta.thinking);
+      } else if (delta.type === "signature_delta" && typeof delta.signature === "string") {
+        block.signature += delta.signature;
       } else if (delta.type === "input_json_delta" && typeof delta.partial_json === "string") {
         block.json += delta.partial_json;
       }
+    } else if (type === "content_block_stop") {
+      if (blocks.get(Number(evt.index))?.type === "thinking") events.onThinkingEnd?.();
     } else if (type === "message_delta") {
       const u = (evt.usage ?? {}) as { output_tokens?: number };
       usage.outputTokens = u.output_tokens ?? usage.outputTokens;
@@ -206,7 +248,8 @@ async function anthropicRound(
       name: b.name,
       arguments: (b.json ? safeJson(b.json) : null) ?? {},
     }));
-  return { content: text || null, toolCalls, usage };
+  const thinking = ordered.filter((b) => b.type === "thinking").map((b) => ({ text: b.text, ...(b.signature ? { signature: b.signature } : {}) }));
+  return { content: text || null, toolCalls, usage, ...(thinking.length ? { thinking } : {}) };
 }
 
 // --- OpenAI wire format -----------------------------------------------------
@@ -241,10 +284,13 @@ async function openaiRound(
   messages: AgentMessage[],
   tools: AgentTool[],
   onDelta: DeltaSink,
+  events: RoundEvents,
 ): Promise<AgentRoundResult> {
   const provider = getProvider(connection.provider)!;
   const config = await ensureFreshTokens(connection);
   const baseUrl = providerBaseUrl(provider, config);
+  const isZai = connection.provider === "zai";
+  const thinkingLevel = events.thinkingLevel ?? "medium";
 
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
@@ -257,6 +303,17 @@ async function openaiRound(
       stream: true,
       stream_options: { include_usage: true },
       messages: openaiMessages(messages),
+      // z.ai: thinking is a plain on/off toggle and effort levels are not
+      // tunable (mirrors pi's zai compat); tool_stream streams tool-call args.
+      // Other openai-compatible reasoning models take reasoning_effort.
+      ...(isZai
+        ? {
+            thinking: thinkingLevel === "off" ? { type: "disabled" } : { type: "enabled", clear_thinking: false },
+            tool_stream: true,
+          }
+        : thinkingLevel !== "off"
+          ? { reasoning_effort: thinkingLevel }
+          : {}),
       ...(tools.length
         ? {
             tools: tools.map((t) => ({
@@ -270,6 +327,7 @@ async function openaiRound(
           }
         : {}),
     }),
+    signal: events.signal,
   });
 
   if (!res.ok || !res.body) {
@@ -279,6 +337,8 @@ async function openaiRound(
 
   const toolAcc = new Map<number, { id: string; name: string; json: string }>();
   let text = "";
+  let reasoningText = "";
+  let reasoningOpen = false;
   const usage = { inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
 
   for await (const data of sseData(res)) {
@@ -302,8 +362,23 @@ async function openaiRound(
     const delta = (choice.delta ?? {}) as Record<string, unknown>;
 
     if (typeof delta.content === "string" && delta.content) {
+      if (reasoningOpen) {
+        reasoningOpen = false;
+        events.onThinkingEnd?.();
+      }
       text += delta.content;
       onDelta(delta.content);
+    }
+    // Reasoning models stream thinking under reasoning_content (OpenRouter,
+    // DeepSeek) or reasoning on some providers.
+    const reasoning = typeof delta.reasoning_content === "string" ? delta.reasoning_content : typeof delta.reasoning === "string" ? delta.reasoning : "";
+    if (reasoning) {
+      if (!reasoningOpen) {
+        reasoningOpen = true;
+        events.onThinkingStart?.();
+      }
+      reasoningText += reasoning;
+      events.onThinkingDelta?.(reasoning);
     }
     for (const raw of Array.isArray(delta.tool_calls) ? (delta.tool_calls as Record<string, unknown>[]) : []) {
       const fn = (raw.function ?? {}) as { name?: string; arguments?: string };
@@ -322,7 +397,8 @@ async function openaiRound(
       name: t.name,
       arguments: (t.json ? safeJson(t.json) : null) ?? {},
     }));
-  return { content: text || null, toolCalls, usage };
+  if (reasoningOpen) events.onThinkingEnd?.();
+  return { content: text || null, toolCalls, usage, ...(reasoningText ? { thinking: [{ text: reasoningText }] } : {}) };
 }
 
 // --- OpenAI Responses wire (Codex) ------------------------------------------
@@ -364,6 +440,7 @@ async function responsesRound(
   messages: AgentMessage[],
   tools: AgentTool[],
   onDelta: DeltaSink,
+  events: RoundEvents,
 ): Promise<AgentRoundResult> {
   const provider = getProvider(connection.provider)!;
   const config = await ensureFreshTokens(connection);
@@ -387,6 +464,7 @@ async function responsesRound(
       // chatgpt backend requires instructions + encrypted reasoning when store=false
       instructions: instructions || "You are a helpful assistant.",
       include: ["reasoning.encrypted_content"],
+      reasoning: events.thinkingLevel === "off" ? { effort: "minimal" } : { effort: events.thinkingLevel ?? "medium", summary: "auto" },
       input,
       ...(tools.length
         ? {
@@ -401,6 +479,7 @@ async function responsesRound(
           }
         : {}),
     }),
+    signal: events.signal,
   });
 
   if (!res.ok || !res.body) {
@@ -409,6 +488,8 @@ async function responsesRound(
   }
 
   let text = "";
+  let reasoningText = "";
+  let reasoningOpen = false;
   const toolCalls: AgentToolCall[] = [];
   const usage = { inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
 
@@ -420,8 +501,27 @@ async function responsesRound(
     if (type === "response.output_text.delta" && typeof evt.delta === "string") {
       text += evt.delta;
       onDelta(evt.delta);
+    } else if (type === "response.reasoning_summary_part.added") {
+      reasoningOpen = true;
+      events.onThinkingStart?.();
+    } else if (type === "response.reasoning_summary_text.delta" && typeof evt.delta === "string") {
+      if (!reasoningOpen) {
+        reasoningOpen = true;
+        events.onThinkingStart?.();
+      }
+      reasoningText += evt.delta;
+      events.onThinkingDelta?.(evt.delta);
+    } else if (type === "response.reasoning_summary_part.done") {
+      if (reasoningOpen) {
+        reasoningOpen = false;
+        events.onThinkingEnd?.();
+      }
     } else if (type === "response.output_item.done") {
       const item = (evt.item ?? {}) as Record<string, unknown>;
+      if (item.type === "reasoning" && reasoningOpen) {
+        reasoningOpen = false;
+        events.onThinkingEnd?.();
+      }
       if (item.type === "function_call") {
         toolCalls.push({
           id: String(item.call_id ?? ""),
@@ -445,7 +545,8 @@ async function responsesRound(
     }
   }
 
-  return { content: text || null, toolCalls, usage };
+  if (reasoningOpen) events.onThinkingEnd?.();
+  return { content: text || null, toolCalls, usage, ...(reasoningText ? { thinking: [{ text: reasoningText }] } : {}) };
 }
 
 /** Runs a single streaming agent-completion round against the connection's provider. */
@@ -455,16 +556,17 @@ export async function runAgentRound(
   messages: AgentMessage[],
   tools: AgentTool[],
   onDelta: DeltaSink = () => {},
+  events: RoundEvents = {},
 ): Promise<AgentRoundResult> {
   const provider = getProvider(connection.provider);
   if (provider?.api === "anthropic") {
-    return anthropicRound(connection, model, messages, tools, onDelta);
+    return anthropicRound(connection, model, messages, tools, onDelta, events);
   }
   if (provider?.api === "openai") {
-    return openaiRound(connection, model, messages, tools, onDelta);
+    return openaiRound(connection, model, messages, tools, onDelta, events);
   }
   if (provider?.api === "responses") {
-    return responsesRound(connection, model, messages, tools, onDelta);
+    return responsesRound(connection, model, messages, tools, onDelta, events);
   }
   throw new Error(`agent completions not supported for provider "${connection.provider}"`);
 }
