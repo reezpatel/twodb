@@ -27,5 +27,5 @@ export function useConnectionPicker(connectionId: string, model: string) {
   const modelList = models.data ?? [];
   const effectiveModel = model || modelList[0]?.modelId || provider?.models[0] || "";
 
-  return { connections: enabled, selected, provider, models: modelList, effectiveModel };
+  return { connections: enabled, selected, provider, providers: providers.data ?? [], models: modelList, effectiveModel };
 }

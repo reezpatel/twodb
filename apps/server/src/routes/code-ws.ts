@@ -4,6 +4,7 @@ import type { createNodeWebSocket } from "@hono/node-ws";
 import { auth, db } from "../auth";
 import type { AgentFrame } from "../lib/agent-loop";
 import { runAgentLoop } from "../lib/agent-loop";
+import { readGitStatus } from "../lib/git-status";
 import type { AgentMessage } from "../lib/agent";
 import { runnerManager } from "../lib/runner-manager";
 
@@ -358,6 +359,20 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               );
             } finally {
               activeRuns.delete(session.id);
+              // The run just touched files — refresh the footer git line.
+              void (async () => {
+                if (!directory) return;
+                const result = await readGitStatus(directory.runnerId, directory.cwd);
+                if ("error" in result) return;
+                const data = JSON.stringify({ type: "gitStatus", ...result });
+                for (const target of run.sockets) {
+                  try {
+                    target.send(data);
+                  } catch {
+                    run.sockets.delete(target);
+                  }
+                }
+              })();
             }
           } catch (e) {
             console.error("[code-ws] send failed:", e);

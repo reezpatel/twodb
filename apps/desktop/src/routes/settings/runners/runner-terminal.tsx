@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import { useRunnerTerminal } from "./use-runner-terminal";
+import { useRunnerTerminal } from "@/lib/use-runner-terminal";
 import { Button } from "@/components/ui/button";
 
 interface RunnerTerminalProps {
@@ -9,7 +9,7 @@ interface RunnerTerminalProps {
 }
 
 export function RunnerTerminal({ runnerId, runnerName, onClose }: RunnerTerminalProps) {
-  const containerRef = useRunnerTerminal(runnerId);
+  const { containerRef: terminalRef } = useRunnerTerminal(runnerId);
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -20,7 +20,7 @@ export function RunnerTerminal({ runnerId, runnerName, onClose }: RunnerTerminal
         </Button>
         <h3 className="text-lg font-medium">Terminal — {runnerName}</h3>
       </div>
-      <div ref={containerRef} className="bg-muted min-h-0 flex-1 overflow-hidden rounded-lg border p-2" />
+      <div ref={terminalRef} className="bg-muted min-h-0 flex-1 overflow-hidden rounded-lg border p-2" />
     </div>
   );
 }

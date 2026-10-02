@@ -187,6 +187,19 @@ export interface CodeSessionTable {
   updatedAt: Date;
 }
 
+export interface CodeCheckpointTable {
+  id: string;
+  organizationId: string;
+  sessionId: string;
+  codeDirectoryId: string;
+  label: string | null;
+  ref: string;
+  commitSha: string;
+  /** manual | auto_pre_round */
+  trigger: string;
+  createdAt: Date;
+}
+
 export interface SkillTable {
   id: string;
   organizationId: string;
@@ -350,6 +363,8 @@ export interface AssistantThreadTable {
   title: string;
   connectionId: string | null;
   model: string | null;
+  /** off | low | medium | high — null means medium. */
+  thinkingLevel: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -489,6 +504,7 @@ export interface Database {
   code_session: CodeSessionTable;
   code_session_message: CodeSessionMessageTable;
   code_session_usage_event: CodeSessionUsageEventTable;
+  code_checkpoint: CodeCheckpointTable;
   skill: SkillTable;
   agent: AgentTable;
   instruction: InstructionTable;

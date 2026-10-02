@@ -14,6 +14,8 @@ interface WsMessage {
   rows?: number;
   data?: string;
   code?: number;
+  cwd?: string;
+  tmuxName?: string;
 }
 
 function parseMessage(data: unknown): WsMessage | null {
@@ -138,6 +140,8 @@ export function registerRunnerWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) 
               sessionId,
               cols: msg.cols ?? 80,
               rows: msg.rows ?? 24,
+              cwd: typeof msg.cwd === "string" && msg.cwd ? msg.cwd : undefined,
+              tmuxName: typeof msg.tmuxName === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(msg.tmuxName) ? msg.tmuxName : undefined,
             });
             return;
           }

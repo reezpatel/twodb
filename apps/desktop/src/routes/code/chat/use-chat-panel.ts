@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CodeMessage, CodeSession } from "../sidenav/use-session-list";
+import type { GitStatus } from "../directories/use-git-status";
 import { api } from "@/lib/api";
 
 export type SessionDetail = CodeSession & {
@@ -14,6 +15,14 @@ export interface SessionStats {
   cachedTokens: number;
   contextTokens: number;
   tokPerSec: number | null;
+}
+
+/** The slim slice of git status the chat footer renders. */
+export interface GitLine {
+  branch: string | null;
+  dirtyFiles: number;
+  ahead: number | null;
+  behind: number | null;
 }
 
 interface StreamFrame {
@@ -36,6 +45,12 @@ interface StreamFrame {
   durationMs?: number;
   usage?: { inputTokens: number; outputTokens: number; cachedTokens: number };
   contextTokens?: number;
+  git?: boolean;
+  branch?: string | null;
+  dirtyFiles?: number;
+  ahead?: number | null;
+  behind?: number | null;
+  exitCode?: number;
 }
 
 export interface ToolEvent {
@@ -44,6 +59,9 @@ export interface ToolEvent {
   args?: Record<string, unknown>;
   output: string;
   done: boolean;
+  startedAt?: number;
+  completedAt?: number;
+  status?: string;
 }
 
 export type WsStatus = "connecting" | "open" | "closed";
@@ -64,7 +82,11 @@ export function useChatPanel(sessionId: string | null) {
   const [round, setRound] = useState<number | null>(null);
   const [thinking, setThinking] = useState<string | null>(null);
   const [thinkingLive, setThinkingLive] = useState(false);
+  const [thinkingStartedAt, setThinkingStartedAt] = useState<number | null>(null);
+  const [thinkingDurationMs, setThinkingDurationMs] = useState<number | null>(null);
+  const thinkingStartRef = useRef(0);
   const [optimistic, setOptimistic] = useState<CodeMessage | null>(null);
+  const [gitStatus, setGitStatus] = useState<GitLine | null>(null);
   const [stats, setStats] = useState<SessionStats>({
     inputTokens: 0,
     outputTokens: 0,
@@ -83,18 +105,6 @@ export function useChatPanel(sessionId: string | null) {
     queryKey: ["code", "session", sessionId],
     queryFn: () => api<SessionDetail>(`/api/code/sessions/${sessionId}`),
     enabled: !!sessionId,
-  });
-
-  const setDirectory = useMutation({
-    mutationFn: (codeDirectoryId: string | null) =>
-      api(`/api/code/sessions/${sessionId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ codeDirectoryId }),
-      }),
-    onSuccess: () =>
-      void queryClient.invalidateQueries({
-        queryKey: ["code", "session", sessionId],
-      }),
   });
 
   const invalidateAfterRun = () => {
@@ -130,12 +140,19 @@ export function useChatPanel(sessionId: string | null) {
     } else if (frame.type === "thinking_start") {
       setThinking("");
       setThinkingLive(true);
+      thinkingStartRef.current = Date.now();
+      setThinkingStartedAt(Date.now());
+      setThinkingDurationMs(null);
     } else if (frame.type === "thinking_delta") {
       setThinking((prev) => (prev ?? "") + (frame.text ?? ""));
     } else if (frame.type === "thinking_end") {
       setThinkingLive(false);
+      setThinkingDurationMs(Date.now() - thinkingStartRef.current);
     } else if (frame.type === "round_start") {
       liveDeltaRef.current = { count: 0, startedAt: 0 };
+      thinkingStartRef.current = 0;
+      setThinkingStartedAt(null);
+      setThinkingDurationMs(null);
       // Round boundary: everything up to the previous round (incl. tool
       // results) is committed — refetch it and keep only the new round's
       // transient state.
@@ -155,11 +172,15 @@ export function useChatPanel(sessionId: string | null) {
         tokPerSec,
       }));
     } else if (frame.type === "tool_start") {
-      setLiveTools((prev) => [...prev, { id: frame.id ?? "", name: frame.name ?? "tool", args: frame.args, output: "", done: false }]);
+      setLiveTools((prev) => [...prev, { id: frame.id ?? "", name: frame.name ?? "tool", args: frame.args, output: "", done: false, startedAt: Date.now() }]);
     } else if (frame.type === "tool_output") {
       setLiveTools((prev) => prev.map((t) => (t.id === frame.id ? { ...t, output: t.output + (frame.data ?? "") } : t)));
     } else if (frame.type === "tool_result") {
-      setLiveTools((prev) => prev.map((t) => (t.id === frame.id ? { ...t, output: frame.output ?? t.output, done: true } : t)));
+      setLiveTools((prev) =>
+        prev.map((t) =>
+          t.id === frame.id ? { ...t, output: frame.output ?? t.output, done: true, completedAt: Date.now(), status: frame.status ?? undefined } : t,
+        ),
+      );
     } else if (frame.type === "run_state") {
       if (frame.active === false) {
         // No run in flight — drop stale transient state (the run finished while we were disconnected).
@@ -190,6 +211,14 @@ export function useChatPanel(sessionId: string | null) {
       setStatusText(frame.text ?? null);
     } else if (frame.type === "session_updated") {
       void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
+    } else if (frame.type === "gitStatus") {
+      // Pushed by the server when a run finishes — files likely changed.
+      setGitStatus(
+        frame.git === false
+          ? null
+          : { branch: frame.branch ?? null, dirtyFiles: frame.dirtyFiles ?? 0, ahead: frame.ahead ?? null, behind: frame.behind ?? null },
+      );
+      void queryClient.invalidateQueries({ queryKey: ["code", "directories"] });
     } else if (frame.type === "done") {
       setStreaming(null);
       setLiveTools([]);
@@ -215,6 +244,18 @@ export function useChatPanel(sessionId: string | null) {
     const committed = session.data?.messages ?? [];
     if (committed.some((m) => m.role === "user" && m.content === optimistic.content)) setOptimistic(null);
   }, [session.data, optimistic]);
+
+  // Seed the footer git line before the first round-end WS push.
+  useEffect(() => {
+    const dirId = session.data?.codeDirectoryId;
+    if (!dirId) {
+      setGitStatus(null);
+      return;
+    }
+    api<GitStatus>(`/api/code/directories/${dirId}/git-status`)
+      .then((s) => setGitStatus(s.git ? { branch: s.branch, dirtyFiles: s.dirtyFiles, ahead: s.ahead, behind: s.behind } : null))
+      .catch(() => {});
+  }, [session.data?.codeDirectoryId]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -274,17 +315,17 @@ export function useChatPanel(sessionId: string | null) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  const send = (sendConnectionId: string | undefined, sendModel: string | undefined, thinkingLevel?: string) => {
-    const content = draft.trim();
+  const send = (sendConnectionId: string | undefined, sendModel: string | undefined, thinkingLevel?: string, contentOverride?: string): boolean => {
+    const content = (contentOverride ?? draft).trim();
     const ws = wsRef.current;
-    if (!content || streaming !== null) return;
+    if (!content || streaming !== null) return false;
     if (!sendConnectionId || !sendModel) {
       setError("Pick a connection and model first");
-      return;
+      return false;
     }
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       setError("Chat socket is not connected — retrying…");
-      return;
+      return false;
     }
 
     setError(null);
@@ -301,6 +342,7 @@ export function useChatPanel(sessionId: string | null) {
       createdAt: new Date().toISOString(),
     });
     ws.send(JSON.stringify({ type: "send", content, connectionId: sendConnectionId, model: sendModel, thinkingLevel }));
+    return true;
   };
 
   const stop = () => {
@@ -322,10 +364,20 @@ export function useChatPanel(sessionId: string | null) {
     round,
     thinking,
     thinkingLive,
+    thinkingStartedAt,
+    thinkingDurationMs,
     optimistic,
     stats,
-    setDirectory,
+    gitStatus,
     send,
     stop,
   };
+}
+
+export const ChatContext = createContext<ReturnType<typeof useChatPanel> | null>(null);
+
+export function useChat() {
+  const chat = useContext(ChatContext);
+  if (!chat) throw new Error("useChat must be used within ChatContext");
+  return chat;
 }

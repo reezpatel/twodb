@@ -226,17 +226,28 @@ function buildCommand(call: AgentToolCall): string {
   }
 }
 
+export interface ToolExecution {
+  output: string;
+  /** null when the command never ran (thrown before exec). */
+  code: number | null;
+  failed: boolean;
+}
+
 export async function executeToolCall(
   runnerId: string | null,
   cwd: string | null,
   call: AgentToolCall,
   onChunk?: ToolOutputSink,
   onWaiting?: () => void,
-): Promise<string> {
+): Promise<ToolExecution> {
   if (call.name === "web_fetch" || call.name === "web_search") {
-    return `${call.name} is not available yet (placeholder). For fetching, use run_command with curl as a workaround.`;
+    return {
+      output: `${call.name} is not available yet (placeholder). For fetching, use run_command with curl as a workaround.`,
+      code: null,
+      failed: true,
+    };
   }
-  if (!runnerId) return "error: no runner assigned to this session";
+  if (!runnerId) return { output: "error: no runner assigned to this session", code: null, failed: true };
 
   try {
     const script = buildCommand(call);
@@ -250,8 +261,12 @@ export async function executeToolCall(
     }
     const result = await runnerManager.execOnRunner(runnerId, command, onChunk, { onWaiting });
     const text = `exit code: ${result.code}\n\nstdout:\n${result.stdout}\n\nstderr:\n${result.stderr}`;
-    return text.length > MAX_OUTPUT ? `${text.slice(0, MAX_OUTPUT)}\n…(truncated)` : text;
+    return {
+      output: text.length > MAX_OUTPUT ? `${text.slice(0, MAX_OUTPUT)}\n…(truncated)` : text,
+      code: result.code,
+      failed: result.code !== 0,
+    };
   } catch (e) {
-    return `error: ${(e as Error).message}`;
+    return { output: `error: ${(e as Error).message}`, code: null, failed: true };
   }
 }

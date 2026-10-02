@@ -24,6 +24,8 @@ export interface AgentThinking {
   text: string;
   /** Anthropic signs thinking blocks; required when replaying them into history. */
   signature?: string;
+  /** Wall time the model spent thinking, when measured. */
+  durationMs?: number;
 }
 
 /**
@@ -39,6 +41,12 @@ export interface AgentMessage {
     name?: string;
     thinking?: AgentThinking[];
     stopped?: boolean;
+    /** Epoch ms — execution timing for tool messages. */
+    startedAt?: number;
+    completedAt?: number;
+    /** Tool execution outcome — "failed" marks non-zero exits and thrown errors. */
+    status?: string;
+    exitCode?: number;
   } | null;
 }
 

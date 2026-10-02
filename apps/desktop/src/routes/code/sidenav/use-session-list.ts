@@ -9,6 +9,7 @@ export interface CodeSession {
   model: string | null;
   codeDirectoryId: string | null;
   thinkingLevel: string | null;
+  runtimeState: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }

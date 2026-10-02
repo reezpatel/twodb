@@ -1,6 +1,6 @@
 import { db } from "../../auth";
 import type { AssistantThreadTable, LlmConnectionTable } from "../../plugins/db";
-import { runAgentRound, type AgentMessage, type AgentTool } from "../agent";
+import { runAgentRound, type AgentMessage, type AgentTool, type ThinkingLevel } from "../agent";
 
 const MAX_ROUNDS = 8;
 
@@ -21,6 +21,9 @@ interface CanvasUpdate {
 export type AssistantFrame =
   | { type: "round_start"; round: number }
   | { type: "delta"; text: string }
+  | { type: "thinking_start"; round: number }
+  | { type: "thinking_delta"; text: string }
+  | { type: "thinking_end"; round: number }
   | { type: "canvas"; artifact: CanvasUpdate }
   | { type: "status"; text: string }
   | { type: "round_done"; round: number; usage: { inputTokens: number; outputTokens: number; cachedTokens: number }; durationMs: number }
@@ -53,6 +56,7 @@ export interface AssistantLoopInput {
   history: AgentMessage[];
   userContent: string;
   organizationId: string;
+  thinkingLevel?: ThinkingLevel;
 }
 
 export async function runAssistantLoop(input: AssistantLoopInput, emit: FrameSink): Promise<void> {
@@ -115,12 +119,38 @@ export async function runAssistantLoop(input: AssistantLoopInput, emit: FrameSin
   };
 
   try {
+    const thinkingLevel = input.thinkingLevel ?? "medium";
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       lastRoundStart = Date.now();
+      let roundThinking = "";
+      let roundThinkingStart = 0;
+      let roundThinkingMs = 0;
       await emit({ type: "round_start", round });
-      const result = await runAgentRound(connection, model, messages, [CANVAS_TOOL], (text) => {
-        void emit({ type: "delta", text });
-      });
+      const result = await runAgentRound(
+        connection,
+        model,
+        messages,
+        [CANVAS_TOOL],
+        (text) => {
+          void emit({ type: "delta", text });
+        },
+        {
+          thinkingLevel,
+          onThinkingStart: () => {
+            roundThinkingStart = Date.now();
+            roundThinkingMs = 0;
+            void emit({ type: "thinking_start", round });
+          },
+          onThinkingDelta: (text) => {
+            roundThinking += text;
+            void emit({ type: "thinking_delta", text });
+          },
+          onThinkingEnd: () => {
+            roundThinkingMs = Math.max(1, Date.now() - roundThinkingStart);
+            void emit({ type: "thinking_end", round });
+          },
+        },
+      );
 
       totals.inputTokens += result.usage.inputTokens;
       totals.outputTokens += result.usage.outputTokens;
@@ -132,13 +162,18 @@ export async function runAssistantLoop(input: AssistantLoopInput, emit: FrameSin
       const canvasCalls = result.toolCalls.filter((call) => call.name === "update_canvas");
       const otherCalls = result.toolCalls.filter((call) => call.name !== "update_canvas");
 
+      const thinkingMeta = result.thinking?.length ? { thinking: result.thinking.map((t) => ({ ...t, durationMs: roundThinkingMs })), thinkingLevel } : {};
+
       if (result.toolCalls.length === 0) {
-        if (result.content) await insertMessage("assistant", result.content, null);
+        if (result.content || result.thinking?.length) {
+          await insertMessage("assistant", result.content ?? "", Object.keys(thinkingMeta).length ? thinkingMeta : null);
+        }
         break;
       }
 
-      await insertMessage("assistant", result.content ?? "", { toolCalls: result.toolCalls });
-      messages.push({ role: "assistant", content: result.content ?? "", meta: { toolCalls: result.toolCalls } });
+      const assistantMeta = { ...thinkingMeta, toolCalls: result.toolCalls };
+      await insertMessage("assistant", result.content ?? "", assistantMeta);
+      messages.push({ role: "assistant", content: result.content ?? "", meta: assistantMeta });
 
       for (const call of canvasCalls) {
         const artifact = await upsertArtifact(call);

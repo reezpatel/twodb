@@ -6,6 +6,7 @@ import { registerSW } from "virtual:pwa-register";
 import { router } from "./router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "@fontsource-variable/outfit";
+import "@fontsource-variable/jetbrains-mono";
 import "./index.css";
 
 const queryClient = new QueryClient();

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useNavigate, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 
@@ -7,6 +7,7 @@ export interface AssistantThread {
   title: string;
   connectionId: string | null;
   model: string | null;
+  thinkingLevel: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,9 +34,12 @@ export interface AssistantThreadDetail extends AssistantThread {
   usage: { inputTokens: number; outputTokens: number; cachedTokens: number; contextTokens: number };
 }
 
+/** Selected thread lives in the URL (/apps/assistant/:threadId) so refresh restores it. */
 export function useAssistantScene() {
   const queryClient = useQueryClient();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { threadId } = useParams<{ threadId: string }>();
+  const navigate = useNavigate();
+  const selectedId = threadId ?? null;
 
   const threads = useQuery({
     queryKey: ["assistant", "threads"],
@@ -52,7 +56,7 @@ export function useAssistantScene() {
     mutationFn: () => api<AssistantThread>("/api/assistant/threads", { method: "POST", body: "{}" }),
     onSuccess: (row) => {
       void queryClient.invalidateQueries({ queryKey: ["assistant", "threads"] });
-      setSelectedId(row.id);
+      navigate(`/apps/assistant/${row.id}`);
     },
   });
 
@@ -60,9 +64,9 @@ export function useAssistantScene() {
     mutationFn: (id: string) => api(`/api/assistant/threads/${id}`, { method: "DELETE" }),
     onSuccess: (_data, id) => {
       void queryClient.invalidateQueries({ queryKey: ["assistant", "threads"] });
-      if (selectedId === id) setSelectedId(null);
+      if (selectedId === id) navigate("/apps/assistant");
     },
   });
 
-  return { threads, thread, selectedId, setSelectedId, create, remove };
+  return { threads, thread, selectedId, setSelectedId: (id: string) => navigate(`/apps/assistant/${id}`), create, remove };
 }

@@ -84,10 +84,33 @@ export const assistantRoutes = new Hono()
     if (!thread) return c.json({ error: "thread_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ title: string }> = {};
+    const patch: Partial<{ title: string; connectionId: string | null; model: string | null; thinkingLevel: string }> = {};
     if (body?.title !== undefined) {
       if (typeof body.title !== "string" || !body.title.trim()) return c.json({ error: "invalid_title" }, 400);
       patch.title = body.title.trim();
+    }
+    if (body?.connectionId !== undefined) {
+      if (body.connectionId === null) {
+        patch.connectionId = null;
+      } else if (typeof body.connectionId === "string" && body.connectionId) {
+        const conn = await db
+          .selectFrom("llm_connection")
+          .select("id")
+          .where("id", "=", body.connectionId)
+          .where("organizationId", "=", s.organizationId)
+          .executeTakeFirst();
+        if (!conn) return c.json({ error: "connection_not_found" }, 404);
+        patch.connectionId = body.connectionId;
+      }
+    }
+    if (body?.model !== undefined) {
+      patch.model = typeof body.model === "string" && body.model.trim() ? body.model.trim().slice(0, 200) : null;
+    }
+    if (body?.thinkingLevel !== undefined) {
+      if (typeof body.thinkingLevel !== "string" || !["off", "low", "medium", "high"].includes(body.thinkingLevel)) {
+        return c.json({ error: "invalid_thinking_level" }, 400);
+      }
+      patch.thinkingLevel = body.thinkingLevel;
     }
     if (Object.keys(patch).length === 0) return c.json({ error: "empty_update" }, 400);
 

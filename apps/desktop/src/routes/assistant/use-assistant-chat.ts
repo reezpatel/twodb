@@ -32,6 +32,11 @@ export function useAssistantChat(threadId: string | null, seed?: AssistantChatSe
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState<string | null>(null);
+  const [thinking, setThinking] = useState<string | null>(null);
+  const [thinkingLive, setThinkingLive] = useState(false);
+  const [thinkingStartedAt, setThinkingStartedAt] = useState<number | null>(null);
+  const [thinkingDurationMs, setThinkingDurationMs] = useState<number | null>(null);
+  const thinkingStartRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [wsStatus, setWsStatus] = useState<WsStatus>("closed");
   const [optimistic, setOptimistic] = useState<AssistantMessage | null>(null);
@@ -67,8 +72,22 @@ export function useAssistantChat(threadId: string | null, seed?: AssistantChatSe
       if (elapsed > 400) {
         setStats((prev) => ({ ...prev, tokPerSec: Math.round((live.count / elapsed) * 10000) / 10 }));
       }
+    } else if (frame.type === "thinking_start") {
+      setThinking("");
+      setThinkingLive(true);
+      thinkingStartRef.current = Date.now();
+      setThinkingStartedAt(Date.now());
+      setThinkingDurationMs(null);
+    } else if (frame.type === "thinking_delta") {
+      setThinking((prev) => (prev ?? "") + (frame.text ?? ""));
+    } else if (frame.type === "thinking_end") {
+      setThinkingLive(false);
+      setThinkingDurationMs(Date.now() - thinkingStartRef.current);
     } else if (frame.type === "round_start") {
       liveDeltaRef.current = { count: 0, startedAt: 0 };
+      thinkingStartRef.current = 0;
+      setThinkingStartedAt(null);
+      setThinkingDurationMs(null);
     } else if (frame.type === "round_done" && frame.usage && frame.durationMs) {
       const u = frame.usage;
       const tokPerSec = u.outputTokens > 0 ? Math.round((u.outputTokens / frame.durationMs) * 10000) / 10 : null;
@@ -85,11 +104,15 @@ export function useAssistantChat(threadId: string | null, seed?: AssistantChatSe
       setActiveArtifactId(artifact.id);
     } else if (frame.type === "error") {
       setError(frame.message ?? "stream error");
+      setOptimistic(null);
+      setStreaming(null);
+      invalidateAfterRun();
     } else if (frame.type === "thread_updated") {
       void queryClient.invalidateQueries({ queryKey: ["assistant", "threads"] });
     } else if (frame.type === "done") {
       setStreaming(null);
       setOptimistic(null);
+      setThinking(null);
       if (frame.usage) {
         setStats((prev) => ({ ...prev, contextTokens: frame.contextTokens ?? prev.contextTokens }));
       }
@@ -167,17 +190,17 @@ export function useAssistantChat(threadId: string | null, seed?: AssistantChatSe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);
 
-  const send = (connectionId: string | undefined, model: string | undefined) => {
-    const content = draft.trim();
+  const send = (connectionId: string | undefined, model: string | undefined, thinkingLevel?: string, contentOverride?: string): boolean => {
+    const content = (contentOverride ?? draft).trim();
     const ws = wsRef.current;
-    if (!content || streaming !== null) return;
+    if (!content || streaming !== null) return false;
     if (!connectionId || !model) {
       setError("Pick a connection and model first");
-      return;
+      return false;
     }
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       setError("Chat socket is not connected — retrying…");
-      return;
+      return false;
     }
 
     setError(null);
@@ -190,7 +213,8 @@ export function useAssistantChat(threadId: string | null, seed?: AssistantChatSe
       meta: null,
       createdAt: new Date().toISOString(),
     });
-    ws.send(JSON.stringify({ type: "send", content, connectionId, model }));
+    ws.send(JSON.stringify({ type: "send", content, connectionId, model, ...(thinkingLevel ? { thinkingLevel } : {}) }));
+    return true;
   };
 
   const activeArtifact = artifacts.find((a) => a.id === activeArtifactId) ?? artifacts[0] ?? null;
@@ -199,6 +223,10 @@ export function useAssistantChat(threadId: string | null, seed?: AssistantChatSe
     draft,
     setDraft,
     streaming,
+    thinking,
+    thinkingLive,
+    thinkingStartedAt,
+    thinkingDurationMs,
     error,
     wsStatus,
     optimistic,

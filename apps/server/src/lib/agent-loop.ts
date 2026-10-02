@@ -21,7 +21,7 @@ export type AgentFrame =
   | { type: "delta"; text: string }
   | { type: "tool_start"; id: string; name: string; args: Record<string, unknown> }
   | { type: "tool_output"; id: string; stream: "stdout" | "stderr"; data: string }
-  | { type: "tool_result"; id: string; name: string; output: string }
+  | { type: "tool_result"; id: string; name: string; output: string; status?: "ok" | "failed"; exitCode?: number }
   | { type: "status"; text: string }
   | { type: "round_done"; round: number; usage: RoundUsage; durationMs: number }
   | { type: "error"; message: string }
@@ -114,6 +114,8 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
 
       let roundText = "";
       let roundThinking = "";
+      let roundThinkingStart = 0;
+      let roundThinkingMs = 0;
       let result: AgentRoundResult | null = null;
       try {
         result = await runAgentRound(
@@ -128,12 +130,19 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
           {
             signal,
             thinkingLevel,
-            onThinkingStart: () => void emit({ type: "thinking_start", round }),
+            onThinkingStart: () => {
+              roundThinkingStart = Date.now();
+              roundThinkingMs = 0;
+              void emit({ type: "thinking_start", round });
+            },
             onThinkingDelta: (text) => {
               roundThinking += text;
               void emit({ type: "thinking_delta", text });
             },
-            onThinkingEnd: () => void emit({ type: "thinking_end", round }),
+            onThinkingEnd: () => {
+              roundThinkingMs = Math.max(1, Date.now() - roundThinkingStart);
+              void emit({ type: "thinking_end", round });
+            },
           },
         );
       } catch (e) {
@@ -157,7 +166,7 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
       contextTokens = result.usage.inputTokens + result.usage.outputTokens;
       await logUsage(result.usage);
 
-      const thinkingMeta = result.thinking?.length ? { thinking: result.thinking, thinkingLevel } : {};
+      const thinkingMeta = result.thinking?.length ? { thinking: result.thinking.map((t) => ({ ...t, durationMs: roundThinkingMs })), thinkingLevel } : {};
 
       if (result.toolCalls.length === 0) {
         // Persist before round_done so a refetch at the round boundary sees it.
@@ -185,8 +194,9 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
           messages.push({ role: "tool", content: "stopped by user", meta: { toolCallId: call.id, name: call.name } });
           continue;
         }
+        const startedAt = Date.now();
         await emit({ type: "tool_start", id: call.id, name: call.name, args: call.arguments });
-        const output = await raceAbort(
+        const exec = await raceAbort(
           executeToolCall(
             runnerId,
             cwd,
@@ -200,19 +210,28 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
           ),
           signal,
         );
-        if (output === ABORTED) {
+        if (exec === ABORTED) {
           stopped = true;
           await emit({ type: "tool_result", id: call.id, name: call.name, output: "stopped by user" });
           await insertMessage("tool", "stopped by user", { toolCallId: call.id, name: call.name, stopped: true });
           messages.push({ role: "tool", content: "stopped by user", meta: { toolCallId: call.id, name: call.name } });
           continue;
         }
-        await emit({ type: "tool_result", id: call.id, name: call.name, output });
-        await insertMessage("tool", output, { toolCallId: call.id, name: call.name });
+        const completedAt = Date.now();
+        const toolMeta = {
+          toolCallId: call.id,
+          name: call.name,
+          startedAt,
+          completedAt,
+          status: exec.failed ? ("failed" as const) : ("ok" as const),
+          ...(exec.code !== null ? { exitCode: exec.code } : {}),
+        };
+        await emit({ type: "tool_result", id: call.id, name: call.name, output: exec.output, status: toolMeta.status, exitCode: exec.code ?? undefined });
+        await insertMessage("tool", exec.output, toolMeta);
         messages.push({
           role: "tool",
-          content: output,
-          meta: { toolCallId: call.id, name: call.name },
+          content: exec.output,
+          meta: toolMeta,
         });
       }
       if (stopped) break;

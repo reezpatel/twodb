@@ -1,5 +1,6 @@
 import os from "node:os";
-import { spawn } from "node:child_process";
+import fs from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import * as pty from "node-pty";
@@ -19,6 +20,10 @@ const terms = new Map<string, pty.IPty>();
 let ws: WebSocket | null = null;
 let backoff = 1000;
 
+// tmux gives terminals persistence: closing a tab detaches instead of killing
+// the session, and reopening reattaches where you left off.
+const hasTmux = process.platform !== "win32" && spawnSync("tmux", ["-V"], { stdio: "ignore" }).status === 0;
+
 function send(msg: unknown) {
   if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
@@ -32,6 +37,8 @@ interface ServerMessage {
   cols?: number;
   rows?: number;
   data?: string;
+  cwd?: string;
+  tmuxName?: string;
 }
 
 function handleExec(execId: string, command: string) {
@@ -66,12 +73,13 @@ function handle(msg: ServerMessage) {
       console.log(`registered as runner ${msg.runnerId}`);
       break;
     case "open": {
-      const shell = process.env.SHELL ?? "bash";
-      const term = pty.spawn(shell, [], {
+      const cwd = msg.cwd && fs.existsSync(msg.cwd) ? msg.cwd : os.homedir();
+      const tmux = hasTmux && typeof msg.tmuxName === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(msg.tmuxName);
+      const term = pty.spawn(tmux ? "tmux" : (process.env.SHELL ?? "bash"), tmux ? ["new-session", "-A", "-s", msg.tmuxName!, "-c", cwd] : [], {
         name: "xterm-256color",
         cols: msg.cols ?? 80,
         rows: msg.rows ?? 24,
-        cwd: os.homedir(),
+        cwd,
         env: process.env as Record<string, string>,
       });
       terms.set(msg.sessionId, term);

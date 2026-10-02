@@ -1,23 +1,28 @@
-import { ChatPanel } from "./chat/chat-panel";
-import { useChatPanel } from "./chat/use-chat-panel";
-import { Editor } from "./editor/editor";
-import { Header } from "./header/header";
+import { Outlet, useNavigate, useParams } from "react-router";
+import { ChatContext, useChatPanel } from "./chat/use-chat-panel";
 import { Sidebar } from "./sidebar/sidebar";
 import { Sidenav } from "./sidenav/sidenav";
-import { useCodeScene } from "./use-code-scene";
 
 export function CodeScene() {
-  const { selectedSessionId, selectSession, view, setView } = useCodeScene();
-  const chat = useChatPanel(selectedSessionId);
+  const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
+  const chat = useChatPanel(sessionId ?? null);
 
   return (
-    <div className="flex h-full flex-col">
-      <Header view={view} onViewChange={setView} />
-      <div className="flex min-h-0 flex-1">
-        <Sidenav selectedId={selectedSessionId} onSelect={selectSession} activeStreaming={chat.streaming !== null} />
-        <div className="flex min-w-0 flex-1 flex-col">{view === "chat" ? <ChatPanel sessionId={selectedSessionId} chat={chat} /> : <Editor />}</div>
+    <ChatContext.Provider value={chat}>
+      <div className="flex h-full min-h-0">
+        <Sidenav selectedId={sessionId ?? null} onSelect={(id) => navigate(`/apps/code/${id}`)} activeStreaming={chat.streaming !== null} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          {sessionId ? (
+            <Outlet />
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <p className="text-muted-foreground">Select a session on the left, or start a new one with +.</p>
+            </div>
+          )}
+        </div>
         <Sidebar />
       </div>
-    </div>
+    </ChatContext.Provider>
   );
 }

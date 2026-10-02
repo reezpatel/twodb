@@ -1,12 +1,19 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Copy, FileText, Loader2, Plus, Search, Send, SquarePen } from "lucide-react";
 import { useAssistantScene, type AssistantThread } from "./use-assistant-scene";
 import { useAssistantChat } from "./use-assistant-chat";
+import { useCanvasPreview } from "./use-canvas-preview";
+import { MessageMarkdown } from "@/components/message-markdown";
+import { EditorContent } from "@tiptap/react";
+import { useComposer } from "@/components/composer/use-composer";
+import type { PasteRef } from "@/components/composer/paste-chip";
+import { StatsRow } from "@/components/model-picker/stats-row";
+import { ModelDialog } from "@/components/model-picker/model-dialog";
+import { useModelConfig } from "@/components/model-picker/use-model-config";
+import { ThinkingBlock } from "@/components/thinking-block";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Textarea } from "@/components/ui/textarea";
-import { useConnectionPicker } from "@/lib/use-connection-picker";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 const selectClasses =
@@ -32,20 +39,22 @@ function relativeTime(updatedAt: string) {
   return `${Math.floor(hours / 24)}d`;
 }
 
-function fmtTokens(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
 function Message({ role, content }: { role: string; content: string }) {
   const isUser = role === "user";
+  if (isUser) {
+    return (
+      <div className="flex flex-col items-end">
+        <div className="bg-card max-w-[85%] rounded-lg px-3 py-2 text-right">
+          <span className="text-primary text-[11px] w-full font-semibold tracking-wide uppercase">You</span>
+          <div className="text-sm leading-relaxed whitespace-pre-wrap">{content}</div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-0.5">
-      <span className={cn("text-[11px] font-semibold tracking-wide uppercase", isUser ? "text-primary" : "text-muted-foreground")}>
-        {isUser ? "You" : "Assistant"}
-      </span>
-      <div className="text-sm leading-relaxed whitespace-pre-wrap">{content}</div>
+      <span className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">Assistant</span>
+      <MessageMarkdown variant="plain" text={content} />
     </div>
   );
 }
@@ -60,29 +69,39 @@ function CanvasChip({ title }: { title: string }) {
   );
 }
 
-function StatsRow({ stats }: { stats: ReturnType<typeof useAssistantChat>["stats"] }) {
-  const cachePct = stats.inputTokens > 0 ? Math.round((stats.cachedTokens / stats.inputTokens) * 100) : null;
-  return (
-    <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs">
-      <span title="Input tokens (incl. cached)">↑ {fmtTokens(stats.inputTokens)}</span>
-      <span title="Output tokens">↓ {fmtTokens(stats.outputTokens)}</span>
-      <span title="Cache hit">⚡ {cachePct !== null ? `${cachePct}%` : "—"}</span>
-      <span title="Generation speed">{stats.tokPerSec !== null ? `${stats.tokPerSec} tok/s` : "—"}</span>
-      <span className="flex items-center gap-2" title="Context consumed">
-        <Progress value={Math.min(100, stats.contextTokens > 0 ? 100 : 0)} className="h-1.5 w-24" />
-        <span>{fmtTokens(stats.contextTokens)}</span>
-      </span>
-    </div>
-  );
-}
-
 export function AssistantScene() {
   const { threads, thread, selectedId, setSelectedId, create, remove } = useAssistantScene();
   const chat = useAssistantChat(selectedId, thread.data ? { artifacts: thread.data.artifacts, usage: thread.data.usage } : undefined);
 
-  const [connectionId, setConnectionId] = useState("");
-  const [model, setModel] = useState("");
-  const { connections, selected, models, effectiveModel } = useConnectionPicker(connectionId, model);
+  const [viewPaste, setViewPaste] = useState<PasteRef | null>(null);
+  const config = useModelConfig(selectedId, thread, {
+    endpoint: "/api/assistant/threads",
+    queryKeyBase: ["assistant", "thread"],
+  });
+  const { connections, selected, effectiveModel, model, thinkingLevel, contextWindow, setConfigOpen } = config;
+  const running = chat.streaming !== null;
+  const [showThinking, setShowThinking] = useState(() => localStorage.getItem("twodb.showThinking") !== "false");
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "t") {
+        event.preventDefault();
+        setShowThinking((v) => {
+          localStorage.setItem("twodb.showThinking", v ? "false" : "true");
+          return !v;
+        });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  const { editor, submit, pastes } = useComposer({
+    files: null,
+    disabled: running || connections.length === 0,
+    placeholder: connections.length === 0 ? "Add an LLM connection in Settings → LLM first" : "Ask anything… — / for commands",
+    onDraft: chat.setDraft,
+    onSend: (content) => chat.send(selected?.id, model || effectiveModel, thinkingLevel ?? undefined, content),
+  });
 
   const groups = useMemo(() => {
     const map = new Map<string, AssistantThread[]>();
@@ -96,8 +115,8 @@ export function AssistantScene() {
   }, [threads.data]);
 
   const messages = thread.data?.messages ?? [];
-  const running = chat.streaming !== null;
   const artifact = chat.activeArtifact;
+  const preview = useCanvasPreview(artifact && (artifact.type === "markdown" || artifact.type === "text") ? artifact : null);
 
   return (
     <div className="flex h-full">
@@ -165,9 +184,15 @@ export function AssistantScene() {
                   if (m.role === "tool") {
                     return <CanvasChip key={m.id} title={m.content.replace("canvas updated: ", "")} />;
                   }
-                  const meta = m.meta as { toolCalls?: { id: string; name: string; arguments: Record<string, unknown> }[] } | null;
+                  const meta = m.meta as {
+                    toolCalls?: { id: string; name: string; arguments: Record<string, unknown> }[];
+                    thinking?: { text: string; durationMs?: number }[];
+                  } | null;
                   return (
                     <div key={m.id} className="flex flex-col gap-2">
+                      {meta?.thinking?.map((t, i) => (
+                        <ThinkingBlock key={i} text={t.text} live={false} durationMs={t.durationMs} visible={showThinking} />
+                      ))}
                       {m.content && <Message role={m.role} content={m.content} />}
                       {meta?.toolCalls
                         ?.filter((tc) => tc.name === "update_canvas")
@@ -180,6 +205,15 @@ export function AssistantScene() {
                 {chat.optimistic && <Message role="user" content={chat.optimistic.content} />}
                 {running && (
                   <div className="flex flex-col gap-2">
+                    {chat.thinking !== null && (
+                      <ThinkingBlock
+                        text={chat.thinking}
+                        live={chat.thinkingLive}
+                        startedAt={chat.thinkingStartedAt ?? undefined}
+                        durationMs={chat.thinkingDurationMs ?? undefined}
+                        visible={showThinking}
+                      />
+                    )}
                     {chat.streaming ? (
                       <Message role="assistant" content={chat.streaming} />
                     ) : (
@@ -198,49 +232,31 @@ export function AssistantScene() {
             </div>
 
             <div className="bg-card border-t mx-auto flex w-full max-w-3xl flex-col gap-2 border-t p-3">
-              <div className="flex items-center gap-2">
-                <select className={selectClasses} value={selected?.id ?? ""} onChange={(e) => setConnectionId(e.target.value)}>
-                  {connections.length === 0 && <option value="">No connections</option>}
-                  {connections.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className={cn(selectClasses, "w-56")}
-                  value={model || effectiveModel}
-                  onChange={(e) => setModel(e.target.value)}
-                  disabled={models.length === 0}
+              <StatsRow stats={chat.stats} contextWindow={contextWindow}>
+                <button
+                  type="button"
+                  className="hover:text-foreground font-medium transition-colors"
+                  title="Connection & model"
+                  onClick={() => setConfigOpen(true)}
                 >
-                  {models.length === 0 && <option value="">No models — refresh in Settings</option>}
-                  {models.map((m) => (
-                    <option key={m.id} value={m.modelId}>
-                      {m.displayName ?? m.modelId}
-                    </option>
-                  ))}
-                </select>
+                  {model || effectiveModel || "no model"}
+                </button>
                 <Badge variant={chat.wsStatus === "open" ? "success" : "secondary"} className="ml-auto" title={`Chat socket: ${chat.wsStatus}`}>
                   {chat.wsStatus === "open" ? "live" : chat.wsStatus}
                 </Badge>
-              </div>
-
-              <StatsRow stats={chat.stats} />
+              </StatsRow>
 
               <div className="bg-card focus-within:border-ring rounded-lg border transition-colors">
-                <Textarea
-                  className="min-h-12 resize-none border-0 shadow-none focus-visible:ring-0"
-                  placeholder={connections.length === 0 ? "Add an LLM connection in Settings → LLM first" : "Ask anything… (⌘⏎ to send)"}
-                  value={chat.draft}
-                  onChange={(e) => chat.setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
-                      e.preventDefault();
-                      chat.send(selected?.id, model || effectiveModel);
-                    }
+                <div
+                  onClick={(e) => {
+                    const chip = (e.target as HTMLElement).closest("[data-paste-chip]");
+                    if (!chip) return;
+                    const paste = pastes.current.get(chip.getAttribute("data-paste-id") ?? "");
+                    if (paste) setViewPaste(paste);
                   }}
-                  disabled={connections.length === 0 || running}
-                />
+                >
+                  <EditorContent editor={editor} className="min-h-12" />
+                </div>
                 <div className="border-t flex items-center gap-1 border-t px-1.5 py-1">
                   <Button variant="ghost" size="icon-sm" title="Search the web (coming soon)" disabled>
                     <Search size={14} />
@@ -249,13 +265,26 @@ export function AssistantScene() {
                     size="icon-sm"
                     className="ml-auto"
                     title="Send"
-                    onClick={() => chat.send(selected?.id, model || effectiveModel)}
+                    onClick={submit}
                     disabled={!chat.draft.trim() || running || !selected || !effectiveModel || chat.wsStatus !== "open"}
                   >
                     <Send size={14} />
                   </Button>
                 </div>
               </div>
+
+              <Dialog open={!!viewPaste} onOpenChange={(o) => !o && setViewPaste(null)}>
+                <DialogContent className="sm:max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>
+                      Paste #{viewPaste?.id} — {viewPaste?.lines} lines
+                    </DialogTitle>
+                  </DialogHeader>
+                  <pre className="bg-muted max-h-[60vh] overflow-auto rounded-lg p-3 font-mono text-xs whitespace-pre-wrap">{viewPaste?.content}</pre>
+                </DialogContent>
+              </Dialog>
+
+              <ModelDialog config={config} />
             </div>
           </>
         )}
@@ -303,7 +332,7 @@ export function AssistantScene() {
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               {artifact.type === "markdown" || artifact.type === "text" ? (
-                <div className="text-sm leading-relaxed whitespace-pre-wrap">{artifact.content}</div>
+                preview && <EditorContent editor={preview} className="note-editor-scroll min-h-0 h-full" />
               ) : (
                 <pre className="text-muted-foreground font-mono text-xs whitespace-pre-wrap">{artifact.content}</pre>
               )}

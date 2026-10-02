@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { Loader2, Plus, Search } from "lucide-react";
 import type { UseMutationResult } from "@tanstack/react-query";
-import { NewSessionDialog } from "./new-session-dialog";
+import { NewDirectoryDialog } from "../directories/new-directory-dialog";
 import { useSessionList, groupSessionsByDirectory } from "./use-session-list";
-import type { SessionDirectoryGroup } from "./use-session-list";
+import type { CodeSession, SessionDirectoryGroup } from "./use-session-list";
 import { useCodeDirectories } from "../directories/use-code-directories";
 import type { CodeDirectory } from "../directories/use-code-directories";
 import { Button } from "@/components/ui/button";
@@ -29,9 +30,11 @@ function relativeTime(updatedAt: string) {
 function DirectoryGroupHeader({
   group,
   rename,
+  create,
 }: {
   group: SessionDirectoryGroup;
   rename: UseMutationResult<CodeDirectory, Error, { id: string; displayName: string }>;
+  create: UseMutationResult<CodeSession, Error, string>;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
@@ -68,14 +71,26 @@ function DirectoryGroupHeader({
 
   return (
     <div
-      className="text-muted-foreground/70 px-3 pb-1 pt-3 text-[11px] font-semibold"
+      className="group/header text-muted-foreground/70 flex items-center justify-between gap-1 px-3 pb-1 pt-3 text-[11px] font-semibold"
       title={`${group.cwd} — double-click to rename`}
       onDoubleClick={() => {
         setValue(group.label);
         setEditing(true);
       }}
     >
-      {group.label}
+      <span className="truncate">{group.label}</span>
+      <button
+        className="text-muted-foreground/50 hover:bg-accent hover:text-foreground flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover/header:opacity-100 focus-visible:opacity-100"
+        title="New session in this directory"
+        disabled={create.isPending}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (group.id) create.mutate(group.id);
+        }}
+        onDoubleClick={(e) => e.stopPropagation()}
+      >
+        <Plus size={12} aria-hidden="true" />
+      </button>
     </div>
   );
 }
@@ -83,7 +98,8 @@ function DirectoryGroupHeader({
 export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps) {
   const { sessions, create, remove } = useSessionList(onSelect);
   const { directories, renameDirectory } = useCodeDirectories();
-  const [newSessionOpen, setNewSessionOpen] = useState(false);
+  const [newDirOpen, setNewDirOpen] = useState(false);
+  const navigate = useNavigate();
 
   const directoryGroups = groupSessionsByDirectory(sessions.data ?? [], directories.data ?? []);
 
@@ -94,7 +110,7 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
         <div className="flex gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" onClick={() => setNewSessionOpen(true)}>
+              <Button variant="ghost" size="icon-sm" onClick={() => setNewDirOpen(true)}>
                 <Plus />
               </Button>
             </TooltipTrigger>
@@ -119,7 +135,7 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
         )}
         {directoryGroups.map((group) => (
           <div key={group.id ?? "none"}>
-            <DirectoryGroupHeader group={group} rename={renameDirectory} />
+            <DirectoryGroupHeader group={group} rename={renameDirectory} create={create} />
             {group.sessions.map((session) => (
               <div
                 key={session.id}
@@ -142,7 +158,10 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
                   title="Delete session"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (window.confirm(`Delete "${session.title}"?`)) remove.mutate(session.id);
+                    if (window.confirm(`Delete "${session.title}"?`)) {
+                      if (session.id === selectedId) navigate("/apps/code");
+                      remove.mutate(session.id);
+                    }
                   }}
                 >
                   ×
@@ -165,7 +184,13 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
         </Button>
       </div>
 
-      <NewSessionDialog open={newSessionOpen} onOpenChange={setNewSessionOpen} create={create} />
+      <NewDirectoryDialog
+        open={newDirOpen}
+        onOpenChange={setNewDirOpen}
+        title="New session"
+        submitLabel="Create session"
+        onCreated={(dir) => create.mutate(dir.id)}
+      />
     </aside>
   );
 }

@@ -12,6 +12,7 @@ interface ClientMessage {
   content?: string;
   connectionId?: string;
   model?: string;
+  thinkingLevel?: string;
 }
 
 function parseMessage(data: unknown): ClientMessage | null {
@@ -53,6 +54,10 @@ export function registerAssistantWs(app: Hono, upgradeWebSocket: UpgradeWebSocke
           const content = (msg.content ?? "").trim();
           const connectionId = msg.connectionId ?? "";
           const model = (msg.model ?? "").trim();
+          const thinkingLevel =
+            msg.thinkingLevel === "off" || msg.thinkingLevel === "low" || msg.thinkingLevel === "medium" || msg.thinkingLevel === "high"
+              ? msg.thinkingLevel
+              : null;
           if (!content || !connectionId || !model) {
             ws.send(JSON.stringify({ type: "error", message: "connection_and_model_required" }));
             return;
@@ -97,6 +102,7 @@ export function registerAssistantWs(app: Hono, upgradeWebSocket: UpgradeWebSocke
             .set({
               connectionId,
               model,
+              ...(thinkingLevel ? { thinkingLevel } : {}),
               updatedAt: now,
               ...(isFirstMessage ? { title: content.slice(0, 60) } : {}),
             })
@@ -126,6 +132,7 @@ export function registerAssistantWs(app: Hono, upgradeWebSocket: UpgradeWebSocke
               })),
               userContent: content,
               organizationId,
+              thinkingLevel: thinkingLevel ?? undefined,
             },
             emit,
           );

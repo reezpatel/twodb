@@ -9,6 +9,11 @@ import { OrgPickerPage } from "./routes/orgs/org-picker";
 import { HomePage } from "./routes/home/home";
 import { AppPage } from "./routes/apps/app-page";
 import { CodeScene } from "./routes/code/code-scene";
+import { ChatPanel } from "./routes/code/chat/chat-panel";
+import { ChatConversation } from "./routes/code/chat/chat-conversation";
+import { TerminalScreen } from "./routes/code/chat/screens/terminal-screen";
+import { CheckpointsScreen } from "./routes/code/chat/screens/checkpoints-screen";
+import { ChangesScreen } from "./routes/code/chat/screens/changes-screen";
 import { SettingsLayout } from "./routes/settings/settings-layout";
 import { GeneralSection } from "./routes/settings/general/general";
 import { AdministratorSection } from "./routes/settings/administrator/administrator";
@@ -19,6 +24,7 @@ import { AgentsSection } from "./routes/settings/llm/agents/agents";
 import { MemoriesSection } from "./routes/settings/llm/memories/memories";
 import { InstructionsSection } from "./routes/settings/llm/instructions/instructions";
 import { RunnersSection } from "./routes/settings/runners/runners";
+import { CodeSection } from "./routes/settings/code/code";
 import { StorageSection } from "./routes/settings/storage/storage";
 import { FilesScene } from "./routes/files/files-scene";
 import { AssistantScene } from "./routes/assistant/assistant-scene";
@@ -72,11 +78,28 @@ export const router = createBrowserRouter([
             ],
           },
           { path: "runners", Component: RunnersSection },
+          { path: "code", Component: CodeSection },
           { path: "storage", Component: StorageSection },
         ],
       },
-      { path: "/apps/code", Component: CodeScene },
+      {
+        path: "/apps/code",
+        Component: CodeScene,
+        children: [
+          {
+            path: ":sessionId",
+            Component: ChatPanel,
+            children: [
+              { index: true, Component: ChatConversation },
+              { path: "terminal", Component: TerminalScreen },
+              { path: "checkpoints", Component: CheckpointsScreen },
+              { path: "changes", Component: ChangesScreen },
+            ],
+          },
+        ],
+      },
       { path: "/apps/assistant", Component: AssistantScene },
+      { path: "/apps/assistant/:threadId", Component: AssistantScene },
       { path: "/apps/overview", Component: OverviewScene },
       { path: "/apps/email", Component: EmailScene },
       { path: "/apps/calendar", Component: CalendarScene },

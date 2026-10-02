@@ -38,6 +38,7 @@
 
 @theme inline {
   --font-sans: "Outfit Variable", "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -409,4 +410,14 @@
 }
 .tw-tnum {
   font-variant-numeric: tabular-nums;
+}
+
+/* Chat composer (tiptap) — root and chip styling live in use-composer/paste-chip
+   class strings; only child/pseudo selectors need real CSS. */
+.cp-composer p {
+  @apply m-0 text-xs tracking-wide;
+}
+.cp-composer p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply text-muted-foreground float-left h-0 pointer-events-none;
 }
