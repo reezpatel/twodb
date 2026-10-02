@@ -1,5 +1,6 @@
 import os from "node:os";
 import fs from "node:fs";
+import { dirname } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
@@ -17,6 +18,21 @@ if (!key) {
 }
 
 const terms = new Map<string, pty.IPty>();
+
+// systemd units get a minimal PATH (/usr/bin:/bin) that on NixOS lacks node,
+// git and coreutils — widen it so execs and terminals can resolve tools.
+function spawnEnv(): Record<string, string> {
+  const path = [
+    dirname(process.execPath),
+    "/run/current-system/sw/bin",
+    "/usr/local/bin",
+    "/opt/homebrew/bin",
+    process.env.PATH ?? "",
+  ]
+    .filter(Boolean)
+    .join(":");
+  return { ...process.env, PATH: path } as Record<string, string>;
+}
 let ws: WebSocket | null = null;
 let backoff = 1000;
 
@@ -45,7 +61,7 @@ function handleExec(execId: string, command: string) {
   const isWin = process.platform === "win32";
   const child = spawn(isWin ? "cmd" : "/bin/sh", isWin ? ["/c", command] : ["-c", command], {
     cwd: os.homedir(),
-    env: process.env,
+    env: spawnEnv(),
   });
 
   const timer = setTimeout(() => child.kill("SIGKILL"), 120_000);
@@ -77,19 +93,13 @@ function handle(msg: ServerMessage) {
       const tmux = hasTmux && typeof msg.tmuxName === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(msg.tmuxName);
       // login shell: profile files re-establish PATH inside the pane, which matters
       // when the tmux server predates the runner and dropped its environment
-      const shell =
-        (process.env.SHELL && fs.existsSync(process.env.SHELL) && process.env.SHELL) ||
-        (fs.existsSync("/bin/bash") && "/bin/bash") ||
-        "/bin/sh";
-      const term = pty.spawn(
-        tmux ? "tmux" : shell,
-        tmux ? ["new-session", "-A", "-s", msg.tmuxName!, "-c", cwd, `${shell} -l`] : ["-l"],
-        {
+      const shell = (process.env.SHELL && fs.existsSync(process.env.SHELL) && process.env.SHELL) || (fs.existsSync("/bin/bash") && "/bin/bash") || "/bin/sh";
+      const term = pty.spawn(tmux ? "tmux" : shell, tmux ? ["new-session", "-A", "-s", msg.tmuxName!, "-c", cwd, `${shell} -l`] : ["-l"], {
         name: "xterm-256color",
         cols: msg.cols ?? 80,
         rows: msg.rows ?? 24,
         cwd,
-        env: process.env as Record<string, string>,
+        env: spawnEnv(),
       });
       terms.set(msg.sessionId, term);
       term.onData((data) => send({ type: "output", sessionId: msg.sessionId, data }));

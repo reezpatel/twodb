@@ -18,7 +18,9 @@ export const runnerRoutes = new Hono()
   })
 
   // POSIX runners exec via /bin/sh -c; the path travels base64-encoded so any
-  // characters survive the shell round-trip. Node is guaranteed on runners.
+  // characters survive the shell round-trip. Node is guaranteed on runners:
+  // the runner itself runs on node (the nix package wraps nodejs, the image is
+  // node:22-slim) and prepends its runtime to the exec PATH.
   .get("/runners/:id/fs", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.json({ error: "unauthorized" }, 401);
