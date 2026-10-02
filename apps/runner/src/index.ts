@@ -75,7 +75,16 @@ function handle(msg: ServerMessage) {
     case "open": {
       const cwd = msg.cwd && fs.existsSync(msg.cwd) ? msg.cwd : os.homedir();
       const tmux = hasTmux && typeof msg.tmuxName === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(msg.tmuxName);
-      const term = pty.spawn(tmux ? "tmux" : (process.env.SHELL ?? "bash"), tmux ? ["new-session", "-A", "-s", msg.tmuxName!, "-c", cwd] : [], {
+      // login shell: profile files re-establish PATH inside the pane, which matters
+      // when the tmux server predates the runner and dropped its environment
+      const shell =
+        (process.env.SHELL && fs.existsSync(process.env.SHELL) && process.env.SHELL) ||
+        (fs.existsSync("/bin/bash") && "/bin/bash") ||
+        "/bin/sh";
+      const term = pty.spawn(
+        tmux ? "tmux" : shell,
+        tmux ? ["new-session", "-A", "-s", msg.tmuxName!, "-c", cwd, `${shell} -l`] : ["-l"],
+        {
         name: "xterm-256color",
         cols: msg.cols ?? 80,
         rows: msg.rows ?? 24,
