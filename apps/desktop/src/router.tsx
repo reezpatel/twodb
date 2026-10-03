@@ -108,6 +108,8 @@ export const router = createBrowserRouter([
       { path: "/apps/automations", Component: AutomationsScene },
       { path: "/apps/showcase", Component: ShowcaseScene },
       { path: "/apps/notes", Component: NotesScene },
+      { path: "/apps/notes/:groupId", Component: NotesScene },
+      { path: "/apps/notes/:groupId/:noteId", Component: NotesScene },
       { path: "/apps/files", Component: FilesScene },
       { path: "/apps/:appId", Component: AppPage },
     ],

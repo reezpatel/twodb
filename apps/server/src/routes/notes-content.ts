@@ -57,7 +57,14 @@ function parseOptions(raw: unknown): NotePropertyOption[] | undefined {
     const value = (entry as { value?: unknown }).value;
     if (typeof value !== "string" || value.trim() === "") continue;
     const color = (entry as { color?: unknown }).color;
-    options.push({ value: value.trim(), ...(typeof color === "string" ? { color } : {}) });
+    const label = (entry as { label?: unknown }).label;
+    const id = (entry as { id?: unknown }).id;
+    options.push({
+      id: typeof id === "string" && id ? id : crypto.randomUUID(),
+      value: value.trim(),
+      ...(typeof color === "string" ? { color } : {}),
+      ...(typeof label === "string" && label ? { label } : {}),
+    });
   }
   return options;
 }
@@ -79,12 +86,28 @@ function validateProps(columns: NotePropertyDef[], props: unknown): { ok: true; 
       case "text":
       case "url":
       case "select":
+      case "status":
+      case "phone":
+      case "email":
+      case "id":
+      case "place":
+      case "person":
+      case "files & media":
         if (typeof value !== "string") return { ok: false, error: `invalid_value:${key}` };
-        if (col.type === "select" && (col.options?.length ?? 0) > 0 && !col.options!.some((o) => o.value === value)) {
+        if ((col.type === "select" || col.type === "status") && (col.options?.length ?? 0) > 0 && !col.options!.some((o) => o.value === value)) {
           return { ok: false, error: `invalid_option:${key}` };
         }
         values[key] = value;
         break;
+      case "multiselect": {
+        if (!Array.isArray(value)) return { ok: false, error: `invalid_value:${key}` };
+        const items = value as unknown[];
+        if ((col.options?.length ?? 0) > 0 && !items.every((v) => typeof v === "string" && col.options!.some((o) => o.value === v))) {
+          return { ok: false, error: `invalid_option:${key}` };
+        }
+        values[key] = value;
+        break;
+      }
       case "number":
         if (typeof value !== "number" || !Number.isFinite(value)) return { ok: false, error: `invalid_value:${key}` };
         values[key] = value;
@@ -203,7 +226,7 @@ export const notesContentRoutes = new Hono()
     if (typeof type !== "string" || !PROPERTY_TYPES.includes(type as NotePropertyType)) return c.json({ error: "invalid_type" }, 400);
 
     const options = parseOptions(body?.options);
-    if (type === "select" && options !== undefined && new Set(options.map((o) => o.value)).size !== options.length) {
+    if ((type === "select" || type === "multiselect") && options !== undefined && new Set(options.map((o) => o.value)).size !== options.length) {
       return c.json({ error: "duplicate_options" }, 400);
     }
 
@@ -211,7 +234,7 @@ export const notesContentRoutes = new Hono()
       id: newPropertyId(),
       name,
       type: type as NotePropertyType,
-      ...(type === "select" ? { options: options ?? [] } : {}),
+      ...(type === "select" || type === "multiselect" ? { options: options ?? [] } : {}),
       ...(body?.validation !== undefined && typeof body.validation === "object" && body.validation !== null
         ? { validation: body.validation as Record<string, unknown> }
         : {}),
@@ -243,18 +266,32 @@ export const notesContentRoutes = new Hono()
       if (typeof body.type !== "string" || !PROPERTY_TYPES.includes(body.type as NotePropertyType)) return c.json({ error: "invalid_type" }, 400);
       const to = body.type as NotePropertyType;
       if (to !== def.type) {
+        console.log("[PATCH /properties/:id] type change", { id: propId, from: def.type, to, currentOptions: def.options?.length ?? 0 });
         try {
           await changePropertyColumnType(db, group.id, propId, def.type, to);
-        } catch {
-          return c.json({ error: "type_change_failed" }, 400);
+          console.log("[PATCH /properties/:id] type change OK");
+        } catch (err) {
+          const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+          console.error("[PATCH /properties/:id] type change FAILED", { id: propId, from: def.type, to, err: detail });
+          return c.json({ error: `type_change_failed:${detail}` }, 400);
         }
         def.type = to;
-        if (to === "select" && !def.options) def.options = [];
-        if (to !== "select") delete def.options;
+        // Seed status columns with the 3 canonical statuses when they have none.
+        if ((to === "select" || to === "multiselect" || to === "status") && !def.options) {
+          def.options =
+            to === "status"
+              ? [
+                  { id: `o_${crypto.randomUUID().slice(0, 8)}`, value: "To Do", label: "To Do" },
+                  { id: `o_${crypto.randomUUID().slice(0, 8)}`, value: "In Progress", label: "In Progress" },
+                  { id: `o_${crypto.randomUUID().slice(0, 8)}`, value: "Completed", label: "Completed" },
+                ]
+              : [];
+        }
+        if (to !== "select" && to !== "multiselect" && to !== "status") delete def.options;
       }
     }
     if (body?.options !== undefined) {
-      if (def.type !== "select") return c.json({ error: "options_need_select_type" }, 400);
+      if (def.type !== "select" && def.type !== "multiselect") return c.json({ error: "options_need_select_type" }, 400);
       const options = parseOptions(body.options) ?? [];
       if (new Set(options.map((o) => o.value)).size !== options.length) return c.json({ error: "duplicate_options" }, 400);
       def.options = options;

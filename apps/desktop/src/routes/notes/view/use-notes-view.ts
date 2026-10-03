@@ -1,16 +1,49 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../lib/api";
+import { api } from "@/lib/api";
 
-export const NOTE_PROPERTY_TYPES = ["text", "number", "select", "date", "checkbox", "url"] as const;
+export const NOTE_PROPERTY_TYPES = [
+  "text",
+  "number",
+  "select",
+  "multiselect",
+  "status",
+  "date",
+  "person",
+  "files & media",
+  "checkbox",
+  "url",
+  "phone",
+  "email",
+  "id",
+  "place",
+] as const;
 export type NotePropertyType = (typeof NOTE_PROPERTY_TYPES)[number];
+
+/** Subset exposed in the "Type" select / "Change type" submenu. The full
+ * NotePropertyType list is supported by validation + cell registry; these are
+ * just the ones the user picks from directly. */
+export const SELECTABLE_PROPERTY_TYPES = [
+  "text",
+  "number",
+  "select",
+  "multiselect",
+  "status",
+  "date",
+  "checkbox",
+  "url",
+] as const satisfies readonly NotePropertyType[];
 
 export const NOTE_VIEW_TYPES = ["table", "list", "kanban"] as const;
 export type NoteViewType = (typeof NOTE_VIEW_TYPES)[number];
 
 export interface NotePropertyOption {
+  id: string;
   value: string;
+  label?: string;
   color?: string;
+  /** Group label (e.g. "Backlog", "Active", "Done") for status columns. */
+  group?: string;
 }
 
 export interface NoteProperty {
@@ -90,11 +123,27 @@ export function useNotesView(groupId: string | null) {
     onSuccess: invalidate,
   });
 
+  const DEFAULT_OPTIONS_BY_TYPE: Partial<Record<NotePropertyType, string[]>> = {
+    status: ["To Do", "In Progress", "Completed"],
+  };
+
   const addProperty = useMutation({
     mutationFn: ({ name, type, options }: { name: string; type: NotePropertyType; options?: string[] }) =>
       api<NoteProperty>(`/api/notes/groups/${groupId}/properties`, {
         method: "POST",
-        body: JSON.stringify({ name, type, ...(type === "select" ? { options: (options ?? []).map((v) => ({ value: v })) } : {}) }),
+        body: JSON.stringify({
+          name,
+          type,
+          ...(type === "select" || type === "multiselect" || type === "status"
+            ? {
+                options: (options ?? DEFAULT_OPTIONS_BY_TYPE[type] ?? []).map((v) => ({
+                  id: crypto.randomUUID(),
+                  value: v,
+                  label: v,
+                })),
+              }
+            : {}),
+        }),
       }),
     onSuccess: invalidate,
   });
@@ -113,6 +162,15 @@ export function useNotesView(groupId: string | null) {
 
   const deleteProperty = useMutation({
     mutationFn: (id: string) => api(`/api/notes/groups/${groupId}/properties/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+
+  const setPropertyOptions = useMutation({
+    mutationFn: ({ id, options }: { id: string; options: NotePropertyOption[] }) =>
+      api(`/api/notes/groups/${groupId}/properties/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ options }),
+      }),
     onSuccess: invalidate,
   });
 
@@ -150,6 +208,7 @@ export function useNotesView(groupId: string | null) {
     renameProperty,
     setPropertyType,
     deleteProperty,
+    setPropertyOptions,
     updateView,
     addView,
     deleteView,

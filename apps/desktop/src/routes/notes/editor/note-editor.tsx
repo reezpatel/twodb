@@ -1,11 +1,12 @@
 import { Trash2 } from "lucide-react";
 import { EditorContent } from "@tiptap/react";
-import type { NoteProperty, NoteRecord, NotesViewHook } from "./use-notes-view";
+import type { NoteProperty, NoteRecord, NotesViewHook } from "../view/use-notes-view";
 import { useNoteEditor } from "./use-note-editor";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
+/** Inline editor — kept for the note-editor property sheet where floating UI isn't appropriate. */
 export function PropertyCell({ value, prop, onCommit }: { value: unknown; prop: NoteProperty; onCommit: (value: unknown) => void }) {
   if (prop.type === "checkbox") {
     return <Checkbox checked={Boolean(value)} onCheckedChange={(checked) => onCommit(checked)} />;
@@ -13,7 +14,7 @@ export function PropertyCell({ value, prop, onCommit }: { value: unknown; prop: 
   if (prop.type === "select") {
     return (
       <select
-        className="border-input bg-background focus:ring-ring/20 h-6 w-full cursor-pointer rounded border px-1 text-xs focus:outline-none"
+        className="border-input bg-background focus:ring-ring/20 h-6 w-full cursor-pointer border px-1 text-xs focus:outline-none"
         value={typeof value === "string" ? value : ""}
         onChange={(e) => onCommit(e.target.value === "" ? null : e.target.value)}
       >

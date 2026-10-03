@@ -5,9 +5,17 @@ const PROPERTY_SQL: Record<NotePropertyType, string> = {
   text: "text",
   number: "double precision",
   select: "text",
+  multiselect: "text[]",
+  status: "text",
   date: "timestamp",
+  person: "text",
+  "files & media": "text",
   checkbox: "boolean",
   url: "text",
+  phone: "text",
+  email: "text",
+  id: "text",
+  place: "text",
 };
 
 export const PROPERTY_TYPES = Object.keys(PROPERTY_SQL) as NotePropertyType[];
@@ -61,13 +69,41 @@ export async function dropPropertyColumn(db: Kysely<Database>, groupId: string, 
 
 const NUMBER_TEXT_RE = "^[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?$";
 
-function castExpr(col: string, from: NotePropertyType, to: NotePropertyType): string {
+function castExpr(col: string, from: NotePropertyType, to: NotePropertyType, actualFromSqlType?: string): string {
   const c = `"${col}"`;
   if (from === to) return c;
+
+  // Going FROM multiselect → single-value type. Branch on the actual source type
+  // so we work for legacy columns where multiselect was a plain `text` (no
+  // array_to_string) and for new columns where multiselect is `text[]`.
+  if (from === "multiselect") {
+    const isArray = actualFromSqlType === "text[]" || actualFromSqlType === "ARRAY" || actualFromSqlType?.startsWith("text[") === true;
+    if (isArray) {
+      if (to === "checkbox") return `(array_length(${c}) > 0)`;
+      if (to === "number") return `NULLIF(array_to_string(${c}, ','), '')::double precision`;
+      if (to === "date") return `NULLIF(array_to_string(${c}, ','), '')::timestamp`;
+      return `NULLIF(array_to_string(${c}, ','), '')`;
+    }
+    // Legacy text column: identity cast.
+    return `${c}::text`;
+  }
+
+  // Going TO multiselect (text[]) from a single-value type: wrap in a one-element array.
+  if (to === "multiselect") {
+    return `ARRAY[${c}::text]`;
+  }
+
   switch (to) {
     case "text":
     case "url":
     case "select":
+    case "status":
+    case "person":
+    case "files & media":
+    case "phone":
+    case "email":
+    case "id":
+    case "place":
       return `${c}::text`;
     case "number":
       if (from === "checkbox") return `(CASE WHEN ${c} THEN 1 WHEN NOT ${c} THEN 0 ELSE NULL END)`;
@@ -85,9 +121,30 @@ function castExpr(col: string, from: NotePropertyType, to: NotePropertyType): st
 }
 
 export async function changePropertyColumnType(db: Kysely<Database>, groupId: string, propertyId: string, from: NotePropertyType, to: NotePropertyType) {
-  await sql`ALTER TABLE ${table(groupId)} ALTER COLUMN ${ident(propertyId)} TYPE ${sql.raw(PROPERTY_SQL[to])} USING ${sql.raw(castExpr(propertyId, from, to))}`.execute(
-    db,
-  );
+  // Look up the actual SQL column type so the USING expression matches the
+  // real source data. This handles legacy columns where multiselect was a plain
+  // `text` column rather than `text[]` (no array_to_string is available).
+  const infoRows = await sql<{ data_type: string }>`
+    SELECT data_type FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = ${notesTableName(groupId)}
+      AND column_name = ${propertyId}
+  `.execute(db);
+  const actualFromSqlType = infoRows.rows[0]?.data_type ?? PROPERTY_SQL[from];
+  const expr = castExpr(propertyId, from, to, actualFromSqlType);
+
+  const sqlText = `ALTER TABLE ${table(groupId)} ALTER COLUMN ${ident(propertyId)} TYPE ${sql.raw(PROPERTY_SQL[to])} USING ${sql.raw(expr)}`;
+  console.log("[changePropertyColumnType]", {
+    groupId,
+    propertyId,
+    from,
+    to,
+    actualFromSqlType,
+    propertySql: PROPERTY_SQL[to],
+    expr,
+    sqlText,
+  });
+  await sql`ALTER TABLE ${table(groupId)} ALTER COLUMN ${ident(propertyId)} TYPE ${sql.raw(PROPERTY_SQL[to])} USING ${sql.raw(expr)}`.execute(db);
 }
 
 export interface NoteRow {

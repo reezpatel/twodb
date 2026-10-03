@@ -393,11 +393,16 @@ export type NoteKind = "section" | "folder" | "notes" | "checklist" | "table" | 
 
 export type NoteGroupType = "notes" | "checklist" | "table" | "sheet" | "canvas";
 
-export type NotePropertyType = "text" | "number" | "select" | "date" | "checkbox" | "url";
+export type NotePropertyType =
+  "text" | "number" | "select" | "multiselect" | "status" | "date" | "person" | "files & media" | "checkbox" | "url" | "phone" | "email" | "id" | "place";
 
 export interface NotePropertyOption {
+  id: string;
   value: string;
+  label?: string;
   color?: string;
+  /** Group label (e.g. "Backlog", "Active", "Done") for status columns. */
+  group?: string;
 }
 
 export interface NotePropertyDef {
@@ -416,6 +421,8 @@ export interface NoteViewDef {
   type: NoteViewType;
   groupBy?: string | null;
   sorts?: { property: string; direction: "asc" | "desc" }[];
+  /** Persisted column widths, keyed by column id. Restored after refresh. */
+  widths?: Record<string, number>;
 }
 
 export interface NoteGroupMetadata {

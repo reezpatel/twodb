@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 
@@ -42,9 +41,16 @@ export interface NotesTree {
 
 export type ReorderKind = "section" | "folder" | "group";
 
-export function useNotesScene() {
+export interface UseNotesSceneOpts {
+  /** Currently selected group id, owned by the caller (e.g. URL params). */
+  selectedGroupId?: string | null;
+  /** Notifies the caller of selection changes (e.g. URL setter). */
+  onSelectGroupId?: (id: string | null) => void;
+}
+
+export function useNotesScene(opts: UseNotesSceneOpts = {}) {
   const queryClient = useQueryClient();
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const { selectedGroupId = null, onSelectGroupId = () => {} } = opts;
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ["notes", "tree"] });
 
@@ -101,7 +107,7 @@ export function useNotesScene() {
       }),
     onSuccess: (row) => {
       invalidate();
-      setSelectedGroupId(row.id);
+      onSelectGroupId(row.id);
     },
   });
 
@@ -111,8 +117,7 @@ export function useNotesScene() {
   });
 
   const moveGroup = useMutation({
-    mutationFn: ({ id, folderId }: { id: string; folderId: string }) =>
-      api(`/api/notes/groups/${id}`, { method: "PATCH", body: JSON.stringify({ folderId }) }),
+    mutationFn: ({ id, folderId }: { id: string; folderId: string }) => api(`/api/notes/groups/${id}`, { method: "PATCH", body: JSON.stringify({ folderId }) }),
     onSuccess: invalidate,
   });
 
@@ -140,7 +145,7 @@ export function useNotesScene() {
   return {
     tree,
     selectedGroupId,
-    setSelectedGroupId,
+    setSelectedGroupId: onSelectGroupId,
     createSection,
     renameSection,
     deleteSection,

@@ -3,7 +3,7 @@ import type { Editor, JSONContent } from "@tiptap/core";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
-import type { NoteRecord, NotesViewHook } from "./use-notes-view";
+import type { NoteRecord, NotesViewHook } from "../view/use-notes-view";
 import { ResizableImage } from "./resizable-image";
 import { useSlashCommand } from "./slash-command";
 
