@@ -10,6 +10,7 @@ import { up as assistantThreadAgent } from "./0008-assistant-thread-agent";
 import { up as mergeAssistant } from "./0009-merge-assistant";
 import { up as codeSessionPlan } from "./0010-code-session-plan";
 import { up as mediaAsset } from "./0011-media-asset";
+import { up as mcpServer } from "./0012-mcp-server";
 
 // Keys sort lexicographically — prefix new migrations with the next number.
 export const migrations: Record<string, Migration> = {
@@ -24,4 +25,5 @@ export const migrations: Record<string, Migration> = {
   "0009_merge_assistant": { up: mergeAssistant },
   "0010_code_session_plan": { up: codeSessionPlan },
   "0011_media_asset": { up: mediaAsset },
+  "0012_mcp_server": { up: mcpServer },
 };
