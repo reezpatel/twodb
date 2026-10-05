@@ -176,6 +176,8 @@ export interface CodeSessionTable {
   connectionId: string | null;
   model: string | null;
   codeDirectoryId: string | null;
+  /** Skills tagged "default" or any of these load into the system prompt. */
+  tags: string[];
   type: CodeSessionType;
   parentSessionId: string | null;
   agentId: string | null;
@@ -183,6 +185,8 @@ export interface CodeSessionTable {
   /** off | low | medium | high — null means medium. */
   thinkingLevel: string | null;
   runtimeState: ColumnType<Record<string, unknown> | null, string | null, string | null>;
+  /** get_plan/update_plan state — { steps: [{ description, status }] }. */
+  plan: ColumnType<Record<string, unknown> | null, string | null, string | null>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -237,12 +241,15 @@ export interface InstructionTable {
   updatedAt: Date;
 }
 
+export type MemoryScope = "workspace" | "project" | "session";
+
 export interface MemoryTable {
   id: string;
   organizationId: string;
   codeDirectoryId: string | null;
   scopeId: string | null;
-  tags: string[];
+  /** workspace | project | session */
+  scope: MemoryScope;
   content: string;
   createdAt: Date;
   updatedAt: Date;
@@ -363,6 +370,10 @@ export interface AssistantThreadTable {
   title: string;
   connectionId: string | null;
   model: string | null;
+  /** Bound agent persona — its system prompt applies to this thread. */
+  agentId: string | null;
+  /** Tags joined into skill/instruction matching. */
+  tags: string[];
   /** off | low | medium | high — null means medium. */
   thinkingLevel: string | null;
   createdAt: Date;
@@ -378,12 +389,28 @@ export interface AssistantMessageTable {
   createdAt: Date;
 }
 
-export interface AssistantArtifactTable {
+export type CodeSessionArtifactType = "markdown" | "html" | "code" | "text";
+
+export interface MediaAssetTable {
   id: string;
-  threadId: string;
+  organizationId: string;
+  sessionId: string | null;
+  backendId: string;
+  /** Full object path inside the backend, including the destination prefix. */
+  path: string;
+  filename: string;
+  extension: string;
+  contentType: string | null;
+  size: number;
+  createdAt: Date;
+}
+
+export interface CodeSessionArtifactTable {
+  id: string;
+  sessionId: string;
   organizationId: string;
   title: string;
-  type: "markdown" | "html" | "code" | "text";
+  type: CodeSessionArtifactType;
   content: string;
   createdAt: Date;
   updatedAt: Date;
@@ -523,9 +550,8 @@ export interface Database {
   storage_backend: StorageBackendTable;
   storage_bucket: StorageBucketTable;
   storage_entry: StorageEntryTable;
-  assistant_thread: AssistantThreadTable;
-  assistant_message: AssistantMessageTable;
-  assistant_artifact: AssistantArtifactTable;
+  code_session_artifact: CodeSessionArtifactTable;
+  media_asset: MediaAssetTable;
   note_node: NoteNodeTable;
   note_item: NoteItemTable;
   server_setting: ServerSettingTable;

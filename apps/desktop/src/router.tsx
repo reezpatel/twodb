@@ -14,6 +14,7 @@ import { ChatConversation } from "./routes/code/chat/chat-conversation";
 import { TerminalScreen } from "./routes/code/chat/screens/terminal-screen";
 import { CheckpointsScreen } from "./routes/code/chat/screens/checkpoints-screen";
 import { ChangesScreen } from "./routes/code/chat/screens/changes-screen";
+import { CanvasScreen } from "./routes/code/chat/screens/canvas-screen";
 import { SettingsLayout } from "./routes/settings/settings-layout";
 import { GeneralSection } from "./routes/settings/general/general";
 import { AdministratorSection } from "./routes/settings/administrator/administrator";
@@ -27,7 +28,6 @@ import { RunnersSection } from "./routes/settings/runners/runners";
 import { CodeSection } from "./routes/settings/code/code";
 import { StorageSection } from "./routes/settings/storage/storage";
 import { FilesScene } from "./routes/files/files-scene";
-import { AssistantScene } from "./routes/assistant/assistant-scene";
 import { NotesScene } from "./routes/notes/notes-scene";
 import { EmailScene } from "./routes/email/email-scene";
 import { ChatScene } from "./routes/chat/chat-scene";
@@ -94,12 +94,11 @@ export const router = createBrowserRouter([
               { path: "terminal", Component: TerminalScreen },
               { path: "checkpoints", Component: CheckpointsScreen },
               { path: "changes", Component: ChangesScreen },
+              { path: "canvas", Component: CanvasScreen },
             ],
           },
         ],
       },
-      { path: "/apps/assistant", Component: AssistantScene },
-      { path: "/apps/assistant/:threadId", Component: AssistantScene },
       { path: "/apps/overview", Component: OverviewScene },
       { path: "/apps/email", Component: EmailScene },
       { path: "/apps/calendar", Component: CalendarScene },

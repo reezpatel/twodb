@@ -39,7 +39,9 @@ export interface ResourceRow {
   id: string;
   name: ReactNode;
   subtitle?: ReactNode;
-  tags: string[];
+  tags?: string[];
+  /** When set, renders a single scope badge instead of tags (memories). */
+  scope?: string;
   codeDirectoryId: string | null;
 }
 
@@ -55,13 +57,14 @@ export function ResourceTable({
   onDelete: (id: string) => void;
   deletePending: boolean;
 }) {
+  const scopeMode = rows.some((row) => row.scope !== undefined);
   return (
     <div className="rounded-xl border">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead className="pl-3.5">Name</TableHead>
-            <TableHead className="pr-3.5">Tags</TableHead>
+            <TableHead className="pr-3.5">{scopeMode ? "Scope" : "Tags"}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -114,12 +117,18 @@ export function ResourceTable({
               </TableCell>
               <TableCell className="pr-3.5">
                 <div className="flex max-w-64 flex-wrap gap-1">
-                  {row.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="text-[10px]">
-                      {tag}
+                  {row.scope ? (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {row.scope}
                     </Badge>
-                  ))}
-                  {row.tags.length === 0 && <span className="text-muted-foreground text-xs">—</span>}
+                  ) : (
+                    (row.tags ?? []).map((tag) => (
+                      <Badge key={tag} variant="secondary" className="text-[10px]">
+                        {tag}
+                      </Badge>
+                    ))
+                  )}
+                  {!row.scope && (row.tags ?? []).length === 0 && <span className="text-muted-foreground text-xs">—</span>}
                 </div>
               </TableCell>
             </TableRow>

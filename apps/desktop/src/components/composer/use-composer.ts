@@ -6,7 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
 import Mention from "@tiptap/extension-mention";
 import PasteChip, { type PasteRef } from "./paste-chip";
-import { searchCommands } from "./composer-commands";
+import { searchCommands, type ComposerCommand } from "./composer-commands";
 import { searchFiles } from "./search-files";
 import { suggestionRenderer, type SuggestionItem } from "./suggestion-popup";
 
@@ -20,12 +20,16 @@ interface ComposerOptions {
   files: string[] | null;
   disabled: boolean;
   placeholder: string;
+  /** Slash-command palette — code chat passes its own list with /compact. */
+  commands?: ComposerCommand[];
   onDraft: (text: string) => void;
   /** Returns true when the message was dispatched — the composer clears itself. */
   onSend: (content: string) => boolean;
 }
 
-export function useComposer({ files, disabled, placeholder, onDraft, onSend }: ComposerOptions) {
+export function useComposer({ files, disabled, placeholder, commands, onDraft, onSend }: ComposerOptions) {
+  const commandsRef = useRef(commands);
+  commandsRef.current = commands;
   const filesRef = useRef(files);
   filesRef.current = files;
   const sendRef = useRef(onSend);
@@ -107,7 +111,8 @@ export function useComposer({ files, disabled, placeholder, onDraft, onSend }: C
           char: "/",
           pluginKey: commandMentionKey,
           startOfLine: true,
-          items: ({ query }) => searchCommands(query).map((c) => ({ id: c.id, label: c.label, hint: c.description, group: c.group }) satisfies SuggestionItem),
+          items: ({ query }) =>
+            searchCommands(query, commandsRef.current).map((c) => ({ id: c.id, label: c.label, hint: c.description, group: c.group }) satisfies SuggestionItem),
           render: () => suggestionRenderer(popupOpenRef),
         },
       }),

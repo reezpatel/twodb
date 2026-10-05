@@ -43,7 +43,9 @@ export function groupSessionsByDirectory(sessions: CodeSession[], directories: C
 
   const known = new Set(directories.map((dir) => dir.id));
   const unassigned = [...byDirectory.entries()].filter(([id]) => id === null || !known.has(id)).flatMap(([, items]) => items);
-  if (unassigned.length > 0) groups.push({ id: null, label: "No directory", sessions: unassigned });
+  // Always present — the Assistant group is the entry point for directory-less
+  // chats, even when empty (its hover + creates them).
+  groups.push({ id: null, label: "Assistant", sessions: unassigned });
 
   return groups;
 }
@@ -57,7 +59,7 @@ export function useSessionList(onCreated: (id: string) => void) {
   });
 
   const create = useMutation({
-    mutationFn: (codeDirectoryId: string) => api<CodeSession>("/api/code/sessions", { method: "POST", body: JSON.stringify({ codeDirectoryId }) }),
+    mutationFn: (codeDirectoryId: string | null) => api<CodeSession>("/api/code/sessions", { method: "POST", body: JSON.stringify({ codeDirectoryId }) }),
     onSuccess: (session) => {
       void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
       onCreated(session.id);

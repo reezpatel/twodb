@@ -34,7 +34,7 @@ function DirectoryGroupHeader({
 }: {
   group: SessionDirectoryGroup;
   rename: UseMutationResult<CodeDirectory, Error, { id: string; displayName: string }>;
-  create: UseMutationResult<CodeSession, Error, string>;
+  create: UseMutationResult<CodeSession, Error, string | null>;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
@@ -46,7 +46,25 @@ function DirectoryGroupHeader({
   };
 
   if (group.id === null) {
-    return <div className="text-muted-foreground/70 px-3 pb-1 pt-3 text-[11px] font-semibold">{group.label}</div>;
+    return (
+      <div
+        className="group/header text-muted-foreground/70 flex items-center justify-between gap-1 px-3 pb-1 pt-3 text-[11px] font-semibold"
+        title="Assistant chats — no working directory"
+      >
+        <span className="truncate">{group.label}</span>
+        <button
+          className="text-muted-foreground/50 hover:bg-accent hover:text-foreground flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover/header:opacity-100 focus-visible:opacity-100"
+          title="New assistant chat"
+          disabled={create.isPending}
+          onClick={(e) => {
+            e.stopPropagation();
+            create.mutate(null);
+          }}
+        >
+          <Plus size={12} aria-hidden="true" />
+        </button>
+      </div>
+    );
   }
 
   if (editing) {

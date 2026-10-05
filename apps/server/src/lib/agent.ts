@@ -8,10 +8,15 @@ import { ensureFreshTokens } from "./token-refresh";
 // back through onDelta while the caller (agent loop) owns the tool decisions.
 // ---------------------------------------------------------------------------
 
+/** Where a tool is offered: "code" sessions have a runner; "assistant" sessions run without one. */
+export type ToolScope = "code" | "assistant";
+
 export interface AgentTool {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
+  /** Chat flavors this tool is available in. */
+  scope: ToolScope[];
 }
 
 export interface AgentToolCall {
@@ -32,9 +37,26 @@ export interface AgentThinking {
  * History entries understood by the agent layer. "assistant" entries may carry
  * toolCalls in meta; "tool" entries carry the result for meta.toolCallId.
  */
+export interface AgentImageRef {
+  /** twodb://<backendId>/<mediaId> */
+  uri: string;
+  filename: string;
+  contentType: string;
+}
+
+export interface AgentImagePart {
+  filename: string;
+  contentType: string;
+  base64: string;
+}
+
 export interface AgentMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
+  /** Uploaded-asset references (persisted in message meta). */
+  images?: AgentImageRef[];
+  /** Resolved image bytes for vision-capable rounds — transient, never persisted. */
+  imageParts?: AgentImagePart[];
   meta?: {
     toolCalls?: AgentToolCall[];
     toolCallId?: string;
@@ -119,16 +141,25 @@ function anthropicMessages(messages: AgentMessage[]) {
       }
       out.push(blocks.length ? { role: "assistant", content: blocks } : { role: "assistant", content: m.content });
     } else if (m.role === "tool") {
-      out.push({
-        role: "user",
-        content: [
-          {
-            type: "tool_result",
-            tool_use_id: m.meta?.toolCallId ?? "",
-            content: m.content,
-          },
-        ],
+      // read_asset images ride inside the tool-result turn, before the
+      // tool_result block (Anthropic requires images to precede it).
+      const blocks: unknown[] = (m.imageParts ?? []).map((img) => ({
+        type: "image",
+        source: { type: "base64", media_type: img.contentType, data: img.base64 },
+      }));
+      blocks.push({
+        type: "tool_result",
+        tool_use_id: m.meta?.toolCallId ?? "",
+        content: m.content,
       });
+      out.push({ role: "user", content: blocks });
+    } else if (m.role === "user" && m.imageParts?.length) {
+      const blocks: unknown[] = m.imageParts.map((img) => ({
+        type: "image",
+        source: { type: "base64", media_type: img.contentType, data: img.base64 },
+      }));
+      if (m.content) blocks.push({ type: "text", text: m.content });
+      out.push({ role: "user", content: blocks });
     } else {
       out.push({ role: m.role, content: m.content });
     }
@@ -281,6 +312,14 @@ function openaiMessages(messages: AgentMessage[]) {
         tool_call_id: m.meta?.toolCallId ?? "",
         content: m.content,
       };
+    }
+    if (m.role === "user" && m.imageParts?.length) {
+      const parts: unknown[] = m.imageParts.map((img) => ({
+        type: "image_url",
+        image_url: { url: `data:${img.contentType};base64,${img.base64}` },
+      }));
+      if (m.content) parts.unshift({ type: "text", text: m.content });
+      return { role: "user", content: parts };
     }
     return { role: m.role, content: m.content };
   });
@@ -435,6 +474,13 @@ function responsesInput(messages: AgentMessage[]) {
         call_id: m.meta?.toolCallId ?? "",
         output: m.content,
       });
+    } else if (m.role === "user" && m.imageParts?.length) {
+      const parts: unknown[] = m.imageParts.map((img) => ({
+        type: "input_image",
+        image_url: `data:${img.contentType};base64,${img.base64}`,
+      }));
+      if (m.content) parts.unshift({ type: "input_text", text: m.content });
+      input.push({ role: "user", content: parts });
     } else {
       input.push({ role: m.role, content: m.content });
     }

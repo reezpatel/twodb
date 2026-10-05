@@ -1,12 +1,23 @@
 import { useState } from "react";
-import { Database, FolderOpen, HardDrive, Loader2, RefreshCw } from "lucide-react";
-import { useStorage, type StorageBackend } from "./use-storage";
+import { Database, FolderOpen, FolderTree, HardDrive, Loader2, RefreshCw } from "lucide-react";
+import { useStorage, type StorageBackend, type StorageDestinationDef } from "./use-storage";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
 function BackendForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: () => void }) {
@@ -186,6 +197,204 @@ function BackendRow({ backend }: { backend: StorageBackend }) {
   );
 }
 
+function DestinationDialog({
+  def,
+  existingBackendId,
+  existingPrefix,
+  onClose,
+}: {
+  def: StorageDestinationDef;
+  existingBackendId: string | null;
+  existingPrefix: string;
+  onClose: () => void;
+}) {
+  const { backends, destinations, saveDestination } = useStorage();
+  const [backendId, setBackendId] = useState(existingBackendId ?? "");
+  const [prefix, setPrefix] = useState(existingPrefix);
+  const [error, setError] = useState<string | null>(null);
+  const [danger, setDanger] = useState(false);
+
+  const enabledBackends = (backends.data ?? []).filter((b) => b.enabled);
+  const changed = Boolean(existingBackendId) && (backendId !== existingBackendId || prefix.trim().replace(/^\/+|\/+$/g, "") !== existingPrefix);
+
+  const save = async (confirmed: boolean) => {
+    setError(null);
+    // Changing a configured destination strands files — gate it behind the
+    // danger dialog up front (the server's confirmation_required is the backstop).
+    if (changed && !confirmed) {
+      setDanger(true);
+      return;
+    }
+    try {
+      await saveDestination.mutateAsync({ id: def.id, backendId, prefix: prefix.trim(), ...(confirmed ? { confirm: true } : {}) });
+      onClose();
+    } catch (e) {
+      if ((e as Error).message === "confirmation_required") setDanger(true);
+      else setError((e as Error).message);
+    }
+  };
+
+  return (
+    <>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{def.label} destination</DialogTitle>
+          <DialogDescription>{def.description} — pick a backend and a path prefix inside it</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          {error && (
+            <p className="text-destructive text-sm" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="flex flex-col gap-2">
+            <Label>Backend</Label>
+            <Select value={backendId} onValueChange={setBackendId}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder={enabledBackends.length === 0 ? "no enabled backends" : "Pick a backend…"} />
+              </SelectTrigger>
+              <SelectContent>
+                {enabledBackends.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name} · {b.type === "object" ? "object" : "block"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="dest-prefix">Path prefix</Label>
+            <Input id="dest-prefix" placeholder="agents/assets (empty = backend root)" value={prefix} onChange={(e) => setPrefix(e.target.value)} />
+            <p className="text-muted-foreground text-xs">Files for this destination live under the prefix inside the backend.</p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={() => void save(false)} disabled={!backendId || saveDestination.isPending || destinations.isPending}>
+              {saveDestination.isPending && <Loader2 className="animate-spin" />}
+              {existingBackendId ? "Save changes" : "Set destination"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+
+      <AlertDialog open={danger} onOpenChange={setDanger}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change the {def.label} destination?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Existing files will break — nothing is moved, and this destination will look for its files at the new backend/prefix from now on. Only continue if
+              you know what you are doing. Suggested: move the files to the new location first, then change the destination.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => {
+                setDanger(false);
+                void save(true);
+              }}
+            >
+              I understand — change it
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function DestinationsCard() {
+  const { backends, destinations, removeDestination } = useStorage();
+  const [editing, setEditing] = useState<StorageDestinationDef | null>(null);
+  const [removing, setRemoving] = useState<StorageDestinationDef | null>(null);
+
+  const defs = destinations.data?.defs ?? [];
+  const configured = destinations.data?.destinations ?? {};
+  const backendName = (id: string) => (backends.data ?? []).find((b) => b.id === id)?.name ?? id;
+
+  if (defs.length === 0) return null;
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FolderTree size={15} aria-hidden="true" /> Destinations
+        </CardTitle>
+        <CardDescription>dedicated storage locations — each purpose gets its own backend and path prefix</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        {defs.map((def) => {
+          const dest = configured[def.id];
+          return (
+            <div key={def.id} className="bg-card flex items-center gap-3 rounded-xl border p-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  {def.label}
+                  {dest ? (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {backendName(dest.backendId)} · /{dest.prefix || "(root)"}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px]">
+                      not configured
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-muted-foreground truncate text-xs">{def.description}</p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setEditing(def)}>
+                {dest ? "Change" : "Configure"}
+              </Button>
+              {dest && (
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setRemoving(def)}>
+                  Unset
+                </Button>
+              )}
+            </div>
+          );
+        })}
+
+        <Dialog open={Boolean(editing)} onOpenChange={(o) => !o && setEditing(null)}>
+          {editing && (
+            <DestinationDialog
+              def={editing}
+              existingBackendId={configured[editing.id]?.backendId ?? null}
+              existingPrefix={configured[editing.id]?.prefix ?? ""}
+              onClose={() => setEditing(null)}
+            />
+          )}
+        </Dialog>
+
+        <AlertDialog open={Boolean(removing)} onOpenChange={(o) => !o && setRemoving(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unset the {removing?.label} destination?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Anything already stored for this destination will stop resolving. Only continue if you know what you are doing.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-white hover:bg-destructive/90"
+                onClick={() => {
+                  if (removing) removeDestination.mutate(removing.id);
+                  setRemoving(null);
+                }}
+              >
+                Unset anyway
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function StorageSection() {
   const { backends, actionError, onSaved } = useStorage();
   const [open, setOpen] = useState(false);
@@ -226,6 +435,8 @@ export function StorageSection() {
           <CardContent />
         </Card>
       )}
+
+      <DestinationsCard />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-lg">

@@ -26,12 +26,14 @@ export interface Agent {
   updatedAt: string;
 }
 
+export type MemoryScope = "workspace" | "project" | "session";
+
 export interface Memory {
   id: string;
   organizationId: string;
   codeDirectoryId: string | null;
   scopeId: string | null;
-  tags: string[];
+  scope: MemoryScope;
   content: string;
   createdAt: string;
   updatedAt: string;

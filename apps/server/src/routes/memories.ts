@@ -1,9 +1,14 @@
 import { Hono } from "hono";
-import { sql, type SqlBool } from "kysely";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
 import { resolveScope } from "../lib/code-directory";
-import { parseTags, syncLlmTags } from "../lib/llm-tags";
+import type { MemoryScope } from "../plugins/db";
+
+function parseScope(value: unknown): MemoryScope | "invalid" {
+  if (value === undefined || value === null) return "workspace";
+  if (value === "workspace" || value === "project" || value === "session") return value;
+  return "invalid";
+}
 
 export const memoryRoutes = new Hono()
   .get("/", async (c) => {
@@ -20,13 +25,10 @@ export const memoryRoutes = new Hono()
     const scopeId = c.req.query("scopeId");
     if (scopeId !== undefined) query = query.where("scopeId", "=", scopeId);
 
-    const tags = c.req.query("tags");
-    if (tags) {
-      const list = tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean);
-      if (list.length > 0) query = query.where(sql<SqlBool>`"tags" && ${list}::text[]`);
+    const scopeFilter = c.req.query("scope");
+    if (scopeFilter) {
+      const parsed = parseScope(scopeFilter);
+      if (parsed !== "invalid") query = query.where("scope", "=", parsed);
     }
 
     const q = c.req.query("q");
@@ -45,8 +47,8 @@ export const memoryRoutes = new Hono()
       return c.json({ error: "invalid_scope" }, 400);
     }
     if (body?.scopeId === "") return c.json({ error: "invalid_scope" }, 400);
-    const tags = parseTags(body?.tags);
-    if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
+    const memoryScope = parseScope(body?.scope);
+    if (memoryScope === "invalid") return c.json({ error: "invalid_scope" }, 400);
     if (typeof body?.content !== "string" || !body.content.trim()) return c.json({ error: "invalid_content" }, 400);
 
     const scope = await resolveScope(db, s.organizationId, body?.codeDirectoryId);
@@ -60,14 +62,13 @@ export const memoryRoutes = new Hono()
         organizationId: s.organizationId,
         codeDirectoryId: scope.codeDirectoryId,
         scopeId: typeof body.scopeId === "string" && body.scopeId ? body.scopeId : null,
-        tags: tags ?? [],
+        scope: memoryScope,
         content: body.content.trim(),
         createdAt: now,
         updatedAt: now,
       })
       .returningAll()
       .executeTakeFirstOrThrow();
-    await syncLlmTags(s.organizationId, row.tags);
     return c.json(row, 201);
   })
 
@@ -93,17 +94,17 @@ export const memoryRoutes = new Hono()
     if (!existing) return c.json({ error: "memory_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ scopeId: string | null; tags: string[]; content: string }> = {};
+    const patch: Partial<{ scopeId: string | null; scope: MemoryScope; content: string }> = {};
     if (body?.scopeId !== undefined) {
       if (body.scopeId !== null && (typeof body.scopeId !== "string" || !body.scopeId)) {
         return c.json({ error: "invalid_scope" }, 400);
       }
       patch.scopeId = body.scopeId;
     }
-    if (body?.tags !== undefined) {
-      const tags = parseTags(body.tags);
-      if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
-      patch.tags = tags ?? [];
+    if (body?.scope !== undefined) {
+      const parsed = parseScope(body.scope);
+      if (parsed === "invalid") return c.json({ error: "invalid_scope" }, 400);
+      patch.scope = parsed;
     }
     if (body?.content !== undefined) {
       if (typeof body.content !== "string" || !body.content.trim()) return c.json({ error: "invalid_content" }, 400);
@@ -117,7 +118,6 @@ export const memoryRoutes = new Hono()
       .where("id", "=", existing.id)
       .returningAll()
       .executeTakeFirstOrThrow();
-    await syncLlmTags(s.organizationId, row.tags);
     return c.json(row);
   })
 

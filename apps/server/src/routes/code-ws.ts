@@ -4,8 +4,9 @@ import type { createNodeWebSocket } from "@hono/node-ws";
 import { auth, db } from "../auth";
 import type { AgentFrame } from "../lib/agent-loop";
 import { runAgentLoop } from "../lib/agent-loop";
+import { projectHistory } from "../lib/compaction";
+import { resolveAskUser, type AskUserAnswer, type AskUserQuestion } from "../lib/ask-user";
 import { readGitStatus } from "../lib/git-status";
-import type { AgentMessage } from "../lib/agent";
 import { runnerManager } from "../lib/runner-manager";
 
 type UpgradeWebSocket = ReturnType<typeof createNodeWebSocket>["upgradeWebSocket"];
@@ -16,6 +17,12 @@ interface ClientMessage {
   connectionId?: string;
   model?: string;
   thinkingLevel?: string;
+  /** Uploaded assets attached to the send — twodb:// refs from the composer. */
+  assets?: { uri: string; filename: string; contentType: string }[];
+  /** ask_user_response fields. */
+  id?: string;
+  cancelled?: boolean;
+  answers?: unknown[];
 }
 
 function parseMessage(data: unknown): ClientMessage | null {
@@ -29,6 +36,7 @@ function parseMessage(data: unknown): ClientMessage | null {
 interface CodeSocket {
   ws: WSContext;
   organizationId: string;
+  sessionId: string;
 }
 
 interface LiveTool {
@@ -55,9 +63,12 @@ interface ActiveRun {
   thinkingOpen: boolean;
   tools: LiveTool[];
   status: string | null;
+  /** Open ask_user question — restored for late-joining sockets via run_state. */
+  askUser: { id: string; questions: AskUserQuestion[] } | null;
 }
 
 const activeRuns = new Map<string, ActiveRun>();
+const sockets = new Set<CodeSocket>();
 
 function accumulate(run: ActiveRun, frame: AgentFrame) {
   switch (frame.type) {
@@ -97,8 +108,12 @@ function accumulate(run: ActiveRun, frame: AgentFrame) {
         tool.output = frame.output;
         tool.done = true;
       }
+      if (run.askUser?.id === frame.id) run.askUser = null;
       break;
     }
+    case "ask_user":
+      run.askUser = { id: frame.id, questions: frame.questions };
+      break;
     case "status":
       run.status = frame.text;
       break;
@@ -129,10 +144,29 @@ function sendRunState(run: ActiveRun, ws: WSContext) {
         thinkingOpen: run.thinkingOpen,
         tools: run.tools,
         status: run.status,
+        askUser: run.askUser,
       }),
     );
   } catch {
     // socket gone; cleanup happens in onClose
+  }
+}
+
+/** True while an agent loop is live on the session — compaction must not race it. */
+export function isSessionRunning(sessionId: string): boolean {
+  return activeRuns.has(sessionId);
+}
+
+/** Fan a frame out to every socket currently viewing this session. */
+export function broadcastToSession(sessionId: string, frame: unknown) {
+  const data = JSON.stringify(frame);
+  for (const s of sockets) {
+    if (s.sessionId !== sessionId) continue;
+    try {
+      s.ws.send(data);
+    } catch {
+      sockets.delete(s);
+    }
   }
 }
 
@@ -171,7 +205,6 @@ async function pushRunners(targets: CodeSocket[], only?: CodeSocket) {
  * (model deltas, tool output chunks, results) back over the socket.
  */
 export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
-  const sockets = new Set<CodeSocket>();
   runnerManager.onChange(() => void pushRunners([...sockets]));
 
   app.get(
@@ -192,7 +225,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
             ws.close(4401, "unauthorized");
             return;
           }
-          socket = { ws, organizationId };
+          socket = { ws, organizationId, sessionId };
           sockets.add(socket);
           await pushRunners([...sockets], socket);
           const run = activeRuns.get(sessionId);
@@ -229,6 +262,18 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
 
           if (msg.type === "stop") {
             activeRuns.get(sessionId)?.controller.abort();
+            return;
+          }
+
+          // Answers to an open ask_user question — any viewer may answer.
+          if (msg.type === "ask_user_response") {
+            const toAnswer = (a: unknown): AskUserAnswer | null =>
+              typeof a === "string" && a.trim() ? a : Array.isArray(a) && a.length > 0 && a.every((x) => typeof x === "string") ? a : null;
+            const answers = Array.isArray(msg.answers) ? msg.answers.map(toAnswer).filter((a): a is AskUserAnswer => a !== null) : undefined;
+            resolveAskUser(sessionId, typeof msg.id === "string" ? msg.id : "", {
+              cancelled: msg.cancelled === true,
+              answers,
+            });
             return;
           }
 
@@ -292,6 +337,11 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
             }
 
             const history = await db.selectFrom("code_session_message").selectAll().where("sessionId", "=", session.id).orderBy("createdAt", "asc").execute();
+            const projectedHistory = projectHistory(history);
+            // Attachments ride on the user row as refs; vision rounds resolve bytes.
+            const assets = Array.isArray(msg.assets)
+              ? msg.assets.filter((a) => a && typeof a.uri === "string" && typeof a.filename === "string" && typeof a.contentType === "string")
+              : [];
 
             const now = new Date();
             const isFirstMessage = history.length === 0;
@@ -302,7 +352,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
                 sessionId: session.id,
                 role: "user",
                 content,
-                meta: null,
+                meta: assets.length > 0 ? { images: assets } : null,
                 createdAt: now,
               })
               .execute();
@@ -330,6 +380,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               thinkingOpen: false,
               tools: [],
               status: null,
+              askUser: null,
             };
             activeRuns.set(session.id, run);
             const emit = (frame: AgentFrame) => {
@@ -347,12 +398,9 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
                   cwd,
                   signal: run.controller.signal,
                   thinkingLevel: thinkingLevel ?? undefined,
-                  history: history.map((m) => ({
-                    role: m.role as AgentMessage["role"],
-                    content: m.content,
-                    meta: (m.meta as AgentMessage["meta"]) ?? null,
-                  })),
+                  history: projectedHistory,
                   userContent: content,
+                  ...(assets.length > 0 ? { userImages: assets } : {}),
                   organizationId,
                 },
                 emit,

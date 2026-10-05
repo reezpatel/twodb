@@ -43,7 +43,7 @@ export function AgentSheet() {
   const submit = (content: string) => {
     if (!agentId) return;
     if (!provider.trim() || !model.trim() || !content.trim()) {
-      setError("Provider, model and instruction are required");
+      setError("Provider, model and system prompt are required");
       return;
     }
     ws.agents.save.mutate(
@@ -66,8 +66,8 @@ export function AgentSheet() {
       loading={Boolean(agentId) && ws.agents.list.isPending}
       title={description.trim() || (isNew ? "New agent" : "Edit agent")}
       initialValue={initialValue}
-      placeholder="System instructions for this agent…"
-      ariaLabel="Agent instruction"
+      placeholder="This agent's system prompt — replaces the workspace default for its sessions…"
+      ariaLabel="Agent system prompt"
       error={error}
       savePending={ws.agents.save.isPending}
       submitLabel={isNew ? "Create agent" : "Save changes"}

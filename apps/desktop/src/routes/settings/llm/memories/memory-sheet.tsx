@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { useWorkspace } from "../use-workspace";
+import { useWorkspace, type MemoryScope } from "../use-workspace";
 import { EditorSheet } from "../editor-sheet";
-import { TagInput } from "../tag-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const MEMORIES_LIST_PATH = "/apps/settings/llm/memories";
+
+const SCOPES: { value: MemoryScope; label: string }[] = [
+  { value: "workspace", label: "Workspace" },
+  { value: "project", label: "Project" },
+  { value: "session", label: "Session" },
+];
 
 export function MemorySheet() {
   const { memoryId } = useParams();
@@ -17,13 +23,13 @@ export function MemorySheet() {
   const existing = memoryId ? ws.memories.list.data?.find((m) => m.id === memoryId) : undefined;
   const isNew = Boolean(memoryId) && ws.memories.list.isSuccess && !existing;
 
+  const [scope, setScope] = useState<MemoryScope>("workspace");
   const [scopeId, setScopeId] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setScope(existing?.scope ?? "workspace");
     setScopeId(existing?.scopeId ?? "");
-    setTags(existing?.tags ?? []);
     setError(null);
   }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -32,9 +38,7 @@ export function MemorySheet() {
     [memoryId, ws.memories.list.isSuccess, existing],
   );
 
-  const fieldsDirty = existing
-    ? scopeId !== (existing.scopeId ?? "") || JSON.stringify(tags) !== JSON.stringify(existing.tags)
-    : Boolean(scopeId || tags.length > 0);
+  const fieldsDirty = existing ? scope !== existing.scope || scopeId !== (existing.scopeId ?? "") : scope !== "workspace" || Boolean(scopeId);
 
   const submit = (content: string) => {
     if (!memoryId) return;
@@ -46,8 +50,8 @@ export function MemorySheet() {
       {
         ...(existing ? { id: existing.id } : {}),
         content: content.trim(),
-        tags,
-        scopeId: scopeId.trim() || null,
+        scope,
+        scopeId: scope === "session" && scopeId.trim() ? scopeId.trim() : null,
       },
       { onSuccess: close, onError: (e) => setError((e as Error).message) },
     );
@@ -69,18 +73,33 @@ export function MemorySheet() {
       onClose={close}
       fieldsDirty={fieldsDirty}
       fields={
-        <div className="grid grid-cols-[1fr_2fr] gap-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="memory-scope" className="text-muted-foreground text-xs">
-              Scope
-            </Label>
-            <Input id="memory-scope" className="h-8 text-xs" value={scopeId} onChange={(e) => setScopeId(e.target.value)} placeholder="optional" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="memory-tags" className="text-muted-foreground text-xs">
-              Tags
-            </Label>
-            <TagInput id="memory-tags" value={tags} onChange={setTags} />
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-[1fr_2fr] gap-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="memory-scope" className="text-muted-foreground text-xs">
+                Scope
+              </Label>
+              <Select value={scope} onValueChange={(v) => setScope(v as MemoryScope)}>
+                <SelectTrigger id="memory-scope" className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SCOPES.map((s) => (
+                    <SelectItem key={s.value} value={s.value} className="text-xs">
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {scope === "session" && (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="memory-scope-id" className="text-muted-foreground text-xs">
+                  Session id
+                </Label>
+                <Input id="memory-scope-id" className="h-8 text-xs" value={scopeId} onChange={(e) => setScopeId(e.target.value)} placeholder="code session" />
+              </div>
+            )}
           </div>
         </div>
       }

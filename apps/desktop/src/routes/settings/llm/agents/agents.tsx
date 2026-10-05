@@ -12,7 +12,7 @@ export function AgentsSection() {
   return (
     <PanelShell
       title="Agents"
-      hint="named provider/model + instruction combos a session can run as"
+      hint="named personas with their own system prompt — sessions bound to an agent run with it"
       onNew={() => navigate(`${AGENTS_LIST_PATH}/${randomId()}`)}
     >
       {ws.agents.list.isPending ? (

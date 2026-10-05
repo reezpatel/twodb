@@ -10,7 +10,11 @@ export function MemoriesSection() {
   const ws = useWorkspace();
 
   return (
-    <PanelShell title="Memories" hint="long-lived facts the agent recalls — tag and scope them" onNew={() => navigate(`${MEMORIES_LIST_PATH}/${randomId()}`)}>
+    <PanelShell
+      title="Memories"
+      hint="long-lived facts the agent recalls — workspace, project, or session scoped"
+      onNew={() => navigate(`${MEMORIES_LIST_PATH}/${randomId()}`)}
+    >
       {ws.memories.list.isPending ? (
         <Empty pending label="memory" />
       ) : (
@@ -20,7 +24,7 @@ export function MemoriesSection() {
               id: m.id,
               name: <span className="line-clamp-1 font-normal">{m.content}</span>,
               subtitle: m.scopeId ? <code className="font-mono">{m.scopeId}</code> : undefined,
-              tags: m.tags,
+              scope: m.scope,
               codeDirectoryId: m.codeDirectoryId,
             }))}
             onEdit={(id) => navigate(`${MEMORIES_LIST_PATH}/${id}`)}

@@ -23,8 +23,6 @@ import { serverSettingsRoutes } from "./routes/server-settings";
 import { apiKeyRoutes } from "./routes/api-keys";
 import { getServerSettings } from "./lib/server-settings";
 import { runMigrations } from "./lib/migrate";
-import { assistantRoutes } from "./routes/assistant";
-import { registerAssistantWs } from "./routes/assistant-ws";
 import { notesRoutes } from "./routes/notes";
 import { notesContentRoutes } from "./routes/notes-content";
 
@@ -74,7 +72,6 @@ app.route("/api/llm-tags", llmTagRoutes);
 app.route("/api", runnerRoutes);
 app.route("/api/storage", storageRoutes);
 app.route("/api/storage-backends", storageAdminRoutes);
-app.route("/api/assistant", assistantRoutes);
 app.route("/api/notes", notesRoutes);
 app.route("/api/notes", notesContentRoutes);
 app.route("/api/server-settings", serverSettingsRoutes);
@@ -84,7 +81,6 @@ app.route("/api/api-keys", apiKeyRoutes);
 app.get("/api/public-settings", async (c) => c.json(await getServerSettings()));
 registerRunnerWs(app, upgradeWebSocket);
 registerCodeWs(app, upgradeWebSocket);
-registerAssistantWs(app, upgradeWebSocket);
 
 // Production: serve the built desktop app (SPA) from a static dir; API routes
 // above always win because they are registered first.

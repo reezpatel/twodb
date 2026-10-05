@@ -1,7 +1,14 @@
 import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
-import { getCodeSettings, setCodeSettings } from "../lib/code-settings";
+import { getCodeSettings, setCodeSettings, type CodeSettingsPatch } from "../lib/code-settings";
+import { parseTags, syncLlmTags } from "../lib/llm-tags";
+import { enabledRepoSources, listRepoSkills, readRepoSkill } from "../lib/skills";
+import { codeCompactionStore, NothingToCompactError, runCompaction } from "../lib/compaction";
+import { readAssetBytesById, storeAsset } from "../lib/assets";
+import { resolveSessionSystemPrompt } from "../lib/session-prompt";
+import { resolveAskUser, type AskUserAnswer } from "../lib/ask-user";
+import { broadcastToSession, isSessionRunning } from "./code-ws";
 import { readGitStatus } from "../lib/git-status";
 import { runnerManager } from "../lib/runner-manager";
 import type { CodeSessionMode, CodeSessionType } from "../plugins/db";
@@ -64,6 +71,42 @@ export const codeRoutes = new Hono()
       return c.json(result.error === "git_failed" ? { error: result.error, detail: result.detail } : { error: result.error }, status);
     }
     return c.json(result);
+  })
+
+  .get("/directories/:id/repo-skills", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const dir = await db
+      .selectFrom("code_directory")
+      .select(["id", "runnerId", "cwd"])
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!dir) return c.json({ error: "directory_not_found" }, 404);
+
+    const settings = await getCodeSettings(s.organizationId);
+    const skills = await listRepoSkills(dir.runnerId, dir.cwd, enabledRepoSources(settings.skillSources));
+    return c.json({ skills });
+  })
+
+  .get("/directories/:id/repo-skills/:name", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const dir = await db
+      .selectFrom("code_directory")
+      .select(["id", "runnerId", "cwd"])
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!dir) return c.json({ error: "directory_not_found" }, 404);
+
+    const name = c.req.param("name") ?? "";
+    const settings = await getCodeSettings(s.organizationId);
+    const content = await readRepoSkill(dir.runnerId, dir.cwd, enabledRepoSources(settings.skillSources), name);
+    if (content === null) return c.json({ error: "skill_not_found" }, 404);
+    return c.json({ name, content });
   })
 
   .get("/directories/:id/git-changes", async (c) => {
@@ -364,10 +407,27 @@ export const codeRoutes = new Hono()
     if (!s) return c.json({ error: "unauthorized" }, 401);
 
     const body = await c.req.json().catch(() => null);
-    if (body?.terminalScope !== undefined && !["runner", "directory", "session"].includes(body.terminalScope)) {
-      return c.json({ error: "invalid_terminal_scope" }, 400);
+    const patch: CodeSettingsPatch = {};
+    if (body?.terminalScope !== undefined) {
+      if (body.terminalScope !== "runner" && body.terminalScope !== "directory" && body.terminalScope !== "session") {
+        return c.json({ error: "invalid_terminal_scope" }, 400);
+      }
+      patch.terminalScope = body.terminalScope;
     }
-    const patch = body?.terminalScope !== undefined ? { terminalScope: body.terminalScope } : {};
+    // null (or empty string) resets to the hardcoded default prompt.
+    if (body?.systemPrompt !== undefined) {
+      if (body.systemPrompt === null) patch.systemPrompt = null;
+      else if (typeof body.systemPrompt === "string" && body.systemPrompt.length <= 50_000) patch.systemPrompt = body.systemPrompt;
+      else return c.json({ error: "invalid_system_prompt" }, 400);
+    }
+    if (body?.skillSources !== undefined) {
+      const sources = body.skillSources as { agents?: unknown; claude?: unknown } | null;
+      if (!sources || typeof sources !== "object" || typeof sources.agents !== "boolean" || typeof sources.claude !== "boolean") {
+        return c.json({ error: "invalid_skill_sources" }, 400);
+      }
+      patch.skillSources = { agents: sources.agents, claude: sources.claude };
+    }
+    if (Object.keys(patch).length === 0) return c.json({ error: "empty_update" }, 400);
     return c.json(await setCodeSettings(s.organizationId, patch));
   })
   .get("/directories", async (c) => {
@@ -605,6 +665,9 @@ export const codeRoutes = new Hono()
       mode = { type: m.type.trim(), instruction: m.instruction, commands };
     }
 
+    const sessionTags = parseTags(body?.tags);
+    if (sessionTags === "invalid") return c.json({ error: "invalid_tags" }, 400);
+
     const now = new Date();
     const row = await db
       .insertInto("code_session")
@@ -620,6 +683,7 @@ export const codeRoutes = new Hono()
         agentId,
         mode: mode === null ? null : JSON.stringify(mode),
         runtimeState: null,
+        tags: sessionTags ?? [],
         createdAt: now,
         updatedAt: now,
       })
@@ -649,22 +713,47 @@ export const codeRoutes = new Hono()
       .orderBy("createdAt", "asc")
       .execute();
 
-    const usage = await db
+    // The newest context boundary (compaction or clear) is a counter reset:
+    // the footer's live totals restart after it, and a compaction's own
+    // summarization call is attributed to the compaction block — not the
+    // running counts. Full history stays in the table (and llm_usage_event).
+    const latestBoundary = await db
+      .selectFrom("code_session_message")
+      .select(["createdAt", "meta"])
+      .where("sessionId", "=", session.id)
+      .where("role", "in", ["compaction", "clear"])
+      .orderBy("createdAt", "desc")
+      .limit(1)
+      .executeTakeFirst();
+
+    let usageQuery = db
       .selectFrom("code_session_usage_event")
       .select((eb) => [
         eb.fn.sum("inputTokens").as("inputTokens"),
         eb.fn.sum("outputTokens").as("outputTokens"),
         eb.fn.sum("cachedInputTokens").as("cachedTokens"),
       ])
-      .where("sessionId", "=", session.id)
-      .executeTakeFirst();
-    const lastRound = await db
+      .where("sessionId", "=", session.id);
+    let lastRoundQuery = db
       .selectFrom("code_session_usage_event")
       .select(["inputTokens", "outputTokens"])
       .where("sessionId", "=", session.id)
       .orderBy("createdAt", "desc")
-      .limit(1)
-      .executeTakeFirst();
+      .limit(1);
+    if (latestBoundary) {
+      usageQuery = usageQuery.where("createdAt", ">", latestBoundary.createdAt);
+      lastRoundQuery = lastRoundQuery.where("createdAt", ">", latestBoundary.createdAt);
+    }
+    const usage = await usageQuery.executeTakeFirst();
+    const lastRound = await lastRoundQuery.executeTakeFirst();
+
+    // With no rounds since a compaction, the context meter shows the compacted
+    // estimate; after a clear the context is simply empty until the next send.
+    let contextTokens = lastRound ? lastRound.inputTokens + lastRound.outputTokens : 0;
+    if (!lastRound && latestBoundary) {
+      const boundaryMeta = latestBoundary.meta as { estimatedTokensAfter?: number } | null;
+      contextTokens = typeof boundaryMeta?.estimatedTokensAfter === "number" ? boundaryMeta.estimatedTokensAfter : 0;
+    }
 
     return c.json({
       ...session,
@@ -674,9 +763,248 @@ export const codeRoutes = new Hono()
         inputTokens: Number(usage?.inputTokens ?? 0),
         outputTokens: Number(usage?.outputTokens ?? 0),
         cachedTokens: Number(usage?.cachedTokens ?? 0),
-        contextTokens: lastRound ? lastRound.inputTokens + lastRound.outputTokens : 0,
+        contextTokens,
       },
     });
+  })
+
+  .get("/sessions/:id/system-prompt", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const session = await db
+      .selectFrom("code_session")
+      .selectAll()
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!session) return c.json({ error: "session_not_found" }, 404);
+
+    const directory = session.codeDirectoryId
+      ? await db.selectFrom("code_directory").select(["runnerId", "cwd"]).where("id", "=", session.codeDirectoryId).executeTakeFirst()
+      : undefined;
+
+    // A bound agent swaps in its own system prompt and skips runner repo skills.
+    const agent = session.agentId
+      ? await db.selectFrom("agent").selectAll().where("id", "=", session.agentId).where("organizationId", "=", s.organizationId).executeTakeFirst()
+      : undefined;
+
+    // Exactly what the next run would send — settings override/default, cwd,
+    // [Skills] titles (incl. runner repo skills), and inline instructions.
+    const resolution = await resolveSessionSystemPrompt({
+      organizationId: s.organizationId,
+      sessionId: session.id,
+      codeDirectoryId: session.codeDirectoryId,
+      sessionTags: [...(session.tags ?? []), ...(agent?.tags ?? [])],
+      runnerId: agent ? null : (directory?.runnerId ?? null),
+      cwd: directory?.cwd ?? null,
+      systemPromptOverride: agent?.instruction ?? null,
+      mode: session.codeDirectoryId ? "code" : "assistant",
+    });
+    return c.json(resolution);
+  })
+
+  .post("/sessions/:id/assets", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const session = await db
+      .selectFrom("code_session")
+      .select("id")
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!session) return c.json({ error: "session_not_found" }, 404);
+
+    const form = await c.req.parseBody().catch(() => null);
+    const file = form?.["file"];
+    if (!file || typeof file === "string") return c.json({ error: "invalid_file" }, 400);
+    if (file.size === 0) return c.json({ error: "empty_file" }, 400);
+    if (file.size > 25 * 1024 * 1024) return c.json({ error: "file_too_large" }, 413);
+
+    try {
+      const asset = await storeAsset({
+        organizationId: s.organizationId,
+        sessionId: session.id,
+        filename: file.name || "asset",
+        contentType: file.type || null,
+        data: Buffer.from(await file.arrayBuffer()),
+      });
+      return c.json({ ...asset, previewUrl: `/api/code/sessions/${session.id}/assets/${asset.id}` }, 201);
+    } catch (e) {
+      const message = (e as Error).message;
+      if (message === "agent_assets_not_configured") return c.json({ error: message }, 409);
+      console.error("[code] asset upload failed:", e);
+      return c.json({ error: message || "upload_failed" }, 500);
+    }
+  })
+
+  .get("/sessions/:id/assets/:mediaId", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    try {
+      const asset = await readAssetBytesById(s.organizationId, c.req.param("mediaId") ?? "");
+      return c.body(new Uint8Array(asset.body), 200, {
+        "content-type": asset.contentType,
+        "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(asset.filename)}`,
+        "cache-control": "private, max-age=86400",
+      });
+    } catch {
+      return c.json({ error: "asset_not_found" }, 404);
+    }
+  })
+
+  .get("/sessions/:id/artifacts", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const session = await db
+      .selectFrom("code_session")
+      .select("id")
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!session) return c.json({ error: "session_not_found" }, 404);
+
+    const rows = await db.selectFrom("code_session_artifact").selectAll().where("sessionId", "=", session.id).orderBy("updatedAt", "desc").execute();
+    return c.json(rows.map((a) => ({ ...a, updatedAt: a.updatedAt.toISOString(), createdAt: a.createdAt.toISOString() })));
+  })
+
+  .post("/sessions/:id/compact", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const session = await db
+      .selectFrom("code_session")
+      .selectAll()
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!session) return c.json({ error: "session_not_found" }, 404);
+    if (isSessionRunning(session.id)) return c.json({ error: "session_busy" }, 409);
+
+    const body = await c.req.json().catch(() => null);
+    const connectionId = typeof body?.connectionId === "string" && body.connectionId ? body.connectionId : session.connectionId;
+    const model = typeof body?.model === "string" && body.model.trim() ? body.model.trim() : session.model;
+    if (!connectionId || !model) return c.json({ error: "connection_and_model_required" }, 400);
+
+    const connection = await db
+      .selectFrom("llm_connection")
+      .selectAll()
+      .where("id", "=", connectionId)
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!connection) return c.json({ error: "connection_not_found" }, 404);
+    if (!connection.enabled) return c.json({ error: "connection_disabled" }, 409);
+
+    const rows = await db.selectFrom("code_session_message").selectAll().where("sessionId", "=", session.id).orderBy("createdAt", "asc").execute();
+    if (rows.length === 0) return c.json({ error: "nothing_to_compact" }, 400);
+
+    const instructions = typeof body?.instructions === "string" ? body.instructions.trim().slice(0, 2000) : undefined;
+
+    try {
+      const row = await runCompaction({
+        connection,
+        model,
+        rows,
+        instructions,
+        store: codeCompactionStore(session, connection, model, s.organizationId),
+      });
+      // Sockets viewing this session refetch; the compaction row renders as a block.
+      broadcastToSession(session.id, { type: "compaction_done", message: row });
+      return c.json(row, 201);
+    } catch (e) {
+      if (e instanceof NothingToCompactError) return c.json({ error: "nothing_to_compact" }, 400);
+      console.error("[code] compact failed:", e);
+      return c.json({ error: (e as Error).message || "compaction_failed" }, 500);
+    }
+  })
+
+  .post("/sessions/:id/ask-answer", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const session = await db
+      .selectFrom("code_session")
+      .selectAll()
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!session) return c.json({ error: "session_not_found" }, 404);
+
+    const body = await c.req.json().catch(() => null);
+    const toolCallId = typeof body?.toolCallId === "string" ? body.toolCallId : "";
+    if (!toolCallId) return c.json({ error: "invalid_tool_call_id" }, 400);
+    const toAnswer = (a: unknown): AskUserAnswer | null =>
+      typeof a === "string" && a.trim() ? a : Array.isArray(a) && a.length > 0 && a.every((x) => typeof x === "string") ? a : null;
+    const rawAnswers: unknown[] = Array.isArray(body?.answers) ? body.answers : [];
+    const answers = rawAnswers.map(toAnswer).filter((a): a is AskUserAnswer => a !== null);
+    const cancelled = body?.cancelled === true;
+
+    // Live loop waiting on the question → hand the answers straight to it.
+    if (resolveAskUser(session.id, toolCallId, { cancelled, answers })) {
+      return c.json({ ok: true, live: true });
+    }
+
+    // Dead loop (e.g. server restarted mid-question) → repair the dangling
+    // tool_use so the next round still validates.
+    const rows = await db.selectFrom("code_session_message").selectAll().where("sessionId", "=", session.id).orderBy("createdAt", "asc").execute();
+    const hasCall = rows.some(
+      (r) => r.role === "assistant" && ((r.meta as { toolCalls?: { id: string }[] } | null)?.toolCalls ?? []).some((tc) => tc.id === toolCallId),
+    );
+    const hasResult = rows.some((r) => r.role === "tool" && (r.meta as { toolCallId?: string } | null)?.toolCallId === toolCallId);
+    if (!hasCall || hasResult) return c.json({ error: "no_open_question" }, 404);
+
+    const row = await db
+      .insertInto("code_session_message")
+      .values({
+        id: crypto.randomUUID(),
+        sessionId: session.id,
+        role: "tool",
+        content: cancelled ? "user stopped without answering" : JSON.stringify({ answers: answers ?? [] }, null, 2),
+        meta: { toolCallId, name: "ask_user" },
+        createdAt: new Date(),
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    await db.updateTable("code_session").set({ updatedAt: new Date() }).where("id", "=", session.id).execute();
+    broadcastToSession(session.id, { type: "session_updated" });
+    return c.json({ ok: true, row });
+  })
+
+  .post("/sessions/:id/clear", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const session = await db
+      .selectFrom("code_session")
+      .selectAll()
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!session) return c.json({ error: "session_not_found" }, 404);
+    if (isSessionRunning(session.id)) return c.json({ error: "session_busy" }, 409);
+
+    // Hard context cutoff: nothing before this row is ever sent again — no
+    // summary, no kept tail. Same projection machinery as compaction.
+    const rows = await db.selectFrom("code_session_message").selectAll().where("sessionId", "=", session.id).orderBy("createdAt", "asc").execute();
+    const row = await db
+      .insertInto("code_session_message")
+      .values({
+        id: crypto.randomUUID(),
+        sessionId: session.id,
+        role: "clear",
+        content: "",
+        meta: { clearedMessages: rows.length },
+        createdAt: new Date(),
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    await db.updateTable("code_session").set({ updatedAt: new Date() }).where("id", "=", session.id).execute();
+
+    broadcastToSession(session.id, { type: "clear_done", message: row });
+    return c.json(row, 201);
   })
 
   .patch("/sessions/:id", async (c) => {
@@ -700,6 +1028,7 @@ export const codeRoutes = new Hono()
       agentId: string | null;
       codeDirectoryId: string | null;
       mode: string | null;
+      tags: string[];
       runtimeState: string | null;
     }> = {};
 
@@ -765,6 +1094,11 @@ export const codeRoutes = new Hono()
         return c.json({ error: "invalid_runtime_state" }, 400);
       }
     }
+    if (body?.tags !== undefined) {
+      const tags = parseTags(body.tags);
+      if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
+      patch.tags = tags ?? [];
+    }
     if (body?.mode !== undefined) {
       if (body.mode === null) {
         patch.mode = null;
@@ -807,6 +1141,7 @@ export const codeRoutes = new Hono()
       .where("id", "=", session.id)
       .returningAll()
       .executeTakeFirst();
+    if (patch.tags) await syncLlmTags(s.organizationId, patch.tags);
     return c.json(row);
   })
 

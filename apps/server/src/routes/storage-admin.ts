@@ -3,6 +3,7 @@ import { db, auth } from "../auth";
 import { getStorageDriverAnyState } from "../lib/storage/registry";
 import { pathSegments } from "../lib/storage/driver";
 import { trackFile, trackFolderChain } from "../lib/storage/entries";
+import { deleteStorageDestination, getStorageDestinations, normalizeStoragePrefix, setStorageDestination, STORAGE_DESTINATIONS } from "../lib/server-settings";
 
 // Server-admin only: storage backends are configured once per server; files
 // inside them are org-scoped (each org lives under `<orgId>/…`).
@@ -21,6 +22,46 @@ export const storageAdminRoutes = new Hono()
   .get("/", async (c) => {
     const rows = await db.selectFrom("storage_backend").selectAll().orderBy("createdAt", "asc").execute();
     return c.json(rows);
+  })
+
+  // Dedicated storage destinations — a backend + path prefix per purpose.
+  .get("/destinations", async (c) => {
+    return c.json({ destinations: await getStorageDestinations(), defs: STORAGE_DESTINATIONS });
+  })
+
+  .put("/destinations/:id", async (c) => {
+    const id = c.req.param("id");
+    if (!STORAGE_DESTINATIONS.some((d) => d.id === id)) return c.json({ error: "unknown_destination" }, 404);
+
+    const body = await c.req.json().catch(() => null);
+    const backendId = typeof body?.backendId === "string" ? body.backendId : "";
+    const prefix = normalizeStoragePrefix(body?.prefix);
+    if (!backendId) return c.json({ error: "invalid_backend" }, 400);
+    if (prefix === "invalid") return c.json({ error: "invalid_prefix" }, 400);
+
+    const backend = await db.selectFrom("storage_backend").select(["id", "enabled"]).where("id", "=", backendId).executeTakeFirst();
+    if (!backend) return c.json({ error: "backend_not_found" }, 404);
+    if (!backend.enabled) return c.json({ error: "backend_disabled" }, 409);
+
+    // Changing a configured destination strands existing files — the caller
+    // must explicitly confirm (the settings UI gates this behind a danger dialog).
+    const existing = (await getStorageDestinations())[id];
+    if (existing && (existing.backendId !== backendId || existing.prefix !== prefix) && body?.confirm !== true) {
+      return c.json({ error: "confirmation_required" }, 409);
+    }
+
+    const destinations = await setStorageDestination(id, { backendId, prefix });
+    return c.json({ destinations });
+  })
+
+  .delete("/destinations/:id", async (c) => {
+    const id = c.req.param("id");
+    if (!STORAGE_DESTINATIONS.some((d) => d.id === id)) return c.json({ error: "unknown_destination" }, 404);
+    const existing = (await getStorageDestinations())[id];
+    if (!existing) return c.json({ error: "not_configured" }, 404);
+    if (c.req.query("confirm") !== "true") return c.json({ error: "confirmation_required" }, 409);
+    const destinations = await deleteStorageDestination(id);
+    return c.json({ destinations });
   })
 
   .post("/", async (c) => {

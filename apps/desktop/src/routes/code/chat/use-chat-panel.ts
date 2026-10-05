@@ -1,8 +1,33 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CodeMessage, CodeSession } from "../sidenav/use-session-list";
 import type { GitStatus } from "../directories/use-git-status";
+import type { ComposerCommand } from "@/components/composer/composer-commands";
+import type { AskUserAnswer, AskUserQuestion } from "./ask-user-wizard";
 import { api } from "@/lib/api";
+
+interface DbSkill {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+}
+
+interface RepoSkill {
+  name: string;
+  description: string;
+  source: string;
+}
+
+export interface PendingAsset {
+  uri: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  previewUrl?: string;
+  /** Client-side object URL for image thumbnails before sending. */
+  localPreview?: string;
+}
 
 export type SessionDetail = CodeSession & {
   messages: CodeMessage[];
@@ -51,6 +76,8 @@ interface StreamFrame {
   ahead?: number | null;
   behind?: number | null;
   exitCode?: number;
+  questions?: AskUserQuestion[];
+  askUser?: { id: string; questions: AskUserQuestion[] } | null;
 }
 
 export interface ToolEvent {
@@ -66,9 +93,40 @@ export interface ToolEvent {
 
 export type WsStatus = "connecting" | "open" | "closed";
 
+const COMPACT_ERRORS: Record<string, string> = {
+  nothing_to_compact: "Nothing to compact — the context fits in the recent window kept verbatim.",
+  session_busy: "Wait for the current run to finish before compacting.",
+};
+
 function wsUrl(sessionId: string) {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${location.host}/api/code/sessions/${sessionId}/ws`;
+}
+
+/** Big photos/PNGs blow past provider image caps — shrink to a model-friendly
+ * size in the browser before upload (long edge 1568, JPEG 0.9; keeps the
+ * original when the re-encode isn't smaller). GIFs/SVGs pass through. */
+async function shrinkImage(file: File): Promise<File> {
+  if (!file.type.startsWith("image/") || file.type === "image/gif" || file.type === "image/svg+xml") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const longEdge = Math.max(bitmap.width, bitmap.height);
+    if (file.size <= 1_500_000 && longEdge <= 1568) {
+      bitmap.close?.();
+      return file;
+    }
+    const scale = Math.min(1, 1568 / longEdge);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name, { type: "image/jpeg", lastModified: file.lastModified });
+  } catch {
+    return file;
+  }
 }
 
 export function useChatPanel(sessionId: string | null) {
@@ -86,6 +144,10 @@ export function useChatPanel(sessionId: string | null) {
   const [thinkingDurationMs, setThinkingDurationMs] = useState<number | null>(null);
   const thinkingStartRef = useRef(0);
   const [optimistic, setOptimistic] = useState<CodeMessage | null>(null);
+  const [compacting, setCompacting] = useState(false);
+  const [askUser, setAskUser] = useState<{ id: string; questions: AskUserQuestion[] } | null>(null);
+  const [pendingAssets, setPendingAssets] = useState<PendingAsset[]>([]);
+  const [uploadingAssets, setUploadingAssets] = useState(false);
   const [gitStatus, setGitStatus] = useState<GitLine | null>(null);
   const [stats, setStats] = useState<SessionStats>({
     inputTokens: 0,
@@ -106,6 +168,33 @@ export function useChatPanel(sessionId: string | null) {
     queryFn: () => api<SessionDetail>(`/api/code/sessions/${sessionId}`),
     enabled: !!sessionId,
   });
+
+  const directoryId = session.data?.codeDirectoryId ?? null;
+  const dbSkills = useQuery({
+    queryKey: ["workspace", "skills", directoryId],
+    queryFn: () => api<DbSkill[]>(`/api/skills${directoryId ? `?codeDirectoryId=${directoryId}` : ""}`),
+    enabled: !!sessionId,
+  });
+  const repoSkills = useQuery({
+    queryKey: ["code", "repo-skills", directoryId],
+    queryFn: () => api<{ skills: RepoSkill[] }>(`/api/code/directories/${directoryId}/repo-skills`),
+    enabled: !!directoryId,
+  });
+
+  // Live slash palette for skills: stored skills plus repo skills (titles only,
+  // content streams in from the runner when expanded).
+  const skillCommands = useMemo<ComposerCommand[]>(
+    () => [
+      ...(dbSkills.data ?? []).map((s) => ({ id: `skill:${s.id}`, label: s.name, description: s.description || "stored skill", group: "Skills" as const })),
+      ...(repoSkills.data?.skills ?? []).map((s) => ({
+        id: `repo-skill:${s.name}`,
+        label: s.name,
+        description: `${s.description} (runner)`,
+        group: "Skills" as const,
+      })),
+    ],
+    [dbSkills.data, repoSkills.data],
+  );
 
   const invalidateAfterRun = () => {
     void queryClient.invalidateQueries({ queryKey: ["code", "session", sessionId] });
@@ -188,6 +277,7 @@ export function useChatPanel(sessionId: string | null) {
         setLiveTools([]);
         setStatusText(null);
         setRound(null);
+        setAskUser(null);
       } else {
         // Resumed a run that was already in progress (reconnect or second viewer).
         setRound(frame.round ?? null);
@@ -196,7 +286,11 @@ export function useChatPanel(sessionId: string | null) {
         setStatusText(frame.status ?? null);
         setThinking(frame.thinking || null);
         setThinkingLive(Boolean(frame.thinkingOpen));
+        setAskUser(frame.askUser ?? null);
       }
+    } else if (frame.type === "ask_user") {
+      // The agent is waiting on answers — the wizard replaces the composer.
+      setAskUser({ id: frame.id ?? "", questions: frame.questions ?? [] });
     } else if (frame.type === "busy") {
       // Server rejected the send — a run is already live on this session.
       setOptimistic(null);
@@ -211,6 +305,15 @@ export function useChatPanel(sessionId: string | null) {
       setStatusText(frame.text ?? null);
     } else if (frame.type === "session_updated") {
       void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
+    } else if (frame.type === "compaction_done") {
+      // Another viewer (or this one) just compacted — refetch so the block renders.
+      void queryClient.invalidateQueries({ queryKey: ["code", "session", sessionId] });
+    } else if (frame.type === "clear_done") {
+      // Context cutoff landed — refetch for the divider + reset counters.
+      void queryClient.invalidateQueries({ queryKey: ["code", "session", sessionId] });
+    } else if (frame.type === "canvas") {
+      // update_canvas landed — refresh the canvas tab.
+      void queryClient.invalidateQueries({ queryKey: ["code", "artifacts", sessionId] });
     } else if (frame.type === "gitStatus") {
       // Pushed by the server when a run finishes — files likely changed.
       setGitStatus(
@@ -227,6 +330,7 @@ export function useChatPanel(sessionId: string | null) {
       setRound(null);
       setThinking(null);
       setThinkingLive(false);
+      setAskUser(null);
       if (frame.usage) {
         setStats((prev) => ({
           ...prev,
@@ -244,6 +348,28 @@ export function useChatPanel(sessionId: string | null) {
     const committed = session.data?.messages ?? [];
     if (committed.some((m) => m.role === "user" && m.content === optimistic.content)) setOptimistic(null);
   }, [session.data, optimistic]);
+
+  // Restore an unanswered ask_user from the transcript when no live run state
+  // provides it — refreshes, reconnects, even a server restart keep the wizard.
+  useEffect(() => {
+    if (askUser || streaming !== null) return;
+    const committed = session.data?.messages ?? [];
+    const answered = new Set<string>();
+    for (const m of committed) {
+      if (m.role === "tool") {
+        const meta = m.meta as { toolCallId?: string } | null;
+        if (meta?.toolCallId) answered.add(meta.toolCallId);
+      }
+    }
+    for (let i = committed.length - 1; i >= 0; i--) {
+      if (committed[i].role !== "ask_user") continue;
+      const meta = committed[i].meta as { toolCallId?: string; questions?: AskUserQuestion[] } | null;
+      if (meta?.toolCallId && meta.questions?.length && !answered.has(meta.toolCallId)) {
+        setAskUser({ id: meta.toolCallId, questions: meta.questions });
+      }
+      break;
+    }
+  }, [session.data, askUser, streaming]);
 
   // Seed the footer git line before the first round-end WS push.
   useEffect(() => {
@@ -315,10 +441,90 @@ export function useChatPanel(sessionId: string | null) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  const send = (sendConnectionId: string | undefined, sendModel: string | undefined, thinkingLevel?: string, contentOverride?: string): boolean => {
-    const content = (contentOverride ?? draft).trim();
+  /** POSTs /compact — the server summarizes older history into a compaction row. */
+  const compact = async (connectionId: string, model: string, instructions?: string) => {
+    setCompacting(true);
+    setError(null);
+    setStatusText("compacting…");
+    try {
+      await api<CodeMessage>(`/api/code/sessions/${sessionId}/compact`, {
+        method: "POST",
+        body: JSON.stringify({ connectionId, model, instructions: instructions || undefined }),
+      });
+    } catch (e) {
+      setError(COMPACT_ERRORS[(e as Error).message] ?? "compaction failed");
+    } finally {
+      setCompacting(false);
+      setStatusText(null);
+      invalidateAfterRun();
+    }
+  };
+
+  /** POSTs /clear — instant context cutoff, no LLM call, nothing replayed. */
+  const clearContext = async () => {
+    setError(null);
+    try {
+      await api<CodeMessage>(`/api/code/sessions/${sessionId}/clear`, { method: "POST" });
+    } catch (e) {
+      setError((e as Error).message === "session_busy" ? "Wait for the current run to finish before clearing." : (e as Error).message || "clear failed");
+    } finally {
+      invalidateAfterRun();
+    }
+  };
+
+  /** Sends an already-resolved message over the WS — everything the intercepts hand off to. */
+  /** Uploads files to the agent_assets destination — any file, any model; the link notation works everywhere. */
+  const uploadAssets = async (files: FileList | File[]) => {
+    if (!sessionId) return;
+    setUploadingAssets(true);
+    setError(null);
+    try {
+      const uploaded: PendingAsset[] = [];
+      for (const raw of Array.from(files)) {
+        const file = await shrinkImage(raw);
+        const localPreview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+        // Raw fetch — multipart boundaries must come from the browser, and the
+        // api() helper forces a JSON content-type.
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch(`/api/code/sessions/${sessionId}/assets`, { method: "POST", credentials: "include", body: form });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(body?.error ?? `upload failed (${res.status})`);
+        }
+        uploaded.push({ ...(await res.json()), localPreview });
+      }
+      setPendingAssets((prev) => [...prev, ...uploaded]);
+    } catch (e) {
+      const code = (e as Error).message;
+      setError(
+        code === "agent_assets_not_configured"
+          ? "No Agents Assets destination configured — set one in Settings → Storage first."
+          : code === "file_too_large"
+            ? "Files up to 25 MB are supported."
+            : code || "upload failed",
+      );
+    } finally {
+      setUploadingAssets(false);
+    }
+  };
+
+  const removeAsset = (uri: string) => {
+    setPendingAssets((prev) => {
+      const target = prev.find((a) => a.uri === uri);
+      if (target?.localPreview) URL.revokeObjectURL(target.localPreview);
+      return prev.filter((a) => a.uri !== uri);
+    });
+  };
+
+  const dispatchSend = (
+    sendConnectionId: string | undefined,
+    sendModel: string | undefined,
+    thinkingLevel: string | undefined,
+    content: string,
+    assets: PendingAsset[] = [],
+  ): boolean => {
     const ws = wsRef.current;
-    if (!content || streaming !== null) return false;
     if (!sendConnectionId || !sendModel) {
       setError("Pick a connection and model first");
       return false;
@@ -328,28 +534,119 @@ export function useChatPanel(sessionId: string | null) {
       return false;
     }
 
+    // Attachments ride the message as markdown links — filename.ext carries the
+    // file type; vision models additionally get the bytes server-side.
+    const fullContent = assets.length > 0 ? `${content}\n\n${assets.map((a) => `[${a.filename}](${a.uri})`).join("\n")}` : content;
+
     setError(null);
     setDraft("");
-    lastSentRef.current = content;
+    setPendingAssets([]);
+    lastSentRef.current = fullContent;
     setStreaming("");
     setLiveTools([]);
     setStatusText(null);
     setOptimistic({
       id: `optimistic-${Date.now()}`,
       role: "user",
-      content,
-      meta: null,
+      content: fullContent,
+      meta: assets.length > 0 ? { images: assets.map(({ uri, filename, contentType }) => ({ uri, filename, contentType })) } : null,
       createdAt: new Date().toISOString(),
     });
-    ws.send(JSON.stringify({ type: "send", content, connectionId: sendConnectionId, model: sendModel, thinkingLevel }));
+    ws.send(
+      JSON.stringify({
+        type: "send",
+        content: fullContent,
+        connectionId: sendConnectionId,
+        model: sendModel,
+        thinkingLevel,
+        ...(assets.length > 0 ? { assets: assets.map(({ uri, filename, contentType }) => ({ uri, filename, contentType })) } : {}),
+      }),
+    );
     return true;
+  };
+
+  const send = (sendConnectionId: string | undefined, sendModel: string | undefined, thinkingLevel?: string, contentOverride?: string): boolean => {
+    const content = (contentOverride ?? draft).trim();
+    if (!content || streaming !== null || compacting) return false;
+    // "/compact [instructions]" never reaches the model as a prompt — it triggers
+    // the compaction flow and the server replays summary + kept context next turn.
+    if (content === "/compact" || content.startsWith("/compact ")) {
+      if (!sendConnectionId || !sendModel) {
+        setError("Pick a connection and model first");
+        return false;
+      }
+      setDraft("");
+      void compact(sendConnectionId, sendModel, content.slice("/compact".length).trim());
+      return true;
+    }
+    // "/clear" cuts history off — a boundary like compaction, minus the summary.
+    if (content === "/clear") {
+      setDraft("");
+      void clearContext();
+      return true;
+    }
+    // "/<skill-name>" expands to the skill's full content as the user message —
+    // stored skills come from the DB cache, repo skills stream from the runner.
+    if (content.startsWith("/")) {
+      const name = content.slice(1).trim();
+      if (name) {
+        const dbSkill = dbSkills.data?.find((s) => s.name === name);
+        if (dbSkill) {
+          setDraft("");
+          return dispatchSend(sendConnectionId, sendModel, thinkingLevel, dbSkill.content);
+        }
+        if (directoryId && repoSkills.data?.skills.some((s) => s.name === name)) {
+          setDraft("");
+          setStatusText(`loading skill ${name}…`);
+          void api<{ name: string; content: string }>(`/api/code/directories/${directoryId}/repo-skills/${encodeURIComponent(name)}`)
+            .then((r) => dispatchSend(sendConnectionId, sendModel, thinkingLevel, r.content))
+            .catch((e) => setError((e as Error).message || "skill not found"))
+            .finally(() => setStatusText(null));
+          return true;
+        }
+      }
+    }
+    return dispatchSend(sendConnectionId, sendModel, thinkingLevel, content, pendingAssets);
   };
 
   const stop = () => {
     const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN || streaming === null) return;
-    ws.send(JSON.stringify({ type: "stop" }));
-    setStatusText("stopping…");
+    if (ws && ws.readyState === WebSocket.OPEN && streaming !== null) {
+      ws.send(JSON.stringify({ type: "stop" }));
+      setAskUser(null);
+      setStatusText("stopping…");
+      return;
+    }
+    // Question restored from the transcript with no live run (e.g. after a
+    // server restart) — cancel it over REST so history stays valid.
+    if (askUser) {
+      void api(`/api/code/sessions/${sessionId}/ask-answer`, {
+        method: "POST",
+        body: JSON.stringify({ toolCallId: askUser.id, cancelled: true }),
+      })
+        .catch(() => {})
+        .finally(() => {
+          setAskUser(null);
+          invalidateAfterRun();
+        });
+    }
+  };
+
+  /** Submits wizard answers — resolves the agent's pending ask_user call. */
+  const answerAskUser = (answers: AskUserAnswer[]) => {
+    if (!askUser) return;
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "ask_user_response", id: askUser.id, answers }));
+      setAskUser(null);
+      return;
+    }
+    // Socket gone (refresh race) — the endpoint resolves a live loop or
+    // repairs the dangling tool_use so the next message continues cleanly.
+    void api(`/api/code/sessions/${sessionId}/ask-answer`, { method: "POST", body: JSON.stringify({ toolCallId: askUser.id, answers }) })
+      .then(() => setAskUser(null))
+      .catch((e) => setError((e as Error).message || "failed to submit answers"))
+      .finally(() => invalidateAfterRun());
   };
 
   return {
@@ -367,8 +664,16 @@ export function useChatPanel(sessionId: string | null) {
     thinkingStartedAt,
     thinkingDurationMs,
     optimistic,
+    compacting,
+    askUser,
+    answerAskUser,
+    pendingAssets,
+    uploadingAssets,
+    uploadAssets,
+    removeAsset,
     stats,
     gitStatus,
+    skillCommands,
     send,
     stop,
   };

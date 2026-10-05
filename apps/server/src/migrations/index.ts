@@ -4,6 +4,12 @@ import { up as llmTags } from "./0002-llm-tags";
 import { up as codeSessionThinking } from "./0003-code-session-thinking";
 import { up as codeCheckpoints } from "./0004-code-checkpoints";
 import { up as assistantThinking } from "./0005-assistant-thread-thinking";
+import { up as codeSessionTags } from "./0006-code-session-tags";
+import { up as memoryScope } from "./0007-memory-scope";
+import { up as assistantThreadAgent } from "./0008-assistant-thread-agent";
+import { up as mergeAssistant } from "./0009-merge-assistant";
+import { up as codeSessionPlan } from "./0010-code-session-plan";
+import { up as mediaAsset } from "./0011-media-asset";
 
 // Keys sort lexicographically — prefix new migrations with the next number.
 export const migrations: Record<string, Migration> = {
@@ -12,4 +18,10 @@ export const migrations: Record<string, Migration> = {
   "0003_code_session_thinking": { up: codeSessionThinking },
   "0004_code_checkpoints": { up: codeCheckpoints },
   "0005_assistant_thread_thinking": { up: assistantThinking },
+  "0006_code_session_tags": { up: codeSessionTags },
+  "0007_memory_scope": { up: memoryScope },
+  "0008_assistant_thread_agent": { up: assistantThreadAgent },
+  "0009_merge_assistant": { up: mergeAssistant },
+  "0010_code_session_plan": { up: codeSessionPlan },
+  "0011_media_asset": { up: mediaAsset },
 };

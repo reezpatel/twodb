@@ -1,6 +1,7 @@
 import { Children, isValidElement, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Paperclip } from "lucide-react";
 import { CodeSnippet } from "@/components/ui/code-snippet";
 
 function nodeText(node: ReactNode): string {
@@ -16,9 +17,18 @@ function nodeText(node: ReactNode): string {
  * "mono" (code chat) uses the mono font at 13px; "plain" (assistant) uses the
  * app's default font at body size.
  */
-export function MessageMarkdown({ text, variant = "mono" }: { text: string; variant?: "mono" | "plain" }) {
+export function MessageMarkdown({
+  text,
+  variant = "mono",
+  resolveAssetUrl,
+}: {
+  text: string;
+  variant?: "mono" | "plain";
+  /** Maps a twodb:// asset uri to a fetchable URL — enables image previews and attachment chips. */
+  resolveAssetUrl?: (uri: string) => string | undefined;
+}) {
   return (
-    <div className={variant === "mono" ? "font-mono text-[13px] leading-relaxed" : "text-sm leading-relaxed"}>
+    <div className={variant === "mono" ? "font-mono text-[13px] leading-relaxed font-light" : "text-sm leading-relaxed font-light"}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -29,11 +39,28 @@ export function MessageMarkdown({ text, variant = "mono" }: { text: string; vari
           ul: ({ children }) => <ul className="mb-2 list-disc pl-4 last:mb-0">{children}</ul>,
           ol: ({ children }) => <ol className="mb-2 list-decimal pl-4 last:mb-0">{children}</ol>,
           li: ({ children }) => <li className="my-0.5">{children}</li>,
-          a: ({ href, children }) => (
-            <a className="text-primary underline underline-offset-2" href={href} target="_blank" rel="noreferrer">
-              {children}
-            </a>
-          ),
+          strong: ({ children }) => <strong className="font-medium">{children}</strong>,
+          a: ({ href, children }) => {
+            // Uploaded-asset links render as chips (images inline) — the label
+            // carries filename.ext so both the user and the model know the file.
+            if (href?.startsWith("twodb://")) {
+              const label = nodeText(children) || href;
+              const url = resolveAssetUrl?.(href);
+              if (url && /\.(png|jpe?g|gif|webp|bmp)$/i.test(label)) {
+                return <img src={url} alt={label} title={label} loading="lazy" className="max-h-56 rounded-lg border" />;
+              }
+              return (
+                <span className="bg-muted/60 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-xs">
+                  <Paperclip size={11} aria-hidden="true" /> {label}
+                </span>
+              );
+            }
+            return (
+              <a className="text-primary underline underline-offset-2" href={href} target="_blank" rel="noreferrer">
+                {children}
+              </a>
+            );
+          },
           blockquote: ({ children }) => <blockquote className="text-muted-foreground mb-2 border-l-2 pl-3 last:mb-0">{children}</blockquote>,
           pre: ({ children }) => {
             const first = Children.toArray(children)[0];

@@ -6,11 +6,23 @@ import { env } from "../env";
 
 const db = createDb(env.databaseUrl);
 
-export interface ServerSettings {
-  signUpEnabled: boolean;
+export interface StorageDestination {
+  backendId: string;
+  /** Path prefix inside the backend (no leading/trailing slash; "" = root). */
+  prefix: string;
 }
 
-const DEFAULTS: ServerSettings = { signUpEnabled: true };
+export interface ServerSettings {
+  signUpEnabled: boolean;
+  storageDestinations: Record<string, StorageDestination>;
+}
+
+/** Known dedicated destinations — extensible; the id is the setting key. */
+export const STORAGE_DESTINATIONS: { id: string; label: string; description: string }[] = [
+  { id: "agent_assets", label: "Agents Assets", description: "where agents store their assets (files, uploads, generated artifacts)" },
+];
+
+const DEFAULTS: ServerSettings = { signUpEnabled: true, storageDestinations: {} };
 
 export async function getServerSettings(): Promise<ServerSettings> {
   try {
@@ -30,4 +42,31 @@ export async function setServerSetting(key: keyof ServerSettings, value: ServerS
     .values({ key, value: { value } as Record<string, unknown>, updatedAt: now })
     .onConflict((oc) => oc.column("key").doUpdateSet({ value: { value } as Record<string, unknown>, updatedAt: now }))
     .execute();
+}
+
+export async function getStorageDestinations(): Promise<Record<string, StorageDestination>> {
+  return (await getServerSettings()).storageDestinations;
+}
+
+export async function setStorageDestination(id: string, destination: StorageDestination): Promise<Record<string, StorageDestination>> {
+  const destinations = { ...(await getStorageDestinations()), [id]: destination };
+  await setServerSetting("storageDestinations", destinations);
+  return destinations;
+}
+
+export async function deleteStorageDestination(id: string): Promise<Record<string, StorageDestination>> {
+  const current = { ...(await getStorageDestinations()) };
+  delete current[id];
+  await setServerSetting("storageDestinations", current);
+  return current;
+}
+
+/** Normalizes a user-entered prefix: trims slashes, collapses empties, rejects traversal. */
+export function normalizeStoragePrefix(raw: unknown): string | "invalid" {
+  if (raw === undefined || raw === null || raw === "") return "";
+  if (typeof raw !== "string") return "invalid";
+  const segments = raw.split("/").filter((s) => s.length > 0);
+  if (segments.some((s) => s === "." || s === "..")) return "invalid";
+  const prefix = segments.join("/");
+  return prefix.length > 200 ? "invalid" : prefix;
 }
