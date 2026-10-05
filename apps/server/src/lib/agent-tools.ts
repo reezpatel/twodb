@@ -265,21 +265,117 @@ export const AGENT_TOOLS: AgentTool[] = [
 
 const MAX_OUTPUT = 8000;
 
-/** update_file body — inputs arrive base64 in env so no shell quoting is involved. */
-const UPDATE_FILE_PY = `
-import os, base64, sys
+/** update_file body — node, guaranteed since the runner itself is a node process (python3 is absent on NixOS runners). Inputs arrive base64 in env so no shell quoting is involved. */
+const UPDATE_FILE_JS = `
+const b64 = (v) => Buffer.from(v ?? "", "base64").toString("utf8");
+const file = b64(process.env.U_FILE), oldS = b64(process.env.U_OLD), newS = b64(process.env.U_NEW);
+const fs = require("fs");
+const s = fs.readFileSync(file, "utf8");
+const n = s.split(oldS).length - 1;
+if (n === 0) { console.error("error: old_string not found in " + file); process.exit(1); }
+if (n > 1) { console.error("error: old_string matches " + n + " times in " + file + " — make it more specific"); process.exit(1); }
+fs.writeFileSync(file, s.replace(oldS, newS));
+console.log("updated " + file);
+`;
 
-p = base64.b64decode(os.environ["U_FILE"]).decode()
-old = base64.b64decode(os.environ["U_OLD"]).decode()
-new = base64.b64decode(os.environ["U_NEW"]).decode()
-s = open(p, encoding="utf-8").read()
-n = s.count(old)
-if n == 0:
-    sys.exit("error: old_string not found in " + p)
-if n > 1:
-    sys.exit("error: old_string matches %d times in %s — make it more specific" % (n, p))
-open(p, "w", encoding="utf-8").write(s.replace(old, new, 1))
-print("updated " + p)
+/**
+ * Models habitually wrap diffs in markdown fences, drop the trailing newline
+ * and miscount `@@` hunk headers. git apply needs `--recount` for the last of
+ * those and plain `patch` has no such flag at all — so the counts are fixed up
+ * here, before the patch ever reaches the runner.
+ */
+function stripPatchFences(patch: string): string {
+  const lines = patch.replace(/\r\n/g, "\n").split("\n");
+  if (lines.length && /^\s*```/.test(lines[0])) lines.shift();
+  while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
+  if (lines.length && /^\s*```\s*$/.test(lines[lines.length - 1])) lines.pop();
+  return `${lines.join("\n")}\n`;
+}
+
+const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/;
+const FILE_HEADER = /^(diff |--- |\+\+\+ |Index: )/;
+
+/** git diffs carry a/ and b/ prefixes (strip 1); bare diffs do not (strip 0). */
+function patchStripLevel(patch: string): number {
+  for (const line of patch.split("\n")) {
+    if (line.startsWith("diff --git ")) return 1;
+    if (line.startsWith("--- ") || line.startsWith("+++ ")) {
+      const path = line.slice(4).split("\t")[0].trim();
+      return /^(a|b)\//.test(path) ? 1 : 0;
+    }
+  }
+  return 1;
+}
+
+/** Rewrites every `@@` header to the counts its body actually contains. */
+function recountHunks(patch: string): string {
+  const lines = patch.split("\n");
+  if (lines.length && lines[lines.length - 1] === "") lines.pop();
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const header = HUNK_HEADER.exec(lines[i]);
+    if (!header) {
+      out.push(lines[i]);
+      continue;
+    }
+    const body: string[] = [];
+    let oldCount = 0;
+    let newCount = 0;
+    let j = i + 1;
+    for (; j < lines.length; j++) {
+      const line = lines[j];
+      if (HUNK_HEADER.test(line) || FILE_HEADER.test(line)) break;
+      if (line.startsWith("\\")) {
+        body.push(line);
+        continue;
+      }
+      if (line.startsWith("-")) oldCount++;
+      else if (line.startsWith("+")) newCount++;
+      else if (line.startsWith(" ") || line === "") {
+        oldCount++;
+        newCount++;
+      } else break;
+      body.push(line);
+    }
+    out.push(`@@ -${header[1]},${oldCount} +${header[3]},${newCount} @@${header[5]}`);
+    out.push(...body);
+    i = j - 1;
+  }
+  return `${out.join("\n")}\n`;
+}
+
+/**
+ * apply_patch body. Reads the diff on stdin and applies it. $1 is the strip
+ * level (1 for git-style a/ b/ prefixes, 0 for bare diffs), used only by the
+ * patch fallback.
+ *
+ * git apply works outside work trees as well, auto-detects a/ b/ stripping and
+ * tolerates stale line numbers; --recount is what repairs the miscounted @@
+ * headers models emit (the "corrupt patch at <stdin>:N" failure). GNU patch is
+ * the fallback for runners without git — fuzz stays at 1 because 2 can match
+ * unrelated context and silently corrupt the file.
+ */
+const APPLY_PATCH_SH = `
+__twodb_p=$(mktemp) || exit 1
+trap 'rm -f "$__twodb_p"' EXIT
+cat > "$__twodb_p" || exit 1
+if [ ! -s "$__twodb_p" ]; then echo 'error: empty patch' >&2; exit 1; fi
+
+if command -v git >/dev/null 2>&1; then
+  git apply --recount --whitespace=nowarn "$__twodb_p" && exit 0
+fi
+
+if ! command -v patch >/dev/null 2>&1; then
+  echo 'error: apply_patch needs git or patch on the runner' >&2
+  exit 1
+fi
+
+set -- "-p$1" --fuzz=1
+__twodb_help=$(patch --help 2>&1)
+for __twodb_opt in --forward --batch --no-backup-if-mismatch; do
+  case "$__twodb_help" in *"$__twodb_opt"*) set -- "$@" "$__twodb_opt";; esac
+done
+patch "$@" < "$__twodb_p"
 `;
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -315,16 +411,15 @@ function buildCommand(call: AgentToolCall): string {
       const path = str(args.path);
       if (!path) throw new Error("path is required");
       return (
-        `command -v python3 >/dev/null 2>&1 || { echo 'error: update_file requires python3 on the runner' >&2; exit 1; }; ` +
         `U_FILE=${shq(b64(path))} U_OLD=${shq(b64(str(args.old_string)))} U_NEW=${shq(b64(str(args.new_string)))} ` +
-        `python3 -c "$(${b64Decode(UPDATE_FILE_PY)})"`
+        `node -e "$(${b64Decode(UPDATE_FILE_JS)})"`
       );
     }
 
     case "apply_patch": {
-      const patch = str(args.patch);
-      if (!patch.trim()) throw new Error("patch is required");
-      return `if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then ${b64Decode(patch)} | git apply -; else ${b64Decode(patch)} | patch -p1; fi`;
+      const raw = str(args.patch);
+      if (!raw.trim()) throw new Error("patch is required");
+      return `${b64Decode(recountHunks(stripPatchFences(raw)))} | sh -c "$(${b64Decode(APPLY_PATCH_SH)})" twodb ${patchStripLevel(raw)}`;
     }
 
     case "grep": {
