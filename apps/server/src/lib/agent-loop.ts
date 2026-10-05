@@ -12,6 +12,7 @@ import {
   type ToolScope,
 } from "./agent";
 import { executeToolCall, toolsForScope, type CanvasArtifactResult, type ToolExecution } from "./agent-tools";
+import { callMcpTool, loadSessionMcpTools, MCP_TOOL_PREFIX } from "./mcp";
 import { MAX_IMAGE_BASE64, resolveImageBase64 } from "./assets";
 import { getProvider } from "./llm-providers";
 import { clearAskUser, waitForAskUserResponse, type AskUserQuestion } from "./ask-user";
@@ -88,7 +89,13 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
   ];
   // Directory-less sessions are assistant-style chats: no runner tools, canvas available.
   const toolScope: ToolScope = session.codeDirectoryId ? "code" : "assistant";
-  const tools = toolsForScope(toolScope);
+  const baseTools = toolsForScope(toolScope);
+  // MCP tools (Settings → LLM → MCP) ride along for code sessions; failures surface as a status note.
+  const mcpLoaded = toolScope === "code" ? await loadSessionMcpTools(organizationId, session.codeDirectoryId, session.tags ?? []) : { tools: [], failures: [] };
+  const tools = [...baseTools, ...mcpLoaded.tools.map((t) => t.tool)];
+  if (mcpLoaded.failures.length) {
+    await emit({ type: "status", text: `MCP unavailable: ${mcpLoaded.failures.map((f) => `${f.server} (${f.error.slice(0, 120)})`).join("; ")}` });
+  }
   const totals: RoundUsage = { inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
   let contextTokens = 0;
   let lastRoundStart = Date.now();
@@ -170,6 +177,16 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
         console.error("[agent-loop] auto-compaction failed:", e);
         await emit({ type: "status", text: "auto-compaction failed — continuing with full context" });
       }
+    }
+  };
+
+  /** MCP tool call — namespaced mcp__<server>__<tool>, executed server-side. */
+  const runMcpCall = async (call: AgentToolCall): Promise<ToolExecution> => {
+    try {
+      const output = await callMcpTool(organizationId, call.name, call.arguments ?? {});
+      return { output, code: 0, failed: false };
+    } catch (e) {
+      return { output: `error: ${(e as Error).message}`, code: null, failed: true };
     }
   };
 
@@ -342,20 +359,22 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
         const startedAt = Date.now();
         await emit({ type: "tool_start", id: call.id, name: call.name, args: call.arguments });
         const exec = await raceAbort(
-          call.name === "ask_user"
-            ? runAskUser(call)
-            : executeToolCall(
-                runnerId,
-                cwd,
-                call,
-                (stream, data) => {
-                  void emit({ type: "tool_output", id: call.id, stream, data });
-                },
-                () => {
-                  void emit({ type: "status", text: "runner is offline — waiting for it to come back (up to 60 min)…" });
-                },
-                { organizationId, sessionId: session.id, codeDirectoryId: session.codeDirectoryId, supportsImages, imageToolResults },
-              ),
+          call.name.startsWith(MCP_TOOL_PREFIX)
+            ? runMcpCall(call)
+            : call.name === "ask_user"
+              ? runAskUser(call)
+              : executeToolCall(
+                  runnerId,
+                  cwd,
+                  call,
+                  (stream, data) => {
+                    void emit({ type: "tool_output", id: call.id, stream, data });
+                  },
+                  () => {
+                    void emit({ type: "status", text: "runner is offline — waiting for it to come back (up to 60 min)…" });
+                  },
+                  { organizationId, sessionId: session.id, codeDirectoryId: session.codeDirectoryId, supportsImages, imageToolResults },
+                ),
           signal,
         );
         if (exec === ABORTED) {

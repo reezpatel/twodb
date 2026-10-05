@@ -26,6 +26,20 @@ export interface Agent {
   updatedAt: string;
 }
 
+export interface McpServer {
+  id: string;
+  organizationId: string;
+  codeDirectoryId: string | null;
+  name: string;
+  url: string;
+  transport: string;
+  headers: Record<string, string>;
+  enabled: boolean;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type MemoryScope = "workspace" | "project" | "session";
 
 export interface Memory {

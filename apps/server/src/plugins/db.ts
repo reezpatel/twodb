@@ -229,6 +229,24 @@ export interface AgentTable {
   updatedAt: Date;
 }
 
+export interface McpServerTable {
+  id: string;
+  organizationId: string;
+  codeDirectoryId: string | null;
+  /** Unique per scope; tools are namespaced with it (mcp__<name>__<tool>). */
+  name: string;
+  url: string;
+  /** auto (streamable http, sse fallback) | http | sse. */
+  transport: string;
+  /** Static auth headers — "Authorization": "Bearer <KEY>" placeholders resolved at connect time. */
+  headers: Record<string, string>;
+  enabled: boolean;
+  /** "default" tag or any session tag enables the server for that session. */
+  tags: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface InstructionTable {
   id: string;
   organizationId: string;
@@ -541,6 +559,7 @@ export interface Database {
   code_checkpoint: CodeCheckpointTable;
   skill: SkillTable;
   agent: AgentTable;
+  mcp_server: McpServerTable;
   instruction: InstructionTable;
   memory: MemoryTable;
   llm_tag: LlmTagTable;

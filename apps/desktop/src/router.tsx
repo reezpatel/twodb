@@ -24,6 +24,7 @@ import { SkillsSection } from "./routes/settings/llm/skills/skills";
 import { AgentsSection } from "./routes/settings/llm/agents/agents";
 import { MemoriesSection } from "./routes/settings/llm/memories/memories";
 import { InstructionsSection } from "./routes/settings/llm/instructions/instructions";
+import { McpSection } from "./routes/settings/llm/mcp/mcp-section";
 import { RunnersSection } from "./routes/settings/runners/runners";
 import { CodeSection } from "./routes/settings/code/code";
 import { StorageSection } from "./routes/settings/storage/storage";
@@ -75,6 +76,7 @@ export const router = createBrowserRouter([
               { path: "agents/:agentId?", Component: AgentsSection },
               { path: "memories/:memoryId?", Component: MemoriesSection },
               { path: "instructions/:instructionId?", Component: InstructionsSection },
+              { path: "mcp/:mcpId?", Component: McpSection },
             ],
           },
           { path: "runners", Component: RunnersSection },

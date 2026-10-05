@@ -1,7 +1,7 @@
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const TABS = ["connections", "skills", "agents", "memories", "instructions"] as const;
+const TABS = ["connections", "skills", "agents", "memories", "instructions", "mcp"] as const;
 
 export function LlmLayout() {
   const navigate = useNavigate();
