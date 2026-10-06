@@ -4,7 +4,8 @@ import { passkeyClient } from "@better-auth/passkey/client";
 import { apiKeyClient } from "@better-auth/api-key/client";
 
 export const authClient = createAuthClient({
-  baseURL: import.meta.env.VITE_API_URL,
+  // Same-origin /api — the vite proxy (dev), tauri (desktop), and the server's
+  // own static hosting (prod) all route it identically. No absolute API URL.
   fetchOptions: { credentials: "include" },
   plugins: [adminClient(), organizationClient(), passkeyClient(), apiKeyClient()],
 });

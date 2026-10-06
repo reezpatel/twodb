@@ -31,6 +31,8 @@ export interface PendingAsset {
 
 export type SessionDetail = CodeSession & {
   messages: CodeMessage[];
+  /** Tail-window metadata — older pages arrive via /messages backfill. */
+  messageWindow: { total: number; hasMore: boolean };
   usage: { inputTokens: number; outputTokens: number; cachedTokens: number; contextTokens: number };
 };
 
@@ -168,6 +170,64 @@ export function useChatPanel(sessionId: string | null) {
     queryFn: () => api<SessionDetail>(`/api/code/sessions/${sessionId}`),
     enabled: !!sessionId,
   });
+
+  // ----- message pagination -------------------------------------------------
+  // The session query ships only the newest window; older pages backfill on
+  // scroll. History is append-only and rows are never evicted from this map,
+  // so the accumulated set stays contiguous — a sliding tail window can only
+  // expose rows the client already holds, never a gap.
+  const [messagesById, setMessagesById] = useState<Map<string, CodeMessage>>(new Map());
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  /** Set once a backfill page returns hasMore=false — window-level hasMore stays true forever. */
+  const olderExhaustedRef = useRef(false);
+
+  const mergeMessages = (rows: CodeMessage[]) =>
+    setMessagesById((prev) => {
+      let next = prev;
+      for (const row of rows) {
+        if (next === prev) next = new Map(prev);
+        next.set(row.id, row);
+      }
+      return next;
+    });
+
+  const messages = useMemo(() => {
+    const rows = [...messagesById.values()];
+    rows.sort((a, b) => (a.createdAt === b.createdAt ? (a.id < b.id ? -1 : 1) : a.createdAt < b.createdAt ? -1 : 1));
+    return rows;
+  }, [messagesById]);
+
+  // Reset accumulated history when switching sessions.
+  useEffect(() => {
+    setMessagesById(new Map());
+    olderExhaustedRef.current = false;
+  }, [sessionId]);
+
+  const tail = session.data?.messages ?? [];
+  const windowHasMore = session.data?.messageWindow?.hasMore ?? false;
+  useEffect(() => {
+    if (tail.length === 0) return;
+    mergeMessages(tail);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tail, sessionId]);
+
+  const hasOlder = windowHasMore && !olderExhaustedRef.current;
+
+  const loadOlder = () => {
+    if (loadingOlder || !hasOlder || messages.length === 0 || !sessionId) return;
+    const oldest = messages[0];
+    const before = `${new Date(oldest.createdAt).toISOString()}~${oldest.id}`;
+    setLoadingOlder(true);
+    void api<{ messages: CodeMessage[]; hasMore: boolean }>(`/api/code/sessions/${sessionId}/messages?before=${encodeURIComponent(before)}&limit=50`)
+      .then((r) => {
+        mergeMessages(r.messages);
+        if (!r.hasMore) olderExhaustedRef.current = true;
+      })
+      .catch((e) => {
+        setError((e as Error).message || "failed to load earlier messages");
+      })
+      .finally(() => setLoadingOlder(false));
+  };
 
   const directoryId = session.data?.codeDirectoryId ?? null;
   const dbSkills = useQuery({
@@ -345,15 +405,15 @@ export function useChatPanel(sessionId: string | null) {
   // Drop the optimistic user message once the committed history contains it.
   useEffect(() => {
     if (!optimistic) return;
-    const committed = session.data?.messages ?? [];
+    const committed = messages;
     if (committed.some((m) => m.role === "user" && m.content === optimistic.content)) setOptimistic(null);
-  }, [session.data, optimistic]);
+  }, [messages, optimistic]);
 
   // Restore an unanswered ask_user from the transcript when no live run state
   // provides it — refreshes, reconnects, even a server restart keep the wizard.
   useEffect(() => {
     if (askUser || streaming !== null) return;
-    const committed = session.data?.messages ?? [];
+    const committed = messages;
     const answered = new Set<string>();
     for (const m of committed) {
       if (m.role === "tool") {
@@ -369,7 +429,7 @@ export function useChatPanel(sessionId: string | null) {
       }
       break;
     }
-  }, [session.data, askUser, streaming]);
+  }, [messages, askUser, streaming]);
 
   // Seed the footer git line before the first round-end WS push.
   useEffect(() => {
@@ -676,6 +736,11 @@ export function useChatPanel(sessionId: string | null) {
     skillCommands,
     send,
     stop,
+    // pagination
+    visibleMessages: messages,
+    hasOlder,
+    loadingOlder,
+    loadOlder,
   };
 }
 

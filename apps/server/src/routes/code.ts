@@ -5,6 +5,7 @@ import { getCodeSettings, setCodeSettings, type CodeSettingsPatch } from "../lib
 import { parseTags, syncLlmTags } from "../lib/llm-tags";
 import { enabledRepoSources, listRepoSkills, readRepoSkill } from "../lib/skills";
 import { codeCompactionStore, NothingToCompactError, runCompaction } from "../lib/compaction";
+import { fetchSessionMessageWindow, fetchSessionMessages, messageCursor } from "../lib/message-window";
 import { readAssetBytesById, storeAsset } from "../lib/assets";
 import { resolveSessionSystemPrompt } from "../lib/session-prompt";
 import { resolveAskUser, type AskUserAnswer } from "../lib/ask-user";
@@ -252,6 +253,35 @@ export const codeRoutes = new Hono()
     } catch {
       return c.json({ error: "runner_offline" }, 503);
     }
+  })
+
+  // Older-message backfill for the chat panel — keyset paginated on
+  // (createdAt, id). `before` is the oldest cursor the client currently holds.
+  .get("/sessions/:id/messages", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const session = await db
+      .selectFrom("code_session")
+      .select("id")
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!session) return c.json({ error: "session_not_found" }, 404);
+
+    const beforeRaw = c.req.query("before");
+    let before: { createdAt: string; id: string } | undefined;
+    if (beforeRaw) {
+      const [createdAt, id] = beforeRaw.split("~");
+      if (!createdAt || !id) return c.json({ error: "bad_before" }, 400);
+      before = { createdAt, id };
+    }
+
+    const limit = Math.min(Number(c.req.query("limit") ?? 50) || 50, 200);
+    const messages = await fetchSessionMessages(session.id, { limit: limit + 1, before });
+    const hasMore = messages.length > limit;
+    const page = hasMore ? messages.slice(0, limit) : messages;
+    return c.json({ messages: page, hasMore });
   })
 
   .get("/sessions/:id/checkpoints", async (c) => {
@@ -704,7 +734,13 @@ export const codeRoutes = new Hono()
       .executeTakeFirst();
     if (!session) return c.json({ error: "session_not_found" }, 404);
 
-    const messages = await db.selectFrom("code_session_message").selectAll().where("sessionId", "=", session.id).orderBy("createdAt", "asc").execute();
+    // Tail window only — the client backfills older pages via /messages (keyset).
+    const messages = await fetchSessionMessageWindow(session.id, 50);
+    const totalMessages = await db
+      .selectFrom("code_session_message")
+      .select((eb) => eb.fn.countAll<number>().as("count"))
+      .where("sessionId", "=", session.id)
+      .executeTakeFirst();
 
     const subagents = await db
       .selectFrom("code_session")
@@ -758,6 +794,7 @@ export const codeRoutes = new Hono()
     return c.json({
       ...session,
       messages,
+      messageWindow: { total: Number(totalMessages?.count ?? 0), hasMore: Number(totalMessages?.count ?? 0) > messages.length },
       subagents,
       usage: {
         inputTokens: Number(usage?.inputTokens ?? 0),
