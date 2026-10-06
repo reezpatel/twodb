@@ -66,7 +66,8 @@ export function McpSheet() {
     setTransport(existing?.transport ?? "auto");
     setHeadersJson(existing ? JSON.stringify(existing.headers ?? {}, null, 2) : "{}");
     setEnabled(existing?.enabled ?? true);
-    setTags(existing?.tags ?? []);
+    // New servers default to the universal tag — empty tags match no session.
+    setTags(existing?.tags?.length ? existing.tags : ["default"]);
     setError(null);
     setTestResult(null);
   }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps

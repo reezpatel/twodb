@@ -4,6 +4,7 @@ import { requireOrgSession } from "../lib/session";
 import { resolveScope } from "../lib/code-directory";
 import { parseTags, syncLlmTags } from "../lib/llm-tags";
 import { evictMcpClient, listMcpServerTools, parseMcpServersJson } from "../lib/mcp";
+import { DEFAULT_SKILL_TAG } from "../lib/skills";
 import type { McpServerTable } from "../plugins/db";
 import type { Selectable } from "kysely";
 
@@ -61,6 +62,8 @@ export const mcpRoutes = new Hono()
     if (headers === "invalid") return c.json({ error: "invalid_headers" }, 400);
     const tags = parseTags(body?.tags);
     if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
+    // Empty tags would match no session — default to the universal tag, like import.
+    const tagList = tags?.length ? tags : [DEFAULT_SKILL_TAG];
 
     const scope = await resolveScope(db, s.organizationId, body?.codeDirectoryId);
     if (!scope.ok) return c.json({ error: scope.error }, scope.error === "directory_not_found" ? 404 : 400);
@@ -78,7 +81,7 @@ export const mcpRoutes = new Hono()
           transport: typeof body?.transport === "string" ? body.transport : "auto",
           headers: headers ?? {},
           enabled: body?.enabled === false ? false : true,
-          tags: tags ?? [],
+          tags: tagList,
           createdAt: now,
           updatedAt: now,
         })
@@ -139,7 +142,8 @@ export const mcpRoutes = new Hono()
     if (body?.tags !== undefined) {
       const tags = parseTags(body.tags);
       if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
-      patch.tags = tags ?? [];
+      // Empty tags would match no session — default to the universal tag.
+      patch.tags = tags?.length ? tags : [DEFAULT_SKILL_TAG];
     }
     if (Object.keys(patch).length === 0) return c.json({ error: "empty_update" }, 400);
 
