@@ -262,3 +262,22 @@ export function parseMcpServersJson(input: unknown): { drafts: McpImportDraft[];
   }
   return { drafts, skipped };
 }
+
+/** Names of tools grouped by server — for the system prompt's [MCP servers] section. */
+export function formatMcpForPrompt(tools: McpTool[]): string {
+  if (tools.length === 0) return "";
+  const byServer = new Map<string, string[]>();
+  for (const t of tools) {
+    const list = byServer.get(t.serverName) ?? [];
+    list.push(t.remoteName);
+    byServer.set(t.serverName, list);
+  }
+  const lines = [...byServer.entries()].map(([server, toolNames]) => `  ${server}: ${toolNames.join(", ")}`);
+  return [
+    "Remote MCP servers are connected. Their tools are available as normal tool calls",
+    "with mcp__<server>__<tool> names — call them directly when the task needs them.",
+    "",
+    "[MCP servers]",
+    ...lines,
+  ].join("\n");
+}

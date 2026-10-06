@@ -42,6 +42,7 @@ export interface SystemPromptSections {
   skills?: string;
   instructions?: string;
   memories?: string;
+  mcp?: string;
   canvas?: string;
 }
 
@@ -52,6 +53,7 @@ export function buildSystemPrompt(override: string | null | undefined, cwd: stri
   if (sections?.skills) prompt += `\n\n<skills>\n${sections.skills}\n</skills>`;
   if (sections?.instructions) prompt += `\n\n<instructions>\n${sections.instructions}\n</instructions>`;
   if (sections?.memories) prompt += `\n\n<memory>\n${sections.memories}\n</memory>`;
+  if (sections?.mcp) prompt += `\n\n<mcp>\n${sections.mcp}\n</mcp>`;
   if (sections?.canvas) prompt += `\n\n<canvas>\n${sections.canvas}\n</canvas>`;
   return prompt;
 }

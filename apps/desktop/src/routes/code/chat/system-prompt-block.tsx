@@ -10,6 +10,8 @@ interface SessionPromptResolution {
   skills: { name: string; source: string }[];
   instructions: { id: string; instruction: string }[];
   memories: { id: string; scope: string; content: string }[];
+  mcpTools: { server: string; name: string }[];
+  mcpFailures: { server: string; error: string }[];
 }
 
 /**
@@ -37,10 +39,13 @@ export function SystemPromptBlock({ endpoint }: { endpoint?: string }) {
   const skills = resolution.data?.skills ?? [];
   const instructions = resolution.data?.instructions ?? [];
   const memories = resolution.data?.memories ?? [];
+  const mcpServers = [...new Set((resolution.data?.mcpTools ?? []).map((t) => t.server))];
+  const mcpFailures = resolution.data?.mcpFailures ?? [];
   const counts = [
     skills.length > 0 ? `${skills.length} skill${skills.length === 1 ? "" : "s"}` : null,
     instructions.length > 0 ? `${instructions.length} instruction${instructions.length === 1 ? "" : "s"}` : null,
     memories.length > 0 ? `${memories.length} ${memories.length === 1 ? "memory" : "memories"}` : null,
+    mcpServers.length > 0 ? `${mcpServers.length} MCP server${mcpServers.length === 1 ? "" : "s"}` : null,
   ].filter(Boolean);
 
   return (
@@ -53,9 +58,16 @@ export function SystemPromptBlock({ endpoint }: { endpoint?: string }) {
         <ChevronDown size={12} className={cn("text-muted-foreground/70 ml-auto shrink-0 transition-transform", !expanded && "-rotate-90")} aria-hidden="true" />
       </button>
       {expanded && (
-        <pre className="text-muted-foreground max-h-96 overflow-y-auto border-t px-3 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
-          {resolution.data?.systemPrompt ?? "…"}
-        </pre>
+        <div className="border-t">
+          {mcpFailures.length > 0 && (
+            <p className="text-destructive px-3 py-2 font-mono text-[11px] leading-relaxed">
+              MCP unreachable: {mcpFailures.map((f) => `${f.server} (${f.error.slice(0, 80)})`).join("; ")}
+            </p>
+          )}
+          <pre className="text-muted-foreground max-h-96 overflow-y-auto px-3 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
+            {resolution.data?.systemPrompt ?? "…"}
+          </pre>
+        </div>
       )}
     </div>
   );
