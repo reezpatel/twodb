@@ -589,6 +589,34 @@ export const llmRoutes = new Hono()
     return c.json(pollCodexOAuth(state));
   })
 
+  /** All quota snapshots for the org, joined with connection provider/name — footer widgets. */
+  .get("/quotas", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+
+    const rows = await db
+      .selectFrom("llm_quota")
+      .innerJoin("llm_connection", (join) => join.onRef("llm_quota.connectionId", "=", "llm_connection.id"))
+      .select([
+        "llm_quota.id",
+        "llm_quota.connectionId",
+        "llm_quota.quotaType",
+        "llm_quota.groupName",
+        "llm_quota.unit",
+        "llm_quota.quotaTotal",
+        "llm_quota.quotaUsed",
+        "llm_quota.capturedAt",
+        "llm_quota.resetAt",
+        "llm_connection.provider as provider",
+        "llm_connection.name as connectionName",
+      ])
+      .where("llm_quota.organizationId", "=", s.organizationId)
+      .orderBy("llm_connection.createdAt", "asc")
+      .orderBy("llm_quota.quotaType", "asc")
+      .execute();
+    return c.json(rows);
+  })
+
   .get("/connections", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);

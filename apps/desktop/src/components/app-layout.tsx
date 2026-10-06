@@ -3,6 +3,7 @@ import { Outlet } from "react-router";
 import { Menu } from "lucide-react";
 import { NavRail } from "./nav-rail";
 import { MobileNavDrawer } from "./mobile-nav";
+import { FooterUsage } from "./footer-usage";
 import { MobileNavContext } from "./mobile-nav-context";
 import { useAppLayout } from "./use-app-layout";
 import { useMediaQuery } from "../lib/use-media-query";
@@ -49,9 +50,12 @@ export function AppLayout() {
           </main>
         </div>
 
-        <footer className="bg-card text-muted-foreground flex h-6 items-center justify-between border-t px-2 text-xs">
-          <span>{activeOrg?.name ?? "twodb"}</span>
-          <span>{session?.user.email}</span>
+        <footer className="bg-card text-muted-foreground flex h-6 items-center justify-between gap-4 border-t px-2 text-xs">
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="shrink-0">{activeOrg?.name ?? "twodb"}</span>
+            <FooterUsage />
+          </div>
+          <span className="truncate">{session?.user.email}</span>
         </footer>
 
         {isMobile && (
