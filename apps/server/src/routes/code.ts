@@ -9,7 +9,7 @@ import { fetchSessionMessageWindow, fetchSessionMessages, messageCursor } from "
 import { readAssetBytesById, storeAsset } from "../lib/assets";
 import { resolveSessionSystemPrompt } from "../lib/session-prompt";
 import { resolveAskUser, type AskUserAnswer } from "../lib/ask-user";
-import { broadcastToSession, isSessionRunning } from "./code-ws";
+import { broadcastSessionEvent, broadcastToSession, isSessionRunning } from "./code-ws";
 import { readGitStatus } from "../lib/git-status";
 import { runnerManager } from "../lib/runner-manager";
 import type { CodeSessionMode, CodeSessionType } from "../plugins/db";
@@ -609,7 +609,6 @@ export const codeRoutes = new Hono()
   .post("/sessions", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.json({ error: "unauthorized" }, 401);
-
     const body = await c.req.json().catch(() => null);
 
     let type: CodeSessionType = "main_agent";
@@ -719,6 +718,10 @@ export const codeRoutes = new Hono()
       })
       .returningAll()
       .executeTakeFirstOrThrow();
+    broadcastSessionEvent(s.organizationId, {
+      type: "session_created",
+      session: { id: row.id, title: row.title, codeDirectoryId: row.codeDirectoryId, updatedAt: row.updatedAt.toISOString() },
+    });
     return c.json(row, 201);
   })
 
@@ -733,6 +736,12 @@ export const codeRoutes = new Hono()
       .where("organizationId", "=", s.organizationId)
       .executeTakeFirst();
     if (!session) return c.json({ error: "session_not_found" }, 404);
+
+    // Opening the session marks it seen — clears the sidebar unread flag.
+    if (session.unseenUpdates) {
+      await db.updateTable("code_session").set({ unseenUpdates: false }).where("id", "=", session.id).execute();
+      broadcastSessionEvent(s.organizationId, { type: "session_state", id: session.id, running: isSessionRunning(session.id), needsInput: false, unseenUpdates: false });
+    }
 
     // Tail window only — the client backfills older pages via /messages (keyset).
     const messages = await fetchSessionMessageWindow(session.id, 50);
@@ -1171,6 +1180,18 @@ export const codeRoutes = new Hono()
     if (Object.keys(patch).length === 0) {
       return c.json({ error: "empty_update" }, 400);
     }
+    // User renames win permanently: merge titleUserEdited into whatever
+    // runtimeState this patch carries so later set_session_name calls no-op.
+    if (patch.title !== undefined) {
+      const prior = await db
+        .selectFrom("code_session")
+        .select("runtimeState")
+        .where("id", "=", session.id)
+        .executeTakeFirst();
+      const priorState = (prior?.runtimeState ?? {}) as Record<string, unknown>;
+      const incoming = typeof patch.runtimeState === "string" ? (JSON.parse(patch.runtimeState) as Record<string, unknown>) : {};
+      patch.runtimeState = JSON.stringify({ ...priorState, ...incoming, titleUserEdited: true });
+    }
 
     const row = await db
       .updateTable("code_session")
@@ -1179,6 +1200,7 @@ export const codeRoutes = new Hono()
       .returningAll()
       .executeTakeFirst();
     if (patch.tags) await syncLlmTags(s.organizationId, patch.tags);
+    if (row) broadcastSessionEvent(s.organizationId, { type: "session_updated", session: { id: row.id, title: row.title, updatedAt: row.updatedAt.toISOString() } });
     return c.json(row);
   })
 
@@ -1193,5 +1215,6 @@ export const codeRoutes = new Hono()
       .returning("id")
       .executeTakeFirst();
     if (!row) return c.json({ error: "session_not_found" }, 404);
+    broadcastSessionEvent(s.organizationId, { type: "session_deleted", id: row.id });
     return c.json({ ok: true });
   });

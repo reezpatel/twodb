@@ -25,6 +25,7 @@ In addition to the tools above, you may have access to other custom tools depend
 - Use run_command for file operations like ls, rg, find
 - Use ask_user to ask the user questions when you need decisions, choices, or clarification — never guess on their behalf
 - Track multi-step work with update_plan — set the plan before starting and keep step statuses current; check it with get_plan
+- Name the session with set_session_name once the user's goal is clear — a few exchanges in, NOT in the first exchange; never rename twice
 - Be concise in your responses
 - Show file paths clearly when working with files`;
 

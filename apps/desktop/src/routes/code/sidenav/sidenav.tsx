@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Loader2, Plus, Search } from "lucide-react";
+import { Loader2, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { NewDirectoryDialog } from "../directories/new-directory-dialog";
-import { useSessionList, groupSessionsByDirectory } from "./use-session-list";
+import { useSessionList, groupSessionsByDirectory, useSessionEvents } from "./use-session-list";
 import type { CodeSession, SessionDirectoryGroup } from "./use-session-list";
 import { useCodeDirectories } from "../directories/use-code-directories";
 import type { CodeDirectory } from "../directories/use-code-directories";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -114,9 +115,12 @@ function DirectoryGroupHeader({
 }
 
 export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps) {
-  const { sessions, create, remove } = useSessionList(onSelect);
+  const { sessions, create, remove, rename } = useSessionList(onSelect);
+  const live = useSessionEvents(true);
   const { directories, renameDirectory } = useCodeDirectories();
   const [newDirOpen, setNewDirOpen] = useState(false);
+  const [renaming, setRenaming] = useState<CodeSession | null>(null);
+  const [renameValue, setRenameValue] = useState("");
   const navigate = useNavigate();
 
   const directoryGroups = groupSessionsByDirectory(sessions.data ?? [], directories.data ?? []);
@@ -154,7 +158,38 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
         {directoryGroups.map((group) => (
           <div key={group.id ?? "none"}>
             <DirectoryGroupHeader group={group} rename={renameDirectory} create={create} />
-            {group.sessions.map((session) => (
+            {group.sessions.map((session) => {
+              const isRenamingThis = renaming?.id === session.id;
+              if (isRenamingThis) {
+                const commitRename = () => {
+                  const trimmed = renameValue.trim();
+                  setRenaming(null);
+                  if (trimmed && trimmed !== session.title) rename.mutate({ id: session.id, title: trimmed });
+                };
+                return (
+                  <div key={session.id} className="mx-1 flex items-center gap-2 rounded-md px-2 py-1">
+                    <span className="size-2 shrink-0 rounded-full bg-muted-foreground/30" />
+                    <input
+                      autoFocus
+                      aria-label="Session name"
+                      className="bg-accent h-6 min-w-0 flex-1 rounded-sm px-1 text-sm outline-none"
+                      value={renameValue}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitRename();
+                        if (e.key === "Escape") setRenaming(null);
+                      }}
+                    />
+                  </div>
+                );
+              }
+              const state = live.get(session.id);
+              const running = state?.running ?? (session.id === selectedId && activeStreaming);
+              const needsInput = state?.needsInput ?? false;
+              const unseen = state?.unseenUpdates ?? session.unseenUpdates ?? false;
+              return (
               <div
                 key={session.id}
                 className={cn(
@@ -166,26 +201,53 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
                 <span
                   className={cn(
                     "size-2 shrink-0 rounded-full",
-                    selectedId === session.id && activeStreaming ? "animate-pulse bg-primary" : "bg-muted-foreground/30",
+                    needsInput
+                      ? "bg-amber-500 ring-2 ring-amber-500/30"
+                      : running
+                        ? "animate-pulse bg-primary"
+                        : unseen
+                          ? "bg-primary/60"
+                          : "bg-muted-foreground/30",
                   )}
+                  title={needsInput ? "waiting for your answer" : running ? "running" : unseen ? "new activity" : undefined}
                 />
                 <span className="min-w-0 flex-1 truncate">{session.title}</span>
                 <span className="text-muted-foreground/70 text-xs">{relativeTime(session.updatedAt)}</span>
-                <button
-                  className="text-muted-foreground/50 hover:text-destructive hidden shrink-0 text-sm leading-none group-hover:block"
-                  title="Delete session"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (window.confirm(`Delete "${session.title}"?`)) {
-                      if (session.id === selectedId) navigate("/apps/code");
-                      remove.mutate(session.id);
-                    }
-                  }}
-                >
-                  ×
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="text-muted-foreground/50 hover:text-foreground size-4 shrink-0 rounded-sm opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
+                      title="Session options"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal size={13} aria-hidden="true" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setRenameValue(session.title);
+                        setRenaming(session);
+                      }}
+                    >
+                      <Pencil size={13} aria-hidden="true" /> Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => {
+                        if (window.confirm(`Delete "${session.title}"?`)) {
+                          if (session.id === selectedId) navigate("/apps/code");
+                          remove.mutate(session.id);
+                        }
+                      }}
+                    >
+                      <Trash2 size={13} aria-hidden="true" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-            ))}
+              );
+            })}
           </div>
         ))}
         {(sessions.data ?? []).length === 0 && !sessions.isPending && (

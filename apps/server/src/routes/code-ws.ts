@@ -70,6 +70,34 @@ interface ActiveRun {
 const activeRuns = new Map<string, ActiveRun>();
 const sockets = new Set<CodeSocket>();
 
+// --- org-wide session list channel (sidebar realtime state) -----------------
+
+interface SessionListSocket {
+  ws: WSContext;
+  organizationId: string;
+}
+
+const sessionListSockets = new Set<SessionListSocket>();
+
+export type SessionListEvent =
+  | { type: "session_created"; session: { id: string; title: string; codeDirectoryId: string | null; updatedAt: string } }
+  | { type: "session_updated"; session: { id: string; title: string; updatedAt: string } }
+  | { type: "session_deleted"; id: string }
+  | { type: "session_state"; id: string; running: boolean; needsInput: boolean; unseenUpdates: boolean };
+
+/** Fan a sidebar event out to every socket of the owning org. */
+export function broadcastSessionEvent(organizationId: string, event: SessionListEvent) {
+  const data = JSON.stringify(event);
+  for (const s of sessionListSockets) {
+    if (s.organizationId !== organizationId) continue;
+    try {
+      s.ws.send(data);
+    } catch {
+      sessionListSockets.delete(s);
+    }
+  }
+}
+
 function accumulate(run: ActiveRun, frame: AgentFrame) {
   switch (frame.type) {
     case "round_start":
@@ -157,6 +185,15 @@ export function isSessionRunning(sessionId: string): boolean {
   return activeRuns.has(sessionId);
 }
 
+/** Sidebar state for one session: run/needsInput/unseen, pushed to the org channel. */
+export function pushSessionState(organizationId: string, sessionId: string, overrides?: Partial<{ needsInput: boolean; unseenUpdates: boolean }>) {
+  const run = activeRuns.get(sessionId);
+  const running = run !== undefined;
+  const needsInput = overrides?.needsInput ?? (run?.askUser != null);
+  const unseenUpdates = overrides?.unseenUpdates ?? false;
+  broadcastSessionEvent(organizationId, { type: "session_state", id: sessionId, running, needsInput, unseenUpdates });
+}
+
 /** Fan a frame out to every socket currently viewing this session. */
 export function broadcastToSession(sessionId: string, frame: unknown) {
   const data = JSON.stringify(frame);
@@ -206,6 +243,43 @@ async function pushRunners(targets: CodeSocket[], only?: CodeSocket) {
  */
 export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
   runnerManager.onChange(() => void pushRunners([...sockets]));
+
+  // Org-wide sidebar channel: coarse per-session state (running, needsInput,
+  // unseen) plus created/updated/deleted notifications. One socket per browser
+  // tab regardless of how many sessions exist.
+  app.get(
+    "/api/code/sessions-ws",
+    upgradeWebSocket((c: Context) => {
+      const orgReady = auth.api
+        .getSession({ headers: c.req.raw.headers })
+        .then((s) => s?.session.activeOrganizationId ?? null)
+        .catch(() => null);
+      let socket: SessionListSocket | null = null;
+      return {
+        async onOpen(_evt: unknown, ws: WSContext) {
+          const organizationId = await orgReady;
+          if (!organizationId) {
+            ws.close(4401, "unauthorized");
+            return;
+          }
+          socket = { ws, organizationId };
+          sessionListSockets.add(socket);
+        },
+        onClose() {
+          if (socket) sessionListSockets.delete(socket);
+        },
+        async onMessage(evt: { data: unknown }, ws: WSContext) {
+          if (parseMessage(evt.data)?.type === "ping") {
+            try {
+              ws.send(JSON.stringify({ type: "pong" }));
+            } catch {
+              // socket gone
+            }
+          }
+        },
+      };
+    }),
+  );
 
   app.get(
     "/api/code/sessions/:id/ws",
@@ -383,9 +457,12 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               askUser: null,
             };
             activeRuns.set(session.id, run);
+            pushSessionState(organizationId, session.id);
             const emit = (frame: AgentFrame) => {
               accumulate(run, frame);
               broadcast(run, frame);
+              if (frame.type === "ask_user") pushSessionState(organizationId, session.id, { needsInput: true });
+              else if (frame.type === "tool_result" && run.askUser?.id === frame.id) pushSessionState(organizationId, session.id, { needsInput: false });
             };
 
             try {
@@ -407,6 +484,16 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               );
             } finally {
               activeRuns.delete(session.id);
+              // Completed while the user was elsewhere — flag it for the sidebar.
+              const watched = run.sockets.size > 0;
+              if (!watched) {
+                try {
+                  await db.updateTable("code_session").set({ unseenUpdates: true }).where("id", "=", session.id).execute();
+                } catch {
+                  // state flag is cosmetic — never fail the run on it
+                }
+              }
+              pushSessionState(organizationId, session.id, { unseenUpdates: !watched });
               // The run just touched files — refresh the footer git line.
               void (async () => {
                 if (!directory) return;

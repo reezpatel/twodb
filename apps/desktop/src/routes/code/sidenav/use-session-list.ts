@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import type { CodeDirectory } from "../directories/use-code-directories";
 import { api } from "@/lib/api";
 
@@ -10,6 +11,8 @@ export interface CodeSession {
   codeDirectoryId: string | null;
   thinkingLevel: string | null;
   runtimeState: Record<string, unknown> | null;
+  /** Run finished since this session was last opened — sidebar unread marker. */
+  unseenUpdates?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,6 +53,77 @@ export function groupSessionsByDirectory(sessions: CodeSession[], directories: C
   return groups;
 }
 
+export interface SessionLiveState {
+  running: boolean;
+  needsInput: boolean;
+  unseenUpdates: boolean;
+}
+
+type SessionListEvent =
+  | { type: "session_created"; session: { id: string; title: string; codeDirectoryId: string | null; updatedAt: string } }
+  | { type: "session_updated"; session: { id: string; title: string; updatedAt: string } }
+  | { type: "session_deleted"; id: string }
+  | { type: "session_state"; id: string; running: boolean; needsInput: boolean; unseenUpdates: boolean };
+
+/**
+ * Org-wide sidebar channel: one socket per tab carrying coarse session state
+ * (running / needsInput / unseen) and create/update/delete notifications.
+ * Overlays are keyed by session id and reset whenever the list refetches.
+ */
+export function useSessionEvents(enabled: boolean) {
+  const queryClient = useQueryClient();
+  const [live, setLive] = useState<Map<string, SessionLiveState>>(new Map());
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let disposed = false;
+    let attempt = 0;
+    const connect = () => {
+      if (disposed) return;
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${proto}://${location.host}/api/code/sessions-ws`);
+      ws.onmessage = (evt) => {
+        let frame: SessionListEvent;
+        try {
+          frame = JSON.parse(evt.data as string) as SessionListEvent;
+        } catch {
+          return;
+        }
+        if (frame.type === "session_state") {
+          setLive((prev) => {
+            const next = new Map(prev);
+            next.set(frame.id, { running: frame.running, needsInput: frame.needsInput, unseenUpdates: frame.unseenUpdates });
+            return next;
+          });
+        } else if (frame.type === "session_deleted") {
+          setLive((prev) => {
+            const next = new Map(prev);
+            next.delete(frame.id);
+            return next;
+          });
+          void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
+        } else {
+          // created / renamed — the REST list is the source of truth.
+          void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
+        }
+      };
+      ws.onclose = () => {
+        if (disposed) return;
+        attempt += 1;
+        retryRef.current = setTimeout(connect, Math.min(1000 * 2 ** (attempt - 1), 15_000));
+      };
+    };
+    connect();
+    return () => {
+      disposed = true;
+      if (retryRef.current) clearTimeout(retryRef.current);
+    };
+  }, [enabled, queryClient]);
+
+  return live;
+}
+
 export function useSessionList(onCreated: (id: string) => void) {
   const queryClient = useQueryClient();
 
@@ -71,5 +145,11 @@ export function useSessionList(onCreated: (id: string) => void) {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] }),
   });
 
-  return { sessions, create, remove };
+  const rename = useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) =>
+      api<CodeSession>(`/api/code/sessions/${id}`, { method: "PATCH", body: JSON.stringify({ title }) }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] }),
+  });
+
+  return { sessions, create, remove, rename };
 }

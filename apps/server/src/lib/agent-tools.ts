@@ -5,6 +5,7 @@ import { getCodeSettings } from "./code-settings";
 import { enabledRepoSources, readRepoSkill } from "./skills";
 import { readAssetForModel } from "./assets";
 import { runnerManager } from "./runner-manager";
+import { broadcastToSession, broadcastSessionEvent } from "../routes/code-ws";
 
 export type ToolOutputSink = (stream: "stdout" | "stderr", data: string) => void;
 
@@ -136,11 +137,27 @@ export const UPDATE_PLAN_TOOL: AgentTool = {
   },
 };
 
+/** Names the session in the sidebar — available everywhere; respects user renames. */
+export const SET_SESSION_NAME_TOOL: AgentTool = {
+  name: "set_session_name",
+  description:
+    "Sets this session's display name in the sidebar. Call it ONCE, after the user's goal for the session has become clear — not in the first exchange. Never call it again after that; a user rename always wins.",
+  scope: ["code", "assistant"],
+  parameters: {
+    type: "object",
+    properties: {
+      name: { type: "string", description: "Short session name (3-6 words), e.g. 'Fix login timeout bug'" },
+    },
+    required: ["name"],
+  },
+};
+
 export const AGENT_TOOLS: AgentTool[] = [
   READ_SKILL_TOOL,
   READ_ASSET_TOOL,
   CANVAS_TOOL,
   ASK_USER_TOOL,
+  SET_SESSION_NAME_TOOL,
   GET_PLAN_TOOL,
   UPDATE_PLAN_TOOL,
   {
@@ -514,6 +531,26 @@ async function executeUpdateCanvas(ctx: ToolContext | undefined, call: AgentTool
 
 const PLAN_STATUSES = new Set(["pending", "in_progress", "done"]);
 
+/**
+ * set_session_name renames the session in the sidebar. A user rename (marked
+ * runtimeState.titleUserEdited) makes this a no-op — the tool still succeeds
+ * so the model doesn't retry.
+ */
+async function executeSetSessionName(ctx: ToolContext | undefined, call: AgentToolCall): Promise<ToolExecution> {
+  if (!ctx) return { output: "error: set_session_name requires session context", code: null, failed: true };
+  const name = str(call.arguments?.name).trim().slice(0, 80);
+  if (!name) return { output: "error: name is required", code: null, failed: true };
+  const row = await db.selectFrom("code_session").select(["id", "title", "runtimeState"]).where("id", "=", ctx.sessionId).executeTakeFirst();
+  if (!row) return { output: "error: session not found", code: null, failed: true };
+  if ((row.runtimeState as { titleUserEdited?: boolean } | null)?.titleUserEdited) {
+    return { output: "name kept — user already renamed this session", code: 0, failed: false };
+  }
+  await db.updateTable("code_session").set({ title: name }).where("id", "=", ctx.sessionId).execute();
+  broadcastToSession(ctx.sessionId, { type: "session_updated" });
+  broadcastSessionEvent(ctx.organizationId, { type: "session_updated", session: { id: ctx.sessionId, title: name, updatedAt: new Date().toISOString() } });
+  return { output: `session named: ${name}`, code: 0, failed: false };
+}
+
 /** get_plan/update_plan — reads or fully replaces the session's plan column. */
 async function executePlan(ctx: ToolContext | undefined, call: AgentToolCall): Promise<ToolExecution> {
   if (!ctx) return { output: "error: plan tools require session context", code: null, failed: true };
@@ -588,6 +625,13 @@ export async function executeToolCall(
   if (call.name === "get_plan" || call.name === "update_plan") {
     try {
       return await executePlan(ctx, call);
+    } catch (e) {
+      return { output: `error: ${(e as Error).message}`, code: null, failed: true };
+    }
+  }
+  if (call.name === "set_session_name") {
+    try {
+      return await executeSetSessionName(ctx, call);
     } catch (e) {
       return { output: `error: ${(e as Error).message}`, code: null, failed: true };
     }
