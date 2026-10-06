@@ -187,6 +187,8 @@ export interface CodeSessionTable {
   runtimeState: ColumnType<Record<string, unknown> | null, string | null, string | null>;
   /** get_plan/update_plan state — { steps: [{ description, status }] }. */
   plan: ColumnType<Record<string, unknown> | null, string | null, string | null>;
+  /** Run finished since the user last opened this session — sidebar unread marker. */
+  unseenUpdates: ColumnType<boolean, boolean | undefined, boolean | undefined>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -313,6 +315,16 @@ export interface LlmUsageEventTable {
   outputTokens: number;
   cachedInputTokens: number;
   createdAt: Date;
+}
+
+export interface FooterPreferenceTable {
+  id: string;
+  organizationId: string;
+  userId: string;
+  key: string;
+  value: ColumnType<Record<string, unknown>, string, string>;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface CodeSessionUsageEventTable {
@@ -565,6 +577,7 @@ export interface Database {
   llm_tag: LlmTagTable;
   llm_quota: LlmQuotaTable;
   llm_usage_event: LlmUsageEventTable;
+  footer_preference: FooterPreferenceTable;
   llm_model: LlmModelTable;
   storage_backend: StorageBackendTable;
   storage_bucket: StorageBucketTable;
