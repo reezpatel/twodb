@@ -38,6 +38,11 @@ Keep chat replies short and conversational; put the substance on the canvas.`;
 /** Default persona for directory-less (assistant-style) code sessions. */
 export const ASSISTANT_DEFAULT_PROMPT = "You are twodb assistant, a helpful general-purpose chat assistant.";
 
+/** Guidance injected into non-interactive (headless subagent) sessions. */
+export const NON_INTERACTIVE_GUIDANCE = `This session is NOT interactive — no human is watching this thread in real time.
+- The ask_user tool is unavailable: it returns an error. Never call it; make reasonable decisions yourself and report them.
+- Work autonomously to complete the assigned task, then stop. Your final message is a summary handed back to the invoking agent.`;
+
 /** Extra tagged sections appended after the prompt body and cwd. */
 export interface SystemPromptSections {
   skills?: string;
@@ -45,6 +50,8 @@ export interface SystemPromptSections {
   memories?: string;
   mcp?: string;
   canvas?: string;
+  /** Non-interactive guidance (headless subagent runs). */
+  nonInteractive?: string;
 }
 
 /** Effective prompt = stored override (non-empty) or the default, plus the per-session cwd and tagged sections. */
@@ -56,5 +63,6 @@ export function buildSystemPrompt(override: string | null | undefined, cwd: stri
   if (sections?.memories) prompt += `\n\n<memory>\n${sections.memories}\n</memory>`;
   if (sections?.mcp) prompt += `\n\n<mcp>\n${sections.mcp}\n</mcp>`;
   if (sections?.canvas) prompt += `\n\n<canvas>\n${sections.canvas}\n</canvas>`;
+  if (sections?.nonInteractive) prompt += `\n\n<non-interactive>\n${sections.nonInteractive}\n</non-interactive>`;
   return prompt;
 }

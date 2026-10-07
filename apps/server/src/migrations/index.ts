@@ -13,6 +13,8 @@ import { up as mediaAsset } from "./0011-media-asset";
 import { up as mcpServer } from "./0012-mcp-server";
 import { up as codeSessionUnseen } from "./0013-code-session-unseen";
 import { up as footerPreference } from "./0014-footer-preference";
+import { up as agentTypes } from "./0015-agent-types";
+import { up as sessionInteractive } from "./0016-session-interactive";
 
 // Keys sort lexicographically — prefix new migrations with the next number.
 export const migrations: Record<string, Migration> = {
@@ -30,4 +32,6 @@ export const migrations: Record<string, Migration> = {
   "0012_mcp_server": { up: mcpServer },
   "0013_code_session_unseen": { up: codeSessionUnseen },
   "0014_footer_preference": { up: footerPreference },
+  "0015_agent_types": { up: agentTypes },
+  "0016_session_interactive": { up: sessionInteractive },
 };

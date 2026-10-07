@@ -13,6 +13,15 @@ export interface Skill {
   updatedAt: string;
 }
 
+export type AgentType = "sub_agent" | "persona" | "collaborator" | "sentinel";
+
+export const AGENT_TYPE_LABELS: Record<AgentType, string> = {
+  sub_agent: "Subagent for code",
+  persona: "Person",
+  collaborator: "Collaborator",
+  sentinel: "Sentinel",
+};
+
 export interface Agent {
   id: string;
   organizationId: string;
@@ -22,6 +31,10 @@ export interface Agent {
   description: string | null;
   instruction: string;
   tags: string[];
+  /** sub_agent | persona | collaborator | sentinel. */
+  type: AgentType;
+  /** Tool allowlist — ["all"] = every tool; [] = no tools. */
+  tools: string[];
   createdAt: string;
   updatedAt: string;
 }
