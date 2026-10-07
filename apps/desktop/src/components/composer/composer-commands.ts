@@ -12,6 +12,7 @@ export const COMPOSER_COMMANDS: ComposerCommand[] = [];
 export const CHAT_COMPOSER_COMMANDS: ComposerCommand[] = [
   { id: "cmd:compact", label: "compact", description: "Summarize older history — keeps recent context", group: "Commands" },
   { id: "cmd:clear", label: "clear", description: "Drop prior context — fresh start without a new session", group: "Commands" },
+  { id: "cmd:btw", label: "btw", description: "Side question to another agent — opens a /btw thread", group: "Commands" },
 ];
 
 export function searchCommands(query: string, commands: ComposerCommand[] = COMPOSER_COMMANDS): ComposerCommand[] {

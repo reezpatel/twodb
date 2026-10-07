@@ -3,6 +3,25 @@ import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
 import { resolveScope } from "../lib/code-directory";
 import { parseTags, syncLlmTags } from "../lib/llm-tags";
+import type { AgentTable } from "../plugins/db";
+
+export type AgentType = AgentTable["type"];
+export const AGENT_TYPES: AgentType[] = ["sub_agent", "persona", "collaborator", "sentinel"];
+
+const parseType = (v: unknown): AgentType | null => (typeof v === "string" && (AGENT_TYPES as string[]).includes(v) ? (v as AgentType) : null);
+const parseTools = (v: unknown): string[] | "invalid" => {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v) || !v.every((t) => typeof t === "string" && t.trim())) return "invalid";
+  const tools = [...new Set((v as string[]).map((t) => t.trim()))].filter(Boolean);
+  return tools.includes("all") ? ["all"] : tools;
+};
+
+/** Only one sentinel per organization. */
+async function sentinelExists(organizationId: string, excludeId?: string) {
+  let query = db.selectFrom("agent").select("id").where("organizationId", "=", organizationId).where("type", "=", "sentinel");
+  if (excludeId) query = query.where("id", "<>", excludeId);
+  return (await query.executeTakeFirst()) !== undefined;
+}
 
 export const agentRoutes = new Hono()
   .get("/", async (c) => {
@@ -33,6 +52,11 @@ export const agentRoutes = new Hono()
     if (typeof body?.instruction !== "string") return c.json({ error: "invalid_instruction" }, 400);
     const tags = parseTags(body?.tags);
     if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
+    const type = body?.type === undefined ? "sub_agent" : parseType(body.type);
+    if (!type) return c.json({ error: "invalid_type" }, 400);
+    const tools = parseTools(body?.tools);
+    if (tools === "invalid") return c.json({ error: "invalid_tools" }, 400);
+    if (type === "sentinel" && (await sentinelExists(s.organizationId))) return c.json({ error: "sentinel_exists" }, 409);
 
     const scope = await resolveScope(db, s.organizationId, body?.codeDirectoryId);
     if (!scope.ok) return c.json({ error: scope.error }, scope.error === "directory_not_found" ? 404 : 400);
@@ -49,6 +73,8 @@ export const agentRoutes = new Hono()
         description: typeof body.description === "string" && body.description ? body.description : null,
         instruction: body.instruction,
         tags: tags ?? [],
+        type,
+        tools,
         createdAt: now,
         updatedAt: now,
       })
@@ -80,7 +106,7 @@ export const agentRoutes = new Hono()
     if (!existing) return c.json({ error: "agent_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ provider: string; model: string; description: string | null; instruction: string; tags: string[] }> = {};
+    const patch: Partial<{ provider: string; model: string; description: string | null; instruction: string; tags: string[]; type: AgentType; tools: string[] }> = {};
     if (body?.provider !== undefined) {
       if (typeof body.provider !== "string" || !body.provider.trim()) return c.json({ error: "invalid_provider" }, 400);
       patch.provider = body.provider.trim();
@@ -104,7 +130,20 @@ export const agentRoutes = new Hono()
       if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
       patch.tags = tags ?? [];
     }
+    let sentinelCheckId: string | undefined;
+    if (body?.type !== undefined) {
+      const type = parseType(body.type);
+      if (!type) return c.json({ error: "invalid_type" }, 400);
+      patch.type = type;
+      sentinelCheckId = existing.id;
+    }
+    if (body?.tools !== undefined) {
+      const tools = parseTools(body.tools);
+      if (tools === "invalid") return c.json({ error: "invalid_tools" }, 400);
+      patch.tools = tools;
+    }
     if (Object.keys(patch).length === 0) return c.json({ error: "empty_update" }, 400);
+    if (patch.type === "sentinel" && (await sentinelExists(s.organizationId, sentinelCheckId))) return c.json({ error: "sentinel_exists" }, 409);
 
     const row = await db
       .updateTable("agent")

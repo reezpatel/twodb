@@ -12,6 +12,7 @@ import {
   type ToolScope,
 } from "./agent";
 import { executeToolCall, toolsForScope, type CanvasArtifactResult, type ToolExecution } from "./agent-tools";
+import { executeCheckSubagentStatus, executeInvokeSubagent, executeListSubagents, SUBAGENT_TOOLS, type SubagentExecution } from "./subagent-tools";
 import { callMcpTool, loadSessionMcpTools, MCP_TOOL_PREFIX } from "./mcp";
 import { MAX_IMAGE_BASE64, resolveImageBase64 } from "./assets";
 import { getProvider } from "./llm-providers";
@@ -90,9 +91,25 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
   // Directory-less sessions are assistant-style chats: no runner tools, canvas available.
   const toolScope: ToolScope = session.codeDirectoryId ? "code" : "assistant";
   const baseTools = toolsForScope(toolScope);
+  // Non-interactive (headless subagent) runs never get ask_user — the tool is
+  // the model's only way to pause on the user, and nobody is watching this thread.
+  const scopedBase = session.interactive === false ? baseTools.filter((t) => t.name !== "ask_user") : baseTools;
+  // A bound agent carries a tool allowlist: ["all"] = every tool (default when
+  // unset), [] = no tools, otherwise the explicit subset (MCP tools included
+  // when "all" or explicitly named).
+  const boundAgent = session.agentId
+    ? await db.selectFrom("agent").select(["instruction", "tags", "tools", "type"]).where("id", "=", session.agentId).where("organizationId", "=", organizationId).executeTakeFirst()
+    : undefined;
+  const agentToolNames = boundAgent?.tools;
+  const filterByAgent = <T extends { name: string }>(list: T[]): T[] =>
+    !agentToolNames || agentToolNames.includes("all") ? list : list.filter((t) => agentToolNames.includes(t.name));
+  const scopedTools = filterByAgent(scopedBase);
   // MCP tools (Settings → LLM → MCP) ride along for code sessions; failures surface as a status note.
   const mcpLoaded = toolScope === "code" ? await loadSessionMcpTools(organizationId, session.codeDirectoryId, session.tags ?? []) : { tools: [], failures: [] };
-  const tools = [...baseTools, ...mcpLoaded.tools.map((t) => t.tool)];
+  // Subagent tools — offered to every session; each call enforces the
+  // invocation permission rules (main → anything; sub_agent → sub_agent; etc).
+  const subagentTools = SUBAGENT_TOOLS;
+  const tools = [...scopedTools, ...subagentTools, ...filterByAgent(mcpLoaded.tools.map((t) => t.tool))];
   if (mcpLoaded.failures.length) {
     await emit({ type: "status", text: `MCP unavailable: ${mcpLoaded.failures.map((f) => `${f.server} (${f.error.slice(0, 120)})`).join("; ")}` });
   }
@@ -190,8 +207,39 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
     }
   };
 
+  /** Subagent orchestration calls — list/invoke/check-status run against the
+   * invoking session's context (permissions + depth enforced inside). */
+  const runSubagentCall = async (call: AgentToolCall): Promise<ToolExecution> => {
+    const ctx = {
+      organizationId,
+      session,
+      callerAgentType: boundAgent?.type ?? null,
+      connectionId: connection.id,
+      model,
+      thinkingLevel: input.thinkingLevel ?? null,
+    };
+    const str = (v: unknown) => (typeof v === "string" ? v : "");
+    let exec: SubagentExecution;
+    if (call.name === "list_subagents") exec = await executeListSubagents(ctx);
+    else if (call.name === "invoke_subagent") {
+      const agentId = str(call.arguments?.agent_id).trim();
+      const prompt = str(call.arguments?.prompt).trim();
+      if (!agentId || !prompt) return { output: "error: invoke_subagent requires agent_id and prompt", code: null, failed: true };
+      exec = await executeInvokeSubagent(ctx, agentId, prompt);
+    } else if (call.name === "check_subagent_status") {
+      const childId = str(call.arguments?.session_id).trim();
+      exec = await executeCheckSubagentStatus(ctx, childId || undefined);
+    } else return { output: `error: unknown subagent tool ${call.name}`, code: null, failed: true };
+    return { output: exec.output, code: exec.failed ? null : 0, failed: exec.failed };
+  };
+
   /** ask_user blocks on the user's answers via the WS bridge; returns a tool result. */
   const runAskUser = async (call: AgentToolCall): Promise<ToolExecution> => {
+    // Headless subagent sessions never offer ask_user; a model calling it
+    // anyway gets a clean error instead of hanging forever.
+    if (session.interactive === false) {
+      return { output: "error: ask_user is not available in non-interactive sessions — decide autonomously and report your choice", code: null, failed: true };
+    }
     const raw = Array.isArray(call.arguments?.questions) ? (call.arguments.questions as unknown[]) : [];
     const questions = raw.filter((q): q is AskUserQuestion => !!q && typeof (q as Record<string, unknown>).question === "string");
     if (questions.length === 0) {
@@ -244,10 +292,9 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
   // skill/instruction match set); agent sessions skip runner repo skills. Org
   // override or the default otherwise, plus cwd, [Skills] titles, inline
   // instructions, and memories. Built once; prepended to every round so it
-  // survives in-memory compaction.
-  const agent = session.agentId
-    ? await db.selectFrom("agent").selectAll().where("id", "=", session.agentId).where("organizationId", "=", organizationId).executeTakeFirst()
-    : undefined;
+  // survives in-memory compaction. (boundAgent was fetched above for the
+  // tool allowlist — reuse it rather than a second query.)
+  const agent = boundAgent ? { ...boundAgent } : undefined;
   const { systemPrompt } = await resolveSessionSystemPrompt({
     organizationId,
     sessionId: session.id,
@@ -257,6 +304,7 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
     cwd,
     systemPromptOverride: agent?.instruction ?? null,
     mode: toolScope,
+    interactive: session.interactive !== false,
   });
   const systemMessage: AgentMessage = { role: "system", content: systemPrompt, meta: null };
 
@@ -363,7 +411,9 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
             ? runMcpCall(call)
             : call.name === "ask_user"
               ? runAskUser(call)
-              : executeToolCall(
+              : call.name === "list_subagents" || call.name === "invoke_subagent" || call.name === "check_subagent_status"
+                ? runSubagentCall(call)
+                : executeToolCall(
                   runnerId,
                   cwd,
                   call,

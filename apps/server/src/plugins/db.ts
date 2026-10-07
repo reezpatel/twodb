@@ -187,6 +187,12 @@ export interface CodeSessionTable {
   runtimeState: ColumnType<Record<string, unknown> | null, string | null, string | null>;
   /** get_plan/update_plan state — { steps: [{ description, status }] }. */
   plan: ColumnType<Record<string, unknown> | null, string | null, string | null>;
+  /** True → read-only thread (closed /btw side thread). */
+  locked: ColumnType<boolean, boolean | undefined, boolean | undefined>;
+  /** True → the agent may ask the user (ask_user) and be steered mid-run; false → headless. */
+  interactive: ColumnType<boolean, boolean | undefined, boolean | undefined>;
+  /** Invocation depth — main sessions 0; children parent + 1. invoke_subagent caps at 3. */
+  depthCount: ColumnType<number, number | undefined, number | undefined>;
   /** Run finished since the user last opened this session — sidebar unread marker. */
   unseenUpdates: ColumnType<boolean, boolean | undefined, boolean | undefined>;
   createdAt: Date;
@@ -218,6 +224,8 @@ export interface SkillTable {
   updatedAt: Date;
 }
 
+export type AgentType = "sub_agent" | "persona" | "collaborator" | "sentinel";
+
 export interface AgentTable {
   id: string;
   organizationId: string;
@@ -227,6 +235,10 @@ export interface AgentTable {
   description: string | null;
   instruction: string;
   tags: string[];
+  /** sub_agent | persona | collaborator | sentinel. */
+  type: AgentType;
+  /** Tool allowlist — ["all"] = every tool (incl. future ones); [] = no tools. */
+  tools: string[];
   createdAt: Date;
   updatedAt: Date;
 }

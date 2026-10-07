@@ -603,7 +603,9 @@ export const codeRoutes = new Hono()
     if (codeDirectoryId) query = query.where("codeDirectoryId", "=", codeDirectoryId);
 
     const rows = await query.orderBy("updatedAt", "desc").execute();
-    return c.json(rows);
+    // Live running flag — the sidebar's subagents section shows live runs.
+    const annotated = rows.map((r) => ({ ...r, running: isSessionRunning(r.id) }));
+    return c.json(annotated);
   })
 
   .post("/sessions", async (c) => {
@@ -628,18 +630,26 @@ export const codeRoutes = new Hono()
     }
 
     let parentSessionId: string | null = null;
+    let parentDepth = 0;
+    let parentTags: string[] | null = null;
+    let parentDirectoryId: string | null = null;
     if (body?.parentSessionId !== undefined && body.parentSessionId !== null) {
       if (typeof body.parentSessionId !== "string") {
         return c.json({ error: "invalid_parent" }, 400);
       }
       const parent = await db
         .selectFrom("code_session")
-        .select("id")
+        .select(["id", "tags", "codeDirectoryId", "depthCount"])
         .where("id", "=", body.parentSessionId)
         .where("organizationId", "=", s.organizationId)
         .executeTakeFirst();
       if (!parent) return c.json({ error: "parent_not_found" }, 404);
       parentSessionId = parent.id;
+      // Children inherit the parent's invocation depth, tags and workspace —
+      // the child agent sees the same skills/agents context as its parent.
+      parentDepth = parent.depthCount;
+      parentTags = parent.tags ?? [];
+      parentDirectoryId = parent.codeDirectoryId ?? null;
     }
     if (type === "sub_agent" && !parentSessionId) {
       return c.json({ error: "parent_required" }, 400);
@@ -662,6 +672,8 @@ export const codeRoutes = new Hono()
       if (!directory) return c.json({ error: "directory_not_found" }, 404);
       codeDirectoryId = directory.id;
     }
+    // Children default to the parent's workspace when not explicitly given.
+    if (codeDirectoryId === null && parentSessionId !== null) codeDirectoryId = parentDirectoryId;
 
     let agentId: string | null = null;
     if (body?.agentId !== undefined && body.agentId !== null) {
@@ -694,8 +706,19 @@ export const codeRoutes = new Hono()
       mode = { type: m.type.trim(), instruction: m.instruction, commands };
     }
 
-    const sessionTags = parseTags(body?.tags);
+    // Children inherit the parent's tags unless explicitly overridden.
+    const sessionTags = parseTags(body?.tags ?? (parentSessionId !== null ? parentTags : undefined));
     if (sessionTags === "invalid") return c.json({ error: "invalid_tags" }, 400);
+
+    // Interactive: default true for main sessions; children default to the
+    // caller's choice, with /btw (interactive side threads) explicitly true.
+    let interactive = true;
+    if (body?.interactive !== undefined) {
+      if (typeof body.interactive !== "boolean") return c.json({ error: "invalid_interactive" }, 400);
+      interactive = body.interactive;
+    } else if (parentSessionId !== null) {
+      interactive = false;
+    }
 
     const now = new Date();
     const row = await db
@@ -713,6 +736,8 @@ export const codeRoutes = new Hono()
         mode: mode === null ? null : JSON.stringify(mode),
         runtimeState: null,
         tags: sessionTags ?? [],
+        interactive,
+        depthCount: parentSessionId !== null ? parentDepth + 1 : 0,
         createdAt: now,
         updatedAt: now,
       })

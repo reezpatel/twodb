@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { ChevronUp, Circle, Flag, Folder, GitBranch, Link, RefreshCw, Tag, User } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Bot, ChevronUp, Circle, Flag, Folder, GitBranch, Link, Loader2, RefreshCw, Tag, User } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { useChat } from "../chat/use-chat-panel";
+import { useSessionDirectory } from "../chat/use-session-directory";
+import { useGitStatus } from "../directories/use-git-status";
 
 const WORKFLOW_ITEMS = [
   { id: "backlog", label: "Backlog", icon: Circle },
@@ -18,40 +21,13 @@ const SESSION_ITEMS = [
   { id: "flag", label: "1 flag", icon: Flag },
 ];
 
-const GIT_FILES = [
-  { name: "server.ts", additions: 12, deletions: 2 },
-  { name: "db.ts", additions: 8, deletions: 1 },
-];
-
 const MEMORIES = [
   { id: "m1", text: "Repo uses pnpm + Kysely; migrations in apps/server/migrations.", scope: "project" },
   { id: "m2", text: "API on :3001, desktop dev on :5173 via /api proxy.", scope: "project" },
   { id: "m3", text: "Runners connect outbound; never expose runner ports.", scope: "global" },
 ];
 
-const USAGE_PROVIDERS = [
-  {
-    id: "anthropic",
-    name: "Anthropic",
-    current: true,
-    windows: [
-      { label: "5h", used: 42, resets: "15:00" },
-      { label: "week", used: 61, resets: "Mon" },
-      { label: "month", used: 23, resets: "Jun 1" },
-    ],
-  },
-  {
-    id: "glm",
-    name: "GLM",
-    windows: [
-      { label: "5h", used: 87, resets: "14:12" },
-      { label: "week", used: 54, resets: "Mon" },
-      { label: "month", used: 38, resets: "Jun 1" },
-    ],
-  },
-];
-
-const SECTIONS = ["usage", "memories", "workflow", "session", "git"] as const;
+const SECTIONS = ["subagents", "memories", "workflow", "session", "git"] as const;
 type SectionId = (typeof SECTIONS)[number];
 
 function Section({ title, open, onToggle, children }: { title: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
@@ -75,9 +51,80 @@ function SidebarItem({ icon: Icon, children }: { icon: typeof Circle; children: 
   );
 }
 
+/** Real git summary for the selected session's directory: branch line from
+ * git-status, changed files from git-changes. Both are invalidated by the
+ * chat panel after a run (the footer gitStatus frame already does this). */
+export interface GitChangeFile {
+  path: string;
+  status: string;
+  additions: number | null;
+  deletions: number | null;
+}
+
+function useSidebarGit() {
+  const queryClient = useQueryClient();
+  const { directoryId } = useSessionDirectory();
+  const status = useGitStatus(directoryId);
+  const changes = useQuery({
+    queryKey: ["code", "directories", directoryId, "changes"],
+    queryFn: () => api<{ git: boolean; files: GitChangeFile[] }>(`/api/code/directories/${directoryId}/git-changes`),
+    enabled: !!directoryId && status.data?.git === true,
+    retry: false,
+  });
+  const isNoGit = (status.data && status.data.git === false) || (changes.data && changes.data.git === false);
+
+  return {
+    hasDirectory: !!directoryId,
+    isPending: status.isPending || (status.data?.git === true && changes.isPending),
+    isError: status.isError || changes.isError,
+    isRefetching: status.isFetching || changes.isFetching,
+    errorText: status.isError ? (status.error instanceof Error ? status.error.message : "failed to load") : "failed to load changes",
+    isNoGit,
+    branch: status.data?.branch ?? "—",
+    ahead: status.data?.ahead ?? null,
+    behind: status.data?.behind ?? null,
+    files: changes.data?.git === true ? changes.data.files : [],
+    refresh: () => {
+      void queryClient.invalidateQueries({ queryKey: ["code", "directories", directoryId, "git"] });
+      void queryClient.invalidateQueries({ queryKey: ["code", "directories", directoryId, "changes"] });
+    },
+  };
+}
+
+/** Child sessions (subagents + /btw) of the current session, with live running
+ * state. Polls while any child runs so the sidebar shows live progress. */
+function useSidebarSubagents() {
+  const { session } = useChat();
+  const sessionId = session.data?.id ?? null;
+  const children = useQuery({
+    queryKey: ["code", "session", sessionId, "children"],
+    queryFn: () =>
+      api<
+        {
+          id: string;
+          title: string;
+          locked: boolean;
+          interactive: boolean;
+          depthCount: number;
+          updatedAt: string;
+          running: boolean;
+        }[]
+      >(`/api/code/sessions?type=sub_agent&parentSessionId=${sessionId}`),
+    enabled: !!sessionId,
+    refetchInterval: (q) => ((q.state.data as { running: boolean }[] | undefined)?.some((c) => c.running) ? 2000 : false),
+  });
+  const anyRunning = (children.data ?? []).some((c) => c.running);
+  return {
+    children: children.data ?? [],
+    isPending: children.isPending,
+    anyRunning,
+    refetch: children.refetch,
+  };
+}
+
 export function Sidebar() {
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
-    usage: true,
+    subagents: true,
     memories: true,
     workflow: false,
     session: true,
@@ -85,37 +132,46 @@ export function Sidebar() {
   });
   const toggle = (id: SectionId) => setOpen((cur) => ({ ...cur, [id]: !cur[id] }));
 
+  const git = useSidebarGit();
+  const subagents = useSidebarSubagents();
+  const { openBtwSession } = useChat();
+
   return (
     <aside className="bg-card border-l hidden h-full w-72 shrink-0 flex-col overflow-y-auto border-l xl:flex">
-      <Section title="Usage" open={open.usage} onToggle={() => toggle("usage")}>
-        <div className="flex flex-col gap-3">
-          {USAGE_PROVIDERS.map((provider) => (
-            <div key={provider.id}>
-              <div className="mb-1 flex items-center gap-2 text-sm font-medium">
-                {provider.name}
-                {provider.current && (
-                  <Badge variant="success" className="text-[10px]">
-                    current
-                  </Badge>
+      <Section
+        title={`Subagents${subagents.children.length ? ` (${subagents.children.length})` : ""}`}
+        open={open.subagents}
+        onToggle={() => toggle("subagents")}
+      >
+        {subagents.isPending ? (
+          <div className="text-muted-foreground py-1 text-xs">loading…</div>
+        ) : subagents.children.length === 0 ? (
+          <div className="text-muted-foreground py-1 text-xs">none — invoke_subagent or /btw spawns one</div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {subagents.children.map((child) => (
+              <button
+                key={child.id}
+                className="bg-muted/40 hover:bg-accent/50 flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition-colors"
+                onClick={() => openBtwSession(child.id)}
+                title="Open the session — live while it runs"
+              >
+                {child.running ? (
+                  <Loader2 size={12} className="text-primary shrink-0 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Bot size={12} className="text-muted-foreground shrink-0" aria-hidden="true" />
                 )}
-              </div>
-              {provider.windows.map((window) => (
-                <div key={window.label} className="flex items-center gap-2 py-0.5 text-xs">
-                  <span className="text-muted-foreground w-10">{window.label}</span>
-                  <Progress
-                    value={window.used}
-                    className={cn(
-                      "h-1.5 flex-1",
-                      window.used >= 85 ? "[&>[data-slot=indicator]]:bg-destructive" : window.used >= 60 ? "[&>[data-slot=indicator]]:bg-warning" : "",
-                    )}
-                  />
-                  <span className="w-8 text-right">{window.used}%</span>
-                  <span className="text-muted-foreground/70 w-12 text-right">↻ {window.resets}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{child.title}</span>
+                  <span className="text-muted-foreground block font-mono text-[10px]">
+                    d{child.depthCount} · {child.locked ? "closed" : child.running ? "running" : "idle"}
+                    {!child.interactive && " · headless"}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </Section>
 
       <Section title="Memories" open={open.memories} onToggle={() => toggle("memories")}>
@@ -145,23 +201,60 @@ export function Sidebar() {
         ))}
       </Section>
 
-      <Section title={`Git Summary (${GIT_FILES.length})`} open={open.git} onToggle={() => toggle("git")}>
-        <div className="mb-2 flex items-center gap-2 text-sm">
-          <GitBranch size={14} aria-hidden="true" />
-          <span className="font-mono">main</span>
-          <Button variant="ghost" size="icon-sm" className="ml-auto" title="Refresh (mock)">
-            <RefreshCw size={12} />
-          </Button>
-        </div>
-        {GIT_FILES.map((file) => (
-          <div key={file.name} className="flex items-center gap-2 py-0.5 text-sm">
-            <span className="text-warning font-mono text-xs">M</span>
-            <span className="truncate font-mono text-xs">{file.name}</span>
-            <span className="ml-auto font-mono text-xs">
-              <span className="text-success">+{file.additions}</span> <span className="text-destructive">-{file.deletions}</span>
-            </span>
+      <Section title={`Git Summary${git.files ? ` (${git.files.length})` : ""}`} open={open.git} onToggle={() => toggle("git")}>
+        {git.isError ? (
+          <div className="text-destructive flex items-center gap-2 py-1 text-xs">
+            <GitBranch size={14} aria-hidden="true" /> {git.errorText}
           </div>
-        ))}
+        ) : !git.hasDirectory ? (
+          <div className="text-muted-foreground py-1 text-xs">select a session</div>
+        ) : git.isPending ? (
+          <div className="text-muted-foreground py-1 text-xs">loading…</div>
+        ) : git.isNoGit ? (
+          <div className="text-muted-foreground py-1 text-xs">not a git repository</div>
+        ) : (
+          <>
+            <div className="mb-2 flex items-center gap-2 text-sm">
+              <GitBranch size={14} aria-hidden="true" />
+              <span className="truncate font-mono">{git.branch}</span>
+              {git.ahead !== null && (
+                <span className={cn("font-mono text-xs", git.ahead > 0 && "text-success")}>
+                  {git.ahead > 0 ? `↑${git.ahead}` : "0"}
+                  {git.behind !== null && git.behind > 0 ? ` ↓${git.behind}` : ""}
+                </span>
+              )}
+              <Button variant="ghost" size="icon-sm" className="ml-auto" title="Refresh" onClick={git.refresh}>
+                <RefreshCw size={12} className={git.isRefetching ? "animate-spin" : undefined} />
+              </Button>
+            </div>
+            {git.files.map((file) => (
+              <div key={file.path + file.status} className="flex items-center gap-2 py-0.5 text-sm">
+                <span
+                  className={cn("font-mono text-xs", file.status === "U" ? "text-muted-foreground" : "text-warning")}
+                  title={
+                    {
+                      M: "modified",
+                      A: "added",
+                      D: "deleted",
+                      R: "renamed",
+                      C: "copied",
+                      U: "untracked",
+                    }[file.status] ?? file.status
+                  }
+                >
+                  {file.status}
+                </span>
+                <span className="truncate font-mono text-xs" title={file.path}>
+                  {file.path}
+                </span>
+                <span className="ml-auto shrink-0 font-mono text-xs">
+                  {file.additions !== null && <span className="text-success">+{file.additions}</span>}{" "}
+                  {file.deletions !== null && <span className="text-destructive">-{file.deletions}</span>}
+                </span>
+              </div>
+            ))}
+          </>
+        )}
       </Section>
     </aside>
   );

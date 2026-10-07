@@ -80,6 +80,8 @@ interface StreamFrame {
   exitCode?: number;
   questions?: AskUserQuestion[];
   askUser?: { id: string; questions: AskUserQuestion[] } | null;
+  /** /btw frames — status while summarizing, ok when the side thread closed. */
+  sendToMain?: boolean | null;
 }
 
 export interface ToolEvent {
@@ -91,6 +93,13 @@ export interface ToolEvent {
   startedAt?: number;
   completedAt?: number;
   status?: string;
+}
+
+export interface BtwState {
+  /** The btw (side-thread) session id — dialog stays open across refreshes. */
+  sessionId: string;
+  /** First question to seed the btw composer with. */
+  seed?: string;
 }
 
 export type WsStatus = "connecting" | "open" | "closed";
@@ -160,10 +169,27 @@ export function useChatPanel(sessionId: string | null) {
   });
   const liveDeltaRef = useRef({ count: 0, startedAt: 0 });
   const lastSentRef = useRef("");
+  const lastConnectionRef = useRef<string | undefined>(undefined);
+  const lastModelRef = useRef<string | undefined>(undefined);
+  const lastThinkingRef = useRef<string | undefined>(undefined);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptRef = useRef(0);
+
+  // ----- steering queue -----------------------------------------------------
+  // Messages typed while a round is running are queued (steering), not sent.
+  // When the run finishes they dispatch together as one user turn. The user
+  // can also fire them immediately ("send now") — the run is stopped first.
+  const [steering, setSteering] = useState<{ id: string; content: string; assets: PendingAsset[] }[]>([]);
+  const steeringRef = useRef(steering);
+  steeringRef.current = steering;
+  const drainRef = useRef(false);
+
+  // ----- /btw side thread ----------------------------------------------------
+  const [btw, setBtw] = useState<BtwState | null>(null);
+  const btwRef = useRef(btw);
+  btwRef.current = btw;
 
   const session = useQuery({
     queryKey: ["code", "session", sessionId],
@@ -201,6 +227,7 @@ export function useChatPanel(sessionId: string | null) {
   useEffect(() => {
     setMessagesById(new Map());
     olderExhaustedRef.current = false;
+    setSteering([]);
   }, [sessionId]);
 
   const tail = session.data?.messages ?? [];
@@ -351,6 +378,13 @@ export function useChatPanel(sessionId: string | null) {
     } else if (frame.type === "ask_user") {
       // The agent is waiting on answers — the wizard replaces the composer.
       setAskUser({ id: frame.id ?? "", questions: frame.questions ?? [] });
+    } else if (frame.type === "btw_status") {
+      setStatusText(frame.text ?? null);
+    } else if (frame.type === "btw_done_ok") {
+      setStatusText(null);
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ["code", "session", sessionId] });
+      void queryClient.invalidateQueries({ queryKey: ["code", "btw-session", sessionId] });
     } else if (frame.type === "busy") {
       // Server rejected the send — a run is already live on this session.
       setOptimistic(null);
@@ -431,7 +465,50 @@ export function useChatPanel(sessionId: string | null) {
     }
   }, [messages, askUser, streaming]);
 
-  // Seed the footer git line before the first round-end WS push.
+  // Restore an open /btw side thread after refresh — the main session's
+  // runtimeState carries the btw session id until it's done (locked).
+  useEffect(() => {
+    const state = (session.data as unknown as { runtimeState?: Record<string, unknown> | null } | undefined)?.runtimeState;
+    if (!state || btwRef.current) return;
+    const btwId = state.btwCodeSessionId;
+    if (typeof btwId === "string" && btwId) setBtw({ sessionId: btwId });
+  }, [session.data]);
+
+  /** Closes the dialog — the btw session stays in runtimeState if not done. */
+  const closeBtw = () => setBtw(null);
+
+  /** Re-opens an existing side thread (clicking its block in the transcript). */
+  const openBtwSession = (sessionId2: string) => setBtw({ sessionId: sessionId2 });
+
+  /** Creates the /btw side session bound to an agent, registers it in the
+   * main session's runtimeState, and opens the dialog. */
+  const startBtw = async (agentId: string, question: string, codeDirectoryId: string | null) => {
+    const mainId = sessionId;
+    if (!mainId) return;
+    setError(null);
+    try {
+      const created = await api<CodeSession>("/api/code/sessions", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "sub_agent",
+          parentSessionId: mainId,
+          agentId,
+          codeDirectoryId,
+          interactive: true,
+          title: question ? `/btw — ${question.slice(0, 40)}` : "/btw",
+        }),
+      });
+      // Persist so a refresh re-opens the dialog (until it's done/locked).
+      const current = (session.data as unknown as { runtimeState?: Record<string, unknown> | null })?.runtimeState ?? {};
+      await api(`/api/code/sessions/${mainId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ runtimeState: { ...current, btwCodeSessionId: created.id } }),
+      });
+      setBtw({ sessionId: created.id, seed: question || undefined });
+    } catch (e) {
+      setError((e as Error).message || "failed to start /btw");
+    }
+  };
   useEffect(() => {
     const dirId = session.data?.codeDirectoryId;
     if (!dirId) {
@@ -602,6 +679,9 @@ export function useChatPanel(sessionId: string | null) {
     setDraft("");
     setPendingAssets([]);
     lastSentRef.current = fullContent;
+    lastConnectionRef.current = sendConnectionId;
+    lastModelRef.current = sendModel;
+    lastThinkingRef.current = thinkingLevel;
     setStreaming("");
     setLiveTools([]);
     setStatusText(null);
@@ -627,7 +707,26 @@ export function useChatPanel(sessionId: string | null) {
 
   const send = (sendConnectionId: string | undefined, sendModel: string | undefined, thinkingLevel?: string, contentOverride?: string): boolean => {
     const content = (contentOverride ?? draft).trim();
-    if (!content || streaming !== null || compacting) return false;
+    if (!content || compacting) return false;
+    // While a round is running, messages go to the steering queue — they're
+    // dispatched when the run finishes (or immediately via "send now").
+    if (streaming !== null) {
+      const assets = contentOverride === undefined ? pendingAssets : [];
+      setSteering((prev) => [...prev, { id: `steer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, content, assets }]);
+      setDraft("");
+      setPendingAssets([]);
+      return true;
+    }
+    if (!sendConnectionId || !sendModel) {
+      setError("Pick a connection and model first");
+      return false;
+    }
+    // "/btw <question>" opens a side thread with another agent — never dispatched.
+    if (content === "/btw" || content.startsWith("/btw ")) {
+      setDraft("");
+      setBtw({ sessionId: "", seed: content.slice(4).trim() || undefined });
+      return true;
+    }
     // "/compact [instructions]" never reaches the model as a prompt — it triggers
     // the compaction flow and the server replays summary + kept context next turn.
     if (content === "/compact" || content.startsWith("/compact ")) {
@@ -692,6 +791,46 @@ export function useChatPanel(sessionId: string | null) {
     }
   };
 
+  /** Pushes all queued steering messages as one user turn. The server aborts
+   * an active run only via {type:"stop"} — after that, a plain send starts a
+   * new run. Draining happens in the ws.onmessage "done"/"run_state" paths,
+   * so the queue is only touched after the run actually ended. */
+  const flushSteering = (connectionId: string | undefined, model: string | undefined, thinkingLevelArg?: string) => {
+    const items = steeringRef.current;
+    if (items.length === 0 || drainRef.current) return;
+    const ws = wsRef.current;
+    if (!connectionId || !model || !ws || ws.readyState !== WebSocket.OPEN) return; // keep queued — retry when the socket recovers
+    drainRef.current = true;
+    try {
+      // One user message: the queued texts joined, attachments merged. All
+      // items belong to the same turn so the model sees them together.
+      const content = items.map((i) => i.content).join("\n\n");
+      const assets = items.flatMap((i) => i.assets);
+      setSteering([]);
+      dispatchSend(connectionId, model, thinkingLevelArg, content, assets);
+    } finally {
+      drainRef.current = false;
+    }
+  };
+
+  /** Queued steering fires the moment a run finishes — no user action needed. */
+  const drainSteeringAfterRun = () => {
+    if (steeringRef.current.length === 0) return;
+    const connectionId = lastConnectionRef.current;
+    const model = lastModelRef.current;
+    if (!connectionId || !model) return;
+    flushSteering(connectionId, model, lastThinkingRef.current);
+  };
+
+  // The single drain point: whenever no run is live but steering messages are
+  // queued, dispatch them as one turn. Covers run-done, stop, busy-rejection
+  // fallback, anything that ends a run.
+  useEffect(() => {
+    if (streaming !== null || askUser || drainRef.current) return;
+    drainSteeringAfterRun();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streaming, steering, askUser]);
+
   /** Submits wizard answers — resolves the agent's pending ask_user call. */
   const answerAskUser = (answers: AskUserAnswer[]) => {
     if (!askUser) return;
@@ -707,6 +846,36 @@ export function useChatPanel(sessionId: string | null) {
       .then(() => setAskUser(null))
       .catch((e) => setError((e as Error).message || "failed to submit answers"))
       .finally(() => invalidateAfterRun());
+  };
+
+  /** Fires the steering queue immediately: halts the run, and the drain effect
+   * dispatches the queued messages once the run actually stops (streaming
+   * clears). If nothing is running, the effect fires on the next tick. */
+  const sendSteeringNow = () => {
+    if (steeringRef.current.length === 0) return;
+    if (streaming !== null) stop();
+    // streaming is already null → the drain effect runs on the steering dep.
+  };
+
+  const removeSteering = (id: string) => setSteering((prev) => prev.filter((s) => s.id !== id));
+
+  /** /btw finish: summarize (sendToMain) or just close, lock the btw session,
+   * and hand the result to the main thread. Server handles the LLM round +
+   * main-session insert; the ws on the btw session carries it. */
+  const btwDone = (sendToMain: boolean) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      setError("Chat socket is not connected — retrying…");
+      return;
+    }
+    const connId = lastConnectionRef.current;
+    const model = lastModelRef.current;
+    if (sendToMain && (!connId || !model)) {
+      setError("Pick a connection and model first");
+      return;
+    }
+    setStatusText(sendToMain ? "summarizing…" : "closing…");
+    ws.send(JSON.stringify({ type: "btw_done", sendToMain, ...(sendToMain && connId && model ? { connectionId: connId, model } : {}) }));
   };
 
   return {
@@ -736,6 +905,15 @@ export function useChatPanel(sessionId: string | null) {
     skillCommands,
     send,
     stop,
+    steering,
+    sendSteeringNow,
+    removeSteering,
+    // /btw side thread
+    btw,
+    startBtw,
+    closeBtw,
+    openBtwSession,
+    btwDone,
     // pagination
     visibleMessages: messages,
     hasOlder,

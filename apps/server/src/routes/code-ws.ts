@@ -5,6 +5,7 @@ import { auth, db } from "../auth";
 import type { AgentFrame } from "../lib/agent-loop";
 import { runAgentLoop } from "../lib/agent-loop";
 import { projectHistory } from "../lib/compaction";
+import { runAgentRound, type ThinkingLevel } from "../lib/agent";
 import { resolveAskUser, type AskUserAnswer, type AskUserQuestion } from "../lib/ask-user";
 import { readGitStatus } from "../lib/git-status";
 import { runnerManager } from "../lib/runner-manager";
@@ -23,6 +24,8 @@ interface ClientMessage {
   id?: string;
   cancelled?: boolean;
   answers?: unknown[];
+  /** btw_done fields — sendToMain=false means just close (no summary round). */
+  sendToMain?: boolean;
 }
 
 function parseMessage(data: unknown): ClientMessage | null {
@@ -183,6 +186,163 @@ function sendRunState(run: ActiveRun, ws: WSContext) {
 /** True while an agent loop is live on the session — compaction must not race it. */
 export function isSessionRunning(sessionId: string): boolean {
   return activeRuns.has(sessionId);
+}
+
+export interface StartRunOptions {
+  connectionId: string;
+  model: string;
+  thinkingLevel?: string | null;
+  /** Socket that initiated the send — receives the live stream even if it's not the session's current viewer set. */
+  ws?: WSContext;
+  /** Extra meta stored on the inserted user message (e.g. btw send-to-main marker). */
+  userMeta?: Record<string, unknown> | null;
+  /** Assets attached to the user message (twodb:// refs). */
+  assets?: { uri: string; filename: string; contentType: string }[];
+}
+
+/**
+ * Shared run starter: persists the user message, registers the run, and drives
+ * the agent loop. Used by both the regular `send` flow and /btw send-to-main
+ * (which starts a round on the MAIN session from the btw session's socket).
+ */
+export async function startSessionRun(organizationId: string, session: SessionRow, content: string, opts: StartRunOptions) {
+  const existingRun = activeRuns.get(session.id);
+  if (existingRun) return { busy: true as const };
+
+  const directory = session.codeDirectoryId
+    ? await db
+        .selectFrom("code_directory")
+        .select(["runnerId", "cwd"])
+        .where("id", "=", session.codeDirectoryId)
+        .where("organizationId", "=", organizationId)
+        .executeTakeFirst()
+    : undefined;
+  const runnerId = directory?.runnerId ?? null;
+  const cwd = directory?.cwd ?? null;
+
+  const connection = await db
+    .selectFrom("llm_connection")
+    .selectAll()
+    .where("id", "=", opts.connectionId)
+    .where("organizationId", "=", organizationId)
+    .executeTakeFirst();
+  if (!connection) return { error: "connection_not_found" as const };
+  if (!connection.enabled) return { error: "connection_disabled" as const };
+
+  const history = await db.selectFrom("code_session_message").selectAll().where("sessionId", "=", session.id).orderBy("createdAt", "asc").execute();
+  const projectedHistory = projectHistory(history);
+  const assets = opts.assets ?? [];
+
+  const now = new Date();
+  const isFirstMessage = history.length === 0;
+  const meta = { ...(assets.length > 0 ? { images: assets } : {}), ...(opts.userMeta ?? {}) };
+  await db
+    .insertInto("code_session_message")
+    .values({
+      id: crypto.randomUUID(),
+      sessionId: session.id,
+      role: "user",
+      content,
+      meta: Object.keys(meta).length > 0 ? meta : null,
+      createdAt: now,
+    })
+    .execute();
+  await db
+    .updateTable("code_session")
+    .set({
+      connectionId: opts.connectionId,
+      model: opts.model,
+      thinkingLevel: opts.thinkingLevel ?? undefined,
+      updatedAt: now,
+      ...(isFirstMessage ? { title: content.slice(0, 60) } : {}),
+    })
+    .where("id", "=", session.id)
+    .execute();
+
+  const run: ActiveRun = {
+    controller: new AbortController(),
+    sockets: new Set(),
+    round: 0,
+    text: "",
+    thinking: "",
+    thinkingOpen: false,
+    tools: [],
+    status: null,
+    askUser: null,
+  };
+  // The initiating socket joins the broadcast set; any sockets already viewing
+  // this session (e.g. the main thread behind a /btw dialog) join in too.
+  if (opts.ws) run.sockets.add(opts.ws);
+  for (const s of sockets) if (s.sessionId === session.id) run.sockets.add(s.ws);
+  activeRuns.set(session.id, run);
+  pushSessionState(organizationId, session.id);
+  const emit = (frame: AgentFrame) => {
+    accumulate(run, frame);
+    broadcast(run, frame);
+    if (frame.type === "ask_user") pushSessionState(organizationId, session.id, { needsInput: true });
+    else if (frame.type === "tool_result" && run.askUser?.id === frame.id) pushSessionState(organizationId, session.id, { needsInput: false });
+  };
+
+  try {
+    await runAgentLoop(
+      {
+        session,
+        connection,
+        model: opts.model,
+        runnerId,
+        cwd,
+        signal: run.controller.signal,
+        thinkingLevel: (opts.thinkingLevel ?? undefined) as ThinkingLevel | undefined,
+        history: projectedHistory,
+        userContent: content,
+        ...(assets.length > 0 ? { userImages: assets } : {}),
+        organizationId,
+      },
+      emit,
+    );
+  } finally {
+    activeRuns.delete(session.id);
+    // Completed while the user was elsewhere — flag it for the sidebar.
+    const watched = run.sockets.size > 0;
+    if (!watched) {
+      try {
+        await db.updateTable("code_session").set({ unseenUpdates: true }).where("id", "=", session.id).execute();
+      } catch {
+        // state flag is cosmetic — never fail the run on it
+      }
+    }
+    pushSessionState(organizationId, session.id, { unseenUpdates: !watched });
+    // The run just touched files — refresh the footer git line.
+    void (async () => {
+      if (!directory) return;
+      const result = await readGitStatus(directory.runnerId, directory.cwd);
+      if ("error" in result) return;
+      const data = JSON.stringify({ type: "gitStatus", ...result });
+      for (const target of run.sockets) {
+        try {
+          target.send(data);
+        } catch {
+          run.sockets.delete(target);
+        }
+      }
+    })();
+  }
+  return { ok: true as const };
+}
+
+export type SessionRow = NonNullable<Awaited<ReturnType<typeof fetchSessionRow>>>;
+async function fetchSessionRow(id: string) {
+  return db.selectFrom("code_session").selectAll().where("id", "=", id).executeTakeFirst();
+}
+
+/** True when the session has no committed messages — used to push session_updated (first-message title). */
+async function historyWasEmpty(sessionId: string) {
+  const row = await db
+    .selectFrom("code_session_message")
+    .select((eb) => eb.fn.countAll<number>().as("count"))
+    .where("sessionId", "=", sessionId)
+    .executeTakeFirst();
+  return Number(row?.count ?? 0) <= 1;
 }
 
 /** Sidebar state for one session: run/needsInput/unseen, pushed to the org channel. */
@@ -351,6 +511,183 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
             return;
           }
 
+          // /btw side thread finished — summarize the btw session with the same
+          // LLM, insert the summary into the MAIN session, trigger a round
+          // there (send-to-main), and lock the btw session read-only.
+          if (msg.type === "btw_done") {
+            try {
+              const connectionId = msg.connectionId ?? "";
+              const model = (msg.model ?? "").trim();
+              const sendToMain = msg.sendToMain !== false;
+              if (!connectionId || !model) {
+                ws.send(JSON.stringify({ type: "error", message: "connection_and_model_required" }));
+                return;
+              }
+
+              const btw = await db
+                .selectFrom("code_session")
+                .selectAll()
+                .where("id", "=", sessionId)
+                .where("organizationId", "=", organizationId)
+                .executeTakeFirst();
+              if (!btw) {
+                ws.send(JSON.stringify({ type: "error", message: "session_not_found" }));
+                return;
+              }
+              if (!btw.parentSessionId) {
+                ws.send(JSON.stringify({ type: "error", message: "not_a_btw_session" }));
+                return;
+              }
+              if (btw.locked) {
+                ws.send(JSON.stringify({ type: "error", message: "btw_already_done" }));
+                return;
+              }
+              if (activeRuns.has(sessionId)) {
+                ws.send(JSON.stringify({ type: "error", message: "btw_run_in_progress" }));
+                return;
+              }
+
+              ws.send(JSON.stringify({ type: "btw_status", text: sendToMain ? "summarizing…" : "closing" }));
+
+              const agent = btw.agentId
+                ? await db
+                    .selectFrom("agent")
+                    .select(["description", "provider", "model"])
+                    .where("id", "=", btw.agentId)
+                    .where("organizationId", "=", organizationId)
+                    .executeTakeFirst()
+                : undefined;
+              const agentName = agent?.description?.trim() || "Agent";
+
+              let summary: string | null = null;
+              if (sendToMain) {
+                const connection = await db
+                  .selectFrom("llm_connection")
+                  .selectAll()
+                  .where("id", "=", connectionId)
+                  .where("organizationId", "=", organizationId)
+                  .executeTakeFirst();
+                if (!connection) {
+                  ws.send(JSON.stringify({ type: "error", message: "connection_not_found" }));
+                  return;
+                }
+                if (!connection.enabled) {
+                  ws.send(JSON.stringify({ type: "error", message: "connection_disabled" }));
+                  return;
+                }
+
+                const rows = await db
+                  .selectFrom("code_session_message")
+                  .selectAll()
+                  .where("sessionId", "=", btw.id)
+                  .orderBy("createdAt", "asc")
+                  .execute();
+                const projected = projectHistory(rows);
+                const conversation = projected
+                  .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+                  .join("\n\n")
+                  .slice(0, 100_000);
+                const result = await runAgentRound(
+                  connection,
+                  model,
+                  [
+                    {
+                      role: "system",
+                      content:
+                        "You are a summarization assistant. Read a side conversation between a user and an agent and produce a concise summary that will be handed to the main agent thread. Do NOT continue the conversation. ONLY output the summary.",
+                      meta: null,
+                    },
+                    {
+                      role: "user",
+                      content: `<side-conversation with agent "${agentName}">\n${conversation}\n</side-conversation>\n\nSummarize this side conversation: what was asked, what the agent found/did, and the conclusions. Be concise (a few paragraphs at most); preserve exact file paths, commands, and error messages.`,
+                      meta: null,
+                    },
+                  ],
+                  [],
+                  () => {},
+                );
+                summary = (result.content ?? "").trim();
+                if (!summary) {
+                  ws.send(JSON.stringify({ type: "error", message: "btw_summary_failed" }));
+                  return;
+                }
+              }
+
+              // Lock the btw session read-only.
+              const now = new Date();
+              await db
+                .updateTable("code_session")
+                .set({
+                  locked: true,
+                  runtimeState: JSON.stringify({ ...((btw.runtimeState ?? {}) as Record<string, unknown>), btwDone: true }),
+                  updatedAt: now,
+                })
+                .where("id", "=", btw.id)
+                .execute();
+
+              // Marker row inside the btw thread (rendered as a closed block).
+              await db
+                .insertInto("code_session_message")
+                .values({
+                  id: crypto.randomUUID(),
+                  sessionId: btw.id,
+                  role: "btw_done",
+                  content: summary ?? "",
+                  meta: { sendToMain, agentName, mainSessionId: btw.parentSessionId },
+                  createdAt: now,
+                })
+                .execute();
+
+              const main = await db
+                .selectFrom("code_session")
+                .selectAll()
+                .where("id", "=", btw.parentSessionId)
+                .where("organizationId", "=", organizationId)
+                .executeTakeFirst();
+              if (main) {
+                if (sendToMain && !activeRuns.has(main.id)) {
+                  const started = await startSessionRun(organizationId, main, `[Agent ${agentName} — /btw summary]\n\n${summary}`, {
+                    connectionId,
+                    model,
+                    thinkingLevel: msg.thinkingLevel ?? null,
+                    ws,
+                    userMeta: { btw: { agentName, btwSessionId: btw.id, sendToMain: true } },
+                  });
+                  if ("error" in started) ws.send(JSON.stringify({ type: "error", message: started.error }));
+                  else if ("busy" in started) ws.send(JSON.stringify({ type: "error", message: "main_run_in_progress" }));
+                  else ws.send(JSON.stringify({ type: "btw_done_ok", sendToMain: true }));
+                } else {
+                  // "done" only (or main busy): a clickable block in the main
+                  // transcript; no round until the next user message.
+                  await db
+                    .insertInto("code_session_message")
+                    .values({
+                      id: crypto.randomUUID(),
+                      sessionId: main.id,
+                      role: "btw",
+                      content: summary ?? "",
+                      meta: { agentName, btwSessionId: btw.id, sendToMain, closed: true },
+                      createdAt: new Date(),
+                    })
+                    .execute();
+                  broadcastToSession(main.id, { type: "session_updated" });
+                  ws.send(JSON.stringify({ type: "btw_done_ok", sendToMain: sendToMain && activeRuns.has(main.id) ? null : false }));
+                }
+              } else {
+                ws.send(JSON.stringify({ type: "btw_done_ok", sendToMain: false }));
+              }
+              broadcastToSession(btw.id, { type: "session_updated" });
+            } catch (e) {
+              console.error("[code-ws] btw_done failed:", e);
+              try {
+                ws.send(JSON.stringify({ type: "error", message: (e as Error).message }));
+              } catch {
+                // socket gone
+              }
+            }
+            return;
+          }
+
           if (msg.type !== "send") return;
           try {
             const content = (msg.content ?? "").trim();
@@ -376,139 +713,36 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               return;
             }
 
-            const existingRun = activeRuns.get(session.id);
-            if (existingRun) {
-              existingRun.sockets.add(ws);
-              sendRunState(existingRun, ws);
-              ws.send(JSON.stringify({ type: "busy" }));
+            if (session.locked) {
+              ws.send(JSON.stringify({ type: "error", message: "session_locked" }));
               return;
             }
 
-            const directory = session.codeDirectoryId
-              ? await db
-                  .selectFrom("code_directory")
-                  .select(["runnerId", "cwd"])
-                  .where("id", "=", session.codeDirectoryId)
-                  .where("organizationId", "=", organizationId)
-                  .executeTakeFirst()
-              : undefined;
-            const runnerId = directory?.runnerId ?? null;
-            const cwd = directory?.cwd ?? null;
-
-            const connection = await db
-              .selectFrom("llm_connection")
-              .selectAll()
-              .where("id", "=", connectionId)
-              .where("organizationId", "=", organizationId)
-              .executeTakeFirst();
-            if (!connection) {
-              ws.send(JSON.stringify({ type: "error", message: "connection_not_found" }));
-              return;
-            }
-            if (!connection.enabled) {
-              ws.send(JSON.stringify({ type: "error", message: "connection_disabled" }));
-              return;
-            }
-
-            const history = await db.selectFrom("code_session_message").selectAll().where("sessionId", "=", session.id).orderBy("createdAt", "asc").execute();
-            const projectedHistory = projectHistory(history);
-            // Attachments ride on the user row as refs; vision rounds resolve bytes.
             const assets = Array.isArray(msg.assets)
               ? msg.assets.filter((a) => a && typeof a.uri === "string" && typeof a.filename === "string" && typeof a.contentType === "string")
               : [];
 
-            const now = new Date();
-            const isFirstMessage = history.length === 0;
-            await db
-              .insertInto("code_session_message")
-              .values({
-                id: crypto.randomUUID(),
-                sessionId: session.id,
-                role: "user",
-                content,
-                meta: assets.length > 0 ? { images: assets } : null,
-                createdAt: now,
-              })
-              .execute();
-            await db
-              .updateTable("code_session")
-              .set({
-                connectionId,
-                model,
-                thinkingLevel,
-                updatedAt: now,
-                ...(isFirstMessage ? { title: content.slice(0, 60) } : {}),
-              })
-              .where("id", "=", session.id)
-              .execute();
-            if (isFirstMessage) {
-              ws.send(JSON.stringify({ type: "session_updated" }));
+            const started = await startSessionRun(organizationId, session, content, {
+              connectionId,
+              model,
+              thinkingLevel,
+              ws,
+              assets,
+            });
+            if ("error" in started) {
+              ws.send(JSON.stringify({ type: "error", message: started.error }));
+              return;
             }
-
-            const run: ActiveRun = {
-              controller: new AbortController(),
-              sockets: new Set([ws]),
-              round: 0,
-              text: "",
-              thinking: "",
-              thinkingOpen: false,
-              tools: [],
-              status: null,
-              askUser: null,
-            };
-            activeRuns.set(session.id, run);
-            pushSessionState(organizationId, session.id);
-            const emit = (frame: AgentFrame) => {
-              accumulate(run, frame);
-              broadcast(run, frame);
-              if (frame.type === "ask_user") pushSessionState(organizationId, session.id, { needsInput: true });
-              else if (frame.type === "tool_result" && run.askUser?.id === frame.id) pushSessionState(organizationId, session.id, { needsInput: false });
-            };
-
-            try {
-              await runAgentLoop(
-                {
-                  session,
-                  connection,
-                  model,
-                  runnerId,
-                  cwd,
-                  signal: run.controller.signal,
-                  thinkingLevel: thinkingLevel ?? undefined,
-                  history: projectedHistory,
-                  userContent: content,
-                  ...(assets.length > 0 ? { userImages: assets } : {}),
-                  organizationId,
-                },
-                emit,
-              );
-            } finally {
-              activeRuns.delete(session.id);
-              // Completed while the user was elsewhere — flag it for the sidebar.
-              const watched = run.sockets.size > 0;
-              if (!watched) {
-                try {
-                  await db.updateTable("code_session").set({ unseenUpdates: true }).where("id", "=", session.id).execute();
-                } catch {
-                  // state flag is cosmetic — never fail the run on it
-                }
+            if ("busy" in started) {
+              const existingRun = activeRuns.get(session.id);
+              if (existingRun) {
+                existingRun.sockets.add(ws);
+                sendRunState(existingRun, ws);
               }
-              pushSessionState(organizationId, session.id, { unseenUpdates: !watched });
-              // The run just touched files — refresh the footer git line.
-              void (async () => {
-                if (!directory) return;
-                const result = await readGitStatus(directory.runnerId, directory.cwd);
-                if ("error" in result) return;
-                const data = JSON.stringify({ type: "gitStatus", ...result });
-                for (const target of run.sockets) {
-                  try {
-                    target.send(data);
-                  } catch {
-                    run.sockets.delete(target);
-                  }
-                }
-              })();
+              ws.send(JSON.stringify({ type: "busy" }));
+              return;
             }
+            if (await historyWasEmpty(session.id)) ws.send(JSON.stringify({ type: "session_updated" }));
           } catch (e) {
             console.error("[code-ws] send failed:", e);
             try {

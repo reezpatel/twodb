@@ -202,8 +202,11 @@ function projectRows(rows: MessageRow[]): ProjectedItem[] {
 /** History for the next agent round — compaction/clear-aware. */
 export function projectHistory(rows: MessageRow[]): AgentMessage[] {
   // ask_user rows are UI markers (the wizard's durable state), never LLM context.
+  // btw/btw_done/subagent rows are UI blocks too — the send-to-main summary
+  // reaches the model as the user message that carried it, and the subagent's
+  // summary arrives as its tool result.
   const projected = projectRows(rows)
-    .filter((item) => item.row?.role !== "ask_user")
+    .filter((item) => !["ask_user", "btw", "btw_done", "subagent"].includes(item.row?.role ?? ""))
     .map((item) => item.message);
   // A crash or restart between tool_use and tool_result leaves history that
   // providers reject — synthesize a placeholder result for every dangling call.

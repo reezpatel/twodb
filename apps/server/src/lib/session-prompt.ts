@@ -2,7 +2,7 @@ import { db } from "../auth";
 import { getCodeSettings } from "./code-settings";
 import { DEFAULT_SKILL_TAG, enabledRepoSources, formatSkillsForPrompt, listRepoSkills, listSessionDbSkills, type SessionSkill } from "./skills";
 import { formatMcpForPrompt, loadSessionMcpTools, type McpTool } from "./mcp";
-import { ASSISTANT_DEFAULT_PROMPT, buildSystemPrompt, CANVAS_GUIDANCE } from "./system-prompt";
+import { ASSISTANT_DEFAULT_PROMPT, buildSystemPrompt, CANVAS_GUIDANCE, NON_INTERACTIVE_GUIDANCE } from "./system-prompt";
 
 // Resolves the exact system prompt a code-session run sends: settings override
 // (or default) + cwd + [Skills] titles + inline instructions. Shared by the
@@ -44,6 +44,8 @@ export interface ResolveSessionPromptInput {
   defaultPrompt?: string;
   /** "assistant" = directory-less code session: assistant persona, canvas section. */
   mode?: "code" | "assistant";
+  /** false → headless subagent run: ask_user disabled, non-interactive guidance appended. */
+  interactive?: boolean;
 }
 
 function instructionsSection(instructions: ResolvedInstruction[]): string {
@@ -118,6 +120,8 @@ export async function resolveSessionSystemPrompt(input: ResolveSessionPromptInpu
     mcp: formatMcpForPrompt(mcp.tools),
     // update_canvas is offered in every chat flavor, so guidance rides along.
     canvas: CANVAS_GUIDANCE,
+    // Headless subagent runs never get ask_user — the section says so too.
+    nonInteractive: input.interactive === false ? NON_INTERACTIVE_GUIDANCE : undefined,
   });
   return { systemPrompt, skills, instructions, memories, mcpTools, mcpFailures };
 }
