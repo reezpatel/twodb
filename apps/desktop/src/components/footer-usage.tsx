@@ -107,6 +107,11 @@ export function FooterUsage() {
           </div>
         </div>
         <div className="max-h-72 overflow-y-auto p-1">
+          {refreshQuotas.data?.failed ? (
+            <div className="text-destructive border-b px-3 py-1.5 text-[11px] leading-snug">
+              {refreshQuotas.data.failed} refresh failed — {refreshQuotas.data.errors.join("; ")}
+            </div>
+          ) : null}
           {quotasLoading ? (
             <div className="flex justify-center py-6">
               <Loader2 className="text-muted-foreground size-4 animate-spin" />
