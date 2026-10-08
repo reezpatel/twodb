@@ -21,10 +21,18 @@ const terms = new Map<string, pty.IPty>();
 
 // systemd units get a minimal PATH (/usr/bin:/bin) that on NixOS lacks node,
 // git and coreutils — widen it so execs and terminals can resolve tools.
+// Nix user profiles (system packages, `nix profile`, home-manager) only enter
+// PATH via profile files, which non-login exec shells never source — so the
+// standard locations are listed explicitly.
 function spawnEnv(): Record<string, string> {
+  const home = os.homedir();
+  const user = process.env.USER || os.userInfo().username;
   const path = [
     dirname(process.execPath),
     "/run/current-system/sw/bin",
+    `/etc/profiles/per-user/${user}/bin`,
+    `${home}/.nix-profile/bin`,
+    `${home}/.local/state/nix/profiles/home-manager/home-path/bin`,
     "/usr/local/bin",
     "/opt/homebrew/bin",
     process.env.PATH ?? "",
