@@ -79,11 +79,21 @@ export function useFooterUsage() {
 
   const refreshQuotas = useMutation({
     mutationFn: async () => {
-      const connections = await api<{ id: string }[]>("/api/llm/connections");
+      const connections = await api<{ id: string; name: string }[]>("/api/llm/connections");
       const results = await Promise.allSettled(
-        connections.map((connection) => api(`/api/llm/connections/${connection.id}/refresh-quotas`, { method: "POST", body: "{}" })),
+        connections.map(async (connection) => {
+          try {
+            await api<{ error?: string; detail?: string }>(`/api/llm/connections/${connection.id}/refresh-quotas`, { method: "POST", body: "{}" });
+            return null;
+          } catch (e) {
+            const message = (e as Error).message;
+            if (message.includes("quota_refresh_not_supported")) return null; // provider has no quota API — not a failure
+            return `${connection.name}: ${message.slice(0, 140)}`;
+          }
+        }),
       );
-      return { refreshed: results.filter((r) => r.status === "fulfilled").length, failed: results.filter((r) => r.status === "rejected").length };
+      const errors = results.map((r) => (r.status === "fulfilled" ? r.value : `request failed: ${r.reason?.message ?? "unknown"}`)).filter((v): v is string => v !== null);
+      return { refreshed: results.length - errors.length, failed: errors.length, errors };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["llm", "quotas"] });
