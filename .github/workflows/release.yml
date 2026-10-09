@@ -521,8 +521,13 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      # Branch off latest main, not the tag: tags are cut before the previous
+      # bump PR merges, and basing the branch on the tag makes every bump
+      # rewrite the same version/hash lines from a stale ancestor -> conflict.
       - name: Checkout
         uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          ref: main
 
       - name: Download release tarballs
         env:
@@ -535,22 +540,30 @@ jobs:
       - name: Bump flake.nix
         run: node scripts/flake-release-bump.mjs "${GITHUB_REF_NAME#v}" tarballs
 
+      # One long-lived branch, force-reset to main + the new bump each release.
+      # A newer release supersedes any pending bump, so there is only ever one
+      # open flake PR and it is always based on current main.
       - name: Open flake bump PR
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          branch="flake-bump/v${version}"
+          branch="flake-bump/latest"
           git config user.name "release-bot"
           git config user.email "bot@users.noreply.github.com"
-          git checkout -b "$branch"
+          git checkout -B "$branch"
           git add flake.nix
           git commit -m "flake: v${version} tarballs (runner + server hashes)"
-          git push -u origin "$branch"
-          gh pr create --base main --head "$branch" \
-            --title "flake: v${version} tarballs" \
-            --body "Automated flake.nix bump for the ${GITHUB_REF_NAME} release tarballs. Merge, then run \`nix flake update twodb\` in infra and deploy." \
-            || echo "PR for $branch already exists"
+          git push -f origin "$branch"
+          if gh pr view "$branch" >/dev/null 2>&1; then
+            gh pr edit "$branch" \
+              --title "flake: v${version} tarballs" \
+              --body "Automated flake.nix bump for the ${GITHUB_REF_NAME} release tarballs. Merge, then run \`nix flake update twodb\` in infra and deploy."
+          else
+            gh pr create --base main --head "$branch" \
+              --title "flake: v${version} tarballs" \
+              --body "Automated flake.nix bump for the ${GITHUB_REF_NAME} release tarballs. Merge, then run \`nix flake update twodb\` in infra and deploy."
+          fi
 
   images:
     needs: check

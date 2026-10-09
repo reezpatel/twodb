@@ -15,10 +15,19 @@ import pino from "pino";
  */
 
 const logFile = process.env.TWODB_LOG_FILE ?? path.join(process.cwd(), "logs", "server.log");
-fs.mkdirSync(path.dirname(logFile), { recursive: true });
 
-// Append-only stream; the server restarts under tsx watch recreate it.
-const stream = fs.createWriteStream(logFile, { flags: "a" });
+// Never let logging crash the server: if the log dir isn't writable (e.g. a
+// service started with cwd=/), fall back to stdout so journald still sees it.
+function openStream(): fs.WriteStream | NodeJS.WritableStream {
+  try {
+    fs.mkdirSync(path.dirname(logFile), { recursive: true });
+    return fs.createWriteStream(logFile, { flags: "a" });
+  } catch (err) {
+    process.stderr.write(`twodb: cannot open log file ${logFile} (${(err as Error).message}), logging to stdout\n`);
+    return process.stdout;
+  }
+}
+const stream = openStream();
 
 export const logger = pino(
   {

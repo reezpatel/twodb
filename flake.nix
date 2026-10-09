@@ -115,6 +115,8 @@
               serviceConfig = {
                 ExecStart = "${serverCfg.package}/bin/twodb-server";
                 DynamicUser = true;
+                StateDirectory = "twodb-server";
+                WorkingDirectory = "/var/lib/twodb-server";
                 Restart = "on-failure";
                 RestartSec = "5s";
               }
