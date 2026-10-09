@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, KeyRound, Loader2, Plus, ShieldCheck } from "lucide-react";
+import { Check, Copy, Download, KeyRound, Loader2, Plus, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { usePwaInstall } from "./use-pwa-install";
 
 interface ServerSettings {
   signUpEnabled: boolean;
@@ -68,6 +69,8 @@ export function AdministratorSection() {
     mutationFn: (id: string) => api(`/api/api-keys/${id}`, { method: "DELETE" }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["api-keys"] }),
   });
+
+  const pwa = usePwaInstall();
 
   const copyRevealed = async () => {
     if (!revealed) return;
@@ -168,6 +171,34 @@ export function AdministratorSection() {
               ))}
               {(keys.data ?? []).length === 0 && !keys.isPending && <p className="text-muted-foreground px-1 text-xs">No keys yet — generate one above.</p>}
             </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="max-w-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download size={16} aria-hidden="true" /> Install app
+          </CardTitle>
+          <CardDescription>install twodb as a standalone desktop-style app</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {pwa.state === "standalone" ? (
+            <p className="text-sm">Installed — you are running the app version.</p>
+          ) : pwa.canInstall ? (
+            <Button size="sm" onClick={() => void pwa.install()}>
+              <Download size={13} /> Install
+            </Button>
+          ) : (
+            <div className="space-y-1 text-sm">
+              <p className="text-muted-foreground">
+                Your browser has not offered installation yet. It needs HTTPS, a service worker, and a moment of usage first.
+              </p>
+              <p className="text-muted-foreground text-xs">
+                Chrome/Edge: ⋮ menu → Cast, save and share → Install page as app. Safari: Share → Add to Dock. Firefox: address-bar
+                install icon.
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>

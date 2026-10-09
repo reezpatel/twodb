@@ -11,6 +11,14 @@ import "./index.css";
 
 const queryClient = new QueryClient();
 
+// Captured before React mounts — if Chrome fires beforeinstallprompt while the
+// bundle is still loading, the settings Install button can still use it.
+window.__pwaInstallEvent = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  window.__pwaInstallEvent = e;
+});
+
 registerSW({ immediate: true });
 
 createRoot(document.getElementById("root")!).render(
