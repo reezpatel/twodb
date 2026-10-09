@@ -13,6 +13,7 @@ import {
 } from "./agent";
 import { executeToolCall, toolsForScope, type CanvasArtifactResult, type ToolExecution } from "./agent-tools";
 import { executeCheckSubagentStatus, executeInvokeSubagent, executeListSubagents, SUBAGENT_TOOLS, type SubagentExecution } from "./subagent-tools";
+import { logger } from "./logger";
 import { callMcpTool, loadSessionMcpTools, MCP_TOOL_PREFIX } from "./mcp";
 import { MAX_IMAGE_BASE64, resolveImageBase64 } from "./assets";
 import { getProvider } from "./llm-providers";
@@ -63,6 +64,8 @@ export interface AgentLoopInput {
   userContent: string;
   /** Uploaded assets attached to this send — refs persisted on the user row, bytes resolved per round for vision models. */
   userImages?: AgentImageRef[];
+  /** Replaces the bound agent instruction / org default as the system prompt body. */
+  systemPromptOverride?: string | null;
   organizationId: string;
 }
 
@@ -185,13 +188,14 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
       messages.push(...projectHistory([...rows, compactionRow]));
       // The next round re-measures the compacted context from its own usage.
       contextTokens = 0;
+      logger.info({ sessionId: session.id, contextTokens: current }, "auto-compaction complete");
       await emit({ type: "compaction_done" });
       await emit({ type: "status", text: "" });
     } catch (e) {
       if (e instanceof NothingToCompactError) {
         await emit({ type: "status", text: "" });
       } else {
-        console.error("[agent-loop] auto-compaction failed:", e);
+        logger.error({ sessionId: session.id, err: e }, "auto-compaction failed — continuing with full context");
         await emit({ type: "status", text: "auto-compaction failed — continuing with full context" });
       }
     }
@@ -302,11 +306,17 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
     sessionTags: [...(session.tags ?? []), ...(agent?.tags ?? [])],
     runnerId: agent ? null : runnerId,
     cwd,
-    systemPromptOverride: agent?.instruction ?? null,
+    systemPromptOverride: input.systemPromptOverride !== undefined ? input.systemPromptOverride : (agent?.instruction ?? null),
     mode: toolScope,
     interactive: session.interactive !== false,
   });
   const systemMessage: AgentMessage = { role: "system", content: systemPrompt, meta: null };
+
+  logger.info(
+    { sessionId: session.id, organizationId, model, connectionId: connection.id, provider: connection.provider, sessionType: session.type, interactive: session.interactive !== false },
+    "agent run started",
+  );
+  const runStartedAt = Date.now();
 
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
@@ -367,6 +377,7 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
           if (roundThinking) meta.thinking = [{ text: roundThinking }];
           await insertMessage("assistant", roundText, meta);
         }
+        logger.info({ sessionId: session.id, round }, "agent run stopped by user mid-round");
         break;
       }
 
@@ -383,9 +394,12 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
         if (result.content || result.thinking?.length) {
           await insertMessage("assistant", result.content ?? "", Object.keys(thinkingMeta).length ? thinkingMeta : null);
         }
+        logger.info({ sessionId: session.id, round, outputTokens: result.usage.outputTokens }, "agent run complete — final answer");
         await emit({ type: "round_done", round, usage: result.usage, durationMs: Date.now() - lastRoundStart });
         break;
       }
+
+      logger.info({ sessionId: session.id, round, tools: result.toolCalls.map((t) => t.name), outputTokens: result.usage.outputTokens }, "agent round done — executing tools");
 
       const assistantMeta = { ...thinkingMeta, toolCalls: result.toolCalls };
       await insertMessage("assistant", result.content ?? "", assistantMeta);
@@ -460,8 +474,10 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
       if (stopped) break;
     }
   } catch (e) {
+    logger.error({ sessionId: session.id, err: e, round: 0, elapsedMs: Date.now() - runStartedAt }, "agent run failed");
     await emit({ type: "error", message: (e as Error).message });
   }
 
   await emit({ type: "done", usage: totals, contextTokens, ...(stopped ? { stopped: true } : {}) });
+  logger.info({ sessionId: session.id, rounds: totals, elapsedMs: Date.now() - runStartedAt, stopped }, "agent run finished");
 }

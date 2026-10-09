@@ -3,6 +3,7 @@ import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
 import type { NoteGroupMetadata, NoteNodeTable, NotePropertyDef, NotePropertyOption, NotePropertyType, NoteViewDef, NoteViewType } from "../plugins/db";
 import type { NoteRow } from "../lib/notes-tables";
+import { logger } from "../lib/logger";
 import {
   PROPERTY_TYPES,
   addPropertyColumn,
@@ -266,13 +267,13 @@ export const notesContentRoutes = new Hono()
       if (typeof body.type !== "string" || !PROPERTY_TYPES.includes(body.type as NotePropertyType)) return c.json({ error: "invalid_type" }, 400);
       const to = body.type as NotePropertyType;
       if (to !== def.type) {
-        console.log("[PATCH /properties/:id] type change", { id: propId, from: def.type, to, currentOptions: def.options?.length ?? 0 });
+        logger.info({ id: propId, from: def.type, to }, "notes: property type change");
         try {
           await changePropertyColumnType(db, group.id, propId, def.type, to);
-          console.log("[PATCH /properties/:id] type change OK");
+          logger.info({ id: propId }, "notes: property type change done");
         } catch (err) {
           const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-          console.error("[PATCH /properties/:id] type change FAILED", { id: propId, from: def.type, to, err: detail });
+          logger.error({ id: propId, err: detail }, "notes: property type change failed");
           return c.json({ error: `type_change_failed:${detail}` }, 400);
         }
         def.type = to;

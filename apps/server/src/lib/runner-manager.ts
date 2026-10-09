@@ -1,4 +1,5 @@
 import type { WSContext } from "hono/ws";
+import { logger } from "./logger";
 
 interface RunnerConnection {
   runnerId: string;
@@ -79,11 +80,17 @@ class RunnerManager {
     if (!this.runners.has(runnerId)) {
       opts.onWaiting?.();
       const back = await this.waitForRunner(runnerId, waitMs);
-      if (!back) return Promise.reject(new Error("runner offline (waited for reconnect)"));
+      if (!back) {
+        logger.warn({ runnerId, waitedMs: waitMs }, "runner exec failed: offline (waited for reconnect)");
+        return Promise.reject(new Error("runner offline (waited for reconnect)"));
+      }
     }
 
     const runner = this.runners.get(runnerId);
-    if (!runner) return Promise.reject(new Error("runner offline"));
+    if (!runner) {
+      logger.warn({ runnerId }, "runner exec failed: offline");
+      return Promise.reject(new Error("runner offline"));
+    }
 
     const execId = crypto.randomUUID();
     return new Promise((resolve, reject) => {
@@ -115,6 +122,7 @@ class RunnerManager {
     if (!pending) return;
     this.execs.delete(msg.execId);
     if (msg.code === undefined) {
+      logger.error({ execId: msg.execId, message: msg.message }, "runner exec errored");
       pending.reject(new Error(msg.message ?? "runner exec error"));
     } else {
       pending.resolve({

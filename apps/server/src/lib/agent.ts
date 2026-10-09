@@ -1,6 +1,7 @@
 import type { LlmConnectionTable } from "../plugins/db";
 import { getProvider, providerAuthHeaders, providerBaseUrl } from "./llm-providers";
 import { ensureFreshTokens } from "./token-refresh";
+import { logger } from "./logger";
 
 // ---------------------------------------------------------------------------
 // Agent layer — generic agent-completion interface every adapter implements.
@@ -220,6 +221,7 @@ async function anthropicRound(
 
   if (!res.ok || !res.body) {
     const body = await res.text();
+    logger.error({ provider: connection.provider, model, status: res.status, body: body.slice(0, 300) }, "provider request failed");
     throw new Error(`provider returned ${res.status}: ${body.slice(0, 300)}`);
   }
 
@@ -379,6 +381,7 @@ async function openaiRound(
 
   if (!res.ok || !res.body) {
     const body = await res.text();
+    logger.error({ provider: connection.provider, model, status: res.status, body: body.slice(0, 300) }, "provider request failed");
     throw new Error(`provider returned ${res.status}: ${body.slice(0, 300)}`);
   }
 
@@ -387,9 +390,14 @@ async function openaiRound(
   let reasoningText = "";
   let reasoningOpen = false;
   const usage = { inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
+  let finishReason: string | null = null;
+  let sawDone = false;
 
   for await (const data of sseData(res)) {
-    if (data === "[DONE]") break;
+    if (data === "[DONE]") {
+      sawDone = true;
+      break;
+    }
     const chunk = safeJson(data);
     if (!chunk) continue;
 
@@ -406,6 +414,7 @@ async function openaiRound(
 
     const choice = (chunk.choices as Record<string, unknown>[] | undefined)?.[0];
     if (!choice) continue;
+    if (choice.finish_reason) finishReason = String(choice.finish_reason);
     const delta = (choice.delta ?? {}) as Record<string, unknown>;
 
     if (typeof delta.content === "string" && delta.content) {
@@ -445,6 +454,15 @@ async function openaiRound(
       arguments: (t.json ? safeJson(t.json) : null) ?? {},
     }));
   if (reasoningOpen) events.onThinkingEnd?.();
+  // A stream that ends without finish_reason or a [DONE] marker was dropped
+  // mid-flight (proxy cut, provider restart) — the accumulated partial output
+  // is unreliable. Flag it so silent stops are diagnosable from the logs.
+  if (!finishReason && !sawDone) {
+    logger.warn({ provider: connection.provider, model, textChars: text.length, toolCalls: toolCalls.length }, "openai stream ended without finish_reason — possible dropped stream");
+  }
+  if (finishReason === "length") {
+    logger.warn({ provider: connection.provider, model, textChars: text.length, toolCalls: toolCalls.length }, "round truncated by output token limit (finish_reason=length)");
+  }
   return { content: text || null, toolCalls, usage, ...(reasoningText ? { thinking: [{ text: reasoningText }] } : {}) };
 }
 
@@ -538,6 +556,7 @@ async function responsesRound(
 
   if (!res.ok || !res.body) {
     const body = await res.text();
+    logger.error({ provider: connection.provider, model, status: res.status, body: body.slice(0, 300) }, "provider request failed");
     throw new Error(`provider returned ${res.status}: ${body.slice(0, 300)}`);
   }
 
@@ -595,6 +614,7 @@ async function responsesRound(
       usage.cachedTokens = u.input_tokens_details?.cached_tokens ?? 0;
     } else if (type === "response.failed" || type === "error") {
       const err = (evt.error ?? evt.response ?? {}) as Record<string, unknown>;
+      logger.error({ provider: connection.provider, model, err: JSON.stringify(err).slice(0, 300) }, "responses stream failed");
       throw new Error(`responses stream failed: ${JSON.stringify(err).slice(0, 300)}`);
     }
   }

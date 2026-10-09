@@ -3,6 +3,7 @@ import type { WSContext } from "hono/ws";
 import type { createNodeWebSocket } from "@hono/node-ws";
 import { auth, db } from "../auth";
 import { runnerManager } from "../lib/runner-manager";
+import { logger } from "../lib/logger";
 
 type UpgradeWebSocket = ReturnType<typeof createNodeWebSocket>["upgradeWebSocket"];
 
@@ -41,6 +42,7 @@ export function registerRunnerWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) 
           const keyRow = await db.selectFrom("runner_access_key").selectAll().where("key", "=", key).executeTakeFirst();
 
           if (!keyRow || keyRow.revokedAt) {
+            logger.warn({ name }, "runner connect rejected: invalid or revoked key");
             ws.close(4403, "invalid or revoked key");
             return;
           }
@@ -80,6 +82,7 @@ export function registerRunnerWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) 
             name,
             ws,
           });
+          logger.info({ runnerId: runner.id, organizationId: keyRow.organizationId, name, hostname }, "runner connected");
           ws.send(JSON.stringify({ type: "welcome", runnerId: runner.id }));
         },
 
@@ -91,6 +94,7 @@ export function registerRunnerWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) 
 
         async onClose() {
           if (!runnerId) return;
+          logger.info({ runnerId }, "runner disconnected");
           runnerManager.removeRunner(runnerId);
           await db.updateTable("runner").set({ lastSeenAt: new Date() }).where("id", "=", runnerId).execute();
         },
