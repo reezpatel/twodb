@@ -28,6 +28,7 @@ import { McpSection } from "./routes/settings/llm/mcp/mcp-section";
 import { RunnersSection } from "./routes/settings/runners/runners";
 import { CodeSection } from "./routes/settings/code/code";
 import { StorageSection } from "./routes/settings/storage/storage";
+import { LogsSection } from "./routes/settings/logs/logs";
 import { FilesScene } from "./routes/files/files-scene";
 import { NotesScene } from "./routes/notes/notes-scene";
 import { EmailScene } from "./routes/email/email-scene";
@@ -82,6 +83,7 @@ export const router = createBrowserRouter([
           { path: "runners", Component: RunnersSection },
           { path: "code", Component: CodeSection },
           { path: "storage", Component: StorageSection },
+          { path: "logs", Component: LogsSection },
         ],
       },
       {

@@ -8,6 +8,7 @@ const SECTIONS = [
   { id: "code", label: "Code" },
   { id: "runners", label: "Runners" },
   { id: "storage", label: "Storage" },
+  { id: "logs", label: "Logs" },
 ] as const;
 
 export function SettingsLayout() {

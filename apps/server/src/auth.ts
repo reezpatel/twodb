@@ -5,6 +5,7 @@ import { apiKey } from "@better-auth/api-key";
 import { createDb } from "./plugins/db";
 import { env } from "./env";
 import { getServerSettings } from "./lib/server-settings";
+import { logger } from "./lib/logger";
 
 export const db = createDb(env.databaseUrl);
 
@@ -24,7 +25,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     sendResetPassword: async ({ user, url }) => {
-      console.log(`[auth] password reset link for ${user.email}: ${url}`);
+      logger.info({ email: user.email }, `password reset link: ${url}`);
     },
   },
   hooks: {

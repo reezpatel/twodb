@@ -1,4 +1,5 @@
 import { db } from "../auth";
+import { logger } from "./logger";
 import type { LlmConnectionTable } from "../plugins/db";
 
 // OAuth refresh endpoints for token-exchange providers. Public client ids
@@ -62,6 +63,7 @@ export async function ensureFreshTokens(connection: LlmConnectionTable): Promise
   });
   if (!res.ok) {
     const body = await res.text();
+    logger.warn({ provider: connection.provider, connectionId: connection.id, status: res.status, body: body.slice(0, 200) }, "oauth token refresh failed");
     if (config.access_token) return config; // stale token still beats none
     throw new Error(`token refresh failed (${res.status}): ${body.slice(0, 200)}`);
   }
@@ -72,6 +74,7 @@ export async function ensureFreshTokens(connection: LlmConnectionTable): Promise
   if (tokens.refresh_token) config.refresh_token = tokens.refresh_token;
   if (tokens.expires_in) config.expires_at = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
+  logger.info({ provider: connection.provider, connectionId: connection.id }, "oauth token refreshed");
   await db.updateTable("llm_connection").set({ config }).where("id", "=", connection.id).executeTakeFirst();
 
   return config;

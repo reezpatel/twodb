@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { Selectable } from "kysely";
+import { logger } from "./logger";
 import { db } from "../auth";
 import type { McpServerTable } from "../plugins/db";
 import type { AgentTool } from "./agent";
@@ -56,13 +57,17 @@ async function connect(row: Selectable<McpServerTable>): Promise<Client> {
   }
   try {
     await client.connect(transportFor(row, url));
-  } catch {
+  } catch (e) {
     // auto + sse: fall back to the legacy SSE endpoint of servers without streamable http.
-    if (row.transport === "http") throw new Error("streamable http transport failed");
+    if (row.transport === "http") {
+      logger.warn({ serverId: row.id, server: row.name, err: e }, "mcp: streamable http transport failed");
+      throw new Error("streamable http transport failed");
+    }
     const sse = new Client({ name: "twodb", version: "1.0.0" });
     await sse.connect(transportFor({ ...row, transport: "sse" } as Selectable<McpServerTable>, url));
     await client.close().catch(() => {});
     pool.set(row.id, { client: sse, connectedAt: Date.now() });
+    logger.info({ serverId: row.id, server: row.name, transport: "sse" }, "mcp: connected via sse fallback");
     return sse;
   }
   pool.set(row.id, { client, connectedAt: Date.now() });
@@ -94,6 +99,7 @@ export async function listMcpServerTools(row: Selectable<McpServerTable>): Promi
   const client = await clientFor(row);
   const { tools } = await client.listTools(undefined, { timeout: CONNECT_TIMEOUT_MS } as never).catch((e) => {
     evictMcpClient(row.id);
+    logger.warn({ serverId: row.id, server: row.name, err: e }, "mcp: listTools failed");
     throw e;
   });
   return tools.map((t) => ({
@@ -161,6 +167,7 @@ export async function callMcpTool(organizationId: string, name: string, args: Re
       .listTools(undefined, { timeout: CONNECT_TIMEOUT_MS } as never)
       .catch((e) => {
         evictMcpClient(row.id);
+        logger.warn({ serverId: row.id, err: e }, "mcp: session listTools failed");
         throw e;
       });
     const remote = tools.find((t) => mcpToolName(row.name, t.name) === name);
@@ -170,6 +177,7 @@ export async function callMcpTool(organizationId: string, name: string, args: Re
       .callTool({ name: remote.name, arguments: args }, undefined, { timeout: CALL_TIMEOUT_MS } as never)
       .catch((e) => {
         evictMcpClient(row.id);
+        logger.error({ serverId: row.id, tool: remote.name, err: e }, "mcp: callTool failed");
         throw e;
       });
     if (result.isError) {

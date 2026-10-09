@@ -19,16 +19,22 @@ import { mcpRoutes } from "./routes/mcp";
 import { runnerRoutes } from "./routes/runners";
 import { registerRunnerWs } from "./routes/runner-ws";
 import { registerCodeWs } from "./routes/code-ws";
+import { registerChatWs } from "./routes/chat-ws";
+import { chatRoutes } from "./routes/chat";
 import { storageRoutes } from "./routes/storage";
 import { storageAdminRoutes } from "./routes/storage-admin";
 import { serverSettingsRoutes } from "./routes/server-settings";
 import { apiKeyRoutes } from "./routes/api-keys";
+import { logsRoutes } from "./routes/logs";
 import { getServerSettings } from "./lib/server-settings";
 import { runMigrations } from "./lib/migrate";
+import { logger } from "./lib/logger";
 import { notesRoutes } from "./routes/notes";
 import { notesContentRoutes } from "./routes/notes-content";
 
 const graph = createGraph(env.memgraph.url, env.memgraph.user, env.memgraph.password);
+
+logger.info({ port: env.port, staticDir: env.staticDir ?? null }, "twodb server starting");
 
 const app = new Hono();
 
@@ -48,15 +54,17 @@ app.get("/api/health", async (c) => {
   try {
     await db.selectFrom("user").select("id").limit(1).execute();
     checks.postgres = true;
-  } catch {
+  } catch (e) {
     checks.postgres = false;
+    logger.error({ err: e }, "health check: postgres unreachable");
   }
 
   try {
     await graph.verifyConnectivity();
     checks.memgraph = true;
-  } catch {
+  } catch (e) {
     checks.memgraph = false;
+    logger.error({ err: e }, "health check: memgraph unreachable");
   }
 
   return c.json({ ok: Object.values(checks).every(Boolean), checks });
@@ -80,11 +88,14 @@ app.route("/api/notes", notesRoutes);
 app.route("/api/notes", notesContentRoutes);
 app.route("/api/server-settings", serverSettingsRoutes);
 app.route("/api/api-keys", apiKeyRoutes);
+app.route("/api/logs", logsRoutes);
 
 // Public subset (register page reads this before showing the form).
 app.get("/api/public-settings", async (c) => c.json(await getServerSettings()));
+app.route("/api/chat", chatRoutes);
 registerRunnerWs(app, upgradeWebSocket);
 registerCodeWs(app, upgradeWebSocket);
+registerChatWs(app, upgradeWebSocket);
 
 // Production: serve the built desktop app (SPA) from a static dir; API routes
 // above always win because they are registered first.
@@ -95,23 +106,24 @@ if (env.staticDir) {
 }
 
 if (env.skipAutoMigration) {
-  console.log("TWO_DB_SKIP_AUTO_MIGRATION set — skipping database migrations");
+  logger.warn("TWO_DB_SKIP_AUTO_MIGRATION set — skipping database migrations");
 } else {
   try {
     await runMigrations(db);
   } catch (error) {
-    console.error("database migration failed:", error);
+    logger.error({ err: error }, "database migration failed");
     process.exit(1);
   }
 }
 
 const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
-  console.log(`server listening on http://localhost:${info.port}`);
+  logger.info({ port: info.port }, "server listening");
 });
 
 injectWebSocket(server);
 
 process.on("SIGINT", async () => {
+  logger.info("shutting down (SIGINT)");
   await graph.close();
   await db.destroy();
   process.exit(0);

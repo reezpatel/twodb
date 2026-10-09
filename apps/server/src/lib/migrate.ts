@@ -2,6 +2,7 @@ import { sql, type Kysely } from "kysely";
 import { Migrator } from "kysely/migration";
 import { dbSchema, type Database } from "../plugins/db";
 import { migrations } from "../migrations";
+import { logger } from "./logger";
 
 const BASELINE_MIGRATION = "0001_initial";
 
@@ -38,7 +39,7 @@ async function seedBaselineIfNeeded(db: Kysely<Database>): Promise<void> {
     insert into ${migrationTable} (name, "timestamp")
     values (${BASELINE_MIGRATION}, ${new Date().toISOString()})
     on conflict do nothing`.execute(db);
-  console.log(`migrations: existing database — marked ${BASELINE_MIGRATION} as applied`);
+  logger.info({ migration: BASELINE_MIGRATION }, "migrations: existing database — baseline marked as applied");
 }
 
 export async function runMigrations(db: Kysely<Database>): Promise<void> {
@@ -55,9 +56,9 @@ export async function runMigrations(db: Kysely<Database>): Promise<void> {
 
   for (const result of results ?? []) {
     if (result.status === "Success") {
-      console.log(`migrations: ✓ ${result.migrationName}`);
+      logger.info({ migration: result.migrationName }, "migration applied");
     } else if (result.status === "Error") {
-      console.error(`migrations: ✗ ${result.migrationName}`);
+      logger.error({ migration: result.migrationName }, "migration failed");
     }
   }
 
