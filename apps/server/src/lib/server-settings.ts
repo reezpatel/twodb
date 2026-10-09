@@ -20,6 +20,7 @@ export interface ServerSettings {
 /** Known dedicated destinations — extensible; the id is the setting key. */
 export const STORAGE_DESTINATIONS: { id: string; label: string; description: string }[] = [
   { id: "agent_assets", label: "Agents Assets", description: "where agents store their assets (files, uploads, generated artifacts)" },
+  { id: "chat_assets", label: "Chat Assets", description: "where team-chat file attachments are stored" },
 ];
 
 const DEFAULTS: ServerSettings = { signUpEnabled: true, storageDestinations: {} };

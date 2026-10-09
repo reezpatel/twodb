@@ -128,7 +128,7 @@ export async function executeListSubagents(ctx: SubagentContext): Promise<Subage
   }
   const lines = agents.map(
     (a) =>
-      `- agent_id: ${a.id}\n  type: ${a.type}\n  description: ${a.description ?? `${a.provider}/${a.model}`}\n  tools: ${a.tools.includes("all") ? "all" : a.tools.length ? a.tools.join(", ") : "none"}`,
+      `- agent_id: ${a.id}\n  type: ${a.type}\n  description: ${a.description ?? `${a.provider}/${a.model}`}\n  tools: ${(a.tools as unknown as string[]).includes("all") ? "all" : (a.tools as unknown as string[]).length ? (a.tools as unknown as string[]).join(", ") : "none"}`,
   );
   return { output: `Subagents available in this session:\n${lines.join("\n")}`, failed: false };
 }

@@ -38,6 +38,15 @@ Keep chat replies short and conversational; put the substance on the canvas.`;
 /** Default persona for directory-less (assistant-style) code sessions. */
 export const ASSISTANT_DEFAULT_PROMPT = "You are twodb assistant, a helpful general-purpose chat assistant.";
 
+/** Appended to collaborator/sentinel instructions when they run inside team chat. */
+export const CHAT_GUIDANCE = [
+  "You are a participant in a team chat channel, replying alongside humans and other AI collaborators.",
+  "Style: concise, conversational, on-topic — short paragraphs, no headers or bullet walls unless asked.",
+  "Address people with @Name mentions when replying to them specifically.",
+  "Only respond when @mentioned, when someone replies directly to one of your messages, or when you have something clearly useful to add — never narrate unprompted activity.",
+  "Tools: available when needed, but chat answers should be direct; mention when a task you ran completed and where results live.",
+].join("\n");
+
 /** Guidance injected into non-interactive (headless subagent) sessions. */
 export const NON_INTERACTIVE_GUIDANCE = `This session is NOT interactive — no human is watching this thread in real time.
 - The ask_user tool is unavailable: it returns an error. Never call it; make reasonable decisions yourself and report them.

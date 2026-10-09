@@ -13,6 +13,7 @@ import { broadcastSessionEvent, broadcastToSession, isSessionRunning } from "./c
 import { readGitStatus } from "../lib/git-status";
 import { runnerManager } from "../lib/runner-manager";
 import type { CodeSessionMode, CodeSessionType } from "../plugins/db";
+import { logger } from "../lib/logger";
 
 export const codeRoutes = new Hono()
   .get("/directories/:id/files", async (c) => {
@@ -594,7 +595,8 @@ export const codeRoutes = new Hono()
 
     const type = c.req.query("type");
     if (type === "sub_agent") query = query.where("type", "=", "sub_agent");
-    else if (type !== "all") query = query.where("type", "=", "main_agent");
+    else if (type === "all") query = query.where("type", "<>", "chat");
+    else query = query.where("type", "=", "main_agent");
 
     const parentSessionId = c.req.query("parentSessionId");
     if (parentSessionId) query = query.where("parentSessionId", "=", parentSessionId);
@@ -905,7 +907,7 @@ export const codeRoutes = new Hono()
     } catch (e) {
       const message = (e as Error).message;
       if (message === "agent_assets_not_configured") return c.json({ error: message }, 409);
-      console.error("[code] asset upload failed:", e);
+      logger.error({ err: e }, "code: asset upload failed");
       return c.json({ error: message || "upload_failed" }, 500);
     }
   })
@@ -987,7 +989,7 @@ export const codeRoutes = new Hono()
       return c.json(row, 201);
     } catch (e) {
       if (e instanceof NothingToCompactError) return c.json({ error: "nothing_to_compact" }, 400);
-      console.error("[code] compact failed:", e);
+      logger.error({ err: e }, "code: compaction failed");
       return c.json({ error: (e as Error).message || "compaction_failed" }, 500);
     }
   })

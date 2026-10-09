@@ -161,7 +161,7 @@ export interface CodeDirectoryTable {
   updatedAt: Date;
 }
 
-export type CodeSessionType = "main_agent" | "sub_agent";
+export type CodeSessionType = "main_agent" | "sub_agent" | "chat";
 
 export interface CodeSessionMode {
   type: string;
@@ -195,6 +195,8 @@ export interface CodeSessionTable {
   depthCount: ColumnType<number, number | undefined, number | undefined>;
   /** Run finished since the user last opened this session — sidebar unread marker. */
   unseenUpdates: ColumnType<boolean, boolean | undefined, boolean | undefined>;
+  /** Set for chat sessions — binds the per-(channel × agent) session to its channel. */
+  chatChannelId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -237,8 +239,10 @@ export interface AgentTable {
   tags: string[];
   /** sub_agent | persona | collaborator | sentinel. */
   type: AgentType;
-  /** Tool allowlist — ["all"] = every tool (incl. future ones); [] = no tools. */
-  tools: string[];
+  /** Tool allowlist — ["all"] = every tool (incl. future ones); [] = no tools. Stored jsonb — insert a JSON string. */
+  tools: ColumnType<string[], string, string>;
+  /** Display name for chat (fallback: description). */
+  name: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -437,6 +441,8 @@ export interface MediaAssetTable {
   id: string;
   organizationId: string;
   sessionId: string | null;
+  /** Chat channel this attachment belongs to — powers the Files tab. */
+  chatChannelId: string | null;
   backendId: string;
   /** Full object path inside the backend, including the destination prefix. */
   path: string;
@@ -563,6 +569,97 @@ export interface NotificationTable {
   createdAt: Date;
 }
 
+export interface ChatChannelTable {
+  id: string;
+  organizationId: string;
+  codeDirectoryId: string | null;
+  parentId: string | null;
+  /** channel | assistant (assistant = per-user sentinel DM). */
+  kind: string;
+  name: string;
+  description: string | null;
+  position: number;
+  createdById: string | null;
+  lastMessageAt: Date | null;
+  archivedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ChatChannelMemberTable {
+  id: string;
+  organizationId: string;
+  channelId: string;
+  /** user | agent. */
+  memberType: string;
+  userId: string | null;
+  agentId: string | null;
+  createdAt: Date;
+}
+
+export interface ChatMessageTable {
+  id: string;
+  organizationId: string;
+  channelId: string;
+  /** user | agent. */
+  authorType: string;
+  userId: string | null;
+  agentId: string | null;
+  body: string;
+  /** { mentions?, attachments?, linkCard?, sessionRef? }. */
+  meta: Record<string, unknown> | null;
+  /** Single-level reply — server clamps to root messages. */
+  replyToId: string | null;
+  editedAt: Date | null;
+  deletedAt: Date | null;
+  createdAt: Date;
+}
+
+export interface ChatReactionTable {
+  id: string;
+  organizationId: string;
+  messageId: string;
+  authorType: string;
+  userId: string | null;
+  emoji: string;
+  createdAt: Date;
+}
+
+export interface ChatPinTable {
+  id: string;
+  organizationId: string;
+  channelId: string;
+  messageId: string;
+  createdById: string;
+  createdAt: Date;
+}
+
+export interface ChatSavedTable {
+  id: string;
+  organizationId: string;
+  messageId: string;
+  userId: string;
+  createdAt: Date;
+}
+
+export interface ChatDraftTable {
+  id: string;
+  organizationId: string;
+  channelId: string;
+  userId: string;
+  body: string;
+  updatedAt: Date;
+}
+
+export interface ChatReadStateTable {
+  id: string;
+  organizationId: string;
+  channelId: string;
+  userId: string;
+  lastReadMessageId: string | null;
+  updatedAt: Date;
+}
+
 export interface Database {
   user: UserTable;
   session: SessionTable;
@@ -596,6 +693,14 @@ export interface Database {
   storage_entry: StorageEntryTable;
   code_session_artifact: CodeSessionArtifactTable;
   media_asset: MediaAssetTable;
+  chat_channel: ChatChannelTable;
+  chat_channel_member: ChatChannelMemberTable;
+  chat_message: ChatMessageTable;
+  chat_reaction: ChatReactionTable;
+  chat_pin: ChatPinTable;
+  chat_saved: ChatSavedTable;
+  chat_draft: ChatDraftTable;
+  chat_read_state: ChatReadStateTable;
   note_node: NoteNodeTable;
   note_item: NoteItemTable;
   server_setting: ServerSettingTable;
