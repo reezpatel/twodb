@@ -3,6 +3,8 @@ import type { WSContext } from "hono/ws";
 import type { createNodeWebSocket } from "@hono/node-ws";
 import { auth, db } from "../auth";
 import type { AgentFrame } from "../lib/agent-loop";
+import { logger } from "../lib/logger";
+import type { AgentMessage } from "../lib/agent";
 import { runAgentLoop } from "../lib/agent-loop";
 import { projectHistory } from "../lib/compaction";
 import { runAgentRound, type ThinkingLevel } from "../lib/agent";
@@ -198,6 +200,14 @@ export interface StartRunOptions {
   userMeta?: Record<string, unknown> | null;
   /** Assets attached to the user message (twodb:// refs). */
   assets?: { uri: string; filename: string; contentType: string }[];
+  /** Replaces the DB-projected history (chat channels project chat_message rows instead). */
+  historyOverride?: AgentMessage[];
+  /** Replaces the bound agent's instruction as the system prompt body. */
+  systemPromptOverride?: string | null;
+  /** Keep the session title on first message (chat sessions carry their own title). */
+  titleLocked?: boolean;
+  /** Live frame tap for callers that don't own a socket (chat agent state). */
+  onFrame?: (frame: AgentFrame) => void;
 }
 
 /**
@@ -254,7 +264,7 @@ export async function startSessionRun(organizationId: string, session: SessionRo
       model: opts.model,
       thinkingLevel: opts.thinkingLevel ?? undefined,
       updatedAt: now,
-      ...(isFirstMessage ? { title: content.slice(0, 60) } : {}),
+      ...(isFirstMessage && !opts.titleLocked ? { title: content.slice(0, 60) } : {}),
     })
     .where("id", "=", session.id)
     .execute();
@@ -275,10 +285,12 @@ export async function startSessionRun(organizationId: string, session: SessionRo
   if (opts.ws) run.sockets.add(opts.ws);
   for (const s of sockets) if (s.sessionId === session.id) run.sockets.add(s.ws);
   activeRuns.set(session.id, run);
+  logger.info({ sessionId: session.id, organizationId, model: opts.model, connectionId: opts.connectionId, sessionType: session.type }, "session run started");
   pushSessionState(organizationId, session.id);
   const emit = (frame: AgentFrame) => {
     accumulate(run, frame);
     broadcast(run, frame);
+    if (opts.onFrame) opts.onFrame(frame);
     if (frame.type === "ask_user") pushSessionState(organizationId, session.id, { needsInput: true });
     else if (frame.type === "tool_result" && run.askUser?.id === frame.id) pushSessionState(organizationId, session.id, { needsInput: false });
   };
@@ -293,15 +305,17 @@ export async function startSessionRun(organizationId: string, session: SessionRo
         cwd,
         signal: run.controller.signal,
         thinkingLevel: (opts.thinkingLevel ?? undefined) as ThinkingLevel | undefined,
-        history: projectedHistory,
+        history: opts.historyOverride ?? projectedHistory,
         userContent: content,
         ...(assets.length > 0 ? { userImages: assets } : {}),
         organizationId,
+        ...(opts.systemPromptOverride !== undefined ? { systemPromptOverride: opts.systemPromptOverride } : {}),
       },
       emit,
     );
   } finally {
     activeRuns.delete(session.id);
+    logger.info({ sessionId: session.id, organizationId, watched: run.sockets.size > 0 }, "session run finished");
     // Completed while the user was elsewhere — flag it for the sidebar.
     const watched = run.sockets.size > 0;
     if (!watched) {
@@ -461,6 +475,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
           }
           socket = { ws, organizationId, sessionId };
           sockets.add(socket);
+          logger.info({ sessionId, organizationId }, "code session ws connected");
           await pushRunners([...sockets], socket);
           const run = activeRuns.get(sessionId);
           if (run) {
@@ -481,6 +496,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
             sockets.delete(socket);
             for (const run of activeRuns.values()) run.sockets.delete(socket.ws);
           }
+          logger.info({ sessionId }, "code session ws disconnected");
         },
 
         async onMessage(evt: { data: unknown }, ws: WSContext) {
@@ -495,6 +511,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
           }
 
           if (msg.type === "stop") {
+            logger.info({ sessionId }, "run stop requested by client");
             activeRuns.get(sessionId)?.controller.abort();
             return;
           }
@@ -678,7 +695,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               }
               broadcastToSession(btw.id, { type: "session_updated" });
             } catch (e) {
-              console.error("[code-ws] btw_done failed:", e);
+              logger.error({ err: e, sessionId }, "code-ws: btw_done failed");
               try {
                 ws.send(JSON.stringify({ type: "error", message: (e as Error).message }));
               } catch {
@@ -744,7 +761,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
             }
             if (await historyWasEmpty(session.id)) ws.send(JSON.stringify({ type: "session_updated" }));
           } catch (e) {
-            console.error("[code-ws] send failed:", e);
+            logger.error({ err: e, sessionId }, "code-ws: send failed");
             try {
               ws.send(JSON.stringify({ type: "error", message: (e as Error).message }));
             } catch {

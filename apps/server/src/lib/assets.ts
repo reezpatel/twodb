@@ -1,6 +1,7 @@
 import { db } from "../auth";
 import { getStorageDestinations } from "./server-settings";
 import { getStorageDriver } from "./storage/registry";
+import { logger } from "./logger";
 
 // Chat assets: files uploaded from the composer land in the agent_assets
 // storage destination (backend + prefix from server settings) and are
@@ -24,33 +25,52 @@ function extensionOf(filename: string): string {
   return dot > 0 && dot < filename.length - 1 ? filename.slice(dot + 1).toLowerCase() : "";
 }
 
-/** Driver for the configured agent_assets destination — throws when unset. */
-async function assetsDriver(): Promise<{ backendId: string; prefix: string; driver: Awaited<ReturnType<typeof getStorageDriver>>["driver"] }> {
-  const destination = (await getStorageDestinations()).agent_assets;
-  if (!destination) throw new Error("agent_assets_not_configured");
+export type DestinationId = "agent_assets" | "chat_assets";
+
+/** Driver for a configured storage destination — throws when unset. */
+async function destinationDriver(destinationId: DestinationId): Promise<{ backendId: string; prefix: string; driver: Awaited<ReturnType<typeof getStorageDriver>>["driver"] }> {
+  const destination = (await getStorageDestinations())[destinationId];
+  if (!destination) throw new Error(`${destinationId}_not_configured`);
   const { backend, driver } = await getStorageDriver(destination.backendId);
   return { backendId: backend.id, prefix: destination.prefix, driver };
 }
 
-export async function storeAsset(input: {
+/** Driver for the configured agent_assets destination — throws when unset. */
+async function assetsDriver(): Promise<{ backendId: string; prefix: string; driver: Awaited<ReturnType<typeof getStorageDriver>>["driver"] }> {
+  return destinationDriver("agent_assets");
+}
+
+export interface StoreAssetInput {
   organizationId: string;
-  sessionId: string | null;
   filename: string;
   contentType: string | null;
   data: Buffer;
-}): Promise<StoredAsset> {
-  const { backendId, prefix, driver } = await assetsDriver();
+  /** agent_assets sessions — media_asset.sessionId. */
+  sessionId?: string | null;
+  /** chat_assets channels — media_asset.chatChannelId. */
+  chatChannelId?: string | null;
+}
+
+/** Stores bytes under a storage destination and records the media_asset row. */
+async function storeAssetAt(destinationId: DestinationId, input: StoreAssetInput): Promise<StoredAsset> {
+  const { backendId, prefix, driver } = await destinationDriver(destinationId);
   const id = crypto.randomUUID();
   const extension = extensionOf(input.filename);
   const path = [prefix, `${id}${extension ? `.${extension}` : ""}`].filter(Boolean).join("/");
-  await driver.put(path, input.data, input.contentType ?? undefined);
+  try {
+    await driver.put(path, input.data, input.contentType ?? undefined);
+  } catch (e) {
+    logger.error({ destinationId, backendId, path, err: e, size: input.data.length }, "asset store failed");
+    throw e;
+  }
 
   await db
     .insertInto("media_asset")
     .values({
       id,
       organizationId: input.organizationId,
-      sessionId: input.sessionId,
+      sessionId: input.sessionId ?? null,
+      chatChannelId: input.chatChannelId ?? null,
       backendId,
       path,
       filename: input.filename,
@@ -60,6 +80,8 @@ export async function storeAsset(input: {
       createdAt: new Date(),
     })
     .execute();
+
+  logger.info({ mediaId: id, destinationId, backendId, filename: input.filename, size: input.data.length }, "asset stored");
 
   return {
     id,
@@ -71,6 +93,27 @@ export async function storeAsset(input: {
     size: input.data.length,
     uri: `twodb://${backendId}/${id}`,
   };
+}
+
+export async function storeAsset(input: {
+  organizationId: string;
+  sessionId: string | null;
+  filename: string;
+  contentType: string | null;
+  data: Buffer;
+}): Promise<StoredAsset> {
+  return storeAssetAt("agent_assets", input);
+}
+
+/** Chat attachment upload — lands in the chat_assets destination, bound to the channel. */
+export async function storeChatAsset(input: {
+  organizationId: string;
+  chatChannelId: string;
+  filename: string;
+  contentType: string | null;
+  data: Buffer;
+}): Promise<StoredAsset> {
+  return storeAssetAt("chat_assets", input);
 }
 
 /** Parses a twodb:// uri into its backend + media id. */

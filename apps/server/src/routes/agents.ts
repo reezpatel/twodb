@@ -50,6 +50,7 @@ export const agentRoutes = new Hono()
       return c.json({ error: "invalid_description" }, 400);
     }
     if (typeof body?.instruction !== "string") return c.json({ error: "invalid_instruction" }, 400);
+    if (body?.name !== undefined && body.name !== null && typeof body.name !== "string") return c.json({ error: "invalid_name" }, 400);
     const tags = parseTags(body?.tags);
     if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
     const type = body?.type === undefined ? "sub_agent" : parseType(body.type);
@@ -71,10 +72,11 @@ export const agentRoutes = new Hono()
         provider: body.provider.trim(),
         model: body.model.trim(),
         description: typeof body.description === "string" && body.description ? body.description : null,
+        name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : null,
         instruction: body.instruction,
         tags: tags ?? [],
         type,
-        tools,
+        tools: JSON.stringify(tools),
         createdAt: now,
         updatedAt: now,
       })
@@ -106,7 +108,11 @@ export const agentRoutes = new Hono()
     if (!existing) return c.json({ error: "agent_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ provider: string; model: string; description: string | null; instruction: string; tags: string[]; type: AgentType; tools: string[] }> = {};
+    const patch: Partial<{ provider: string; model: string; description: string | null; instruction: string; tags: string[]; type: AgentType; tools: string; name: string | null }> = {};
+    if (body?.name !== undefined) {
+      if (body.name !== null && typeof body.name !== "string") return c.json({ error: "invalid_name" }, 400);
+      patch.name = body.name && body.name.trim() ? body.name.trim() : null;
+    }
     if (body?.provider !== undefined) {
       if (typeof body.provider !== "string" || !body.provider.trim()) return c.json({ error: "invalid_provider" }, 400);
       patch.provider = body.provider.trim();
@@ -140,7 +146,7 @@ export const agentRoutes = new Hono()
     if (body?.tools !== undefined) {
       const tools = parseTools(body.tools);
       if (tools === "invalid") return c.json({ error: "invalid_tools" }, 400);
-      patch.tools = tools;
+      patch.tools = JSON.stringify(tools);
     }
     if (Object.keys(patch).length === 0) return c.json({ error: "empty_update" }, 400);
     if (patch.type === "sentinel" && (await sentinelExists(s.organizationId, sentinelCheckId))) return c.json({ error: "sentinel_exists" }, 409);
