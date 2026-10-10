@@ -181,7 +181,10 @@ async function anthropicRound(
   const baseUrl = providerBaseUrl(provider, config);
   const { system, messages: mapped } = anthropicMessages(messages);
   // Extended thinking exists on Claude 3.7+; older models reject the param.
-  const supportsThinking = /claude-(?:3-7|[4-9])/.test(model);
+  // Matches both old naming (claude-3-7-sonnet, claude-4-5-sonnet) and the
+  // current family-first naming (claude-sonnet-4-6, claude-opus-5-5, …).
+  const supportsThinking =
+    /claude-(?:3-7|[4-9])/.test(model) || /claude-(?:sonnet|opus|haiku|fable)-(?:[4-9]|latest)/.test(model);
   const budgetTokens = supportsThinking ? { off: 0, low: 1024, medium: 4096, high: 16384 }[events.thinkingLevel ?? "medium"] : 0;
 
   // OAuth (Claude Code subscription) requests must lead with the Claude Code

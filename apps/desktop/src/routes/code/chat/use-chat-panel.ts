@@ -569,11 +569,20 @@ export function useChatPanel(sessionId: string | null) {
       if (retryRef.current) clearTimeout(retryRef.current);
       if (pingRef.current) clearInterval(pingRef.current);
       wsRef.current?.close();
+      // Session switched — ALL transient state from the previous thread drops,
+      // otherwise its compaction/stream/status leaks into every other thread
+      // (the hook lives in CodeScene, shared by all panels).
       setStreaming(null);
       setLiveTools([]);
       setRound(null);
       setThinking(null);
       setThinkingLive(false);
+      setCompacting(false);
+      setStatusText(null);
+      setAskUser(null);
+      setOptimistic(null);
+      setGitStatus(null);
+      setStats({ inputTokens: 0, outputTokens: 0, cachedTokens: 0, contextTokens: 0, tokPerSec: null });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
