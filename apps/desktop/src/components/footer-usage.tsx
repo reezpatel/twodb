@@ -16,11 +16,12 @@ const TYPE_LABELS: Record<string, string> = {
   "weekly-sonnet": "Weekly Sonnet",
   monthly: "Monthly",
   daily: "Daily",
-  credits: "Balance",
+  credits: "Credits",
+  added: "Added",
   extra: "Extra",
 };
 
-const TYPE_ORDER: Record<string, number> = { "5h": 0, weekly: 1, "weekly-opus": 1, "weekly-sonnet": 1, daily: 2, monthly: 3, extra: 4, credits: 5 };
+const TYPE_ORDER: Record<string, number> = { "5h": 0, weekly: 1, "weekly-opus": 1, "weekly-sonnet": 1, daily: 2, monthly: 3, extra: 4, credits: 5, added: 6 };
 
 const metricId = (q: QuotaRow) => `${q.connectionId}:${q.groupName}:${q.quotaType}`;
 
@@ -37,7 +38,10 @@ function until(iso: string | null): string | null {
 
 function quotaValue(q: QuotaRow): string {
   if (q.unit === "percent") return `${Math.round(q.quotaUsed)}%`;
-  if (q.unit === "usd") return `$${q.quotaUsed.toFixed(2)}`;
+  if (q.unit === "usd") {
+    const remaining = Math.max(0, (q.quotaTotal ?? 0) - q.quotaUsed);
+    return `$${remaining.toFixed(2)}`;
+  }
   const total = q.quotaTotal ? `/${compact.format(q.quotaTotal)}` : "";
   return `${compact.format(q.quotaUsed)}${total}`;
 }

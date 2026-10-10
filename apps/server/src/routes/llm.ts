@@ -262,7 +262,9 @@ async function collectKimi(connection: LlmConnectionTable): Promise<QuotaSnapsho
   }));
 }
 
-/** Ollama Cloud: scrapes the settings page with the browser session cookie. */
+/** Ollama Cloud: scrapes the settings page with the browser session cookie.
+ * Credits pricing (late 2026): monthly credits + purchased add-ons, meter on
+ * the settings page itself. */
 async function collectOllamaCloud(connection: LlmConnectionTable): Promise<QuotaSnapshot[]> {
   const config = connection.config as Record<string, string>;
   const session = config.session_token?.trim();
@@ -275,34 +277,53 @@ async function collectOllamaCloud(connection: LlmConnectionTable): Promise<Quota
   if (!res.ok) throw new Error(`ollama.com returned ${res.status}`);
   const html = await res.text();
 
-  const resets = [...html.matchAll(/class="[^"]*local-time[^"]*"\s*\n?\s*data-time="([^"]+)"/g)].map((m) => m[1]);
-  const usedPercent = (label: string): number | undefined => {
-    const m = html.match(new RegExp(`aria-label="${label} usage\\s+(\\d+(?:\\.\\d+)?)%\\s+used"`));
-    const value = m?.[1] ? Number(m[1]) : undefined;
-    return value !== undefined && Number.isFinite(value) ? value : undefined;
-  };
+  const balanceMatch = html.match(/id="usage-credits-balance"[^>]*>\s*\$([\d,.]+)/);
+  const total = balanceMatch ? Number(balanceMatch[1].replace(/,/g, "")) : undefined;
+
+  const meterMatch = html.match(/aria-label="Monthly credits used:\s*\$([\d,.]+)\s+of\s+\$([\d,.]+)"/);
+  const used = meterMatch ? Number(meterMatch[1].replace(/,/g, "")) : undefined;
+  const monthlyTotal = meterMatch ? Number(meterMatch[2].replace(/,/g, "")) : undefined;
+
+  const extraMatch = html.match(/id="extra-usage-balance"[^>]*>\s*\$([\d,.]+)/);
+  const added = extraMatch ? Number(extraMatch[1].replace(/,/g, "")) : undefined;
+
+  const refillMatch = html.match(/Refills to \$[\d,.]+ on ([A-Z][a-z]+ \d{1,2}, \d{4})/);
+
+  if (total === undefined && used === undefined) throw new Error("could not parse ollama.com credits — page layout may have changed");
 
   const snap: QuotaSnapshot[] = [];
-  const five = usedPercent("Session");
-  if (five !== undefined) {
+  const resetAt = refillMatch ? new Date(refillMatch[1]) : null;
+
+  // Primary: monthly included credits — grant vs spent, resets at refill date.
+  if (used !== undefined && monthlyTotal !== undefined) {
     snap.push({
-      quotaType: "5h",
+      quotaType: "credits",
       groupName: "default",
-      unit: "percent",
-      quotaTotal: 100,
-      quotaUsed: Math.max(0, Math.min(100, five)),
-      resetAt: resets[0] ? new Date(resets[0]) : null,
+      unit: "usd",
+      quotaTotal: monthlyTotal,
+      quotaUsed: used,
+      resetAt,
+    });
+  } else if (total !== undefined) {
+    // Meter absent (fresh account?) — fall back to raw balance.
+    snap.push({
+      quotaType: "credits",
+      groupName: "default",
+      unit: "usd",
+      quotaTotal: total,
+      quotaUsed: Math.max(0, total - total),
+      resetAt,
     });
   }
-  const weekly = usedPercent("Weekly");
-  if (weekly !== undefined) {
+  // Purchased add-on balance (shown as remaining).
+  if (added !== undefined && added > 0) {
     snap.push({
-      quotaType: "weekly",
+      quotaType: "added",
       groupName: "default",
-      unit: "percent",
-      quotaTotal: 100,
-      quotaUsed: Math.max(0, Math.min(100, weekly)),
-      resetAt: resets[1] ? new Date(resets[1]) : null,
+      unit: "usd",
+      quotaTotal: added,
+      quotaUsed: 0,
+      resetAt: null,
     });
   }
   return snap;
