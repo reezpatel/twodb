@@ -21,6 +21,7 @@ export interface ServerSettings {
 export const STORAGE_DESTINATIONS: { id: string; label: string; description: string }[] = [
   { id: "agent_assets", label: "Agents Assets", description: "where agents store their assets (files, uploads, generated artifacts)" },
   { id: "chat_assets", label: "Chat Assets", description: "where team-chat file attachments are stored" },
+  { id: "meeting_recordings", label: "Meeting Recordings", description: "where meeting-recording uploads (webm tracks) are stored" },
 ];
 
 const DEFAULTS: ServerSettings = { signUpEnabled: true, storageDestinations: {} };

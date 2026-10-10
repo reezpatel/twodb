@@ -26,6 +26,7 @@ import { storageAdminRoutes } from "./routes/storage-admin";
 import { serverSettingsRoutes } from "./routes/server-settings";
 import { apiKeyRoutes } from "./routes/api-keys";
 import { logsRoutes } from "./routes/logs";
+import { meetingsRoutes } from "./routes/meetings";
 import { getServerSettings } from "./lib/server-settings";
 import { runMigrations } from "./lib/migrate";
 import { logger } from "./lib/logger";
@@ -43,7 +44,11 @@ const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 app.use(
   "/api/*",
   cors({
-    origin: [env.webOrigin],
+    origin: (origin) => {
+      if (!origin) return env.webOrigin;
+      if (origin === env.webOrigin || origin.startsWith("chrome-extension://")) return origin;
+      return null;
+    },
     credentials: true,
   }),
 );
@@ -93,6 +98,7 @@ app.route("/api/logs", logsRoutes);
 // Public subset (register page reads this before showing the form).
 app.get("/api/public-settings", async (c) => c.json(await getServerSettings()));
 app.route("/api/chat", chatRoutes);
+app.route("/api/meetings", meetingsRoutes);
 registerRunnerWs(app, upgradeWebSocket);
 registerCodeWs(app, upgradeWebSocket);
 registerChatWs(app, upgradeWebSocket);

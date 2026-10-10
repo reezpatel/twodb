@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "twodb Meeting Recorder",
+  "version": "0.1.0",
+  "description": "Capture Google Meet / Teams meetings (tab + optional screen track) and upload them to a twodb server.",
+  "minimum_chrome_version": "116",
+  "permissions": ["tabCapture", "desktopCapture", "offscreen", "storage", "alarms"],
+  "host_permissions": ["http://localhost:3001/*", "https://*/*"],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "twodb Meeting Recorder"
+  },
+  "background": {
+    "service_worker": "sw.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://meet.google.com/*", "https://teams.microsoft.com/*", "https://teams.live.com/*"],
+      "js": ["content/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

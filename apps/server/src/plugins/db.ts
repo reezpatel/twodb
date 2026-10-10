@@ -660,6 +660,34 @@ export interface ChatReadStateTable {
   updatedAt: Date;
 }
 
+
+export interface MeetingRecordingTable {
+  id: string;
+  organizationId: string;
+  platform: string;
+  title: string | null;
+  meetingUrl: string | null;
+  clientSessionId: string | null;
+  status: "recording" | "finalized" | "abandoned";
+  startedAt: Date;
+  endedAt: Date | null;
+  lastHeartbeatAt: Date | null;
+}
+
+export interface MeetingRecordingTrackTable {
+  id: string;
+  recordingId: string;
+  organizationId: string;
+  trackId: string;
+  nextSeq: number;
+  receivedChunks: number;
+  receivedBytes: number;
+  durationMs: number | null;
+  trackStartedAt: Date | null;
+  mediaAssetId: string | null;
+  createdAt: Date;
+}
+
 export interface Database {
   user: UserTable;
   session: SessionTable;
@@ -693,6 +721,8 @@ export interface Database {
   storage_entry: StorageEntryTable;
   code_session_artifact: CodeSessionArtifactTable;
   media_asset: MediaAssetTable;
+  meeting_recording: MeetingRecordingTable;
+  meeting_recording_track: MeetingRecordingTrackTable;
   chat_channel: ChatChannelTable;
   chat_channel_member: ChatChannelMemberTable;
   chat_message: ChatMessageTable;
