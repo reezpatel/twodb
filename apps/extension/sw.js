@@ -43,9 +43,8 @@ async function getTabStreamId(tabId) {
 async function startRecordingForTab(tabId, tab, withScreen) {
   await ensureOffscreen();
 
-  const stream = await getTabStreamId(tabId);
-  if (stream.err) return { ok: false, error: `tab_capture_failed: ${stream.err}` };
-
+  // Desktop picker first — it blocks for as long as the user browses choices,
+  // and capture stream ids expire if fetched before the picker resolves.
   let screenStreamId = null;
   if (withScreen) {
     screenStreamId = await new Promise((resolve) => {
@@ -53,6 +52,9 @@ async function startRecordingForTab(tabId, tab, withScreen) {
       chrome.desktopCapture.chooseDesktopMedia(["screen", "window", "tab"], tab, (id) => resolve(id || null));
     });
   }
+
+  const stream = await getTabStreamId(tabId);
+  if (stream.err) return { ok: false, error: `tab_capture_failed: ${stream.err}` };
 
   const { serverUrl = "http://localhost:3001", apiKey = "" } = await chrome.storage.local.get(["serverUrl", "apiKey"]);
   const reply = await chrome.runtime.sendMessage({
