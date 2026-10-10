@@ -54,11 +54,14 @@ async function startRecordingForTab(tabId, tab, withScreen) {
     });
   }
 
+  const { serverUrl = "http://localhost:3001", apiKey = "" } = await chrome.storage.local.get(["serverUrl", "apiKey"]);
   const reply = await chrome.runtime.sendMessage({
     type: "twodb-start",
-    meetingTabId: tabId,
     meetingStreamId: stream.id,
     screenStreamId,
+    serverUrl,
+    apiKey,
+    meetingUrl: tab.url ?? null,
   });
   return reply ?? { ok: false, error: "offscreen_unreachable" };
 }

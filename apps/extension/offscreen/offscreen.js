@@ -17,13 +17,6 @@ const state = {
   closing: false,
 };
 
-async function settings() {
-  const { serverUrl = "http://localhost:3001", apiKey = "", screenDefault = true } = await chrome.storage.local.get(["serverUrl", "apiKey", "screenDefault"]);
-  state.serverUrl = serverUrl.replace(/\/+$/, "");
-  state.apiKey = apiKey;
-  return { screenDefault };
-}
-
 function api(path, init = {}) {
   return fetch(`${state.serverUrl}/api/meetings${path}`, {
     ...init,
@@ -209,12 +202,13 @@ function platformFor(url) {
   return "other";
 }
 
-async function startRecording({ meetingTabId, meetingStreamId, screenStreamId }) {
-  await settings();
+async function startRecording({ meetingStreamId, screenStreamId, serverUrl, apiKey, meetingUrl }) {
   state.closing = false;
   state.clientSessionId = crypto.randomUUID();
+  state.serverUrl = (serverUrl || "http://localhost:3001").replace(/\/+$/, "");
+  state.apiKey = apiKey || "";
+  state.meetingUrl = meetingUrl ?? null;
   state.platform = platformFor(state.meetingUrl ?? "");
-  state.meetingUrl = (await chrome.tabs.get?.(meetingTabId))?.url ?? null;
 
   const tracks = ["meeting"];
   if (screenStreamId) tracks.push("screen");
