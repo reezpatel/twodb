@@ -35,7 +35,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (!tabId) return sendResponse({ ok: false, error: "no_tab" });
 
           const meetingStreamId = await new Promise((resolve) =>
-            chrome.tabCapture.getMediaStreamId({ targetTabId: tabId, consumerTabId: tabId }, (id) => resolve(chrome.runtime.lastError ? null : id)),
+            chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (id) => resolve(chrome.runtime.lastError ? null : id)),
           );
           if (!meetingStreamId) return sendResponse({ ok: false, error: "tab_capture_failed" });
 

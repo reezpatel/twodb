@@ -235,10 +235,17 @@ async function startRecording({ meetingTabId, meetingStreamId, screenStreamId })
 }
 
 async function startTrack(trackId, streamId, serverNextSeq) {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { chromeMediaSource: "tab", chromeMediaSourceId: streamId },
-    video: { chromeMediaSource: "tab", chromeMediaSourceId: streamId },
-  });
+  const constraints =
+    trackId === "screen"
+      ? {
+          audio: false,
+          video: { chromeMediaSource: "desktop", chromeMediaSourceId: streamId },
+        }
+      : {
+          audio: { chromeMediaSource: "tab", chromeMediaSourceId: streamId },
+          video: { chromeMediaSource: "tab", chromeMediaSourceId: streamId },
+        };
+  const stream = await navigator.mediaDevices.getUserMedia(constraints);
   if (trackId === "screen") {
     stream.getVideoTracks()[0]?.addEventListener("ended", () => chrome.runtime.sendMessage({ type: "twodb-screen-track-ended", trackId }));
   }
@@ -250,6 +257,7 @@ async function startTrack(trackId, streamId, serverNextSeq) {
     if (event.data.size === 0) return;
     const bytes = new Uint8Array(await event.data.arrayBuffer());
     const seq = rec.seq++;
+    rec.chunksReceived += 1;
     const digest = await sha256Hex(bytes);
     const stored = await storeChunk(trackId, seq, bytes);
     if (seq >= rec.serverSeq) queueUpload(trackId, { seq, offset: stored.offset, length: stored.length, digest });
