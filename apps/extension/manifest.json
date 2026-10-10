@@ -4,7 +4,13 @@
   "version": "0.1.0",
   "description": "Capture Google Meet / Teams meetings (tab + optional screen track) and upload them to a twodb server.",
   "minimum_chrome_version": "116",
-  "permissions": ["tabCapture", "desktopCapture", "offscreen", "storage", "alarms"],
+  "permissions": ["tabCapture", "desktopCapture", "offscreen", "storage", "alarms", "contextMenus"],
+  "commands": {
+    "record-toggle": {
+      "suggested_key": { "default": "Ctrl+Shift+R", "linux": "Ctrl+Shift+R", "mac": "Command+Shift+R" },
+      "description": "Start/stop recording the current meeting tab"
+    }
+  },
   "host_permissions": ["http://localhost:3001/*", "https://*/*"],
   "action": {
     "default_popup": "popup/popup.html",

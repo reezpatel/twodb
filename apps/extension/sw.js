@@ -1,5 +1,10 @@
 // Service worker: brokers capture stream ids (user-gesture bound) and owns
 // the offscreen document. All recording state lives in the offscreen doc.
+//
+// tabCapture requires the extension to be "invoked" for the target tab
+// (activeTab-style). Invocation = action click, context menu, or keyboard
+// shortcut — a content-script button click is not always honored, so the
+// popup / context-menu paths are the guaranteed ones.
 
 const OFFSCREEN_URL = "offscreen/offscreen.html";
 
@@ -23,39 +28,53 @@ async function closeOffscreenIfIdle() {
   if (await hasOffscreen()) await chrome.offscreen.closeDocument();
 }
 
+async function getTabStreamId(tabId) {
+  return new Promise((resolve) =>
+    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (id) => {
+      if (chrome.runtime.lastError || !id) {
+        resolve({ err: chrome.runtime.lastError?.message ?? "no stream id" });
+      } else {
+        resolve({ id });
+      }
+    }),
+  );
+}
+
+async function startRecordingForTab(tabId, tab, withScreen) {
+  await ensureOffscreen();
+
+  const stream = await getTabStreamId(tabId);
+  if (stream.err) return { ok: false, error: `tab_capture_failed: ${stream.err}` };
+
+  let screenStreamId = null;
+  if (withScreen) {
+    screenStreamId = await new Promise((resolve) => {
+      // cancelled picker → null → meeting-only recording continues
+      chrome.desktopCapture.chooseDesktopMedia(["screen", "window", "tab"], tab, (id) => resolve(id || null));
+    });
+  }
+
+  const reply = await chrome.runtime.sendMessage({
+    type: "twodb-start",
+    meetingTabId: tabId,
+    meetingStreamId: stream.id,
+    screenStreamId,
+  });
+  return reply ?? { ok: false, error: "offscreen_unreachable" };
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     switch (msg?.type) {
-      // content script → start recording (user gesture alive in this turn)
       case "twodb-ui-start": {
         try {
-          await ensureOffscreen();
-
-          const tabId = sender.tab?.id;
+          const tabId = msg.tabId ?? sender.tab?.id;
           if (!tabId) return sendResponse({ ok: false, error: "no_tab" });
-
-          const meetingStreamId = await new Promise((resolve) =>
-            chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (id) => resolve(chrome.runtime.lastError ? null : id)),
-          );
-          if (!meetingStreamId) return sendResponse({ ok: false, error: "tab_capture_failed" });
-
+          const tab = sender.tab ?? (await chrome.tabs.get(tabId));
           const { screenDefault = true } = await chrome.storage.local.get(["screenDefault"]);
-          let screenStreamId = null;
-          if (msg.withScreen ?? screenDefault) {
-            screenStreamId = await new Promise((resolve) => {
-              // desktopCapture picker must run inside the user gesture;
-              // cancelled → resolve null, meeting-only recording continues.
-              chrome.desktopCapture.chooseDesktopMedia(["screen", "window", "tab"], sender.tab, (id) => resolve(id || null));
-            });
-          }
-
-          const reply = await chrome.runtime.sendMessage({
-            type: "twodb-start",
-            meetingTabId: tabId,
-            meetingStreamId,
-            screenStreamId,
-          });
-          sendResponse(reply ?? { ok: false, error: "offscreen_unreachable" });
+          const reply = await startRecordingForTab(tabId, tab, msg.withScreen ?? screenDefault);
+          if (!reply.ok) void closeOffscreenIfIdle();
+          sendResponse(reply);
         } catch (e) {
           sendResponse({ ok: false, error: String(e?.message ?? e) });
         }
@@ -97,6 +116,37 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true;
 });
 
+// Keyboard shortcut = extension invocation (activeTab) → tabCapture passes.
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== "record-toggle") return;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+  const status = await chrome.runtime.sendMessage({ type: "twodb-status" }).catch(() => null);
+  if (status?.recording) {
+    await chrome.runtime.sendMessage({ type: "twodb-stop", finalize: true }).catch(() => {});
+    void closeOffscreenIfIdle();
+    return;
+  }
+  const { screenDefault = true } = await chrome.storage.local.get(["screenDefault"]);
+  const reply = await startRecordingForTab(tab.id, tab, screenDefault).catch((e) => ({ ok: false, error: String(e) }));
+  if (!reply.ok) console.error("[twodb-ext] start via shortcut failed:", reply.error);
+});
+
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.action.setBadgeText({ text: "" });
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "twodb-record",
+      title: "Record this meeting (twodb)",
+      contexts: ["page"],
+      documentUrlPatterns: ["https://meet.google.com/*", "https://teams.microsoft.com/*", "https://teams.live.com/*"],
+    });
+  });
+});
+
+// Context-menu click = extension invocation (activeTab) → tabCapture passes.
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId !== "twodb-record" || !tab?.id) return;
+  const { screenDefault = true } = await chrome.storage.local.get(["screenDefault"]);
+  const reply = await startRecordingForTab(tab.id, tab, screenDefault).catch((e) => ({ ok: false, error: String(e) }));
+  if (!reply.ok) console.error("[twodb-ext] start via context menu failed:", reply.error);
 });

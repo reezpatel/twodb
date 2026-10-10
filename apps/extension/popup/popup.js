@@ -39,6 +39,15 @@ $("keys").onclick = async (e) => {
   chrome.tabs.create({ url: `${origin.replace(":3001", ":5173")}/settings/administrator` });
 };
 
+$("record").onclick = async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return status("no active tab", "err");
+  status("starting…");
+  const r = await chrome.runtime.sendMessage({ type: "twodb-ui-start", tabId: tab.id });
+  if (r?.ok) status(`recording ✓ (${tab.url?.includes("teams") ? "Teams" : "meeting"} tab)`, "ok");
+  else status(r?.error ?? "failed", "err");
+};
+
 chrome.runtime.sendMessage({ type: "twodb-ui-status" }, (s) => {
   if (chrome.runtime.lastError || !s?.recording) return;
   status(`recording in progress (${s.platform ?? "meeting"})`, "ok");
