@@ -1,10 +1,8 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router";
-import { AlertTriangle, ChevronLeft, ChevronRight, CloudUpload, Loader2, Plus, Search, Settings, Trash2, Users, X } from "lucide-react";
+import { useMemo } from "react";
+import { ChevronLeft, ChevronRight, Loader2, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SideNav, SideNavFooter, SideNavGroup, SideNavItem } from "@/components/side-nav";
 import { addDays, daysBetween, formatDay, formatRange, toWall, type CalendarView, type Occurrence, type PendingChange } from "./calendar-api";
 import { EventDetails } from "./event/event-details";
 import { EventEditor } from "./event/event-editor";
@@ -12,8 +10,7 @@ import { ScopeDialog } from "./event/scope-dialog";
 import { PendingPush } from "./pending/pending-push";
 import { TrashPanel } from "./panels/trash-panel";
 import { ReminderToasts } from "./reminders/reminder-toasts";
-import { CalendarList } from "./sidebar/calendar-list";
-import { useCalendarScene } from "./use-calendar-scene";
+import { useCalendar } from "./calendar-provider";
 import { useCalendarShortcuts } from "./use-calendar-shortcuts";
 import { AgendaView } from "./views/agenda-view";
 import { MiniMonth } from "./views/mini-month";
@@ -58,9 +55,8 @@ function occurrenceFromPending(row: PendingChange): Occurrence {
 }
 
 export function CalendarScene() {
-  const s = useCalendarScene();
+  const s = useCalendar();
   useCalendarShortcuts(s);
-  const [miniMonth, setMiniMonth] = useState<string | null>(null);
   const calendarsById = useMemo(() => new Map((s.calendars.data ?? []).map((c) => [c.id, c])), [s.calendars.data]);
   const settings = s.settings.data;
   const hideWeekends = settings ? !settings.showWeekends : false;
@@ -97,58 +93,12 @@ export function CalendarScene() {
     );
   }
 
-  const pendingTotal = (s.pendingCount.data?.awaiting ?? 0) + (s.pendingCount.data?.failed ?? 0);
   const showDetails = !!s.selected && s.panel === "calendar";
 
   return (
     <div
-      className={`bg-background relative grid h-full min-h-0 grid-cols-1 overflow-hidden ${showDetails ? "lg:grid-cols-[240px_1fr_380px]" : "lg:grid-cols-[240px_1fr]"}`}
+      className={`bg-background relative grid h-full min-h-0 grid-cols-1 overflow-hidden ${showDetails ? "lg:grid-cols-[1fr_380px]" : "lg:grid-cols-[1fr]"}`}
     >
-      <SideNav className="w-[240px]">
-        <Button onClick={() => s.openEditor({})} disabled={!s.writableCalendars.length}>
-          <Plus /> Create
-        </Button>
-        <MiniMonth
-          month={miniMonth ?? s.cursor}
-          today={s.today}
-          weekStart={s.weekStart}
-          selected={s.view === "month" || s.view === "year" ? null : s.range}
-          busyDays={busyDays}
-          onMonth={setMiniMonth}
-          onPick={(day) => {
-            s.setCursor(day);
-            setMiniMonth(null);
-            if (s.view === "year" || s.panel !== "calendar") s.setView("day");
-          }}
-        />
-        <SideNavGroup separated>
-          <SideNavItem
-            label="Pending push"
-            icon={CloudUpload}
-            count={pendingTotal || undefined}
-            active={s.panel === "pending"}
-            onSelect={() => s.setPanel(s.panel === "pending" ? "calendar" : "pending")}
-            className={s.pendingCount.data?.failed ? "text-destructive" : undefined}
-          />
-          <SideNavItem label="Search" icon={Search} active={s.panel === "search"} onSelect={() => s.setPanel(s.panel === "search" ? "calendar" : "search")} />
-          <SideNavItem label="Trash" icon={Trash2} active={s.panel === "trash"} onSelect={() => s.setPanel(s.panel === "trash" ? "calendar" : "trash")} />
-          <SideNavItem label="People" icon={Users} to="/apps/contacts" />
-        </SideNavGroup>
-        <CalendarList
-          calendars={s.calendars.data ?? []}
-          accounts={s.meta.data?.accounts ?? []}
-          onToggle={(id, hidden) => s.toggleCalendar.mutate({ id, hidden })}
-        />
-        <SideNavFooter>
-          {(s.meta.data?.accounts ?? []).some((a) => a.calendarState === "reauth_required") ? (
-            <Link to="/apps/settings/accounts" className="text-destructive flex items-center gap-1.5 px-2 py-1 text-xs">
-              <AlertTriangle size={12} /> An account needs reconnecting
-            </Link>
-          ) : null}
-          <SideNavItem label="Calendar settings" icon={Settings} to="/apps/settings/calendar" />
-        </SideNavFooter>
-      </SideNav>
-
       <section className="flex min-h-0 min-w-0 flex-col">
         {s.panel === "calendar" ? (
           <>

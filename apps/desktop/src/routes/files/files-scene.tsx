@@ -1,28 +1,11 @@
 import { useMemo, useState } from "react";
-import {
-  Database,
-  Download,
-  File as FileIcon,
-  FileImage,
-  FileSpreadsheet,
-  FileText,
-  Folder,
-  FolderOpen,
-  HardDrive,
-  LayoutGrid,
-  List,
-  Loader2,
-  Plus,
-  Search,
-  Trash2,
-  Upload,
-} from "lucide-react";
-import { useFilesScene, type StorageEntryInfo } from "./use-files-scene";
+import { Download, File as FileIcon, FileImage, FileSpreadsheet, FileText, Folder, FolderOpen, LayoutGrid, List, Search, Trash2, Upload } from "lucide-react";
+import { type StorageEntryInfo } from "./use-files-scene";
 import { formatFileSize, UploadDialog } from "./upload-dialog";
+import { useFiles } from "./files-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -73,16 +56,12 @@ function entryName(entry: StorageEntryInfo) {
 }
 
 export function FilesScene() {
-  const { backends, buckets, bucket, bucketInfo, path, entries, createBucket, upload, mkdir, remove, openBucket, openFolder, navigateTo } = useFilesScene();
+  const { bucket, bucketInfo, path, entries, upload, mkdir, remove, openBucket, openFolder, navigateTo } = useFiles();
   const [typeTab, setTypeTab] = useState("all");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"list" | "grid">("list");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [newBucketOpen, setNewBucketOpen] = useState(false);
-  const [bucketName, setBucketName] = useState("");
-  const [bucketBackend, setBucketBackend] = useState("");
-  const [bucketLimitGb, setBucketLimitGb] = useState("");
 
   const rows = useMemo(() => {
     const all = entries.data ?? [];
@@ -126,92 +105,6 @@ export function FilesScene() {
 
   return (
     <div className="flex h-full">
-      {/* left nav — storage buckets */}
-      <aside className="bg-card border-r hidden w-56 shrink-0 flex-col overflow-y-auto border-r p-3 md:flex">
-        <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold uppercase">Storage</h3>
-        <div className="mb-3 flex flex-col gap-1">
-          {(buckets.data ?? []).map((b) => (
-            <button
-              key={b.id}
-              className={cn(
-                "flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-accent",
-                bucket === b.id ? "border-ring bg-accent font-medium" : "border-transparent",
-              )}
-              onClick={() => openBucket(b.id)}
-            >
-              {b.backendType === "object" ? (
-                <Database size={14} className="text-lavender-400 shrink-0" aria-hidden="true" />
-              ) : (
-                <HardDrive size={14} className="text-blue-400 shrink-0" aria-hidden="true" />
-              )}
-              <span className="min-w-0 flex-1 truncate">{b.name}</span>
-              <span className="text-muted-foreground text-[10px]">{formatFileSize(b.used)}</span>
-            </button>
-          ))}
-          {(buckets.data ?? []).length === 0 && !buckets.isPending && <p className="text-muted-foreground px-2 text-xs">No buckets yet — create one below.</p>}
-        </div>
-        <Button variant="outline" size="sm" className="mx-1" onClick={() => setNewBucketOpen(true)} disabled={(backends.data ?? []).length === 0}>
-          <Plus size={13} /> New bucket
-        </Button>
-
-        <Dialog open={newBucketOpen} onOpenChange={setNewBucketOpen}>
-          <DialogContent className="sm:max-w-sm">
-            <DialogHeader>
-              <DialogTitle>New storage bucket</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <Input placeholder="Bucket name (e.g. project-files)" value={bucketName} onChange={(e) => setBucketName(e.target.value)} />
-              <select
-                className="border-input bg-background focus:border-ring focus:ring-ring/50 h-8 w-full rounded-md border px-2 text-sm shadow-xs focus:outline-none"
-                value={bucketBackend}
-                onChange={(e) => setBucketBackend(e.target.value)}
-              >
-                <option value="">Select backend…</option>
-                {(backends.data ?? []).map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name} ({b.type})
-                  </option>
-                ))}
-              </select>
-              <Input
-                placeholder="Storage limit in GB (optional)"
-                value={bucketLimitGb}
-                onChange={(e) => setBucketLimitGb(e.target.value)}
-                inputMode="numeric"
-              />
-            </div>
-            <DialogFooter>
-              <Button
-                size="sm"
-                disabled={!bucketName.trim() || !bucketBackend || createBucket.isPending}
-                onClick={() => {
-                  const gb = Number(bucketLimitGb);
-                  createBucket.mutate(
-                    {
-                      name: bucketName.trim(),
-                      backendId: bucketBackend,
-                      storageLimit: bucketLimitGb.trim() && Number.isFinite(gb) && gb > 0 ? Math.round(gb * 1024 ** 3) : null,
-                    },
-                    {
-                      onSuccess: (row) => {
-                        setNewBucketOpen(false);
-                        setBucketName("");
-                        setBucketBackend("");
-                        setBucketLimitGb("");
-                        openBucket(row.id);
-                      },
-                    },
-                  );
-                }}
-              >
-                {createBucket.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                Create
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </aside>
-
       <main className="min-w-0 flex-1 overflow-y-auto p-6">
         {!bucket ? (
           <div className="flex h-full flex-col items-center justify-center gap-2">

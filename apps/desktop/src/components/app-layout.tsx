@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router";
+import { Outlet, useLocation } from "react-router";
 import { Menu } from "lucide-react";
 import { NavRail } from "./nav-rail";
 import { MobileNavDrawer } from "./mobile-nav";
@@ -7,6 +7,13 @@ import { FooterUsage } from "./footer-usage";
 import { MobileNavContext } from "./mobile-nav-context";
 import { useAppLayout } from "./use-app-layout";
 import { useMediaQuery } from "../lib/use-media-query";
+import { appShellFor, getApp } from "../lib/apps";
+
+function useActiveAppId(): string | undefined {
+  const { pathname } = useLocation();
+  const match = pathname.match(/^\/apps\/([^/]+)/);
+  return match?.[1];
+}
 
 export function AppLayout() {
   const { session, activeOrg, signOut, switchOrg } = useAppLayout();
@@ -15,9 +22,19 @@ export function AppLayout() {
   const [sideNavTarget, setSideNavTarget] = useState<HTMLElement | null>(null);
   const [sideNavActive, setSideNavActive] = useState(false);
 
+  const appId = useActiveAppId();
+  const app = getApp(appId);
+  const Shell = appShellFor(app);
+  const Sidenav = app?.Sidenav;
+
   useEffect(() => {
     if (!isMobile) setNavOpen(false);
   }, [isMobile]);
+
+  // Switching apps closes the drawer; the new app's sidenav replaces the portal content.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [appId]);
 
   return (
     <MobileNavContext.Provider value={{ isMobile, closeNav: () => setNavOpen(false), sideNavTarget, setSideNavActive }}>
@@ -31,7 +48,7 @@ export function AppLayout() {
             >
               <Menu size={18} />
             </button>
-            <span className="truncate text-sm font-semibold">{activeOrg?.name ?? "twodb"}</span>
+            <span className="truncate text-sm font-semibold">{app?.label ?? activeOrg?.name ?? "twodb"}</span>
           </header>
         )}
 
@@ -45,9 +62,17 @@ export function AppLayout() {
               onSignOut={signOut}
             />
           )}
-          <main className="min-w-0 flex-1 overflow-y-auto">
-            <Outlet />
-          </main>
+          <Shell>
+            {/* Desktop: the app's sidenav is a column beside the content.
+                Mobile: SideNav portals itself into the floating drawer, so
+                nothing renders here and the main panel stays clean. */}
+            <div className="flex h-full min-h-0 min-w-0 flex-1">
+              {Sidenav ? <Sidenav /> : null}
+              <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+                <Outlet />
+              </main>
+            </div>
+          </Shell>
         </div>
 
         <footer className="bg-card text-muted-foreground flex h-6 items-center justify-between gap-4 border-t px-2 text-xs">
@@ -55,7 +80,6 @@ export function AppLayout() {
             <span className="shrink-0">{activeOrg?.name ?? "twodb"}</span>
             <FooterUsage />
           </div>
-          <span className="truncate">{session?.user.email}</span>
         </footer>
 
         {isMobile && (

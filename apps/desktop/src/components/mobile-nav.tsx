@@ -54,7 +54,7 @@ export function MobileNavDrawer({ open, onClose, hasSideNav, userName, userEmail
 
         <div className="flex min-h-0 flex-1">
           <NavRail userName={userName} userEmail={userEmail} userImage={userImage} onSwitchOrg={onSwitchOrg} onSignOut={onSignOut} />
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="min-h-0 flex-1">
             <div ref={sideNavRef} />
             {!hasSideNav && (
               <SideNavGroup label="Apps">

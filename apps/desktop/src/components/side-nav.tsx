@@ -16,7 +16,7 @@ function SideNav({ className, children }: { className?: string; children: ReactN
 
   if (isMobile) {
     if (!sideNavTarget) return null;
-    return createPortal(<aside className="flex flex-col gap-3">{children}</aside>, sideNavTarget);
+    return createPortal(<aside className={cn("flex flex-col gap-3", className)}>{children}</aside>, sideNavTarget);
   }
   return (
     <aside className={cn("bg-muted/20 flex h-full min-h-0 w-[220px] shrink-0 flex-col gap-3 overflow-y-auto border-r p-4 px-3", className)}>{children}</aside>

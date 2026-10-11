@@ -10,6 +10,7 @@ import type { CodeDirectory } from "../directories/use-code-directories";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SideNav } from "@/components/side-nav";
 import { cn } from "@/lib/utils";
 
 interface SidenavProps {
@@ -126,7 +127,7 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
   const directoryGroups = groupSessionsByDirectory(sessions.data ?? [], directories.data ?? []);
 
   return (
-    <aside className="bg-card border-r flex h-full w-60 shrink-0 flex-col border-r">
+    <SideNav className="bg-card w-60 gap-0 overflow-hidden border-r p-0">
       <div className="border-b flex items-center justify-between border-b px-3 py-2">
         <span className="text-sm font-semibold">Agents</span>
         <div className="flex gap-1">
@@ -271,6 +272,6 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
         submitLabel="Create session"
         onCreated={(dir) => create.mutate(dir.id)}
       />
-    </aside>
+    </SideNav>
   );
 }

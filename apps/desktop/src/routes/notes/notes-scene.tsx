@@ -1,59 +1,25 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useMemo } from "react";
 import { NotebookPen, Star } from "lucide-react";
-import { useNotesScene, type NoteFolder, type NoteGroup } from "./use-notes-scene";
-import { Sidebar } from "./scene/sidebar";
+import { useNotes, type NoteFolder, type NoteGroup } from "./notes-provider";
 import { CreatePanel } from "./scene/create-panel";
 import { NotesView } from "./view/notes-view";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export function NotesScene() {
-  const navigate = useNavigate();
-  const { groupId: groupIdParam, noteId: noteIdParam } = useParams();
-  const groupFromUrl = groupIdParam ?? null;
-  const noteFromUrl = noteIdParam ?? null;
-
-  const setSelectedGroupId = useCallback(
-    (id: string | null) => {
-      navigate(id ? `/apps/notes/${id}` : "/apps/notes", { replace: true });
-    },
-    [navigate],
-  );
-
-  const setOpenNoteId = useCallback(
-    (id: string | null) => {
-      if (!groupFromUrl) return;
-      navigate(id ? `/apps/notes/${groupFromUrl}/${id}` : `/apps/notes/${groupFromUrl}`, { replace: true });
-    },
-    [navigate, groupFromUrl],
-  );
-
-  const notes = useNotesScene({ selectedGroupId: groupFromUrl, onSelectGroupId: setSelectedGroupId });
+  const { notes, createView, closeCreate, noteFromUrl, setOpenNoteId } = useNotes();
   const data = notes.tree.data;
-  const scrollRoot = useRef<HTMLDivElement>(null);
-  const [createView, setCreateView] = useState<{ sectionId: string; parentId: string | null; parentName: string } | null>(null);
-
   const selectedGroup = (data?.groups ?? []).find((g) => g.id === notes.selectedGroupId) ?? null;
 
   return (
-    <div className="flex h-full">
-      <Sidebar notes={notes} scrollRoot={scrollRoot} onCreate={(sectionId, parentId, parentName) => setCreateView({ sectionId, parentId, parentName })} />
-      <div className="flex h-full min-w-0 flex-1 flex-col">
-        {createView ? (
-          <CreatePanel
-            sectionId={createView.sectionId}
-            parentId={createView.parentId}
-            parentName={createView.parentName}
-            notes={notes}
-            onClose={() => setCreateView(null)}
-          />
-        ) : selectedGroup ? (
-          <SelectedGroupPane group={selectedGroup} notes={notes} openNoteId={noteFromUrl} setOpenNoteId={setOpenNoteId} />
-        ) : (
-          <EmptyState />
-        )}
-      </div>
+    <div className="flex h-full min-w-0 flex-1 flex-col">
+      {createView ? (
+        <CreatePanel sectionId={createView.sectionId} parentId={createView.parentId} parentName={createView.parentName} notes={notes} onClose={closeCreate} />
+      ) : selectedGroup ? (
+        <SelectedGroupPane group={selectedGroup} notes={notes} openNoteId={noteFromUrl} setOpenNoteId={setOpenNoteId} />
+      ) : (
+        <EmptyState />
+      )}
     </div>
   );
 }
@@ -65,7 +31,7 @@ function SelectedGroupPane({
   setOpenNoteId,
 }: {
   group: NoteGroup;
-  notes: ReturnType<typeof useNotesScene>;
+  notes: ReturnType<typeof useNotes>["notes"];
   openNoteId: string | null;
   setOpenNoteId: (id: string | null) => void;
 }) {

@@ -6,6 +6,7 @@ import { FavoriteRow } from "./favorites-row";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { SideNav } from "@/components/side-nav";
 import { cn } from "@/lib/utils";
 
 export function Sidebar({
@@ -78,7 +79,7 @@ export function Sidebar({
   };
 
   return (
-    <aside className="bg-card border-r flex h-full w-72 shrink-0 flex-col border-r">
+    <SideNav className="bg-card w-72 gap-0 overflow-hidden p-0">
       <div className="border-b flex items-center justify-between border-b px-3 py-2">
         <span className="text-sm font-semibold">Notes</span>
         <Button
@@ -176,6 +177,6 @@ export function Sidebar({
         )}
         {notes.tree.isPending && <p className="text-muted-foreground p-3 text-sm">Loading…</p>}
       </div>
-    </aside>
+    </SideNav>
   );
 }

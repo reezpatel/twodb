@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AtSign, Bookmark, Box, Check, FileText, Link2, Loader2, MessageSquare, Paperclip, Pin, Plus, Send, Smile, Sparkles, X } from "lucide-react";
+import { AtSign, Bookmark, Box, Check, FileText, Link2, Loader2, MessageSquare, Paperclip, Pin, Send, Smile, X } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { ChatAttachment, ChatChannel, ChatMessage } from "./use-chat";
-import { useChannelDetail, useChannelFiles, useChannelPins, useChannels, useChatActions, useChatSocket, useCollaborators, useDrafts, useInbox, useMessages } from "./use-chat";
+import type { ChatAttachment, ChatMessage } from "./use-chat";
+import { useChatScene } from "./chat-provider";
 
 const QUICK_EMOJI = ["👍", "❤️", "😂", "🎉", "🔥", "✅"];
 
@@ -51,7 +51,11 @@ function AttachmentChip({ a }: { a: ChatAttachment }) {
       rel="noreferrer"
       className="bg-card hover:border-primary/40 flex max-w-60 items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors"
     >
-      {image ? <img src={`/api/chat/assets/${a.mediaId}`} alt={a.filename} className="size-7 rounded object-cover" /> : <FileText size={14} className="text-muted-foreground shrink-0" />}
+      {image ? (
+        <img src={`/api/chat/assets/${a.mediaId}`} alt={a.filename} className="size-7 rounded object-cover" />
+      ) : (
+        <FileText size={14} className="text-muted-foreground shrink-0" />
+      )}
       <span className="truncate text-xs">{a.filename}</span>
     </a>
   );
@@ -87,11 +91,7 @@ function Post({ post, mine, onReply, onReact, onPin, onSave, onDelete }: PostPro
   const [copied, setCopied] = useState(false);
 
   if (post.deletedAt) {
-    return (
-      <article className="text-muted-foreground/60 flex gap-3 py-3 text-xs italic">
-        message deleted
-      </article>
-    );
+    return <article className="text-muted-foreground/60 flex gap-3 py-3 text-xs italic">message deleted</article>;
   }
 
   return (
@@ -283,7 +283,12 @@ function Composer({ members, replyTo, onCancelReply, onSend, onUpload, pending, 
             <span key={a.mediaId} className="bg-card flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs">
               <FileText size={12} className="text-muted-foreground" />
               {a.filename}
-              <button type="button" aria-label={`Remove ${a.filename}`} className="text-muted-foreground hover:text-foreground" onClick={() => setAttachments((list) => list.filter((x) => x.mediaId !== a.mediaId))}>
+              <button
+                type="button"
+                aria-label={`Remove ${a.filename}`}
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => setAttachments((list) => list.filter((x) => x.mediaId !== a.mediaId))}
+              >
                 <X size={12} />
               </button>
             </span>
@@ -305,17 +310,38 @@ function Composer({ members, replyTo, onCancelReply, onSend, onUpload, pending, 
                 <AvatarFallback className={cn("text-[9px]", m.type === "agent" && "bg-primary/15 text-primary")}>{initials(m.name)}</AvatarFallback>
               </Avatar>
               {m.name}
-              {m.type === "agent" ? <Badge variant="secondary" className="ml-auto h-4 px-1 text-[9px]">AI</Badge> : null}
+              {m.type === "agent" ? (
+                <Badge variant="secondary" className="ml-auto h-4 px-1 text-[9px]">
+                  AI
+                </Badge>
+              ) : null}
             </button>
           ))}
         </div>
       ) : null}
       <div className="flex items-center gap-0.5">
-        <input ref={fileRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void attach(f); e.target.value = ""; }} />
+        <input
+          ref={fileRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void attach(f);
+            e.target.value = "";
+          }}
+        />
         <Button variant="ghost" size="icon-sm" aria-label="Attach" onClick={() => fileRef.current?.click()}>
           <Paperclip size={15} />
         </Button>
-        <Button variant="ghost" size="icon-sm" aria-label="Mention" onClick={() => { setText((t) => `${t}@`); inputRef.current?.focus(); }}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Mention"
+          onClick={() => {
+            setText((t) => `${t}@`);
+            inputRef.current?.focus();
+          }}
+        >
           <AtSign size={15} />
         </Button>
         <input
@@ -335,7 +361,16 @@ function Composer({ members, replyTo, onCancelReply, onSend, onUpload, pending, 
           }}
           aria-label="Write a reply"
         />
-        <Button variant="secondary" size="sm" className="h-7 rounded-full px-4 text-xs" onClick={() => { setText(""); setAttachments([]); onDraft(""); }}>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-7 rounded-full px-4 text-xs"
+          onClick={() => {
+            setText("");
+            setAttachments([]);
+            onDraft("");
+          }}
+        >
           Discard
         </Button>
         <Button size="sm" className="h-7 rounded-full px-4.5 text-xs" onClick={send} disabled={!text.trim() || pending}>
@@ -346,7 +381,15 @@ function Composer({ members, replyTo, onCancelReply, onSend, onUpload, pending, 
   );
 }
 
-function CreateChannelDialog({ agents, onClose, onCreate }: { agents: { id: string; name: string; type: string; available: boolean }[]; onClose: () => void; onCreate: (name: string, agentIds: string[]) => void }) {
+function CreateChannelDialog({
+  agents,
+  onClose,
+  onCreate,
+}: {
+  agents: { id: string; name: string; type: string; available: boolean }[];
+  onClose: () => void;
+  onCreate: (name: string, agentIds: string[]) => void;
+}) {
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   return (
@@ -371,7 +414,10 @@ function CreateChannelDialog({ agents, onClose, onCreate }: { agents: { id: stri
             key={a.id}
             type="button"
             disabled={!a.available}
-            className={cn("hover:bg-accent/50 flex items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-sm transition-colors", !a.available && "opacity-40")}
+            className={cn(
+              "hover:bg-accent/50 flex items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-sm transition-colors",
+              !a.available && "opacity-40",
+            )}
             onClick={() => setPicked((p) => (p.includes(a.id) ? p.filter((x) => x !== a.id) : [...p, a.id]))}
           >
             <Avatar size="sm">
@@ -397,31 +443,28 @@ const TEAM_VARIANT: Record<string, "success" | "warning" | "destructive"> = {
 };
 
 export function ChatScene() {
-  const channels = useChannels();
-  const collaborators = useCollaborators();
-  const drafts = useDrafts();
-  const inbox = useInbox();
-  const [channelId, setChannelId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [infoTab, setInfoTab] = useState("info");
-  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const s = useChatScene();
+  const {
+    channels,
+    collaborators,
+    drafts,
+    messages,
+    detail,
+    files,
+    pins,
+    agentStates,
+    actions,
+    channelId,
+    setChannelId,
+    creating,
+    setCreating,
+    replyTo,
+    setReplyTo,
+  } = s;
 
   const list = channels.data ?? [];
   const active = useMemo(() => list.find((ch) => ch.id === channelId) ?? null, [list, channelId]);
 
-  // Pick a default channel once loaded.
-  useEffect(() => {
-    if (channelId === null && list.length > 0) setChannelId(list[0].id);
-  }, [channelId, list]);
-
-  const messages = useMessages(channelId);
-  const detail = useChannelDetail(channelId);
-  const files = useChannelFiles(channelId);
-  const pins = useChannelPins(channelId);
-  const agentStates = useChatSocket(channelId);
-  const actions = useChatActions(channelId);
-
-  const me = inbox.data; // any query works to detect auth; inbox also feeds the nav count
   const draftForChannel = (drafts.data ?? []).find((d) => d.channelId === channelId);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onDraft = (body: string) => {
@@ -431,18 +474,11 @@ export function ChatScene() {
 
   const rows = messages.data?.messages ?? [];
   const lastMessage = rows[rows.length - 1];
+  const [infoTab, setInfoTab] = useState("info");
   useEffect(() => {
     if (lastMessage) actions.markRead.mutate(lastMessage.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastMessage?.id]);
-
-  const visibleChannels = list.filter((ch) => ch.kind === "channel");
-  const assistantChannel = list.find((ch) => ch.kind === "assistant");
-  const depthOf = (ch: ChatChannel, guard = 0): number => {
-    if (!ch.parentId || guard > 8) return 0;
-    const parent = list.find((p) => p.id === ch.parentId);
-    return parent ? depthOf(parent, guard + 1) + 1 : 0;
-  };
 
   const memberOptions = (detail.data?.members ?? []).map((m) => ({ id: m.agentId ?? m.userId ?? m.id, name: m.name, type: m.memberType }));
   const activeAgents = [...agentStates.entries()].filter(([key]) => key.startsWith(`${channelId}:`));
@@ -452,19 +488,8 @@ export function ChatScene() {
     setReplyTo(null);
   };
 
-  const inboxCount = (me ?? []).length;
-  const draftCount = (drafts.data ?? []).filter((d) => d.body.trim()).length;
-  const savedCount = rows.filter((r) => r.saved).length;
-
-  const createAssistant = async () => {
-    const sentinel = (collaborators.data ?? []).find((c) => c.type === "sentinel");
-    if (!sentinel || !sentinel.available) return;
-    const created = await actions.createChannel.mutateAsync({ name: "Assistant", kind: "assistant", memberAgentIds: [sentinel.id] }).catch(() => null);
-    if (created) setChannelId(created.id);
-  };
-
   return (
-    <div className="bg-background relative grid h-full min-h-0 grid-cols-1 overflow-hidden lg:grid-cols-[230px_1fr] xl:grid-cols-[230px_1fr_300px]">
+    <div className="bg-background relative grid h-full min-h-0 grid-cols-1 overflow-hidden xl:grid-cols-[1fr_300px]">
       {creating ? (
         <CreateChannelDialog
           agents={(collaborators.data ?? []).filter((c) => c.type !== "sentinel")}
@@ -475,110 +500,6 @@ export function ChatScene() {
           }}
         />
       ) : null}
-      <aside className="bg-muted/20 flex flex-col gap-3 border-r p-4 px-3">
-        <div className="flex items-center justify-between px-1">
-          <strong className="text-base font-semibold">Chat</strong>
-          <Button variant="ghost" size="icon-xs" aria-label="Add channel" onClick={() => setCreating(true)}>
-            <Plus size={13} />
-          </Button>
-        </div>
-        <nav className="flex flex-col gap-0.5">
-          {assistantChannel ? (
-            <button
-              type="button"
-              className={cn(
-                "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-                assistantChannel.id === channelId ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:bg-accent/50",
-              )}
-              onClick={() => setChannelId(assistantChannel.id)}
-            >
-              <Sparkles size={15} className="shrink-0 opacity-70" />
-              Assistant
-              {assistantChannel.unread ? <b className="ml-auto text-xs font-medium tabular-nums">{assistantChannel.unread}</b> : null}
-            </button>
-          ) : (
-            <button type="button" className="text-muted-foreground hover:bg-accent/50 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm" onClick={() => void createAssistant()}>
-              <Sparkles size={15} className="shrink-0 opacity-70" />
-              Assistant
-              <Badge variant="destructive" className="ml-1 h-4 px-1.5 text-[10px]">
-                New
-              </Badge>
-            </button>
-          )}
-          {[
-            { icon: FileText, label: "Drafts", count: draftCount },
-            { icon: Bookmark, label: "Saved items", count: savedCount },
-            { icon: AtSign, label: "Inbox", count: inboxCount },
-          ].map((q) => {
-            const Icon = q.icon;
-            return (
-              <span key={q.label} className="text-muted-foreground flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
-                <Icon size={15} className="shrink-0 opacity-70" />
-                {q.label}
-                {q.count ? <b className="ml-auto text-xs font-medium tabular-nums">{q.count}</b> : null}
-              </span>
-            );
-          })}
-        </nav>
-        <div className="flex items-center justify-between border-t pt-2">
-          <span className="text-muted-foreground/70 px-2 text-[11px] font-semibold tracking-wider uppercase">Collaborators</span>
-        </div>
-        <nav className="flex flex-col gap-px">
-          {(collaborators.data ?? [])
-            .filter((c) => c.type === "collaborator")
-            .map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className="hover:bg-accent/50 flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors"
-                title={c.available ? `${c.provider} · ${c.model}` : "no enabled connection"}
-                onClick={() => {
-                  const existing = visibleChannels.find((ch) => (detail.data?.members ?? []).some((m) => m.agentId === c.id) && ch.id === channelId);
-                  if (existing) setChannelId(existing.id);
-                }}
-              >
-                <span className="relative shrink-0">
-                  <Avatar size="sm">
-                    <AvatarFallback className="bg-primary/15 text-primary text-[9px]">{initials(c.name)}</AvatarFallback>
-                  </Avatar>
-                  {c.active ? <i className="absolute -right-0.5 -bottom-0.5 size-2 rounded-full bg-emerald-500 ring-2 ring-background" /> : null}
-                </span>
-                <span className={cn("truncate", !c.available && "text-muted-foreground/50")}>{c.name}</span>
-              </button>
-            ))}
-          {(collaborators.data ?? []).filter((c) => c.type === "collaborator").length === 0 ? (
-            <span className="text-muted-foreground/60 px-2 py-1 text-xs">None yet — add agents in Settings</span>
-          ) : null}
-        </nav>
-        <div className="flex items-center justify-between border-t pt-2">
-          <span className="text-muted-foreground/70 px-2 text-[11px] font-semibold tracking-wider uppercase">Channels</span>
-          <Button variant="ghost" size="icon-xs" aria-label="Add channel" onClick={() => setCreating(true)}>
-            <Plus size={13} />
-          </Button>
-        </div>
-        <nav className="-mr-1 flex min-h-0 flex-1 flex-col gap-px overflow-y-auto pr-1">
-          {visibleChannels.map((c) => {
-            const depth = depthOf(c);
-            return (
-              <button
-                key={c.id}
-                type="button"
-                className={cn(
-                  "hover:bg-accent/50 flex items-center gap-1.5 rounded-md py-1.5 pr-2 text-left text-sm transition-colors",
-                  c.id === channelId ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground",
-                )}
-                style={{ paddingLeft: 8 + depth * 16 }}
-                onClick={() => setChannelId(c.id)}
-              >
-                <span className="w-3 shrink-0 text-xs">{depth === 0 ? "#" : "↳"}</span>
-                <span className="truncate">{c.name}</span>
-                {c.unread ? <b className="ml-auto text-xs font-medium tabular-nums">{c.unread}</b> : null}
-              </button>
-            );
-          })}
-          {visibleChannels.length === 0 ? <span className="text-muted-foreground/60 px-2 py-1 text-xs">No channels — create one with +</span> : null}
-        </nav>
-      </aside>
 
       <section className="flex min-w-0 flex-col">
         <header className="flex items-center justify-between gap-3 border-b px-4 py-3 text-sm">
@@ -726,7 +647,12 @@ export function ChatScene() {
                 <h4 className="m-0 text-sm font-semibold">Linked threads</h4>
                 <div className="flex flex-col gap-1.5">
                   {(detail.data?.children ?? []).map((child) => (
-                    <button key={child.id} type="button" className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm" onClick={() => setChannelId(child.id)}>
+                    <button
+                      key={child.id}
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm"
+                      onClick={() => setChannelId(child.id)}
+                    >
                       <span className="w-3 text-xs">#</span> {child.name}
                     </button>
                   ))}
@@ -744,7 +670,9 @@ export function ChatScene() {
                     <div key={m.id} className="flex items-center gap-2">
                       <span className="relative shrink-0">
                         <Avatar>
-                          <AvatarFallback className={cn("text-xs", m.memberType === "agent" && "bg-primary/15 text-primary")}>{initials(m.name)}</AvatarFallback>
+                          <AvatarFallback className={cn("text-xs", m.memberType === "agent" && "bg-primary/15 text-primary")}>
+                            {initials(m.name)}
+                          </AvatarFallback>
                         </Avatar>
                         {(m.memberType === "agent" && running) || m.memberType === "user" ? (
                           <i className="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-background" />
@@ -787,7 +715,13 @@ export function ChatScene() {
               <p className="text-muted-foreground text-xs">No files yet — attach one below the composer.</p>
             ) : (
               (files.data ?? []).map((f) => (
-                <a key={f.id} href={f.previewUrl} target="_blank" rel="noreferrer" className="bg-card hover:border-primary/40 flex items-center gap-3 rounded-lg border p-3 transition-colors">
+                <a
+                  key={f.id}
+                  href={f.previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="bg-card hover:border-primary/40 flex items-center gap-3 rounded-lg border p-3 transition-colors"
+                >
                   <span className="bg-primary/10 text-primary grid size-8 shrink-0 place-items-center rounded-md">
                     <FileText size={14} />
                   </span>
@@ -807,7 +741,13 @@ export function ChatScene() {
               rows
                 .filter((r) => r.meta?.linkCard)
                 .map((r) => (
-                  <a key={r.id} href={r.meta!.linkCard!.url} target="_blank" rel="noreferrer" className="bg-card hover:border-primary/40 flex items-center gap-3 rounded-lg border p-3 transition-colors">
+                  <a
+                    key={r.id}
+                    href={r.meta!.linkCard!.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-card hover:border-primary/40 flex items-center gap-3 rounded-lg border p-3 transition-colors"
+                  >
                     <span className="bg-primary/10 text-primary grid size-8 shrink-0 place-items-center rounded-md">
                       <Box size={14} />
                     </span>

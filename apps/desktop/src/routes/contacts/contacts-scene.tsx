@@ -1,16 +1,15 @@
 import { useForm } from "@tanstack/react-form";
-import { BookUser, Calendar, Loader2, Mail, Pin, Plus, Search, Users } from "lucide-react";
+import { BookUser, Loader2, Pin, Plus, Search, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { SideNav, SideNavGroup, SideNavHeader, SideNavItem } from "@/components/side-nav";
 import { cn } from "@/lib/utils";
 import { relativeDate } from "./contacts-api";
 import { ContactDetail } from "./contact-detail";
-import { useContactsScene } from "./use-contacts-scene";
+import { useContacts } from "./contacts-provider";
 
 function AddContactForm({
   onSubmit,
@@ -58,35 +57,10 @@ function AddContactForm({
 }
 
 export function ContactsScene() {
-  const s = useContactsScene();
-  const books = s.books.data ?? [];
+  const s = useContacts();
 
   return (
-    <div className="bg-background grid h-full min-h-0 grid-cols-1 overflow-hidden lg:grid-cols-[220px_minmax(320px,1fr)_420px]">
-      <SideNav>
-        <SideNavHeader title="Contacts" description="Learned from your mail and meetings — one list per account." />
-        <SideNavGroup label="Accounts">
-          {books
-            .filter((b) => b.kind === "account")
-            .map((b) => (
-              <SideNavItem key={b.id} label={b.label} icon={Mail} count={b.count} active={b.id === s.bookId} onSelect={() => s.selectBook(b.id)} />
-            ))}
-        </SideNavGroup>
-        <SideNavGroup label="twodb" separated>
-          {books
-            .filter((b) => b.kind === "local")
-            .map((b) => (
-              <SideNavItem key={b.id} label="twodb calendars" icon={Calendar} count={b.count} active={b.id === s.bookId} onSelect={() => s.selectBook(b.id)} />
-            ))}
-        </SideNavGroup>
-        {s.book?.learnState === "running" ? (
-          <p className="text-muted-foreground mt-auto flex items-center gap-1.5 px-2 text-xs">
-            <Loader2 size={12} className="animate-spin" /> Learning from stored mail · {s.book.learnProgress.done?.toLocaleString() ?? 0}
-            {s.book.learnProgress.total ? ` / ${s.book.learnProgress.total.toLocaleString()}` : ""}
-          </p>
-        ) : null}
-      </SideNav>
-
+    <div className="bg-background grid h-full min-h-0 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(320px,1fr)_420px]">
       <section className="flex min-h-0 min-w-0 flex-col gap-3 border-r p-4">
         <header className="flex items-center gap-2">
           <h3 className="truncate text-lg font-semibold">{s.book?.kind === "local" ? "twodb calendars" : (s.book?.label ?? "Contacts")}</h3>
