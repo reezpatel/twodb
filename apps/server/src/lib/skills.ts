@@ -33,12 +33,14 @@ export function dbSkillMatches(skill: Selectable<SkillTable>, sessionTags: strin
   return skill.tags.some((t) => sessionTags.includes(t));
 }
 
-/** Scope- and tag-filtered DB skills for a session. */
+/** Scope- and tag-filtered DB skills for a session — AI-visible only (hidden
+ * skills are user-only: /<name> expansion, never listed or readable). */
 export async function listSessionDbSkills(organizationId: string, codeDirectoryId: string | null, sessionTags: string[]): Promise<SessionSkill[]> {
   const rows = await db
     .selectFrom("skill")
     .selectAll()
     .where("organizationId", "=", organizationId)
+    .where("aiVisible", "=", true)
     .where((eb) => eb.or([eb("codeDirectoryId", "is", null), ...(codeDirectoryId ? [eb("codeDirectoryId", "=", codeDirectoryId)] : [])]))
     .execute();
   return rows.filter((r) => dbSkillMatches(r, sessionTags)).map((r) => ({ name: r.name, description: r.description, source: "db" }));

@@ -12,6 +12,8 @@ export interface SuggestionItem {
   hint?: string;
   group?: string;
   folder?: boolean;
+  /** "skill" → the composer inserts a skill chip instead of plain text. */
+  kind?: "skill";
 }
 
 export interface SuggestionPopupHandle {

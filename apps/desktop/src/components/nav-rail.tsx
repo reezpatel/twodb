@@ -26,7 +26,6 @@ interface NavRailProps {
 
 function RailButton({ app }: { app: AppEntry }) {
   const isActive = useMatch(`/apps/${app.id}`);
-  const { isMobile, closeNav } = useMobileNav();
 
   return (
     <Tooltip>
@@ -34,9 +33,6 @@ function RailButton({ app }: { app: AppEntry }) {
         <NavLink
           to={`/apps/${app.id}`}
           aria-label={app.label}
-          onClick={() => {
-            if (isMobile) closeNav();
-          }}
           className={cn(
             "text-muted-foreground relative flex h-8 w-8 items-center justify-center rounded-md transition-colors outline-none",
             "hover:bg-accent hover:text-foreground focus-visible:ring-ring focus-visible:ring-2",

@@ -578,7 +578,8 @@ async function executePlan(ctx: ToolContext | undefined, call: AgentToolCall): P
   return { output: JSON.stringify({ steps }, null, 2), code: 0, failed: false };
 }
 
-/** read_skill resolves DB skills first, then repo skills from the runner. */
+/** read_skill resolves DB skills first (AI-visible only — hidden skills are
+ * user-only), then repo skills from the runner. */
 async function executeReadSkill(ctx: ToolContext | undefined, runnerId: string | null, cwd: string | null, call: AgentToolCall): Promise<ToolExecution> {
   const name = str(call.arguments?.name).trim();
   if (!name) return { output: "error: name is required", code: null, failed: true };
@@ -587,6 +588,7 @@ async function executeReadSkill(ctx: ToolContext | undefined, runnerId: string |
       .selectFrom("skill")
       .selectAll()
       .where("organizationId", "=", ctx.organizationId)
+      .where("aiVisible", "=", true)
       .where((eb) => eb.or([eb("codeDirectoryId", "is", null), ...(ctx.codeDirectoryId ? [eb("codeDirectoryId", "=", ctx.codeDirectoryId)] : [])]))
       .execute();
     const row = rows.find((r) => r.name === name);

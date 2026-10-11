@@ -9,6 +9,8 @@ export interface Skill {
   description: string;
   content: string;
   tags: string[];
+  /** false → hidden from the AI: not listed in the prompt, read_skill fails; user-only via /name. */
+  aiVisible: boolean;
   createdAt: string;
   updatedAt: string;
 }

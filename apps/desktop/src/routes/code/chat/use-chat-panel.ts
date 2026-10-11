@@ -268,16 +268,26 @@ export function useChatPanel(sessionId: string | null) {
     enabled: !!directoryId,
   });
 
-  // Live slash palette for skills: stored skills plus repo skills (titles only,
-  // content streams in from the runner when expanded).
+  // Live slash palette for skills: stored skills (full content — chips expand
+  // on send) plus repo skills (titles only, content streams from the runner
+  // when the chip is placed).
   const skillCommands = useMemo<ComposerCommand[]>(
     () => [
-      ...(dbSkills.data ?? []).map((s) => ({ id: `skill:${s.id}`, label: s.name, description: s.description || "stored skill", group: "Skills" as const })),
+      ...(dbSkills.data ?? []).map((s) => ({
+        id: `skill:${s.id}`,
+        label: s.name,
+        description: s.description || "stored skill",
+        group: "Skills" as const,
+        kind: "skill" as const,
+        content: s.content,
+      })),
       ...(repoSkills.data?.skills ?? []).map((s) => ({
         id: `repo-skill:${s.name}`,
         label: s.name,
         description: `${s.description} (runner)`,
         group: "Skills" as const,
+        kind: "skill" as const,
+        content: "", // fetched on demand when the chip is placed
       })),
     ],
     [dbSkills.data, repoSkills.data],
@@ -675,6 +685,7 @@ export function useChatPanel(sessionId: string | null) {
     thinkingLevel: string | undefined,
     content: string,
     assets: PendingAsset[] = [],
+    skills: { name: string; content: string }[] = [],
   ): boolean => {
     const ws = wsRef.current;
     if (!sendConnectionId || !sendModel) {
@@ -704,7 +715,11 @@ export function useChatPanel(sessionId: string | null) {
       id: `optimistic-${Date.now()}`,
       role: "user",
       content: fullContent,
-      meta: assets.length > 0 ? { images: assets.map(({ uri, filename, contentType }) => ({ uri, filename, contentType })) } : null,
+      meta: skills.length
+        ? { skills, ...(assets.length > 0 ? { images: assets.map(({ uri, filename, contentType }) => ({ uri, filename, contentType })) } : null) }
+        : assets.length > 0
+          ? { images: assets.map(({ uri, filename, contentType }) => ({ uri, filename, contentType })) }
+          : null,
       createdAt: new Date().toISOString(),
     });
     ws.send(
@@ -714,15 +729,37 @@ export function useChatPanel(sessionId: string | null) {
         connectionId: sendConnectionId,
         model: sendModel,
         thinkingLevel,
+        ...(skills.length > 0 ? { skills } : {}),
         ...(assets.length > 0 ? { assets: assets.map(({ uri, filename, contentType }) => ({ uri, filename, contentType })) } : {}),
       }),
     );
     return true;
   };
 
-  const send = (sendConnectionId: string | undefined, sendModel: string | undefined, thinkingLevel?: string, contentOverride?: string): boolean => {
+  const send = (
+    sendConnectionId: string | undefined,
+    sendModel: string | undefined,
+    thinkingLevel?: string,
+    contentOverride?: string,
+    skillsOverride?: { name: string; content: string }[],
+  ): boolean => {
     const content = (contentOverride ?? draft).trim();
     if (!content || compacting) return false;
+    // Skill chips already expanded by the composer — meta.skills rides the row
+    // so the transcript can render chips again.
+    if (skillsOverride?.length) {
+      if (streaming !== null) {
+        setSteering((prev) => [...prev, { id: `steer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, content, assets: [] }]);
+        setDraft("");
+        return true;
+      }
+      if (!sendConnectionId || !sendModel) {
+        setError("Pick a connection and model first");
+        return false;
+      }
+      setDraft("");
+      return dispatchSend(sendConnectionId, sendModel, thinkingLevel, content, [], skillsOverride);
+    }
     // While a round is running, messages go to the steering queue — they're
     // dispatched when the run finishes (or immediately via "send now").
     if (streaming !== null) {

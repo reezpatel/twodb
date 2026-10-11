@@ -34,6 +34,7 @@ export const skillRoutes = new Hono()
 
     const scope = await resolveScope(db, s.organizationId, body?.codeDirectoryId);
     if (!scope.ok) return c.json({ error: scope.error }, scope.error === "directory_not_found" ? 404 : 400);
+    if (body?.aiVisible !== undefined && typeof body.aiVisible !== "boolean") return c.json({ error: "invalid_ai_visible" }, 400);
 
     const now = new Date();
     const row = await db
@@ -46,6 +47,7 @@ export const skillRoutes = new Hono()
         description: body.description,
         content: body.content,
         tags: tags ?? [],
+        aiVisible: body?.aiVisible ?? true,
         createdAt: now,
         updatedAt: now,
       })
@@ -77,7 +79,7 @@ export const skillRoutes = new Hono()
     if (!existing) return c.json({ error: "skill_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ name: string; description: string; content: string; tags: string[] }> = {};
+    const patch: Partial<{ name: string; description: string; content: string; tags: string[]; aiVisible: boolean }> = {};
     if (body?.name !== undefined) {
       if (typeof body.name !== "string" || !body.name.trim()) return c.json({ error: "invalid_name" }, 400);
       patch.name = body.name.trim();
@@ -94,6 +96,10 @@ export const skillRoutes = new Hono()
       const tags = parseTags(body.tags);
       if (tags === "invalid") return c.json({ error: "invalid_tags" }, 400);
       patch.tags = tags ?? [];
+    }
+    if (body?.aiVisible !== undefined) {
+      if (typeof body.aiVisible !== "boolean") return c.json({ error: "invalid_ai_visible" }, 400);
+      patch.aiVisible = body.aiVisible;
     }
     if (Object.keys(patch).length === 0) return c.json({ error: "empty_update" }, 400);
 

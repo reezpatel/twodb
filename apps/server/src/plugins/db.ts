@@ -222,6 +222,8 @@ export interface SkillTable {
   description: string;
   content: string;
   tags: string[];
+  /** false → hidden from the AI (not listed, not readable via read_skill); user-only via /name. */
+  aiVisible: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

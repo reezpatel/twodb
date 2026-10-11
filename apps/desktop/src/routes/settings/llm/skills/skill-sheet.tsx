@@ -6,6 +6,7 @@ import type { Skill } from "../use-workspace";
 import { EditorSheet } from "../editor-sheet";
 import { TagInput } from "../tag-input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 export const SKILLS_LIST_PATH = "/apps/settings/llm/skills";
 
@@ -47,10 +48,10 @@ export function SkillSheet() {
     void queryClient.invalidateQueries({ queryKey: ["workspace", "llm-tags"] });
   };
   const save = useMutation({
-    mutationFn: (input: { id: string; isNew: boolean; name: string; description: string; content: string; tags: string[] }) =>
+    mutationFn: (input: { id: string; isNew: boolean; name: string; description: string; content: string; tags: string[]; aiVisible: boolean }) =>
       api<Skill>(input.isNew ? "/api/skills" : `/api/skills/${input.id}`, {
         method: input.isNew ? "POST" : "PATCH",
-        body: JSON.stringify({ id: input.id, name: input.name, description: input.description, content: input.content, tags: input.tags }),
+        body: JSON.stringify(input),
       }),
     onSuccess: invalidate,
   });
@@ -64,10 +65,12 @@ export function SkillSheet() {
   }, [skillId, list.isSuccess, existing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [tags, setTags] = useState<string[]>(existing?.tags ?? []);
+  const [aiVisible, setAiVisible] = useState(existing?.aiVisible ?? true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setTags(existing?.tags ?? []);
+    setAiVisible(existing?.aiVisible ?? true);
     setError(null);
   }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -85,12 +88,14 @@ export function SkillSheet() {
       return;
     }
     save.mutate(
-      { id: skillId, isNew, name: frontmatter.title.trim(), description: frontmatter.description.trim(), content, tags },
+      { id: skillId, isNew, name: frontmatter.title.trim(), description: frontmatter.description.trim(), content, tags, aiVisible },
       { onSuccess: close, onError: (e) => setError((e as Error).message) },
     );
   };
 
-  const fieldsDirty = existing ? JSON.stringify(tags) !== JSON.stringify(existing.tags) : tags.length > 0;
+  const fieldsDirty = existing
+    ? JSON.stringify(tags) !== JSON.stringify(existing.tags) || aiVisible !== existing.aiVisible
+    : tags.length > 0 || !aiVisible;
 
   return (
     <EditorSheet
@@ -113,6 +118,15 @@ export function SkillSheet() {
             Tags
           </Label>
           <TagInput id="skill-tags" value={tags} onChange={setTags} placeholder="convention, db" />
+          <label className="mt-3 flex items-center justify-between gap-2">
+            <span className="flex flex-col">
+              <span className="text-xs font-medium">Visible to AI</span>
+              <span className="text-muted-foreground text-[11px]">
+                {aiVisible ? "Listed in the prompt; the agent can read it via read_skill" : "User-only — hidden from the agent; expand it yourself with /name"}
+              </span>
+            </span>
+            <Switch checked={aiVisible} onCheckedChange={setAiVisible} />
+          </label>
         </div>
       }
     />

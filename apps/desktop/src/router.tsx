@@ -10,11 +10,6 @@ import { HomePage } from "./routes/home/home";
 import { AppPage } from "./routes/apps/app-page";
 import { CodeScene } from "./routes/code/code-scene";
 import { ChatPanel } from "./routes/code/chat/chat-panel";
-import { ChatConversation } from "./routes/code/chat/chat-conversation";
-import { TerminalScreen } from "./routes/code/chat/screens/terminal-screen";
-import { CheckpointsScreen } from "./routes/code/chat/screens/checkpoints-screen";
-import { ChangesScreen } from "./routes/code/chat/screens/changes-screen";
-import { CanvasScreen } from "./routes/code/chat/screens/canvas-screen";
 import { SettingsLayout } from "./routes/settings/settings-layout";
 import { GeneralSection } from "./routes/settings/general/general";
 import { AdministratorSection } from "./routes/settings/administrator/administrator";
@@ -100,11 +95,14 @@ export const router = createBrowserRouter([
             path: ":sessionId",
             Component: ChatPanel,
             children: [
-              { index: true, Component: ChatConversation },
-              { path: "terminal", Component: TerminalScreen },
-              { path: "checkpoints", Component: CheckpointsScreen },
-              { path: "changes", Component: ChangesScreen },
-              { path: "canvas", Component: CanvasScreen },
+              { index: true, element: null },
+              // Panel screens render inside the right bar (CodeScene); the main
+              // column is owned by ChatPanel. Routes exist for deep links +
+              // active-tab state, so they render nothing themselves.
+              { path: "terminal", element: null },
+              { path: "checkpoints", element: null },
+              { path: "changes", element: null },
+              { path: "canvas", element: null },
             ],
           },
         ],

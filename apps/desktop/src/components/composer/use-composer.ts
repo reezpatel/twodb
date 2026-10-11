@@ -6,7 +6,8 @@ import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
 import Mention from "@tiptap/extension-mention";
 import PasteChip, { type PasteRef } from "./paste-chip";
-import { searchCommands, type ComposerCommand } from "./composer-commands";
+import SkillChip from "./skill-chip";
+import { searchCommands, isSkillCommand, type ComposerCommand } from "./composer-commands";
 import { searchFiles } from "./search-files";
 import { suggestionRenderer, type SuggestionItem } from "./suggestion-popup";
 
@@ -22,12 +23,16 @@ interface ComposerOptions {
   placeholder: string;
   /** Slash-command palette — code chat passes its own list with /compact. */
   commands?: ComposerCommand[];
+  /** Resolves skill content lazily (repo skills fetch on demand); returns null on failure. */
+  loadSkillContent?: (label: string) => Promise<string | null>;
+  /** Opens the skill-content dialog when a skill chip is clicked (composer + transcript share it). */
+  onSkillClick?: (skill: { name: string; content: string }) => void;
   onDraft: (text: string) => void;
   /** Returns true when the message was dispatched — the composer clears itself. */
-  onSend: (content: string) => boolean;
+  onSend: (content: string, skills: { name: string; content: string }[]) => boolean;
 }
 
-export function useComposer({ files, disabled, placeholder, commands, onDraft, onSend }: ComposerOptions) {
+export function useComposer({ files, disabled, placeholder, commands, onSkillClick, loadSkillContent, onDraft, onSend }: ComposerOptions) {
   const commandsRef = useRef(commands);
   commandsRef.current = commands;
   const filesRef = useRef(files);
@@ -42,6 +47,11 @@ export function useComposer({ files, disabled, placeholder, commands, onDraft, o
   const popupOpenRef = useRef(false);
   const pastesRef = useRef(new Map<string, PasteRef>());
   const pasteCountRef = useRef(0);
+  const skillsRef = useRef(new Map<string, { name: string; content: string }>());
+  const skillClickRef = useRef(onSkillClick);
+  skillClickRef.current = onSkillClick;
+  const loadSkillRef = useRef(loadSkillContent);
+  loadSkillRef.current = loadSkillContent;
 
   // Chips render as labels; the wire gets the full content expanded back in.
   const expandPastes = (text: string) =>
@@ -50,11 +60,27 @@ export function useComposer({ files, disabled, placeholder, commands, onDraft, o
       return paste ? `\n\n--- paste #${paste.id} (${paste.lines} lines) ---\n${paste.content}\n--- end paste ---` : match;
     });
 
+  // Skill chips expand to <skill> blocks in the wire message; the collected
+  // refs ride meta.skills so the transcript can render chips again.
+  const expandSkills = (text: string): { text: string; skills: { name: string; content: string }[] } => {
+    const skills: { name: string; content: string }[] = [];
+    const out = text.replace(/\/([\w][\w.-]*)/g, (match, name: string) => {
+      const skill = skillsRef.current.get(name);
+      if (!skill) return match;
+      skills.push(skill);
+      return `<skill name="${name}">\n${skill.content}\n</skill>`;
+    });
+    return { text: out, skills };
+  };
+
   const submit = () => {
     const editor = editorRef.current;
     if (!editor) return;
-    const text = editor.getText().trim();
-    if (!text || sendRef.current(expandPastes(text))) editor.commands.clearContent(true);
+    const raw = editor.getText().trim();
+    if (!raw) return;
+    const { text, skills } = expandSkills(expandPastes(raw));
+    if (skills.some((s) => !s.content)) return; // repo skill still loading
+    if (sendRef.current(text, skills)) editor.commands.clearContent(true);
   };
 
   const editor = useEditor({
@@ -73,6 +99,7 @@ export function useComposer({ files, disabled, placeholder, commands, onDraft, o
       }),
       Placeholder.configure({ placeholder: () => placeholderRef.current }),
       PasteChip,
+      SkillChip,
       Extension.create({
         name: "composerSubmit",
         addKeyboardShortcuts() {
@@ -112,7 +139,34 @@ export function useComposer({ files, disabled, placeholder, commands, onDraft, o
           pluginKey: commandMentionKey,
           startOfLine: true,
           items: ({ query }) =>
-            searchCommands(query, commandsRef.current).map((c) => ({ id: c.id, label: c.label, hint: c.description, group: c.group }) satisfies SuggestionItem),
+            searchCommands(query, commandsRef.current).map((c) => ({
+              id: c.id,
+              label: c.label,
+              hint: c.description,
+              group: c.group,
+              kind: c.kind,
+            }) satisfies SuggestionItem),
+          // Skill picks insert a chip; commands stay plain text.
+          command: ({ editor, props: item }) => {
+            const cmd = commandsRef.current?.find((c) => c.id === item?.id);
+            if (cmd && isSkillCommand(cmd)) {
+              const store = skillsRef.current;
+              if (cmd.content) {
+                store.set(cmd.label, { name: cmd.label, content: cmd.content });
+              } else {
+                // Repo skill — content streams in from the runner; the chip is
+                // placed immediately and expands with whatever loaded by send.
+                store.set(cmd.label, { name: cmd.label, content: "" });
+                void loadSkillRef.current?.(cmd.label).then((content) => {
+                  if (content) store.set(cmd.label, { name: cmd.label, content });
+                });
+              }
+              editor.chain().focus().insertContent({ type: "skillChip", attrs: { id: cmd.id, label: `/${cmd.label}` } }).run();
+            } else if (item) {
+              // Default mention insertion: /<label> as plain text.
+              editor.chain().focus().insertContent(`/${item.label}`).run();
+            }
+          },
           render: () => suggestionRenderer(popupOpenRef),
         },
       }),
@@ -133,6 +187,19 @@ export function useComposer({ files, disabled, placeholder, commands, onDraft, o
         editorRef.current?.commands.insertContent({ type: "pasteChip", attrs: { id, label: `Paste #${id}: ${lines} lines` } });
         return true;
       },
+      // Clicking a skill chip opens its content in a dialog (the raw content
+      // never renders inline).
+      handleClick: (_view, _pos, event) => {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest("[data-skill-chip]")) {
+          const label = (target.closest("[data-skill-chip]") as HTMLElement).textContent ?? "";
+          const name = label.replace(/^\//, "");
+          const skill = skillsRef.current.get(name);
+          if (skill) skillClickRef.current?.(skill);
+          return true;
+        }
+        return false;
+      },
     },
     onUpdate: ({ editor: current }) => draftRef.current(current.getText()),
   });
@@ -145,5 +212,13 @@ export function useComposer({ files, disabled, placeholder, commands, onDraft, o
     editor?.setEditable(!disabled);
   }, [editor, disabled]);
 
-  return { editor, submit, pastes: pastesRef };
+  // Live skill content refreshes (edit, directory switch) flow into chips
+  // already placed in the draft — expansion always uses the current content.
+  useEffect(() => {
+    for (const cmd of commandsRef.current ?? []) {
+      if (isSkillCommand(cmd)) skillsRef.current.set(cmd.label, { name: cmd.label, content: cmd.content ?? "" });
+    }
+  }, [commands]);
+
+  return { editor, submit, pastes: pastesRef, skills: skillsRef };
 }

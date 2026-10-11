@@ -21,7 +21,7 @@ import { clearAskUser, waitForAskUserResponse, type AskUserQuestion } from "./as
 import { COMPACT_RESERVE_TOKENS, codeCompactionStore, estimateContextTokens, NothingToCompactError, projectHistory, runCompaction } from "./compaction";
 import { resolveSessionSystemPrompt } from "./session-prompt";
 
-export const MAX_ROUNDS = 60;
+export const MAX_ROUNDS = 300;
 
 export interface RoundUsage {
   inputTokens: number;

@@ -43,6 +43,8 @@ export interface ResourceRow {
   /** When set, renders a single scope badge instead of tags (memories). */
   scope?: string;
   codeDirectoryId: string | null;
+  /** Extra node after the name (e.g. a "hidden" badge). */
+  badge?: ReactNode;
 }
 
 /** Name + Tags table; hovering a name reveals a menu with edit/delete. */
@@ -76,6 +78,7 @@ export function ResourceTable({
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <span className="truncate">{row.name}</span>
                       <ScopeBadge codeDirectoryId={row.codeDirectoryId} />
+                      {row.badge}
                     </div>
                     {row.subtitle && <p className="text-muted-foreground truncate text-xs">{row.subtitle}</p>}
                   </div>

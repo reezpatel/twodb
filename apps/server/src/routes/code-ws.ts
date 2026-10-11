@@ -22,6 +22,8 @@ interface ClientMessage {
   thinkingLevel?: string;
   /** Uploaded assets attached to the send — twodb:// refs from the composer. */
   assets?: { uri: string; filename: string; contentType: string }[];
+  /** Expanded skills from the composer — stored on the user row meta. */
+  skills?: { name: string; content: string }[];
   /** ask_user_response fields. */
   id?: string;
   cancelled?: boolean;
@@ -220,6 +222,9 @@ export interface StartRunOptions {
   userMeta?: Record<string, unknown> | null;
   /** Assets attached to the user message (twodb:// refs). */
   assets?: { uri: string; filename: string; contentType: string }[];
+  /** Expanded skills the composer sent — stored on the user row meta so the
+   * transcript renders chips instead of the raw expanded content. */
+  skills?: { name: string; content: string }[];
   /** Replaces the DB-projected history (chat channels project chat_message rows instead). */
   historyOverride?: AgentMessage[];
   /** Replaces the bound agent's instruction as the system prompt body. */
@@ -265,7 +270,12 @@ export async function startSessionRun(organizationId: string, session: SessionRo
 
   const now = new Date();
   const isFirstMessage = history.length === 0;
-  const meta = { ...(assets.length > 0 ? { images: assets } : {}), ...(opts.userMeta ?? {}) };
+  const skills = (opts.skills ?? []).filter((s) => s && typeof s.name === "string" && typeof s.content === "string");
+  const meta = {
+    ...(assets.length > 0 ? { images: assets } : {}),
+    ...(skills.length > 0 ? { skills } : {}),
+    ...(opts.userMeta ?? {}),
+  };
   await db
     .insertInto("code_session_message")
     .values({
@@ -774,6 +784,9 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               thinkingLevel,
               ws,
               assets,
+              skills: Array.isArray(msg.skills)
+                ? msg.skills.filter((s: unknown) => s && typeof (s as { name?: unknown }).name === "string" && typeof (s as { content?: unknown }).content === "string")
+                : [],
             });
             if ("error" in started) {
               ws.send(JSON.stringify({ type: "error", message: started.error }));

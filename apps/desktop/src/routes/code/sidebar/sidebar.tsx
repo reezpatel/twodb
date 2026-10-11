@@ -137,7 +137,7 @@ export function Sidebar() {
   const { openBtwSession } = useChat();
 
   return (
-    <aside className="bg-card border-l hidden h-full w-72 shrink-0 flex-col overflow-y-auto border-l xl:flex">
+    <div className="flex h-full flex-col">
       <Section
         title={`Subagents${subagents.children.length ? ` (${subagents.children.length})` : ""}`}
         open={open.subagents}
@@ -256,6 +256,6 @@ export function Sidebar() {
           </>
         )}
       </Section>
-    </aside>
+    </div>
   );
 }

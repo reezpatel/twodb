@@ -5,6 +5,7 @@ import { randomId } from "@/lib/utils";
 import type { Skill } from "../use-workspace";
 import { SkillSheet, SKILLS_LIST_PATH } from "./skill-sheet";
 import { Empty, PanelShell, ResourceTable } from "../workspace-panels";
+import { Badge } from "@/components/ui/badge";
 
 export function SkillsSection() {
   const { skillId } = useParams();
@@ -30,6 +31,7 @@ export function SkillsSection() {
               subtitle: <span className="line-clamp-1">{skill.description}</span>,
               tags: skill.tags,
               codeDirectoryId: skill.codeDirectoryId,
+              badge: skill.aiVisible ? undefined : <Badge variant="secondary">user-only</Badge>,
             }))}
             onEdit={(id) => navigate(`${SKILLS_LIST_PATH}/${id}`)}
             onDelete={(id) => remove.mutate(id, { onSuccess: () => skillId === id && navigate(SKILLS_LIST_PATH) })}

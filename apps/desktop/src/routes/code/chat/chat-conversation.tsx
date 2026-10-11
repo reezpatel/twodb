@@ -99,25 +99,52 @@ function ToolBlock({
   );
 }
 
+/** Expanded skills on a user message render as chips — content stays in the
+ * dialog (click), never inline. */
+function SkillChipButton({ skill, onOpen }: { skill: { name: string; content: string }; onOpen: (s: { name: string; content: string }) => void }) {
+  return (
+    <button
+      type="button"
+      className="rounded-md border border-primary/30 bg-primary/10 px-1.5 py-[0.1rem] font-medium text-primary transition-colors hover:bg-primary/20"
+      onClick={() => onOpen(skill)}
+      title="Show skill content"
+    >
+      /{skill.name}
+    </button>
+  );
+}
+
 function Message({
   role,
   content,
   resolveAssetUrl,
   label,
+  skills,
+  onSkillClick,
 }: {
   role: string;
   content: string;
   resolveAssetUrl?: (uri: string) => string | undefined;
   label?: string;
+  skills?: { name: string; content: string }[];
+  onSkillClick?: (s: { name: string; content: string }) => void;
 }) {
   const isUser = role === "user";
   if (isUser) {
+    // Skill blocks hide from the rendered message — chips stand in for them.
+    const stripped = skills?.length ? content.replace(/<skill name="[\w.-]+">[\s\S]*?<\/skill>/g, "").trim() : content;
     return (
       <div className="flex flex-col items-end">
         <div className="bg-card max-w-[85%] rounded-lg px-3 py-2 text-right">
           <span className="text-primary text-[11px] w-full font-semibold tracking-wide uppercase">{label ?? "You"}</span>
-
-          <MessageMarkdown text={content} resolveAssetUrl={resolveAssetUrl} />
+          {skills?.length ? (
+            <div className="flex flex-wrap justify-end gap-1.5 pb-1">
+              {skills.map((s) => (
+                <SkillChipButton key={s.name} skill={s} onOpen={(x) => onSkillClick?.(x)} />
+              ))}
+            </div>
+          ) : null}
+          {stripped && <MessageMarkdown text={stripped} resolveAssetUrl={resolveAssetUrl} />}
         </div>
       </div>
     );
@@ -172,6 +199,8 @@ interface ChatMessageListProps {
   orphanToolIds: Set<string>;
   /** Opens the /btw side thread when its block is clicked (main thread only). */
   onOpenBtw?: (sessionId: string) => void;
+  /** Opens the skill-content dialog when a skill chip is clicked. */
+  onSkillClick?: (skill: { name: string; content: string }) => void;
 }
 
 /**
@@ -196,6 +225,7 @@ function ChatMessageList(props: ChatMessageListProps) {
     toolTimings,
     orphanToolIds,
     onOpenBtw,
+    onSkillClick,
   } = props;
   const virtuoso = useRef<VirtuosoHandle>(null);
   const [atBottom, setAtBottom] = useState(true);
@@ -411,7 +441,6 @@ function ChatMessageList(props: ChatMessageListProps) {
   );
 
   function renderableRows(list: CodeMessage[], orphans: Set<string>) {
-    let assistantRound = 0;
     const out: RenderRow[] = [];
     let lastClearIdx = -1;
     for (let i = 0; i < list.length; i++) if (list[i].role === "clear") lastClearIdx = i;
@@ -420,8 +449,7 @@ function ChatMessageList(props: ChatMessageListProps) {
       if (m.role === "tool" && !orphans.has(m.id)) continue;
       if (m.role === "ask_user") continue;
       if (m.role === "compaction" && !(m.meta as CompactionBlockMeta | null)?.summary) continue;
-      if (m.role === "assistant") assistantRound += 1;
-      out.push({ message: m, dimmed: lastClearIdx >= 0 && i < lastClearIdx, round: m.role === "assistant" ? assistantRound : null });
+      out.push({ message: m, dimmed: lastClearIdx >= 0 && i < lastClearIdx });
     }
     return out;
   }
@@ -511,6 +539,8 @@ function ChatMessageList(props: ChatMessageListProps) {
             content={m.content}
             resolveAssetUrl={resolveAssetUrl}
             label={meta?.btw?.agentName ? `Agent ${meta.btw.agentName}` : undefined}
+            skills={m.role === "user" ? ((m.meta as { skills?: { name: string; content: string }[] } | null)?.skills ?? undefined) : undefined}
+            onSkillClick={onSkillClick}
           />
         )}
         {meta?.stopped && <span className="text-muted-foreground/70 text-[11px] italic">stopped</span>}
@@ -531,13 +561,6 @@ function ChatMessageList(props: ChatMessageListProps) {
             />
           );
         })}
-        {row.round !== null && (
-          <div className="text-muted-foreground/60 flex items-center gap-3 py-1 font-mono text-[10px]">
-            <span className="bg-border h-px flex-1" aria-hidden="true" />
-            <span>round {row.round} complete</span>
-            <span className="bg-border h-px flex-1" aria-hidden="true" />
-          </div>
-        )}
       </div>
     );
   }
@@ -546,7 +569,6 @@ function ChatMessageList(props: ChatMessageListProps) {
 interface RenderRow {
   message: CodeMessage;
   dimmed: boolean;
-  round: number | null;
 }
 
 export function ChatConversation() {
@@ -604,6 +626,7 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
     loadOlder,
   } = useChat();
   const [viewPaste, setViewPaste] = useState<PasteRef | null>(null);
+  const [viewSkill, setViewSkill] = useState<{ name: string; content: string } | null>(null);
   const assetInputRef = useRef<HTMLInputElement>(null);
   const [showThinking, setShowThinking] = useState(() => localStorage.getItem("twodb.showThinking") !== "false");
   const queryClient = useQueryClient();
@@ -690,8 +713,15 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
         : running
           ? "Steering — message queues until this round finishes"
           : "Ask the agent… — @ files, / commands",
+    onSkillClick: setViewSkill,
+    loadSkillContent: (name) =>
+      directoryId
+        ? api<{ name: string; content: string }>(`/api/code/directories/${directoryId}/repo-skills/${encodeURIComponent(name)}`)
+            .then((r) => r.content)
+            .catch(() => null)
+        : Promise.resolve(null),
     onDraft: setDraft,
-    onSend: (content) => send(selected?.id, model || effectiveModel, thinkingLevel, content),
+    onSend: (content, skills) => send(selected?.id, model || effectiveModel, thinkingLevel, content, skills),
   });
 
   return (
@@ -721,6 +751,7 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
         toolTimings={toolTimings}
         orphanToolIds={orphanToolIds}
         onOpenBtw={openBtwSession}
+        onSkillClick={setViewSkill}
       />
 
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
@@ -861,6 +892,15 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
               </DialogTitle>
             </DialogHeader>
             <pre className="bg-muted max-h-[60vh] overflow-auto rounded-lg p-3 font-mono text-xs whitespace-pre-wrap">{viewPaste?.content}</pre>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!viewSkill} onOpenChange={(o) => !o && setViewSkill(null)}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>/{viewSkill?.name}</DialogTitle>
+            </DialogHeader>
+            <pre className="bg-muted max-h-[60vh] overflow-auto rounded-lg p-3 font-mono text-xs whitespace-pre-wrap">{viewSkill?.content}</pre>
           </DialogContent>
         </Dialog>
       </div>

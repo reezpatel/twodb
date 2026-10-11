@@ -3,6 +3,10 @@ export interface ComposerCommand {
   label: string;
   description: string;
   group: "Skills" | "Commands";
+  /** "skill" → the composer inserts a skill chip (content expands on send). */
+  kind?: "skill";
+  /** Full skill content for kind="skill". */
+  content?: string;
 }
 
 /** No built-in commands — chats supply their own; skills arrive live from the session. */
@@ -19,4 +23,8 @@ export function searchCommands(query: string, commands: ComposerCommand[] = COMP
   const q = query.trim().toLowerCase();
   if (!q) return commands;
   return commands.filter((c) => c.label.toLowerCase().includes(q) || c.description.toLowerCase().includes(q));
+}
+
+export function isSkillCommand(command: ComposerCommand): boolean {
+  return command.kind === "skill";
 }
