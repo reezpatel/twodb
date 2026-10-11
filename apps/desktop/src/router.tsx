@@ -28,11 +28,13 @@ import { McpSection } from "./routes/settings/llm/mcp/mcp-section";
 import { RunnersSection } from "./routes/settings/runners/runners";
 import { CodeSection } from "./routes/settings/code/code";
 import { StorageSection } from "./routes/settings/storage/storage";
-import { EmailSection } from "./routes/settings/email/email-settings";
+import { AccountsSection } from "./routes/settings/accounts/accounts-settings";
+import { CalendarSettingsSection } from "./routes/settings/calendar/calendar-settings";
 import { LogsSection } from "./routes/settings/logs/logs";
 import { FilesScene } from "./routes/files/files-scene";
 import { NotesScene } from "./routes/notes/notes-scene";
 import { EmailScene } from "./routes/email/email-scene";
+import { ContactsScene } from "./routes/contacts/contacts-scene";
 import { ChatScene } from "./routes/chat/chat-scene";
 import { CalendarScene } from "./routes/calendar/calendar-scene";
 import { MeetingsScene } from "./routes/meetings/meetings-scene";
@@ -84,7 +86,9 @@ export const router = createBrowserRouter([
           { path: "runners", Component: RunnersSection },
           { path: "code", Component: CodeSection },
           { path: "storage", Component: StorageSection },
-          { path: "email", Component: EmailSection },
+          { path: "accounts", Component: AccountsSection },
+          { path: "calendar", Component: CalendarSettingsSection },
+          { path: "email", element: <Navigate to="/apps/settings/accounts" replace /> },
           { path: "logs", Component: LogsSection },
         ],
       },
@@ -108,6 +112,7 @@ export const router = createBrowserRouter([
       { path: "/apps/overview", Component: OverviewScene },
       { path: "/apps/email", Component: EmailScene },
       { path: "/apps/calendar", Component: CalendarScene },
+      { path: "/apps/contacts", Component: ContactsScene },
       { path: "/apps/chat", Component: ChatScene },
       { path: "/apps/meetings", Component: MeetingsScene },
       { path: "/apps/automations", Component: AutomationsScene },

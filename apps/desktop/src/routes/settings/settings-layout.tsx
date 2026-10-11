@@ -8,7 +8,8 @@ const SECTIONS = [
   { id: "code", label: "Code" },
   { id: "runners", label: "Runners" },
   { id: "storage", label: "Storage" },
-  { id: "email", label: "Email" },
+  { id: "accounts", label: "Accounts" },
+  { id: "calendar", label: "Calendar" },
   { id: "logs", label: "Logs" },
 ] as const;
 

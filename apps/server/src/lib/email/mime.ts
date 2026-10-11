@@ -58,7 +58,11 @@ export function quoteFor(kind: string | null, source: MessageRow): { html: strin
 const toMime = (list: EmailAddress[]) => list.map((a) => ({ name: a.name ?? "", address: a.address }));
 
 /** Builds the exact RFC822 bytes we send and archive. keepBcc is for Gmail, which reads recipients from headers. */
-export async function buildMime(message: MessageRow, account: EmailAccountRow, opts: { keepBcc: boolean }): Promise<{ mime: Buffer; envelope: { from: string; to: string[] } }> {
+export async function buildMime(
+  message: MessageRow,
+  account: EmailAccountRow,
+  opts: { keepBcc: boolean },
+): Promise<{ mime: Buffer; envelope: { from: string; to: string[] } }> {
   let html = message.bodyHtml ?? "";
   let text = html ? htmlToText(html) : (message.bodyText ?? "");
   if (message.sourceMessageId && message.headers["x-twodb-include-quote"] !== "0") {
@@ -72,10 +76,22 @@ export async function buildMime(message: MessageRow, account: EmailAccountRow, o
 
   const attachments = await db.selectFrom("email_attachment").selectAll().where("messageId", "=", message.id).execute();
   const parts = [];
+  // Calendar invitations: the .ics becomes a text/calendar alternative part (what mail clients render as an RSVP card).
+  const icalMethod = message.headers["x-twodb-ical-method"];
+  let icalEvent: { method: string; content: string; filename: string } | undefined;
   for (const a of attachments) {
     if (!a.mediaId) continue;
     const media = await readEmailMedia(message.organizationId, a.mediaId);
-    parts.push({ filename: a.filename, content: media.body, contentType: a.contentType ?? undefined, ...(a.isInline && a.contentId ? { cid: a.contentId } : {}) });
+    if (icalMethod && !icalEvent && (a.contentType ?? "").startsWith("text/calendar")) {
+      icalEvent = { method: icalMethod, content: media.body.toString("utf8"), filename: a.filename };
+      continue;
+    }
+    parts.push({
+      filename: a.filename,
+      content: media.body,
+      contentType: a.contentType ?? undefined,
+      ...(a.isInline && a.contentId ? { cid: a.contentId } : {}),
+    });
   }
 
   const fromAddress = message.fromAddress ?? account.address;
@@ -92,6 +108,7 @@ export async function buildMime(message: MessageRow, account: EmailAccountRow, o
     html: html || undefined,
     text,
     attachments: parts,
+    ...(icalEvent ? { icalEvent } : {}),
     xMailer: "twodb",
   });
   const node = composer.compile();

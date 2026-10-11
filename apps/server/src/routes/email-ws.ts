@@ -21,6 +21,7 @@ export type EmailEvent =
   | { type: "thread.updated"; accountId: string; threadIds: string[] }
   | { type: "account.status"; accountId: string; status: string; lastError?: string | null }
   | { type: "account.backfill"; accountId: string; state: string; progress: Record<string, unknown> }
+  | { type: "account.calendar"; accountId: string; calendarState: string; calendarError: string | null }
   | { type: "labels.updated" };
 
 function sendTo(userIds: Set<string>, event: EmailEvent) {

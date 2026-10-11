@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import {
   emailKeys,
   threadAction,
-  useEmailAccounts,
+  useMailAccounts,
   useEmailLabels,
   useEmailMeta,
   useEmailSocket,
@@ -35,7 +35,7 @@ export function useEmailScene() {
   useEmailSocket();
   const queryClient = useQueryClient();
   const meta = useEmailMeta();
-  const accounts = useEmailAccounts();
+  const accounts = useMailAccounts();
   const labels = useEmailLabels();
 
   const [accountId, setAccountId] = useState<string | null>(null);

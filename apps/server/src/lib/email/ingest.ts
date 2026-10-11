@@ -6,6 +6,8 @@ import { storeEmailBytes } from "./storage";
 import { findThread, normalizeSubject } from "./threading";
 import { recomputeThread, senderIsSpam } from "./threads";
 import type { EmailAccountRow, RawIncoming } from "./types";
+import { learnFromMessageId } from "../contacts/email-learning";
+import { processImipSafely } from "../calendar/imip";
 
 // Single inbound path for every connector: dedupe → parse → reconcile our own
 // outbound → store raw → thread → insert → attachments → recompute → events.
@@ -52,7 +54,9 @@ async function reconcileExisting(account: EmailAccountRow, item: RawIncoming, pa
         .set({
           providerMessageId: item.providerMessageId,
           providerThreadId: item.providerThreadId ?? existing.providerThreadId,
-          ...(existing.status === "sending" || existing.status === "failed" ? { status: "sent", lastError: null, sentAt: existing.sentAt ?? parsed.date ?? new Date() } : {}),
+          ...(existing.status === "sending" || existing.status === "failed"
+            ? { status: "sent", lastError: null, sentAt: existing.sentAt ?? parsed.date ?? new Date() }
+            : {}),
           updatedAt: new Date(),
         })
         .where("id", "=", existing.id)
@@ -61,7 +65,12 @@ async function reconcileExisting(account: EmailAccountRow, item: RawIncoming, pa
       if (!isUniqueViolation(e)) throw e;
     }
     if (item.providerThreadId) {
-      await db.updateTable("email_thread").set({ providerThreadId: item.providerThreadId }).where("id", "=", existing.threadId).where("providerThreadId", "is", null).execute();
+      await db
+        .updateTable("email_thread")
+        .set({ providerThreadId: item.providerThreadId })
+        .where("id", "=", existing.threadId)
+        .where("providerThreadId", "is", null)
+        .execute();
     }
   }
   return existing.threadId;
@@ -219,6 +228,11 @@ export async function ingestBatch(account: EmailAccountRow, items: RawIncoming[]
       }
       touched.add(threadId);
       created.push({ threadId, messageId });
+      if (!spam) await learnFromMessageId(account, messageId);
+      if (!spam && !outbound) {
+        const ics = parsed.attachments.find((a) => a.contentType.startsWith("text/calendar") || a.filename.toLowerCase().endsWith(".ics"));
+        if (ics) await processImipSafely(account, messageId, ics.content.toString("utf8"), { backfill: opts.backfill });
+      }
     } catch (e) {
       if ((e as Error).message === "email_attachments_not_configured") throw e;
       logger.error({ err: e, accountId: account.id, providerMessageId: item.providerMessageId }, "email: ingest failed for message");

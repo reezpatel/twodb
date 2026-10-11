@@ -67,9 +67,11 @@ export function EmailScene() {
             <Mail size={20} />
           </span>
           <h2 className="text-lg font-semibold">Connect a mailbox</h2>
-          <p className="text-muted-foreground text-sm">Add a Gmail, Yahoo or IMAP/SMTP account. Mail is synced and stored locally in twodb — the UI never talks to the provider directly.</p>
+          <p className="text-muted-foreground text-sm">
+            Add a Gmail, Yahoo or IMAP/SMTP account. Mail is synced and stored locally in twodb — the UI never talks to the provider directly.
+          </p>
           <Button asChild>
-            <Link to="/apps/settings/email">Add an account</Link>
+            <Link to="/apps/settings/accounts">Add an account</Link>
           </Button>
         </div>
       </div>
@@ -88,11 +90,17 @@ export function EmailScene() {
             <DropdownMenuTrigger asChild>
               <button type="button" className="hover:bg-accent/50 flex min-w-0 flex-1 items-center gap-2 rounded-md p-1 text-left">
                 <Avatar size="lg">
-                  <AvatarFallback className="text-xs">{activeAccount ? initials(activeAccount.displayName ?? activeAccount.address) : <Layers size={14} />}</AvatarFallback>
+                  <AvatarFallback className="text-xs">
+                    {activeAccount ? initials(activeAccount.displayName ?? activeAccount.address) : <Layers size={14} />}
+                  </AvatarFallback>
                 </Avatar>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <strong className="truncate text-sm font-semibold">{activeAccount ? (activeAccount.displayName ?? activeAccount.address.split("@")[0]) : "All accounts"}</strong>
-                  <span className="text-muted-foreground truncate text-xs">{activeAccount ? activeAccount.address : `${accounts.length} mailbox${accounts.length === 1 ? "" : "es"}`}</span>
+                  <strong className="truncate text-sm font-semibold">
+                    {activeAccount ? (activeAccount.displayName ?? activeAccount.address.split("@")[0]) : "All accounts"}
+                  </strong>
+                  <span className="text-muted-foreground truncate text-xs">
+                    {activeAccount ? activeAccount.address : `${accounts.length} mailbox${accounts.length === 1 ? "" : "es"}`}
+                  </span>
                 </span>
                 <ChevronDown size={14} className="text-muted-foreground shrink-0" />
               </button>
@@ -113,7 +121,7 @@ export function EmailScene() {
               ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link to="/apps/settings/email">
+                <Link to="/apps/settings/accounts">
                   <Settings /> Manage accounts
                 </Link>
               </DropdownMenuItem>
@@ -145,7 +153,7 @@ export function EmailScene() {
             </span>
           ))}
           {attention.length ? (
-            <Link to="/apps/settings/email" className="text-destructive flex items-center gap-1.5 px-2 py-1 text-xs">
+            <Link to="/apps/settings/accounts" className="text-destructive flex items-center gap-1.5 px-2 py-1 text-xs">
               <AlertTriangle size={12} /> {attention.length === 1 ? `${attention[0].address} needs attention` : `${attention.length} accounts need attention`}
             </Link>
           ) : null}
@@ -154,7 +162,7 @@ export function EmailScene() {
               <AlertTriangle size={12} /> Attachment storage not configured
             </Link>
           ) : null}
-          <SideNavItem label="Email settings" icon={Settings} to="/apps/settings/email" />
+          <SideNavItem label="Email settings" icon={Settings} to="/apps/settings/accounts" />
         </SideNavFooter>
       </SideNav>
 
@@ -200,7 +208,12 @@ export function EmailScene() {
           {s.undo ? (
             <>
               <span>{s.undo.scheduled ? "Message scheduled." : "Sending…"}</span>
-              <button type="button" className="font-semibold underline-offset-2 hover:underline" disabled={s.cancelUndo.isPending} onClick={() => s.cancelUndo.mutate(s.undo!.messageId)}>
+              <button
+                type="button"
+                className="font-semibold underline-offset-2 hover:underline"
+                disabled={s.cancelUndo.isPending}
+                onClick={() => s.cancelUndo.mutate(s.undo!.messageId)}
+              >
                 Undo
               </button>
             </>

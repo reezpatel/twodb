@@ -1,7 +1,9 @@
 import type { Selectable } from "kysely";
-import type { EmailAccountTable } from "../../plugins/db";
+import type { ConnectedAccountTable } from "../../plugins/db";
 
-export type EmailAccountRow = Selectable<EmailAccountTable>;
+export type EmailAccountRow = Selectable<ConnectedAccountTable>;
+export type AccountKind = "google" | "microsoft" | "imap";
+export type AccountCapability = "mail" | "calendar";
 
 /** One message as fetched from a provider — always raw RFC822 so parsing has a single path. */
 export interface RawIncoming {
@@ -50,12 +52,16 @@ export interface ConnectorField {
   /** Sealed into credentials instead of config. */
   secret?: boolean;
   required?: boolean;
+  /** Only shown / validated when this capability is enabled. */
+  capability?: AccountCapability;
 }
 
 export interface ConnectorPreset {
   id: string;
   label: string;
-  kind: "gmail" | "imap_smtp";
+  kind: AccountKind;
+  auth: "oauth" | "password";
+  capabilities: AccountCapability[];
   description: string;
   defaults: Record<string, unknown>;
   /** Shown above the form — e.g. "create an app password". */
@@ -63,9 +69,13 @@ export interface ConnectorPreset {
 }
 
 export interface EmailConnector {
-  kind: "gmail" | "imap_smtp";
+  kind: AccountKind;
   /** Throws on bad credentials / unreachable host. */
-  verify(account: Pick<EmailAccountRow, "address" | "config">, credentials: Record<string, unknown>, saveCredentials?: SyncContext["saveCredentials"]): Promise<void>;
+  verify(
+    account: Pick<EmailAccountRow, "address" | "config">,
+    credentials: Record<string, unknown>,
+    saveCredentials?: SyncContext["saveCredentials"],
+  ): Promise<void>;
   /** Pull new mail since syncCursor; returns the next head cursor (plus an initial backfill cursor on first run). */
   pullHead(ctx: SyncContext): Promise<{ cursor: Record<string, unknown>; backfillCursor?: Record<string, unknown> | null; total?: number | null }>;
   /** One bounded backfill batch, newest → oldest. */

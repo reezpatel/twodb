@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useStore } from "@tanstack/react-form";
 import { Check, ChevronDown, Clock, FileText, Loader2, Maximize2, MailPlus, Minimize2, Paperclip, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -50,6 +51,7 @@ function ComposeForm({ draft, accounts, onClose, onSent }: ComposeWindowProps & 
   const fileRef = useRef<HTMLInputElement>(null);
   const isNew = draft.composeKind === "new";
   const busy = c.send.isPending || c.discard.isPending;
+  const accountId = useStore(c.form.store, (st) => st.values.accountId);
 
   return (
     <div
@@ -152,7 +154,11 @@ function ComposeForm({ draft, accounts, onClose, onSent }: ComposeWindowProps & 
             <label htmlFor="compose-to" className="w-12 shrink-0 pt-1 text-sm font-semibold">
               To
             </label>
-            <c.form.Field name="to">{(field) => <RecipientInput id="compose-to" value={field.state.value} onChange={field.handleChange} placeholder="Recipients" />}</c.form.Field>
+            <c.form.Field name="to">
+              {(field) => (
+                <RecipientInput id="compose-to" accountId={accountId} value={field.state.value} onChange={field.handleChange} placeholder="Recipients" />
+              )}
+            </c.form.Field>
             {!c.showCc ? (
               <Button variant="secondary" size="xs" className="mt-0.5" onClick={() => c.setShowCc(true)}>
                 Cc / Bcc
@@ -165,13 +171,17 @@ function ComposeForm({ draft, accounts, onClose, onSent }: ComposeWindowProps & 
                 <label htmlFor="compose-cc" className="w-12 shrink-0 pt-1 text-sm font-semibold">
                   Cc
                 </label>
-                <c.form.Field name="cc">{(field) => <RecipientInput id="compose-cc" value={field.state.value} onChange={field.handleChange} />}</c.form.Field>
+                <c.form.Field name="cc">
+                  {(field) => <RecipientInput id="compose-cc" accountId={accountId} value={field.state.value} onChange={field.handleChange} />}
+                </c.form.Field>
               </div>
               <div className="flex min-h-9 items-start gap-2 py-0.5">
                 <label htmlFor="compose-bcc" className="w-12 shrink-0 pt-1 text-sm font-semibold">
                   Bcc
                 </label>
-                <c.form.Field name="bcc">{(field) => <RecipientInput id="compose-bcc" value={field.state.value} onChange={field.handleChange} />}</c.form.Field>
+                <c.form.Field name="bcc">
+                  {(field) => <RecipientInput id="compose-bcc" accountId={accountId} value={field.state.value} onChange={field.handleChange} />}
+                </c.form.Field>
               </div>
             </>
           ) : null}
@@ -187,7 +197,9 @@ function ComposeForm({ draft, accounts, onClose, onSent }: ComposeWindowProps & 
               />
             )}
           </c.form.Field>
-          <c.form.Field name="bodyHtml">{(field) => <RichEditor value={field.state.value} onChange={field.handleChange} className={expanded ? "flex-1" : undefined} />}</c.form.Field>
+          <c.form.Field name="bodyHtml">
+            {(field) => <RichEditor value={field.state.value} onChange={field.handleChange} className={expanded ? "flex-1" : undefined} />}
+          </c.form.Field>
 
           {draft.sourceMessageId ? (
             <c.form.Field name="includeQuote">
@@ -213,7 +225,12 @@ function ComposeForm({ draft, accounts, onClose, onSent }: ComposeWindowProps & 
                       <strong className="block truncate text-xs font-semibold">{a.filename}</strong>
                       <em className="text-muted-foreground mt-0.5 block text-[11px] not-italic">{formatBytes(a.size)}</em>
                     </span>
-                    <button type="button" aria-label={`Remove ${a.filename}`} className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100" onClick={() => c.removeAttachment.mutate(a.id)}>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${a.filename}`}
+                      className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
+                      onClick={() => c.removeAttachment.mutate(a.id)}
+                    >
                       <X size={14} />
                     </button>
                   </div>
@@ -270,7 +287,13 @@ function ComposeForm({ draft, accounts, onClose, onSent }: ComposeWindowProps & 
                     if (scheduleAt) c.send.mutate(new Date(scheduleAt).toISOString());
                   }}
                 >
-                  <Input type="datetime-local" value={scheduleAt} onChange={(e) => setScheduleAt(e.target.value)} className="h-7 text-xs" onKeyDown={(e) => e.stopPropagation()} />
+                  <Input
+                    type="datetime-local"
+                    value={scheduleAt}
+                    onChange={(e) => setScheduleAt(e.target.value)}
+                    className="h-7 text-xs"
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
                   <Button size="xs" type="submit" disabled={!scheduleAt}>
                     <Check />
                   </Button>

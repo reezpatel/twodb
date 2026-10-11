@@ -1,5 +1,6 @@
 import {
   Calendar,
+  Contact,
   CodeXml,
   Folder,
   LayoutDashboard,
@@ -23,6 +24,7 @@ export const APPS: AppEntry[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "email", label: "Email", icon: Mail },
   { id: "calendar", label: "Calendar", icon: Calendar },
+  { id: "contacts", label: "Contacts", icon: Contact },
   { id: "notes", label: "Notes", icon: StickyNote },
   { id: "chat", label: "Chat", icon: MessageSquare },
   { id: "code", label: "Code", icon: CodeXml },

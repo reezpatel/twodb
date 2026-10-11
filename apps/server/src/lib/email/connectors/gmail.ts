@@ -113,7 +113,7 @@ export async function gmailProfile(ctx: TokenCtx): Promise<Profile> {
 }
 
 export const gmailConnector: EmailConnector = {
-  kind: "gmail",
+  kind: "google",
 
   async verify(account, credentials, saveCredentials) {
     const profile = await gmailProfile({ credentials, saveCredentials: saveCredentials ?? (async () => {}) });
@@ -133,10 +133,11 @@ export const gmailConnector: EmailConnector = {
       do {
         const params = new URLSearchParams({ startHistoryId: cursor.historyId, historyTypes: "messageAdded", maxResults: "500" });
         if (pageToken) params.set("pageToken", pageToken);
-        const page = await gmail<{ history?: { messagesAdded?: { message: { id: string; labelIds?: string[] } }[] }[]; historyId?: string; nextPageToken?: string }>(
-          ctx,
-          `/history?${params}`,
-        );
+        const page = await gmail<{
+          history?: { messagesAdded?: { message: { id: string; labelIds?: string[] } }[] }[];
+          historyId?: string;
+          nextPageToken?: string;
+        }>(ctx, `/history?${params}`);
         for (const h of page.history ?? []) {
           for (const a of h.messagesAdded ?? []) {
             if ((a.message.labelIds ?? []).some((l) => SKIP_LABELS.has(l))) continue;

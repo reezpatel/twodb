@@ -16,11 +16,33 @@ import {
   setVisibility,
   testAccount,
   updateAccount,
-  upsertGmailAccount,
+  setCapabilities,
+  upsertGoogleAccount,
   upsertMember,
+  upsertMicrosoftAccount,
 } from "../lib/email/accounts";
+import {
+  clearMicrosoftOAuthConfig,
+  exchangeMicrosoftCode,
+  getMicrosoftOAuthPublic,
+  microsoftAuthUrl,
+  readMicrosoftState,
+  setMicrosoftOAuthConfig,
+} from "../lib/accounts/microsoft-oauth";
+import { syncAccountCalendars } from "../lib/calendar/scheduler";
+import type { AccountCapability } from "../lib/email/types";
 import { IMAP_FIELDS, PRESETS } from "../lib/email/connectors/registry";
-import { addDraftAttachment, cancelSend, createDraft, discardDraft, removeDraftAttachment, retrySend, sendDraft, updateDraft, type ComposeKind } from "../lib/email/compose";
+import {
+  addDraftAttachment,
+  cancelSend,
+  createDraft,
+  discardDraft,
+  removeDraftAttachment,
+  retrySend,
+  sendDraft,
+  updateDraft,
+  type ComposeKind,
+} from "../lib/email/compose";
 import { clearGmailOAuthConfig, exchangeGmailCode, getGmailOAuthPublic, gmailAuthUrl, readGmailState, setGmailOAuthConfig } from "../lib/email/gmail-oauth";
 import { ingestBatch } from "../lib/email/ingest";
 import { createLabel, deleteLabel, listLabels, updateLabel } from "../lib/email/labels";
@@ -89,11 +111,16 @@ function handle(fn: Handler) {
       if (e instanceof EmailAuthError) return c.json({ error: "auth_failed", detail: e.message }, 400);
       const message = (e as Error).message ?? "error";
       if (message === "email_attachments_not_configured") return c.json({ error: message }, 409);
-      if (message === "gmail_oauth_not_configured") return c.json({ error: message }, 409);
+      if (message === "gmail_oauth_not_configured" || message === "microsoft_oauth_not_configured") return c.json({ error: message }, 409);
       logger.error({ err: e, path: c.req.path }, "email route failed");
       return c.json({ error: "request_failed", detail: message }, 500);
     }
   };
+}
+
+function capabilitiesOf(value: unknown): AccountCapability[] {
+  const list = Array.isArray(value) ? value.filter((v): v is AccountCapability => v === "mail" || v === "calendar") : [];
+  return list.length ? [...new Set(list)] : ["mail"];
 }
 
 async function body(c: Context): Promise<Record<string, unknown>> {
@@ -117,6 +144,7 @@ export const emailRoutes = new Hono()
         presets: PRESETS,
         imapFields: IMAP_FIELDS,
         gmail: await getGmailOAuthPublic(),
+        microsoft: await getMicrosoftOAuthPublic(),
         storageReady: await emailStorageReady(),
         views: EMAIL_VIEWS,
         isAdmin: u.role === "admin",
@@ -146,6 +174,28 @@ export const emailRoutes = new Hono()
     }),
   )
 
+  .put(
+    "/admin/microsoft-oauth",
+    handle(async (u, c) => {
+      if (u.role !== "admin") return c.json({ error: "forbidden" }, 403);
+      const b = await body(c);
+      const clientId = typeof b.clientId === "string" ? b.clientId.trim() : "";
+      const clientSecret = typeof b.clientSecret === "string" && b.clientSecret.trim() ? b.clientSecret.trim() : null;
+      const tenant = typeof b.tenant === "string" && b.tenant.trim() ? b.tenant.trim() : null;
+      if (!clientId) return c.json({ error: "client_id_required" }, 400);
+      await setMicrosoftOAuthConfig(clientId, clientSecret, tenant);
+      return c.json(await getMicrosoftOAuthPublic());
+    }),
+  )
+  .delete(
+    "/admin/microsoft-oauth",
+    handle(async (u, c) => {
+      if (u.role !== "admin") return c.json({ error: "forbidden" }, 403);
+      await clearMicrosoftOAuthConfig();
+      return c.json(await getMicrosoftOAuthPublic());
+    }),
+  )
+
   // ── accounts ─────────────────────────────────────────────────────────────
   .get(
     "/accounts",
@@ -156,6 +206,7 @@ export const emailRoutes = new Hono()
     handle(async (u, c) => {
       const id = await createImapAccount(u.organizationId, u.userId, await body(c));
       void syncAccount(id, { force: true });
+      void syncAccountCalendars(id, { force: true });
       return c.json({ id }, 201);
     }),
   )
@@ -165,24 +216,72 @@ export const emailRoutes = new Hono()
       const b = await body(c);
       const accountId = typeof b.accountId === "string" ? b.accountId : null;
       if (accountId) await requireAccountRole(u.organizationId, u.userId, accountId, "owner");
-      return c.json({ authUrl: await gmailAuthUrl({ organizationId: u.organizationId, userId: u.userId, accountId }) });
+      return c.json({
+        authUrl: await gmailAuthUrl({ organizationId: u.organizationId, userId: u.userId, accountId, capabilities: capabilitiesOf(b.capabilities) }),
+      });
     }),
   )
   .get("/accounts/gmail/oauth/callback", async (c) => {
-    const back = (params: Record<string, string>) => c.redirect(`${env.webOrigin}/apps/settings/email?${new URLSearchParams(params)}`);
+    const back = (params: Record<string, string>) => c.redirect(`${env.webOrigin}/apps/settings/accounts?${new URLSearchParams(params)}`);
     const error = c.req.query("error");
-    if (error) return back({ gmail: "error", reason: error });
+    if (error) return back({ oauth: "error", provider: "google", reason: error });
     try {
       const state = readGmailState(c.req.query("state") ?? "");
       const tokens = await exchangeGmailCode(c.req.query("code") ?? "");
-      const id = await upsertGmailAccount(state.organizationId, state.userId, tokens, state.accountId);
+      const id = await upsertGoogleAccount(
+        state.organizationId,
+        state.userId,
+        tokens,
+        state.capabilities?.length ? state.capabilities : ["mail"],
+        state.accountId,
+      );
       void syncAccount(id, { force: true });
-      return back({ gmail: "connected", accountId: id });
+      void syncAccountCalendars(id, { force: true });
+      return back({ oauth: "connected", provider: "google", accountId: id });
     } catch (e) {
       logger.warn({ err: e }, "email: gmail oauth callback failed");
-      return back({ gmail: "error", reason: (e as Error).message });
+      return back({ oauth: "error", provider: "google", reason: (e as Error).message });
     }
   })
+  .post(
+    "/accounts/microsoft/oauth/start",
+    handle(async (u, c) => {
+      const b = await body(c);
+      const accountId = typeof b.accountId === "string" ? b.accountId : null;
+      if (accountId) await requireAccountRole(u.organizationId, u.userId, accountId, "owner");
+      return c.json({
+        authUrl: await microsoftAuthUrl({ organizationId: u.organizationId, userId: u.userId, accountId, capabilities: capabilitiesOf(b.capabilities) }),
+      });
+    }),
+  )
+  .get("/accounts/microsoft/oauth/callback", async (c) => {
+    const back = (params: Record<string, string>) => c.redirect(`${env.webOrigin}/apps/settings/accounts?${new URLSearchParams(params)}`);
+    const error = c.req.query("error");
+    if (error) return back({ oauth: "error", provider: "microsoft", reason: c.req.query("error_description") ?? error });
+    try {
+      const state = readMicrosoftState(c.req.query("state") ?? "");
+      const tokens = await exchangeMicrosoftCode(c.req.query("code") ?? "");
+      const id = await upsertMicrosoftAccount(state.organizationId, state.userId, tokens, state.capabilities, state.accountId);
+      void syncAccount(id, { force: true });
+      void syncAccountCalendars(id, { force: true });
+      return back({ oauth: "connected", provider: "microsoft", accountId: id });
+    } catch (e) {
+      logger.warn({ err: e }, "email: microsoft oauth callback failed");
+      return back({ oauth: "error", provider: "microsoft", reason: (e as Error).message });
+    }
+  })
+  .post(
+    "/accounts/:id/capabilities",
+    handle(async (u, c) => {
+      const id = c.req.param("id") ?? "";
+      const result = await setCapabilities(u.organizationId, u.userId, id, capabilitiesOf((await body(c)).capabilities));
+      if (!result.needsAuth) {
+        void syncAccount(id, { force: true });
+        void syncAccountCalendars(id, { force: true });
+      }
+      return c.json(result);
+    }),
+  )
   .patch(
     "/accounts/:id",
     handle(async (u, c) => {
@@ -208,7 +307,7 @@ export const emailRoutes = new Hono()
       const id = c.req.param("id") ?? "";
       await requireAccountRole(u.organizationId, u.userId, id, "member");
       const account = await loadAccount(id);
-      if (account.status === "error") await db.updateTable("email_account").set({ status: "active" }).where("id", "=", id).execute();
+      if (account.status === "error") await db.updateTable("connected_account").set({ status: "active" }).where("id", "=", id).execute();
       void syncAccount(id, { force: true });
       return c.json({ ok: true }, 202);
     }),
@@ -498,7 +597,12 @@ export const emailRoutes = new Hono()
   .get(
     "/attachments/:id",
     handle(async (u, c) => {
-      const att = await db.selectFrom("email_attachment").selectAll().where("id", "=", c.req.param("id") ?? "").where("organizationId", "=", u.organizationId).executeTakeFirst();
+      const att = await db
+        .selectFrom("email_attachment")
+        .selectAll()
+        .where("id", "=", c.req.param("id") ?? "")
+        .where("organizationId", "=", u.organizationId)
+        .executeTakeFirst();
       if (!att) return c.json({ error: "attachment_not_found" }, 404);
       await requireMessage(u.organizationId, u.userId, att.messageId);
       if (!att.mediaId) return c.json({ error: "attachment_not_stored", status: att.status }, 404);
@@ -574,7 +678,11 @@ export const emailRoutes = new Hono()
   .delete(
     "/sender-rules/:id",
     handle(async (u, c) => {
-      await db.deleteFrom("email_sender_rule").where("id", "=", c.req.param("id") ?? "").where("ownerUserId", "=", u.userId).execute();
+      await db
+        .deleteFrom("email_sender_rule")
+        .where("id", "=", c.req.param("id") ?? "")
+        .where("ownerUserId", "=", u.userId)
+        .execute();
       return c.json({ ok: true });
     }),
   );

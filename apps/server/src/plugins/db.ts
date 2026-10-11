@@ -243,6 +243,8 @@ export interface AgentTable {
   tools: ColumnType<string[], string, string>;
   /** Display name for chat (fallback: description). */
   name: string | null;
+  /** Persona only: directory its sessions run in; null = inherit the invoking session's. */
+  workDirectoryId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -662,7 +664,6 @@ export interface ChatReadStateTable {
   updatedAt: Date;
 }
 
-
 export interface MeetingRecordingTable {
   id: string;
   organizationId: string;
@@ -698,15 +699,15 @@ export interface EmailAddress {
   address: string;
 }
 
-export interface EmailAccountTable {
+export interface ConnectedAccountTable {
   id: string;
   organizationId: string;
   ownerUserId: string;
   /** private | shared. */
   visibility: Generated<string>;
-  /** gmail | imap_smtp. */
+  /** google | microsoft | imap (imap covers IMAP/SMTP + CalDAV presets). */
   kind: string;
-  /** yahoo | custom | gmail. */
+  /** google | microsoft | icloud | fastmail | yahoo | nextcloud | custom. */
   preset: string | null;
   address: string;
   displayName: string | null;
@@ -731,12 +732,28 @@ export interface EmailAccountTable {
   signatureHtml: string | null;
   color: string | null;
   position: Generated<number>;
+  /** mail | calendar. */
+  capabilities: ColumnType<string[], string[] | undefined, string[]>;
+  grantedScopes: ColumnType<string[], string[] | undefined, string[]>;
+  /** disabled | active | paused | error | reauth_required. */
+  calendarState: Generated<string>;
+  calendarError: string | null;
+  /** pending | running | done | error. */
+  calendarImportState: Generated<string>;
+  calendarImportProgress: ColumnType<Record<string, unknown>, string | undefined, string>;
+  calendarImportFrom: ColumnType<Date | null, string | null | undefined, string | null>;
+  calendarListSyncedAt: Date | null;
+  calendarLastSyncedAt: Date | null;
+  calendarNextSyncAt: Date | null;
+  /** polling | webhooks. */
+  syncMode: Generated<string>;
+  suggestOrgMembers: Generated<boolean>;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
 }
 
-export interface EmailAccountMemberTable {
+export interface ConnectedAccountMemberTable {
   id: string;
   organizationId: string;
   accountId: string;
@@ -877,6 +894,338 @@ export interface EmailSenderRuleTable {
   createdAt: Date;
 }
 
+export interface ConnectedAccountWebhookTable {
+  id: string;
+  organizationId: string;
+  accountId: string;
+  calendarId: string | null;
+  /** google | microsoft. */
+  provider: string;
+  channelId: string;
+  resourceId: string | null;
+  secretHash: string;
+  expiresAt: Date;
+  lastNotifiedAt: Date | null;
+  createdAt: Date;
+}
+
+export interface ContactBookTable {
+  id: string;
+  organizationId: string;
+  /** account | local. */
+  kind: string;
+  accountId: string | null;
+  ownerUserId: string;
+  /** pending | running | done — one-time learning pass over stored mail. */
+  learnState: Generated<string>;
+  learnProgress: ColumnType<Record<string, unknown>, string | undefined, string>;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+export interface ContactTable {
+  id: string;
+  organizationId: string;
+  bookId: string;
+  email: string;
+  name: string | null;
+  /** email | calendar | imip | manual — manual is never overwritten by learning. */
+  nameSource: Generated<string>;
+  /** person | resource | list | group_address. */
+  kind: Generated<string>;
+  domain: ColumnType<string, never, never>;
+  notes: string | null;
+  userId: string | null;
+  sentCount: Generated<number>;
+  receivedCount: Generated<number>;
+  repliedCount: Generated<number>;
+  meetingCount: Generated<number>;
+  organizedByMeCount: Generated<number>;
+  organizedByThemCount: Generated<number>;
+  score: Generated<number>;
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+  lastEmailAt: Date | null;
+  lastMeetingAt: Date | null;
+  nextMeetingAt: Date | null;
+  pinned: Generated<boolean>;
+  hidden: Generated<boolean>;
+  forgottenAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+export interface CalendarReminderSpec {
+  method: "popup" | "email";
+  minutes: number;
+  allDay?: boolean;
+}
+
+export interface CalendarTable {
+  id: string;
+  organizationId: string;
+  /** null = twodb calendar (no provider). */
+  accountId: string | null;
+  ownerUserId: string;
+  providerCalendarId: string | null;
+  name: string;
+  description: string | null;
+  color: Generated<string>;
+  timezone: Generated<string>;
+  /** default | regular | holiday | birthdays | subscription | invitations. */
+  kind: Generated<string>;
+  subscriptionUrl: string | null;
+  /** owner | writer | reader | free_busy. */
+  accessRole: Generated<string>;
+  isPrimary: Generated<boolean>;
+  defaultReminders: Json<CalendarReminderSpec[]>;
+  allowedConference: ColumnType<string[], string[] | undefined, string[]>;
+  syncCursor: string | null;
+  ctag: string | null;
+  syncEnabled: Generated<boolean>;
+  lastSyncedAt: Date | null;
+  lastError: string | null;
+  feedTokenHash: string | null;
+  occurrenceFrom: ColumnType<Date | null, string | null | undefined, string | null>;
+  occurrenceTo: ColumnType<Date | null, string | null | undefined, string | null>;
+  providerData: Json<Record<string, unknown>>;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+export interface CalendarShareTable {
+  id: string;
+  organizationId: string;
+  calendarId: string;
+  /** user | org | email. */
+  principalType: string;
+  principal: string;
+  /** owner | editor | viewer | free_busy. */
+  role: string;
+  providerRuleId: string | null;
+  createdAt: Date;
+}
+
+export interface CalendarUserPrefTable {
+  userId: string;
+  calendarId: string;
+  hidden: Generated<boolean>;
+  color: string | null;
+  name: string | null;
+  sortOrder: Generated<number>;
+  notify: Json<Record<string, unknown>>;
+  updatedAt: Date;
+}
+
+export interface CalendarPerson {
+  email: string;
+  name?: string | null;
+  self?: boolean;
+}
+
+export interface CalendarConference {
+  type: "meet" | "teams" | "custom";
+  url: string | null;
+  phone?: string | null;
+  pin?: string | null;
+  /** Ask the provider to create a link on push. */
+  create?: boolean;
+  providerData?: Record<string, unknown>;
+}
+
+/** Field pinned after a rejected push: twodb shows the local value, the provider keeps its own. */
+export interface LocalOnlyField {
+  providerValue: unknown;
+  remoteValue?: unknown;
+}
+
+export interface CalendarEventTable {
+  id: string;
+  organizationId: string;
+  calendarId: string;
+  uid: string;
+  providerEventId: string | null;
+  etag: string | null;
+  sequence: Generated<number>;
+  recurringEventId: string | null;
+  originalStartAt: Date | null;
+  originalStartDate: ColumnType<string | null, string | null | undefined, string | null>;
+  rrule: ColumnType<string[] | null, string[] | null | undefined, string[] | null>;
+  /** confirmed | tentative | cancelled. */
+  status: Generated<string>;
+  title: Generated<string>;
+  descriptionHtml: string | null;
+  location: string | null;
+  geo: Json<Record<string, unknown> | null>;
+  isAllDay: Generated<boolean>;
+  startAt: Date | null;
+  endAt: Date | null;
+  /** yyyy-mm-dd; end exclusive. */
+  startDate: ColumnType<string | null, string | null | undefined, string | null>;
+  endDate: ColumnType<string | null, string | null | undefined, string | null>;
+  startTz: string | null;
+  endTz: string | null;
+  isFloating: Generated<boolean>;
+  /** opaque | transparent. */
+  transparency: Generated<string>;
+  /** default | public | private | confidential. */
+  visibility: Generated<string>;
+  /** default | out_of_office | focus_time | working_location | birthday. */
+  eventType: Generated<string>;
+  eventTypeProps: Json<Record<string, unknown>>;
+  color: string | null;
+  organizer: Json<CalendarPerson | null>;
+  conference: Json<CalendarConference | null>;
+  guestsCanModify: Generated<boolean>;
+  guestsCanInviteOthers: Generated<boolean>;
+  guestsCanSeeOthers: Generated<boolean>;
+  attendeesOmitted: Generated<boolean>;
+  attendeeText: Generated<string>;
+  meetingRecordingId: string | null;
+  /** local | provider | imip | ics_import. */
+  source: Generated<string>;
+  rawIcs: string | null;
+  providerData: Json<Record<string, unknown>>;
+  providerUpdatedAt: Date | null;
+  /** none | awaiting_approval | pending | failed | conflict. */
+  pushState: Generated<string>;
+  localOnly: Generated<boolean>;
+  localOnlyFields: Json<Record<string, LocalOnlyField>>;
+  localDeletedAt: Date | null;
+  createdByUserId: string | null;
+  searchVector: ColumnType<string, never, never>;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+  /** user | provider. */
+  deletedSource: string | null;
+}
+
+export interface CalendarEventAttendeeTable {
+  id: string;
+  eventId: string;
+  email: string;
+  name: string | null;
+  contactId: string | null;
+  userId: string | null;
+  /** required | optional | chair | resource | non_participant. */
+  role: Generated<string>;
+  /** needs_action | accepted | declined | tentative | delegated. */
+  status: Generated<string>;
+  /** Rejected RSVP kept in twodb only. */
+  localStatus: string | null;
+  comment: string | null;
+  additionalGuests: Generated<number>;
+  isOrganizer: Generated<boolean>;
+  isSelf: Generated<boolean>;
+  respondedAt: Date | null;
+  proposedStart: Date | null;
+  proposedEnd: Date | null;
+}
+
+export interface CalendarEventReminderTable {
+  id: string;
+  eventId: string;
+  /** null = event-level (synced); set = personal. */
+  userId: string | null;
+  /** popup | email. */
+  method: Generated<string>;
+  minutesBefore: number;
+  localOnly: Generated<boolean>;
+}
+
+export interface CalendarEventAttachmentTable {
+  id: string;
+  organizationId: string;
+  eventId: string;
+  mediaAssetId: string | null;
+  url: string | null;
+  title: string;
+  mimeType: string | null;
+  size: number | null;
+  providerFileId: string | null;
+  createdAt: Date;
+}
+
+export interface CalendarOccurrenceTable {
+  eventId: string;
+  overrideEventId: string | null;
+  calendarId: string;
+  startAt: Date;
+  endAt: Date;
+  isAllDay: boolean;
+  startDate: ColumnType<string | null, string | null | undefined, string | null>;
+  endDate: ColumnType<string | null, string | null | undefined, string | null>;
+  status: string;
+  transparency: string;
+}
+
+export interface CalendarChangeTable {
+  id: string;
+  organizationId: string;
+  accountId: string;
+  calendarId: string;
+  eventId: string;
+  /** create | update | delete | move | rsvp | cancel_instance | reminders. */
+  op: string;
+  /** this | following | all. */
+  recurrenceScope: Generated<string>;
+  occurrenceStart: Date | null;
+  fields: ColumnType<string[], string[] | undefined, string[]>;
+  diff: Json<Record<string, { before: unknown; after: unknown }>>;
+  impact: Json<Record<string, unknown>>;
+  payload: Json<Record<string, unknown>>;
+  baseSnapshot: Json<Record<string, unknown> | null>;
+  baseEtag: string | null;
+  remoteChangedFields: ColumnType<string[], string[] | undefined, string[]>;
+  remoteDeleted: Generated<boolean>;
+  /** awaiting_approval | pending | sending | done | failed | conflict | rejected | discarded. */
+  status: string;
+  createdByUserId: string | null;
+  decidedByUserId: string | null;
+  decidedAt: Date | null;
+  attempts: Generated<number>;
+  nextAttemptAt: Date | null;
+  lastError: string | null;
+  doneAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CalendarReminderDeliveryTable {
+  id: string;
+  userId: string;
+  eventId: string;
+  occurrenceStart: Date;
+  minutesBefore: number;
+  method: string;
+  firedAt: Date;
+  dismissedAt: Date | null;
+  snoozedUntil: Date | null;
+}
+
+export interface CalendarImipMessageTable {
+  id: string;
+  organizationId: string;
+  emailMessageId: string;
+  method: string;
+  uid: string;
+  sequence: Generated<number>;
+  eventId: string | null;
+  result: string | null;
+  processedAt: Date;
+}
+
+export interface CalendarUserSettingsTable {
+  userId: string;
+  organizationId: string;
+  settings: Json<Record<string, unknown>>;
+  updatedAt: Date;
+}
+
 export interface Database {
   user: UserTable;
   session: SessionTable;
@@ -926,8 +1275,23 @@ export interface Database {
   api_key: OrgApiKeyTable;
   device: DeviceTable;
   notification: NotificationTable;
-  email_account: EmailAccountTable;
-  email_account_member: EmailAccountMemberTable;
+  connected_account: ConnectedAccountTable;
+  connected_account_member: ConnectedAccountMemberTable;
+  connected_account_webhook: ConnectedAccountWebhookTable;
+  contact_book: ContactBookTable;
+  contact: ContactTable;
+  calendar: CalendarTable;
+  calendar_share: CalendarShareTable;
+  calendar_user_pref: CalendarUserPrefTable;
+  calendar_event: CalendarEventTable;
+  calendar_event_attendee: CalendarEventAttendeeTable;
+  calendar_event_reminder: CalendarEventReminderTable;
+  calendar_event_attachment: CalendarEventAttachmentTable;
+  calendar_occurrence: CalendarOccurrenceTable;
+  calendar_change: CalendarChangeTable;
+  calendar_reminder_delivery: CalendarReminderDeliveryTable;
+  calendar_imip_message: CalendarImipMessageTable;
+  calendar_user_settings: CalendarUserSettingsTable;
   email_thread: EmailThreadTable;
   email_message: EmailMessageTable;
   email_attachment: EmailAttachmentTable;

@@ -5,7 +5,10 @@ export type EmailRole = "owner" | "member" | "viewer";
 const RANK: Record<EmailRole, number> = { viewer: 0, member: 1, owner: 2 };
 
 export class EmailAccessError extends Error {
-  constructor(public status: 400 | 403 | 404 | 409, message: string) {
+  constructor(
+    public status: 400 | 403 | 404 | 409,
+    message: string,
+  ) {
     super(message);
   }
 }
@@ -13,12 +16,12 @@ export class EmailAccessError extends Error {
 /** Accounts the user can see, with their role — every email query is scoped through this. */
 export async function accessibleAccounts(organizationId: string, userId: string): Promise<Map<string, EmailRole>> {
   const rows = await db
-    .selectFrom("email_account_member")
-    .innerJoin("email_account", "email_account.id", "email_account_member.accountId")
-    .select(["email_account_member.accountId", "email_account_member.role"])
-    .where("email_account_member.userId", "=", userId)
-    .where("email_account.organizationId", "=", organizationId)
-    .where("email_account.deletedAt", "is", null)
+    .selectFrom("connected_account_member")
+    .innerJoin("connected_account", "connected_account.id", "connected_account_member.accountId")
+    .select(["connected_account_member.accountId", "connected_account_member.role"])
+    .where("connected_account_member.userId", "=", userId)
+    .where("connected_account.organizationId", "=", organizationId)
+    .where("connected_account.deletedAt", "is", null)
     .execute();
   return new Map(rows.map((r) => [r.accountId, r.role as EmailRole]));
 }
@@ -56,6 +59,6 @@ export async function requireMessage(organizationId: string, userId: string, mes
 
 /** Users that should receive realtime events for an account. */
 export async function accountMemberIds(accountId: string): Promise<string[]> {
-  const rows = await db.selectFrom("email_account_member").select("userId").where("accountId", "=", accountId).execute();
+  const rows = await db.selectFrom("connected_account_member").select("userId").where("accountId", "=", accountId).execute();
   return rows.map((r) => r.userId);
 }

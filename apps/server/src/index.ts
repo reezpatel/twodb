@@ -30,6 +30,11 @@ import { meetingsRoutes } from "./routes/meetings";
 import { emailRoutes } from "./routes/email";
 import { registerEmailWs } from "./routes/email-ws";
 import { startEmailScheduler, stopEmailScheduler } from "./lib/email/scheduler";
+import { calendarRoutes } from "./routes/calendar";
+import { registerCalendarWs } from "./routes/calendar-ws";
+import { contactRoutes } from "./routes/contacts";
+import { startCalendarScheduler, stopCalendarScheduler } from "./lib/calendar/scheduler";
+import "./lib/calendar/imip";
 import { getServerSettings } from "./lib/server-settings";
 import { runMigrations } from "./lib/migrate";
 import { logger } from "./lib/logger";
@@ -103,10 +108,13 @@ app.get("/api/public-settings", async (c) => c.json(await getServerSettings()));
 app.route("/api/chat", chatRoutes);
 app.route("/api/meetings", meetingsRoutes);
 app.route("/api/email", emailRoutes);
+app.route("/api/calendar", calendarRoutes);
+app.route("/api/contacts", contactRoutes);
 registerRunnerWs(app, upgradeWebSocket);
 registerCodeWs(app, upgradeWebSocket);
 registerChatWs(app, upgradeWebSocket);
 registerEmailWs(app, upgradeWebSocket);
+registerCalendarWs(app, upgradeWebSocket);
 
 // Production: serve the built desktop app (SPA) from a static dir; API routes
 // above always win because they are registered first.
@@ -133,10 +141,12 @@ const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
 
 injectWebSocket(server);
 startEmailScheduler();
+startCalendarScheduler();
 
 process.on("SIGINT", async () => {
   logger.info("shutting down (SIGINT)");
   stopEmailScheduler();
+  stopCalendarScheduler();
   await graph.close();
   await db.destroy();
   process.exit(0);

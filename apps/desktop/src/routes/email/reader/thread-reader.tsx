@@ -32,13 +32,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -48,6 +42,7 @@ import { LabelPicker } from "../labels/label-picker";
 import { labelPathName } from "../labels/use-label-tree";
 import { MessageHtml, MessageText } from "./message-html";
 import { useThreadReader } from "./use-thread-reader";
+import { InviteCard } from "./invite-card";
 
 export function snoozeOptions(): { label: string; at: Date }[] {
   const now = new Date();
@@ -85,9 +80,19 @@ function AddressChips({ label, list }: { label: string; list: EmailAddress[] }) 
 function StatusLine({ message, onOp, canWrite }: { message: EmailMessage; onOp: (op: "retry" | "edit") => void; canWrite: boolean }) {
   if (message.direction !== "outbound" || message.status === "sent" || message.status === "draft") return null;
   const map = {
-    queued: { icon: Loader2, text: message.lastError ? `Waiting to retry — ${message.lastError}` : "Queued — sending shortly", cls: "text-muted-foreground", spin: true },
+    queued: {
+      icon: Loader2,
+      text: message.lastError ? `Waiting to retry — ${message.lastError}` : "Queued — sending shortly",
+      cls: "text-muted-foreground",
+      spin: true,
+    },
     sending: { icon: Loader2, text: "Sending…", cls: "text-muted-foreground", spin: true },
-    scheduled: { icon: Clock, text: `Scheduled for ${message.scheduledAt ? new Date(message.scheduledAt).toLocaleString() : ""}`, cls: "text-primary", spin: false },
+    scheduled: {
+      icon: Clock,
+      text: `Scheduled for ${message.scheduledAt ? new Date(message.scheduledAt).toLocaleString() : ""}`,
+      cls: "text-primary",
+      spin: false,
+    },
     failed: { icon: AlertTriangle, text: `Not sent — ${message.lastError ?? "unknown error"}`, cls: "text-destructive", spin: false },
     cancelled: { icon: X, text: "Cancelled", cls: "text-muted-foreground", spin: false },
     received: null,
@@ -150,7 +155,11 @@ function MessageBlock({ message, open, canWrite, onToggle, onReply, onOp, onEdit
 
   if (!open) {
     return (
-      <button type="button" onClick={onToggle} className={cn("hover:bg-accent/40 flex w-full items-center gap-3 border-t px-1 py-2.5 text-left", message.deletedAt && "opacity-60")}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cn("hover:bg-accent/40 flex w-full items-center gap-3 border-t px-1 py-2.5 text-left", message.deletedAt && "opacity-60")}
+      >
         <Avatar size="sm">
           <AvatarFallback className="text-[10px]">{initials(name)}</AvatarFallback>
         </Avatar>
@@ -158,7 +167,9 @@ function MessageBlock({ message, open, canWrite, onToggle, onReply, onOp, onEdit
         <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">{message.snippet}</span>
         {message.deletedAt ? <Badge variant="outline">in trash</Badge> : null}
         {files.length ? <Paperclip size={12} className="text-muted-foreground" /> : null}
-        <span className="text-muted-foreground shrink-0 text-xs tabular-nums">{new Date(message.date).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>
+        <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+          {new Date(message.date).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+        </span>
       </button>
     );
   }
@@ -179,9 +190,17 @@ function MessageBlock({ message, open, canWrite, onToggle, onReply, onOp, onEdit
           </div>
         </button>
         {message.deletedAt ? <Badge variant="outline">in trash</Badge> : null}
-        <span className="text-muted-foreground text-xs tabular-nums">{new Date(message.date).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {new Date(message.date).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+        </span>
         {canWrite ? (
-          <Button variant="ghost" size="icon-xs" aria-label={message.isStarred ? "Unstar" : "Star"} className={message.isStarred ? "text-primary" : undefined} onClick={() => onOp(message.isStarred ? "unstar" : "star")}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={message.isStarred ? "Unstar" : "Star"}
+            className={message.isStarred ? "text-primary" : undefined}
+            onClick={() => onOp(message.isStarred ? "unstar" : "star")}
+          >
             <Star size={14} fill={message.isStarred ? "currentColor" : "none"} />
           </Button>
         ) : null}
@@ -248,6 +267,10 @@ function MessageBlock({ message, open, canWrite, onToggle, onReply, onOp, onEdit
         <AddressChips label="Bcc" list={message.bcc} />
       </div>
       <StatusLine message={message} canWrite={canWrite} onOp={onOp} />
+      {message.direction === "inbound" &&
+      message.attachments.some((a) => (a.contentType ?? "").startsWith("text/calendar") || a.filename.toLowerCase().endsWith(".ics")) ? (
+        <InviteCard messageId={message.id} />
+      ) : null}
       {message.bodyHtml ? <MessageHtml html={message.bodyHtml} attachments={message.attachments} /> : <MessageText text={message.bodyText ?? ""} />}
       {files.length ? (
         <div className="flex flex-wrap gap-2">
@@ -256,11 +279,16 @@ function MessageBlock({ message, open, canWrite, onToggle, onReply, onOp, onEdit
               key={a.id}
               href={a.status === "stored" ? a.url : undefined}
               download={a.filename}
-              className={cn("bg-card hover:bg-accent/50 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium", a.status !== "stored" && "pointer-events-none opacity-60")}
+              className={cn(
+                "bg-card hover:bg-accent/50 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium",
+                a.status !== "stored" && "pointer-events-none opacity-60",
+              )}
             >
               <FileText size={13} className="text-muted-foreground" />
               {a.filename}
-              <em className="text-muted-foreground text-[11px] not-italic tabular-nums">{a.status === "skipped" ? "too large — not stored" : formatBytes(a.size)}</em>
+              <em className="text-muted-foreground text-[11px] not-italic tabular-nums">
+                {a.status === "skipped" ? "too large — not stored" : formatBytes(a.size)}
+              </em>
             </a>
           ))}
         </div>
@@ -381,7 +409,9 @@ export function ThreadReader({ threadId, labels, index, total, onStep, onClose, 
                 <DropdownMenuContent align="start" className="w-64">
                   {thread.snoozedUntil ? (
                     <>
-                      <DropdownMenuItem onSelect={() => onAction("unsnooze")}>Unsnooze (until {new Date(thread.snoozedUntil).toLocaleString()})</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => onAction("unsnooze")}>
+                        Unsnooze (until {new Date(thread.snoozedUntil).toLocaleString()})
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </>
                   ) : null}
@@ -399,14 +429,22 @@ export function ThreadReader({ threadId, labels, index, total, onStep, onClose, 
                       if (customSnooze) onAction("snooze", { snoozedUntil: new Date(customSnooze).toISOString() });
                     }}
                   >
-                    <Input type="datetime-local" value={customSnooze} onChange={(e) => setCustomSnooze(e.target.value)} className="h-7 text-xs" onKeyDown={(e) => e.stopPropagation()} />
+                    <Input
+                      type="datetime-local"
+                      value={customSnooze}
+                      onChange={(e) => setCustomSnooze(e.target.value)}
+                      className="h-7 text-xs"
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
                     <Button size="xs" type="submit" disabled={!customSnooze}>
                       Set
                     </Button>
                   </form>
                 </DropdownMenuContent>
               </DropdownMenu>
-              {iconButton(thread.isPinned ? "Unpin" : "Pin", thread.isPinned ? <PinOff size={15} /> : <Pin size={15} />, () => onAction(thread.isPinned ? "unpin" : "pin"))}
+              {iconButton(thread.isPinned ? "Unpin" : "Pin", thread.isPinned ? <PinOff size={15} /> : <Pin size={15} />, () =>
+                onAction(thread.isPinned ? "unpin" : "pin"),
+              )}
               {iconButton(
                 thread.hasStarred ? "Unstar" : "Star",
                 <Star size={15} fill={thread.hasStarred ? "currentColor" : "none"} />,
@@ -414,7 +452,12 @@ export function ThreadReader({ threadId, labels, index, total, onStep, onClose, 
                 thread.hasStarred ? "text-primary" : undefined,
               )}
               {iconButton("Mark as unread", <MailOpen size={15} />, () => onAction("unread"))}
-              {iconButton(thread.muted ? "Unmute" : "Mute", <BellOff size={15} />, () => onAction(thread.muted ? "unmute" : "mute"), thread.muted ? "text-primary" : undefined)}
+              {iconButton(
+                thread.muted ? "Unmute" : "Mute",
+                <BellOff size={15} />,
+                () => onAction(thread.muted ? "unmute" : "mute"),
+                thread.muted ? "text-primary" : undefined,
+              )}
             </>
           )
         ) : (
@@ -436,7 +479,9 @@ export function ThreadReader({ threadId, labels, index, total, onStep, onClose, 
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex max-w-3xl flex-col gap-3 px-5 pt-4 pb-10">
-          <span className="text-muted-foreground text-xs tabular-nums">{new Date(thread.lastMessageAt).toLocaleString([], { dateStyle: "long", timeStyle: "short" })}</span>
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {new Date(thread.lastMessageAt).toLocaleString([], { dateStyle: "long", timeStyle: "short" })}
+          </span>
           <h3 className="flex flex-wrap items-center gap-2 text-xl font-semibold">
             {messages.find((m) => m.status !== "draft")?.subject || thread.subject || "(no subject)"}
             {thread.messageCount > 1 ? <Badge variant="secondary">{thread.messageCount}</Badge> : null}
@@ -450,7 +495,12 @@ export function ThreadReader({ threadId, labels, index, total, onStep, onClose, 
                   <span className="size-2 rounded-sm" style={{ backgroundColor: l.effectiveColor ?? "var(--color-muted-foreground)" }} />
                   {labelPathName(labels, l.id)}
                   {canWrite ? (
-                    <button type="button" aria-label={`Remove label ${l.name}`} className="text-muted-foreground hover:text-foreground" onClick={() => onAction("label", { remove: [l.id] })}>
+                    <button
+                      type="button"
+                      aria-label={`Remove label ${l.name}`}
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => onAction("label", { remove: [l.id] })}
+                    >
                       <X size={11} />
                     </button>
                   ) : null}
@@ -493,7 +543,9 @@ export function ThreadReader({ threadId, labels, index, total, onStep, onClose, 
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete forever?</DialogTitle>
-            <DialogDescription>The conversation's content and attachments are permanently removed from twodb. Nothing is deleted at the provider.</DialogDescription>
+            <DialogDescription>
+              The conversation's content and attachments are permanently removed from twodb. Nothing is deleted at the provider.
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirmPurge(false)}>

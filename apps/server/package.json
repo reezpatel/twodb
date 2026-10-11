@@ -17,6 +17,7 @@
     "@modelcontextprotocol/sdk": "^1.32.0",
     "better-auth": "^1.7.5",
     "hono": "^4.10.0",
+    "ical.js": "^2.2.1",
     "imapflow": "^2.3.0",
     "kysely": "^0.29.5",
     "mailparser": "^3.9.37",
@@ -24,6 +25,8 @@
     "nodemailer": "^10.0.16",
     "pg": "^8.23.0",
     "pino": "^10.4.0",
+    "rrule": "^2.8.1",
+    "tsdav": "^2.4.0",
     "tsx": "^4.20.0"
   },
   "devDependencies": {

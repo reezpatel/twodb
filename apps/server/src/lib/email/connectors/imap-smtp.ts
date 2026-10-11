@@ -48,10 +48,19 @@ function cfg(account: Pick<EmailAccountRow, "address" | "config">): Required<Omi
 
 function isAuthFailure(e: unknown): boolean {
   const err = e as { authenticationFailed?: boolean; responseCode?: number; code?: string; message?: string };
-  return !!err?.authenticationFailed || err?.code === "EAUTH" || err?.responseCode === 535 || /auth/i.test(err?.message ?? "") && /fail|invalid/i.test(err?.message ?? "");
+  return (
+    !!err?.authenticationFailed ||
+    err?.code === "EAUTH" ||
+    err?.responseCode === 535 ||
+    (/auth/i.test(err?.message ?? "") && /fail|invalid/i.test(err?.message ?? ""))
+  );
 }
 
-async function withImap<T>(account: Pick<EmailAccountRow, "address" | "config">, credentials: Record<string, unknown>, fn: (client: ImapFlow) => Promise<T>): Promise<T> {
+async function withImap<T>(
+  account: Pick<EmailAccountRow, "address" | "config">,
+  credentials: Record<string, unknown>,
+  fn: (client: ImapFlow) => Promise<T>,
+): Promise<T> {
   const c = cfg(account);
   const client = new ImapFlow({
     host: c.imapHost,
@@ -102,14 +111,19 @@ async function fetchRaw(client: ImapFlow, mailbox: string, uidValidity: string, 
 }
 
 export const imapSmtpConnector: EmailConnector = {
-  kind: "imap_smtp",
+  kind: "imap",
 
   async verify(account, credentials) {
     await withImap(account, credentials, async (client) => {
       await client.mailboxOpen("INBOX", { readOnly: true });
     });
     const c = cfg(account);
-    const transport = nodemailer.createTransport({ host: c.smtpHost, port: c.smtpPort, secure: c.smtpSecure, auth: { user: c.username, pass: String(credentials.password ?? "") } });
+    const transport = nodemailer.createTransport({
+      host: c.smtpHost,
+      port: c.smtpPort,
+      secure: c.smtpSecure,
+      auth: { user: c.username, pass: String(credentials.password ?? "") },
+    });
     try {
       await transport.verify();
     } catch (e) {
@@ -197,7 +211,12 @@ export const imapSmtpConnector: EmailConnector = {
 
   async send(ctx, mime, envelope) {
     const c = cfg(ctx.account);
-    const transport = nodemailer.createTransport({ host: c.smtpHost, port: c.smtpPort, secure: c.smtpSecure, auth: { user: c.username, pass: String(ctx.credentials.password ?? "") } });
+    const transport = nodemailer.createTransport({
+      host: c.smtpHost,
+      port: c.smtpPort,
+      secure: c.smtpSecure,
+      auth: { user: c.username, pass: String(ctx.credentials.password ?? "") },
+    });
     try {
       await transport.sendMail({ envelope: { from: envelope.from, to: envelope.to }, raw: mime });
     } catch (e) {

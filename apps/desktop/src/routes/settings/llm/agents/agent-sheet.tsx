@@ -9,10 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { AGENT_TOOL_ALL, AGENT_TOOL_NAMES } from "@/lib/agent-tool-names";
 import { cn } from "@/lib/utils";
+import { useCodeDirectories } from "../../../code/directories/use-code-directories";
 
 export const AGENTS_LIST_PATH = "/apps/settings/llm/agents";
 
 const AGENT_TYPES: AgentType[] = ["sub_agent", "persona", "collaborator", "sentinel"];
+const INHERIT = "__inherit";
 
 export function AgentSheet() {
   const { agentId } = useParams();
@@ -20,6 +22,7 @@ export function AgentSheet() {
   const close = () => navigate(AGENTS_LIST_PATH);
 
   const ws = useWorkspace();
+  const { directories } = useCodeDirectories();
   const existing = agentId ? ws.agents.list.data?.find((a) => a.id === agentId) : undefined;
   const isNew = Boolean(agentId) && ws.agents.list.isSuccess && !existing;
 
@@ -29,6 +32,7 @@ export function AgentSheet() {
   const [tags, setTags] = useState<string[]>([]);
   const [type, setType] = useState<AgentType>("sub_agent");
   const [tools, setTools] = useState<string[]>([]);
+  const [workDirectoryId, setWorkDirectoryId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,6 +42,7 @@ export function AgentSheet() {
     setTags(existing?.tags ?? []);
     setType(existing?.type ?? "sub_agent");
     setTools(existing?.tools ?? []);
+    setWorkDirectoryId(existing?.workDirectoryId ?? null);
     setError(null);
   }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -49,8 +54,9 @@ export function AgentSheet() {
       description !== (existing.description ?? "") ||
       JSON.stringify(tags) !== JSON.stringify(existing.tags) ||
       type !== existing.type ||
-      JSON.stringify(tools) !== JSON.stringify(existing.tools)
-    : Boolean(provider || model || description || tags.length > 0 || tools.length > 0);
+      JSON.stringify(tools) !== JSON.stringify(existing.tools) ||
+      (type === "persona" && workDirectoryId !== existing.workDirectoryId)
+    : Boolean(provider || model || description || tags.length > 0 || tools.length > 0 || workDirectoryId);
 
   const allTools = tools.includes(AGENT_TOOL_ALL);
   const toggleTool = (name: string) => {
@@ -77,6 +83,7 @@ export function AgentSheet() {
         tags,
         type,
         tools,
+        workDirectoryId: type === "persona" ? workDirectoryId : null,
       },
       { onSuccess: close, onError: (e) => setError((e as Error).message) },
     );
@@ -130,6 +137,33 @@ export function AgentSheet() {
               />
             </div>
           </div>
+          {type === "persona" ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="agent-work-dir" className="text-muted-foreground text-xs">
+                Work directory
+              </Label>
+              <Select value={workDirectoryId ?? INHERIT} onValueChange={(v) => setWorkDirectoryId(v === INHERIT ? null : v)}>
+                <SelectTrigger id="agent-work-dir" className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={INHERIT} className="text-xs">
+                    Inherit from the invoking session
+                  </SelectItem>
+                  {(directories.data ?? []).map((d) => (
+                    <SelectItem key={d.id} value={d.id} className="text-xs">
+                      {d.displayName} <span className="text-muted-foreground font-mono">{d.cwd}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground/70 text-[10px]">
+                {workDirectoryId
+                  ? "This persona's sessions always run here, whichever session invokes it"
+                  : "Runs in the same directory as the session that invokes it"}
+              </p>
+            </div>
+          ) : null}
           <div className="grid grid-cols-2 gap-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="agent-provider" className="text-muted-foreground text-xs">

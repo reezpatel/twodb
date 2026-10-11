@@ -9,7 +9,8 @@ import type { AgentType } from "../plugins/db";
  * Subagent orchestration tools — list/invoke/check-status. Agents invoke other
  * configured agents as headless child code sessions (like /btw, but not
  * interactive): the child inherits the parent's directory + tags, runs with its
- * own prompt/tools, and its final summary returns as the tool output.
+ * own prompt/tools, and its final summary returns as the tool output. A persona
+ * with its own work directory runs there instead of in the parent's.
  *
  * Permission rules (caller type → allowed target types):
  *   main session      → sub_agent, persona, collaborator
@@ -44,7 +45,7 @@ export function canInvoke(callerAgentType: AgentType | null, targetType: AgentTy
 export async function listMatchingSubagents(organizationId: string, codeDirectoryId: string | null, sessionTags: string[], callerAgentType: AgentType | null) {
   const rows = await db
     .selectFrom("agent")
-    .select(["id", "description", "provider", "model", "type", "tools", "tags", "codeDirectoryId"])
+    .select(["id", "description", "provider", "model", "type", "tools", "tags", "codeDirectoryId", "workDirectoryId"])
     .where("organizationId", "=", organizationId)
     .orderBy("createdAt", "asc")
     .execute();
@@ -69,7 +70,7 @@ export const LIST_SUBAGENTS_TOOL: AgentTool = {
 export const INVOKE_SUBAGENT_TOOL: AgentTool = {
   name: "invoke_subagent",
   description:
-    "Invokes a subagent with a prompt and waits for its summary. The subagent runs as a headless child session with the same workspace, its own system prompt and tools; its final answer is returned as this tool's output. It cannot ask the user questions. Max nesting depth is 3.",
+    "Invokes a subagent with a prompt and waits for its summary. The subagent runs as a headless child session in this session's workspace (or a persona's own directory, if list_subagents shows one), with its own system prompt and tools; its final answer is returned as this tool's output. It cannot ask the user questions. Max nesting depth is 3.",
   scope: ["code", "assistant"],
   parameters: {
     type: "object",
@@ -115,21 +116,45 @@ export interface SubagentExecution {
   failed: boolean;
 }
 
-function agentMatchError(target: { type: string; tags: string[]; codeDirectoryId: string | null }, sessionTags: string[], codeDirectoryId: string | null): string | null {
+function agentMatchError(
+  target: { type: string; tags: string[]; codeDirectoryId: string | null },
+  sessionTags: string[],
+  codeDirectoryId: string | null,
+): string | null {
   if (target.codeDirectoryId !== null && target.codeDirectoryId !== codeDirectoryId) return "agent belongs to a different workspace";
   if (!target.tags.includes(DEFAULT_SKILL_TAG) && !target.tags.some((t) => sessionTags.includes(t))) return "agent tags do not match this session";
   return null;
 }
 
+/** Children inherit the parent's directory unless a persona pins its own. */
+export function childDirectoryId(agent: { type: AgentType; workDirectoryId: string | null }, parentDirectoryId: string | null): string | null {
+  return agent.type === "persona" && agent.workDirectoryId ? agent.workDirectoryId : parentDirectoryId;
+}
+
 export async function executeListSubagents(ctx: SubagentContext): Promise<SubagentExecution> {
   const agents = await listMatchingSubagents(ctx.organizationId, ctx.session.codeDirectoryId, ctx.session.tags ?? [], ctx.callerAgentType);
   if (agents.length === 0) {
-    return { output: "no subagents configured for this session — add agents in Settings → LLM → Agents and tag them 'default' or a session tag", failed: false };
+    return {
+      output: "no subagents configured for this session — add agents in Settings → LLM → Agents and tag them 'default' or a session tag",
+      failed: false,
+    };
   }
-  const lines = agents.map(
-    (a) =>
-      `- agent_id: ${a.id}\n  type: ${a.type}\n  description: ${a.description ?? `${a.provider}/${a.model}`}\n  tools: ${(a.tools as unknown as string[]).includes("all") ? "all" : (a.tools as unknown as string[]).length ? (a.tools as unknown as string[]).join(", ") : "none"}`,
-  );
+  const ownDirs = agents.map((a) => childDirectoryId(a, ctx.session.codeDirectoryId)).filter((id): id is string => !!id && id !== ctx.session.codeDirectoryId);
+  const dirs = ownDirs.length ? await db.selectFrom("code_directory").select(["id", "displayName", "cwd"]).where("id", "in", ownDirs).execute() : [];
+  const lines = agents.map((a) => {
+    const dirId = childDirectoryId(a, ctx.session.codeDirectoryId);
+    const dir = dirId !== ctx.session.codeDirectoryId ? dirs.find((d) => d.id === dirId) : undefined;
+    const tools = a.tools as unknown as string[];
+    return [
+      `- agent_id: ${a.id}`,
+      `  type: ${a.type}`,
+      `  description: ${a.description ?? `${a.provider}/${a.model}`}`,
+      `  tools: ${tools.includes("all") ? "all" : tools.length ? tools.join(", ") : "none"}`,
+      ...(dir
+        ? [`  directory: works in its own directory ${dir.displayName} (${dir.cwd}), not this session's — pass file contents or paths it can reach`]
+        : []),
+    ].join("\n");
+  });
   return { output: `Subagents available in this session:\n${lines.join("\n")}`, failed: false };
 }
 
@@ -139,12 +164,7 @@ export async function executeListSubagents(ctx: SubagentContext): Promise<Subage
  * but headless: no human in the loop, ask_user disabled.
  */
 export async function executeInvokeSubagent(ctx: SubagentContext, agentId: string, prompt: string): Promise<SubagentExecution> {
-  const agent = await db
-    .selectFrom("agent")
-    .selectAll()
-    .where("id", "=", agentId)
-    .where("organizationId", "=", ctx.organizationId)
-    .executeTakeFirst();
+  const agent = await db.selectFrom("agent").selectAll().where("id", "=", agentId).where("organizationId", "=", ctx.organizationId).executeTakeFirst();
   if (!agent) return { output: `error: agent not found: ${agentId}`, failed: true };
   if (agent.type === "sentinel") return { output: "error: sentinel agents cannot be invoked", failed: true };
   if (!canInvoke(ctx.callerAgentType, agent.type)) {
@@ -167,8 +187,7 @@ export async function executeInvokeSubagent(ctx: SubagentContext, agentId: strin
       title: `${agent.description?.slice(0, 40) ?? agent.type} — ${prompt.slice(0, 30)}`,
       connectionId: ctx.connectionId,
       model: ctx.model,
-      // Children inherit the parent's workspace; /btw and tool-invoked alike.
-      codeDirectoryId: parent.codeDirectoryId,
+      codeDirectoryId: childDirectoryId(agent, parent.codeDirectoryId),
       type: "sub_agent",
       parentSessionId: parent.id,
       agentId: agent.id,
@@ -248,7 +267,9 @@ export async function executeCheckSubagentStatus(ctx: SubagentContext, sessionId
       .limit(1)
       .executeTakeFirst();
     const status = running ? "running" : last?.role === "assistant" ? "done" : "no output yet";
-    lines.push(`- session_id: ${child.id}\n  title: ${child.title}\n  status: ${status}${last?.content && !running ? `\n  last message: ${last.content.slice(0, 400)}` : ""}`);
+    lines.push(
+      `- session_id: ${child.id}\n  title: ${child.title}\n  status: ${status}${last?.content && !running ? `\n  last message: ${last.content.slice(0, 400)}` : ""}`,
+    );
   }
   return { output: `Subagent sessions invoked from this session:\n${lines.join("\n")}`, failed: false };
 }

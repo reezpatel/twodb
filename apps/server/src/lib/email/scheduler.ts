@@ -57,7 +57,7 @@ async function runHead(account: EmailAccountRow) {
     values.backfillState = account.backfillState === "paused" ? "paused" : "running";
     values.backfillProgress = JSON.stringify({ done: 0, total: result.total ?? null, startedAt: now.toISOString() });
   }
-  await db.updateTable("email_account").set(values).where("id", "=", account.id).execute();
+  await db.updateTable("connected_account").set(values).where("id", "=", account.id).execute();
   if (account.status !== "active") await broadcastEmailEvent(account.id, { type: "account.status", accountId: account.id, status: "active", lastError: null });
 }
 
@@ -77,7 +77,7 @@ async function runBackfill(accountId: string) {
       ...(state === "done" ? { finishedAt: new Date().toISOString() } : {}),
     };
     await db
-      .updateTable("email_account")
+      .updateTable("connected_account")
       .set({ backfillCursor: JSON.stringify(step.cursor), backfillState: state, backfillProgress: JSON.stringify(progress), updatedAt: new Date() })
       .where("id", "=", account.id)
       .execute();
@@ -95,7 +95,7 @@ export async function syncAccount(accountId: string, opts: { force?: boolean } =
       const lock = await sql<{ ok: boolean }>`select pg_try_advisory_xact_lock(hashtext(${`email:${accountId}`})) as ok`.execute(trx);
       if (!lock.rows[0]?.ok) return;
       const account = await loadAccount(accountId);
-      if (!account.credentials || account.status === "paused" || account.status === "reauth_required") return;
+      if (!account.credentials || !account.capabilities.includes("mail") || account.status === "paused" || account.status === "reauth_required") return;
       try {
         if (opts.force || !account.nextSyncAt || account.nextSyncAt <= new Date()) await runHead(account);
         await runBackfill(accountId);
@@ -105,7 +105,11 @@ export async function syncAccount(accountId: string, opts: { force?: boolean } =
         if (e instanceof EmailAuthError) {
           await setAccountStatus(accountId, "reauth_required", err.message);
         } else {
-          await db.updateTable("email_account").set({ nextSyncAt: new Date(Date.now() + ERROR_RETRY_MS) }).where("id", "=", accountId).execute();
+          await db
+            .updateTable("connected_account")
+            .set({ nextSyncAt: new Date(Date.now() + ERROR_RETRY_MS) })
+            .where("id", "=", accountId)
+            .execute();
           await setAccountStatus(accountId, "error", err.message);
         }
       }
@@ -133,10 +137,11 @@ async function tick() {
   }
 
   const due = await db
-    .selectFrom("email_account")
+    .selectFrom("connected_account")
     .select("id")
     .where("deletedAt", "is", null)
     .where("credentials", "is not", null)
+    .where(sql<boolean>`'mail' = any(capabilities)`)
     .where("status", "not in", ["paused", "reauth_required"])
     .where((eb) => eb.or([eb("nextSyncAt", "is", null), eb("nextSyncAt", "<=", new Date()), eb("backfillState", "=", "running")]))
     .orderBy("nextSyncAt")

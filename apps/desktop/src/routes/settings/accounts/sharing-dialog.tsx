@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { EmailAccount } from "../../email/email-api";
-import { useAccountSharing } from "./use-email-settings";
+import { useAccountSharing } from "./use-accounts-settings";
 
 export function SharingDialog({ account, onOpenChange }: { account: EmailAccount | null; onOpenChange: (open: boolean) => void }) {
   const { members, orgUsers, setVisibility, upsert, removeMember } = useAccountSharing(account);

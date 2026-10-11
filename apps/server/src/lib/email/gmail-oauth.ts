@@ -1,13 +1,26 @@
 import { env } from "../../env";
 import { getPrivateSetting, setPrivateSetting } from "../server-settings";
 import { seal, unseal } from "./crypto";
-import { EmailAuthError } from "./types";
+import { EmailAuthError, type AccountCapability } from "./types";
 
 // Self-hosted Google OAuth client per deployment. The client secret is
 // sealed in a private server_setting row (never part of public settings).
 
 const SETTING_KEY = "emailGmailOAuth";
-const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send", "openid", "email"];
+const BASE_SCOPES = ["openid", "email"];
+const CAPABILITY_SCOPES: Record<AccountCapability, string[]> = {
+  mail: ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"],
+  calendar: ["https://www.googleapis.com/auth/calendar"],
+};
+
+export function googleScopes(capabilities: AccountCapability[]): string[] {
+  return [...BASE_SCOPES, ...capabilities.flatMap((c) => CAPABILITY_SCOPES[c])];
+}
+
+/** Which capabilities a granted scope list actually covers. */
+export function googleCapabilitiesFor(scopes: string[]): AccountCapability[] {
+  return (Object.keys(CAPABILITY_SCOPES) as AccountCapability[]).filter((c) => CAPABILITY_SCOPES[c].every((s) => scopes.includes(s)));
+}
 const STATE_TTL_MS = 15 * 60_000;
 
 interface StoredGmailOAuth {
@@ -20,6 +33,7 @@ export interface GmailOAuthState {
   userId: string;
   /** Reconnect an existing account instead of creating one. */
   accountId?: string | null;
+  capabilities?: AccountCapability[];
   exp: number;
 }
 
@@ -56,7 +70,7 @@ export async function gmailAuthUrl(state: Omit<GmailOAuthState, "exp">): Promise
     client_id: config.clientId,
     redirect_uri: gmailRedirectUri(),
     response_type: "code",
-    scope: SCOPES.join(" "),
+    scope: googleScopes(state.capabilities?.length ? state.capabilities : ["mail"]).join(" "),
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: "true",
@@ -75,6 +89,7 @@ interface TokenResponse {
   access_token: string;
   refresh_token?: string;
   expires_in: number;
+  scope?: string;
   error?: string;
   error_description?: string;
 }
@@ -104,7 +119,12 @@ export async function exchangeGmailCode(code: string) {
     grant_type: "authorization_code",
   });
   if (!json.refresh_token) throw new Error("gmail_no_refresh_token");
-  return { refreshToken: json.refresh_token, accessToken: json.access_token, expiresAt: Date.now() + json.expires_in * 1000 };
+  return {
+    refreshToken: json.refresh_token,
+    accessToken: json.access_token,
+    expiresAt: Date.now() + json.expires_in * 1000,
+    scopes: (json.scope ?? "").split(" ").filter(Boolean),
+  };
 }
 
 export async function refreshGmailToken(refreshToken: string) {

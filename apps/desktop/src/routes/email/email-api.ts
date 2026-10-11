@@ -9,9 +9,11 @@ export interface EmailAddress {
 
 export type EmailRole = "owner" | "member" | "viewer";
 
+export type AccountCapability = "mail" | "calendar";
+
 export interface EmailAccount {
   id: string;
-  kind: "gmail" | "imap_smtp";
+  kind: "google" | "microsoft" | "imap";
   preset: string | null;
   address: string;
   displayName: string | null;
@@ -25,6 +27,15 @@ export interface EmailAccount {
   lastSyncedAt: string | null;
   backfillState: "pending" | "running" | "paused" | "done" | "error";
   backfillProgress: { done?: number; total?: number | null; startedAt?: string; finishedAt?: string };
+  capabilities: AccountCapability[];
+  grantedCapabilities: AccountCapability[];
+  calendarState: "disabled" | "active" | "paused" | "error" | "reauth_required";
+  calendarError: string | null;
+  calendarImportState: "pending" | "running" | "done" | "error";
+  calendarImportProgress: { done?: number; calendar?: number; calendars?: number; finishedAt?: string };
+  calendarLastSyncedAt: string | null;
+  syncMode: "polling" | "webhooks";
+  suggestOrgMembers: boolean;
   syncIntervalSec: number;
   signatureHtml: string | null;
   color: string | null;
@@ -39,12 +50,15 @@ export interface ConnectorField {
   placeholder?: string;
   secret?: boolean;
   required?: boolean;
+  capability?: AccountCapability;
 }
 
 export interface ConnectorPreset {
   id: string;
   label: string;
-  kind: "gmail" | "imap_smtp";
+  kind: "google" | "microsoft" | "imap";
+  auth: "oauth" | "password";
+  capabilities: AccountCapability[];
   description: string;
   defaults: Record<string, unknown>;
   help?: string;
@@ -54,6 +68,7 @@ export interface EmailMeta {
   presets: ConnectorPreset[];
   imapFields: ConnectorField[];
   gmail: { configured: boolean; clientId: string; redirectUri: string };
+  microsoft: { configured: boolean; clientId: string; tenant: string; redirectUri: string };
   storageReady: boolean;
   views: string[];
   isAdmin: boolean;
@@ -223,6 +238,15 @@ export async function uploadForm<T>(path: string, form: FormData): Promise<T> {
 
 export function useEmailMeta() {
   return useQuery({ queryKey: emailKeys.meta, queryFn: fetchMeta });
+}
+
+/** Accounts with the mail capability — the email app ignores calendar-only connections. */
+export function useMailAccounts() {
+  return useQuery({
+    queryKey: emailKeys.accounts,
+    queryFn: fetchAccounts,
+    select: (list: EmailAccount[]) => list.filter((a) => a.capabilities.includes("mail")),
+  });
 }
 
 export function useEmailAccounts() {

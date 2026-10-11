@@ -17,7 +17,7 @@ export type AgentType = "sub_agent" | "persona" | "collaborator" | "sentinel";
 
 export const AGENT_TYPE_LABELS: Record<AgentType, string> = {
   sub_agent: "Subagent for code",
-  persona: "Person",
+  persona: "Persona",
   collaborator: "Collaborator",
   sentinel: "Sentinel",
 };
@@ -35,6 +35,8 @@ export interface Agent {
   type: AgentType;
   /** Tool allowlist — ["all"] = every tool; [] = no tools. */
   tools: string[];
+  /** Persona only: directory its sessions run in; null = inherit the invoking session's. */
+  workDirectoryId: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -8,6 +8,7 @@ import { buildMime } from "./mime";
 import { storeEmailBytes } from "./storage";
 import { recomputeThread } from "./threads";
 import { EmailAuthError } from "./types";
+import { learnFromMessageId } from "../contacts/email-learning";
 
 // Outbox worker: claims due queued/scheduled rows with SKIP LOCKED, builds
 // MIME locally, archives the raw bytes, hands them to the connector and
@@ -28,7 +29,14 @@ async function setStatus(messageId: string, values: Record<string, unknown>) {
     .executeTakeFirst();
   if (!row) return;
   await recomputeThread(row.threadId);
-  await broadcastEmailEvent(row.accountId, { type: "message.status", accountId: row.accountId, threadId: row.threadId, messageId: row.id, status: row.status, lastError: row.lastError });
+  await broadcastEmailEvent(row.accountId, {
+    type: "message.status",
+    accountId: row.accountId,
+    threadId: row.threadId,
+    messageId: row.id,
+    status: row.status,
+    lastError: row.lastError,
+  });
   await broadcastEmailEvent(row.accountId, { type: "thread.updated", accountId: row.accountId, threadIds: [row.threadId] });
 }
 
@@ -50,7 +58,7 @@ async function sendOne(messageId: string) {
   try {
     const account = await loadAccount(message.accountId);
     const thread = await db.selectFrom("email_thread").select(["providerThreadId"]).where("id", "=", message.threadId).executeTakeFirst();
-    const { mime, envelope } = await buildMime(message, account, { keepBcc: account.kind === "gmail" });
+    const { mime, envelope } = await buildMime(message, account, { keepBcc: account.kind === "google" });
     const rawMediaId = await storeEmailBytes({
       organizationId: message.organizationId,
       accountId: account.id,
@@ -78,10 +86,16 @@ async function sendOne(messageId: string) {
       logger.warn({ err: e, messageId }, "email: provider id already linked");
     }
     if (result.providerThreadId) {
-      await db.updateTable("email_thread").set({ providerThreadId: result.providerThreadId }).where("id", "=", message.threadId).where("providerThreadId", "is", null).execute();
+      await db
+        .updateTable("email_thread")
+        .set({ providerThreadId: result.providerThreadId })
+        .where("id", "=", message.threadId)
+        .where("providerThreadId", "is", null)
+        .execute();
     }
     await setStatus(message.id, { status: "sent", sentAt: now, lastError: null, nextAttemptAt: null });
     logger.info({ messageId, accountId: account.id }, "email: sent");
+    await learnFromMessageId(account, message.id);
   } catch (e) {
     const err = e as Error;
     logger.warn({ err, messageId }, "email: send failed");
@@ -120,7 +134,14 @@ export async function runOutbox() {
     returning id`.execute(db);
   for (const row of claimed.rows) {
     const msg = await db.selectFrom("email_message").select(["threadId", "accountId"]).where("id", "=", row.id).executeTakeFirst();
-    if (msg) await broadcastEmailEvent(msg.accountId, { type: "message.status", accountId: msg.accountId, threadId: msg.threadId, messageId: row.id, status: "sending" });
+    if (msg)
+      await broadcastEmailEvent(msg.accountId, {
+        type: "message.status",
+        accountId: msg.accountId,
+        threadId: msg.threadId,
+        messageId: row.id,
+        status: "sending",
+      });
     await sendOne(row.id);
   }
 }

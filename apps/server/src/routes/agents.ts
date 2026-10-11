@@ -61,6 +61,12 @@ export const agentRoutes = new Hono()
 
     const scope = await resolveScope(db, s.organizationId, body?.codeDirectoryId);
     if (!scope.ok) return c.json({ error: scope.error }, scope.error === "directory_not_found" ? 404 : 400);
+    const work = await resolveScope(db, s.organizationId, type === "persona" ? body?.workDirectoryId : null);
+    if (!work.ok)
+      return c.json(
+        { error: work.error === "directory_not_found" ? "work_directory_not_found" : "invalid_work_directory" },
+        work.error === "directory_not_found" ? 404 : 400,
+      );
 
     const now = new Date();
     const row = await db
@@ -77,6 +83,7 @@ export const agentRoutes = new Hono()
         tags: tags ?? [],
         type,
         tools: JSON.stringify(tools),
+        workDirectoryId: work.codeDirectoryId,
         createdAt: now,
         updatedAt: now,
       })
@@ -101,14 +108,24 @@ export const agentRoutes = new Hono()
 
     const existing = await db
       .selectFrom("agent")
-      .select("id")
+      .select(["id", "type"])
       .where("id", "=", c.req.param("id"))
       .where("organizationId", "=", s.organizationId)
       .executeTakeFirst();
     if (!existing) return c.json({ error: "agent_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ provider: string; model: string; description: string | null; instruction: string; tags: string[]; type: AgentType; tools: string; name: string | null }> = {};
+    const patch: Partial<{
+      provider: string;
+      model: string;
+      description: string | null;
+      instruction: string;
+      tags: string[];
+      type: AgentType;
+      tools: string;
+      name: string | null;
+      workDirectoryId: string | null;
+    }> = {};
     if (body?.name !== undefined) {
       if (body.name !== null && typeof body.name !== "string") return c.json({ error: "invalid_name" }, 400);
       patch.name = body.name && body.name.trim() ? body.name.trim() : null;
@@ -147,6 +164,18 @@ export const agentRoutes = new Hono()
       const tools = parseTools(body.tools);
       if (tools === "invalid") return c.json({ error: "invalid_tools" }, 400);
       patch.tools = JSON.stringify(tools);
+    }
+    const nextType = patch.type ?? existing.type;
+    if (nextType !== "persona") {
+      if (patch.type) patch.workDirectoryId = null;
+    } else if (body?.workDirectoryId !== undefined) {
+      const work = await resolveScope(db, s.organizationId, body.workDirectoryId);
+      if (!work.ok)
+        return c.json(
+          { error: work.error === "directory_not_found" ? "work_directory_not_found" : "invalid_work_directory" },
+          work.error === "directory_not_found" ? 404 : 400,
+        );
+      patch.workDirectoryId = work.codeDirectoryId;
     }
     if (Object.keys(patch).length === 0) return c.json({ error: "empty_update" }, 400);
     if (patch.type === "sentinel" && (await sentinelExists(s.organizationId, sentinelCheckId))) return c.json({ error: "sentinel_exists" }, 409);
