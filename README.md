@@ -62,6 +62,11 @@ docker run -p 3001:3001 \
   ghcr.io/reezpatel/twodb:latest
 ```
 
+`BETTER_AUTH_URL` is the URL people open in the browser (e.g.
+`https://app.example.com`). Sign-in, CORS, passkeys and the Google/Microsoft
+OAuth redirect URIs all derive from it. In local dev it defaults to the Vite
+URL `http://localhost:5173`, which proxies `/api` to the server.
+
 Run a runner next to it (`docker-compose.runner.yaml` does the same):
 
 ```sh

@@ -53,8 +53,8 @@ app.use(
   "/api/*",
   cors({
     origin: (origin) => {
-      if (!origin) return env.webOrigin;
-      if (origin === env.webOrigin || origin.startsWith("chrome-extension://")) return origin;
+      if (!origin) return env.auth.origin;
+      if (origin === env.auth.origin || origin.startsWith("chrome-extension://")) return origin;
       return null;
     },
     credentials: true,

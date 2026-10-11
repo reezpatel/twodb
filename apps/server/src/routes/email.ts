@@ -222,7 +222,7 @@ export const emailRoutes = new Hono()
     }),
   )
   .get("/accounts/gmail/oauth/callback", async (c) => {
-    const back = (params: Record<string, string>) => c.redirect(`${env.webOrigin}/apps/settings/accounts?${new URLSearchParams(params)}`);
+    const back = (params: Record<string, string>) => c.redirect(`${env.auth.url}/apps/settings/accounts?${new URLSearchParams(params)}`);
     const error = c.req.query("error");
     if (error) return back({ oauth: "error", provider: "google", reason: error });
     try {
@@ -255,7 +255,7 @@ export const emailRoutes = new Hono()
     }),
   )
   .get("/accounts/microsoft/oauth/callback", async (c) => {
-    const back = (params: Record<string, string>) => c.redirect(`${env.webOrigin}/apps/settings/accounts?${new URLSearchParams(params)}`);
+    const back = (params: Record<string, string>) => c.redirect(`${env.auth.url}/apps/settings/accounts?${new URLSearchParams(params)}`);
     const error = c.req.query("error");
     if (error) return back({ oauth: "error", provider: "microsoft", reason: c.req.query("error_description") ?? error });
     try {

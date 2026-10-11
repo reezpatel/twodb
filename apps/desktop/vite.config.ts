@@ -31,6 +31,8 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,svg,png,woff,woff2}"],
         navigateFallback: "index.html",
+        // Server endpoints opened as pages (OAuth callbacks, .ics/attachment downloads) must reach the network.
+        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],
@@ -48,9 +50,6 @@ export default defineConfig({
         target: "http://localhost:3001",
         changeOrigin: true,
         ws: true,
-        headers: {
-          origin: "http://localhost:3001",
-        },
       },
     },
     strictPort: true,

@@ -21,7 +21,7 @@ export const auth = betterAuth({
   database: { db, type: "pg" },
   secret: env.auth.secret,
   baseURL: env.auth.url,
-  trustedOrigins: [env.webOrigin],
+  trustedOrigins: [env.auth.origin],
   emailAndPassword: {
     enabled: true,
     sendResetPassword: async ({ user, url }) => {
@@ -44,7 +44,7 @@ export const auth = betterAuth({
     passkey({
       rpName: "twodb",
       rpID: env.passkey.rpID,
-      origin: [env.webOrigin, env.auth.url],
+      origin: env.auth.origin,
     }),
     apiKey(),
   ],
