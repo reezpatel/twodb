@@ -27,6 +27,9 @@ import { serverSettingsRoutes } from "./routes/server-settings";
 import { apiKeyRoutes } from "./routes/api-keys";
 import { logsRoutes } from "./routes/logs";
 import { meetingsRoutes } from "./routes/meetings";
+import { emailRoutes } from "./routes/email";
+import { registerEmailWs } from "./routes/email-ws";
+import { startEmailScheduler, stopEmailScheduler } from "./lib/email/scheduler";
 import { getServerSettings } from "./lib/server-settings";
 import { runMigrations } from "./lib/migrate";
 import { logger } from "./lib/logger";
@@ -99,9 +102,11 @@ app.route("/api/logs", logsRoutes);
 app.get("/api/public-settings", async (c) => c.json(await getServerSettings()));
 app.route("/api/chat", chatRoutes);
 app.route("/api/meetings", meetingsRoutes);
+app.route("/api/email", emailRoutes);
 registerRunnerWs(app, upgradeWebSocket);
 registerCodeWs(app, upgradeWebSocket);
 registerChatWs(app, upgradeWebSocket);
+registerEmailWs(app, upgradeWebSocket);
 
 // Production: serve the built desktop app (SPA) from a static dir; API routes
 // above always win because they are registered first.
@@ -127,9 +132,11 @@ const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
 });
 
 injectWebSocket(server);
+startEmailScheduler();
 
 process.on("SIGINT", async () => {
   logger.info("shutting down (SIGINT)");
+  stopEmailScheduler();
   await graph.close();
   await db.destroy();
   process.exit(0);

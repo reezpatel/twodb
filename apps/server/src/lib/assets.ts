@@ -25,10 +25,10 @@ function extensionOf(filename: string): string {
   return dot > 0 && dot < filename.length - 1 ? filename.slice(dot + 1).toLowerCase() : "";
 }
 
-export type DestinationId = "agent_assets" | "chat_assets";
+export type DestinationId = "agent_assets" | "chat_assets" | "email_attachments";
 
 /** Driver for a configured storage destination — throws when unset. */
-async function destinationDriver(destinationId: DestinationId): Promise<{ backendId: string; prefix: string; driver: Awaited<ReturnType<typeof getStorageDriver>>["driver"] }> {
+export async function destinationDriver(destinationId: DestinationId): Promise<{ backendId: string; prefix: string; driver: Awaited<ReturnType<typeof getStorageDriver>>["driver"] }> {
   const destination = (await getStorageDestinations())[destinationId];
   if (!destination) throw new Error(`${destinationId}_not_configured`);
   const { backend, driver } = await getStorageDriver(destination.backendId);

@@ -22,6 +22,7 @@ export const STORAGE_DESTINATIONS: { id: string; label: string; description: str
   { id: "agent_assets", label: "Agents Assets", description: "where agents store their assets (files, uploads, generated artifacts)" },
   { id: "chat_assets", label: "Chat Assets", description: "where team-chat file attachments are stored" },
   { id: "meeting_recordings", label: "Meeting Recordings", description: "where meeting-recording uploads (webm tracks) are stored" },
+  { id: "email_attachments", label: "Email Attachments", description: "where synced and outgoing email attachments and raw .eml messages are stored" },
 ];
 
 const DEFAULTS: ServerSettings = { signUpEnabled: true, storageDestinations: {} };
@@ -29,7 +30,10 @@ const DEFAULTS: ServerSettings = { signUpEnabled: true, storageDestinations: {} 
 export async function getServerSettings(): Promise<ServerSettings> {
   try {
     const rows = await db.selectFrom("server_setting").selectAll().execute();
-    const overrides = Object.fromEntries(rows.map((r) => [r.key, (r.value as { value: unknown }).value])) as Partial<ServerSettings>;
+    // Only known keys — other rows (e.g. email OAuth secrets) must never leak through /api/public-settings.
+    const overrides = Object.fromEntries(
+      rows.filter((r) => r.key in DEFAULTS).map((r) => [r.key, (r.value as { value: unknown }).value]),
+    ) as Partial<ServerSettings>;
     return { ...DEFAULTS, ...overrides };
   } catch {
     // table missing / db unavailable — fall back to defaults rather than breaking auth
@@ -43,6 +47,22 @@ export async function setServerSetting(key: keyof ServerSettings, value: ServerS
     .insertInto("server_setting")
     .values({ key, value: { value } as Record<string, unknown>, updatedAt: now })
     .onConflict((oc) => oc.column("key").doUpdateSet({ value: { value } as Record<string, unknown>, updatedAt: now }))
+    .execute();
+}
+
+/** Raw read of a private server_setting row (not part of ServerSettings). */
+export async function getPrivateSetting<T>(key: string): Promise<T | null> {
+  const row = await db.selectFrom("server_setting").selectAll().where("key", "=", key).executeTakeFirst();
+  return row ? ((row.value as { value: T }).value ?? null) : null;
+}
+
+export async function setPrivateSetting(key: string, value: unknown) {
+  const now = new Date();
+  const json = { value } as Record<string, unknown>;
+  await db
+    .insertInto("server_setting")
+    .values({ key, value: json, updatedAt: now })
+    .onConflict((oc) => oc.column("key").doUpdateSet({ value: json, updatedAt: now }))
     .execute();
 }
 

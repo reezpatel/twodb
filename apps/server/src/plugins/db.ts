@@ -1,4 +1,4 @@
-import { type ColumnType, Kysely, PostgresDialect } from "kysely";
+import { type ColumnType, type Generated, Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
 
 export interface UserTable {
@@ -451,6 +451,8 @@ export interface MediaAssetTable {
   contentType: string | null;
   size: number;
   createdAt: Date;
+  /** Content hash — email attachments dedupe identical bytes. */
+  sha256: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
 export interface CodeSessionArtifactTable {
@@ -688,6 +690,193 @@ export interface MeetingRecordingTrackTable {
   createdAt: Date;
 }
 
+/** jsonb column written as a JSON string (pg would serialize JS arrays as postgres arrays). */
+type Json<T> = ColumnType<T, string, string>;
+
+export interface EmailAddress {
+  name: string | null;
+  address: string;
+}
+
+export interface EmailAccountTable {
+  id: string;
+  organizationId: string;
+  ownerUserId: string;
+  /** private | shared. */
+  visibility: Generated<string>;
+  /** gmail | imap_smtp. */
+  kind: string;
+  /** yahoo | custom | gmail. */
+  preset: string | null;
+  address: string;
+  displayName: string | null;
+  aliases: Json<string[]>;
+  /** Non-secret connector config (hosts, ports, tls, appendToSent). */
+  config: Json<Record<string, unknown>>;
+  /** AES-256-GCM sealed JSON (lib/email/crypto). */
+  credentials: string | null;
+  /** Head cursor — gmail {historyId}; imap {[mailbox]: {uidValidity, lastUid}}. */
+  syncCursor: Json<Record<string, unknown>>;
+  /** Tail cursor for the full backfill; null once done. */
+  backfillCursor: Json<Record<string, unknown> | null>;
+  /** pending | running | paused | done | error. */
+  backfillState: Generated<string>;
+  backfillProgress: Json<Record<string, unknown>>;
+  /** active | error | reauth_required | paused. */
+  status: Generated<string>;
+  lastError: string | null;
+  lastSyncedAt: Date | null;
+  nextSyncAt: Date | null;
+  syncIntervalSec: Generated<number>;
+  signatureHtml: string | null;
+  color: string | null;
+  position: Generated<number>;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+export interface EmailAccountMemberTable {
+  id: string;
+  organizationId: string;
+  accountId: string;
+  userId: string;
+  /** owner | member | viewer. */
+  role: string;
+  createdAt: Date;
+}
+
+export interface EmailThreadTable {
+  id: string;
+  organizationId: string;
+  accountId: string;
+  providerThreadId: string | null;
+  subject: string;
+  /** inbox | archive | spam — local placement only. */
+  location: string;
+  isPinned: Generated<boolean>;
+  snoozedUntil: Date | null;
+  mutedAt: Date | null;
+  lastMessageAt: Date;
+  lastInboundAt: Date | null;
+  messageCount: Generated<number>;
+  unreadCount: Generated<number>;
+  hasAttachments: Generated<boolean>;
+  hasStarred: Generated<boolean>;
+  hasDraft: Generated<boolean>;
+  hasSent: Generated<boolean>;
+  hasOutbox: Generated<boolean>;
+  hasScheduled: Generated<boolean>;
+  hasDeletedMessages: Generated<boolean>;
+  participants: Json<EmailAddress[]>;
+  snippet: string | null;
+  deletedAt: Date | null;
+  deletedByUserId: string | null;
+  purgedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EmailMessageTable {
+  id: string;
+  organizationId: string;
+  accountId: string;
+  threadId: string;
+  /** inbound | outbound. */
+  direction: string;
+  /** received | draft | scheduled | queued | sending | sent | failed | cancelled. */
+  status: string;
+  /** new | reply | reply_all | forward. */
+  composeKind: string | null;
+  sourceMessageId: string | null;
+  providerMessageId: string | null;
+  providerThreadId: string | null;
+  rfcMessageId: string | null;
+  inReplyTo: string | null;
+  references: ColumnType<string[], string[] | undefined, string[]>;
+  fromAddress: string | null;
+  fromName: string | null;
+  to: Json<EmailAddress[]>;
+  cc: Json<EmailAddress[]>;
+  bcc: Json<EmailAddress[]>;
+  replyTo: Json<EmailAddress[]>;
+  subject: string;
+  snippet: string | null;
+  bodyText: string | null;
+  bodyHtml: string | null;
+  headers: Json<Record<string, string>>;
+  rawMediaId: string | null;
+  sentAt: Date | null;
+  receivedAt: Date | null;
+  scheduledAt: Date | null;
+  sendAfter: Date | null;
+  attempts: Generated<number>;
+  nextAttemptAt: Date | null;
+  lastError: string | null;
+  isRead: Generated<boolean>;
+  isStarred: Generated<boolean>;
+  sentByUserId: string | null;
+  searchVector: ColumnType<string, never, never>;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+  deletedByUserId: string | null;
+  purgedAt: Date | null;
+}
+
+export interface EmailAttachmentTable {
+  id: string;
+  organizationId: string;
+  messageId: string;
+  mediaId: string | null;
+  filename: string;
+  contentType: string | null;
+  size: number;
+  contentId: string | null;
+  isInline: Generated<boolean>;
+  /** stored | pending | skipped | failed. */
+  status: string;
+  createdAt: Date;
+}
+
+export interface EmailLabelTable {
+  id: string;
+  organizationId: string;
+  ownerUserId: string;
+  /** null = personal label usable across accounts; set = shared-account label. */
+  accountId: string | null;
+  parentId: string | null;
+  /** Materialized ancestor chain of ids, "rootId/childId/…/id". */
+  path: string;
+  depth: number;
+  name: string;
+  /** null = inherit from parent. */
+  color: string | null;
+  position: Generated<number>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EmailThreadLabelTable {
+  threadId: string;
+  labelId: string;
+  addedByUserId: string | null;
+  createdAt: Date;
+}
+
+export interface EmailSenderRuleTable {
+  id: string;
+  organizationId: string;
+  ownerUserId: string;
+  accountId: string | null;
+  /** address | domain. */
+  matchType: string;
+  value: string;
+  /** spam. */
+  action: string;
+  createdAt: Date;
+}
+
 export interface Database {
   user: UserTable;
   session: SessionTable;
@@ -737,6 +926,14 @@ export interface Database {
   api_key: OrgApiKeyTable;
   device: DeviceTable;
   notification: NotificationTable;
+  email_account: EmailAccountTable;
+  email_account_member: EmailAccountMemberTable;
+  email_thread: EmailThreadTable;
+  email_message: EmailMessageTable;
+  email_attachment: EmailAttachmentTable;
+  email_label: EmailLabelTable;
+  email_thread_label: EmailThreadLabelTable;
+  email_sender_rule: EmailSenderRuleTable;
 }
 
 export const dbSchema = process.env.TWODB_DB_SCHEMA ?? "twodb";

@@ -17,6 +17,7 @@ import { up as agentTypes } from "./0015-agent-types";
 import { up as sessionInteractive } from "./0016-session-interactive";
 import { up as chatSystem } from "./0017-chat-system";
 import { up as meetingRecordings } from "./0018-meeting-recordings";
+import { up as email } from "./0019-email";
 
 // Keys sort lexicographically — prefix new migrations with the next number.
 export const migrations: Record<string, Migration> = {
@@ -38,4 +39,5 @@ export const migrations: Record<string, Migration> = {
   "0016_session_interactive": { up: sessionInteractive },
   "0017_chat_system": { up: chatSystem },
   "0018_meeting_recordings": { up: meetingRecordings },
+  "0019_email": { up: email },
 };

@@ -1,123 +1,214 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import {
+  emailKeys,
+  threadAction,
+  useEmailAccounts,
+  useEmailLabels,
+  useEmailMeta,
+  useEmailSocket,
+  type EmailCounts,
+  type EmailMessage,
+  type EmailView,
+  type ThreadAction,
+  type ThreadPage,
+} from "./email-api";
 
-export interface EmailThread {
-  id: string;
-  from: string;
-  count?: number;
-  time: string;
-  snippet: string;
-  pinned?: boolean;
-  unread?: boolean;
+export interface UndoState {
+  messageId: string;
+  until: number;
+  scheduled: boolean;
 }
 
-export interface EmailMessage {
-  id: string;
-  author: string;
-  email: string;
-  time: string;
-  to: string[];
-  cc?: string[];
-  body: string;
-  attachments?: { name: string; size: string }[];
+function useDebounced<T>(value: T, ms: number): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
 }
 
-export interface EmailFolder {
-  id: string;
-  label: string;
-  icon: string;
-  count?: number;
-}
-
-const THREADS: EmailThread[] = [
-  { id: "sitemap", from: "Ava, Ethan, Sophia, Me", count: 12, time: "10:15", snippet: "Hello Design Team,…", pinned: true, unread: true },
-  { id: "oliver", from: "Oliver from Nissan", count: 5, time: "10:45", snippet: "Let's finalize these details during o…", pinned: true },
-  { id: "luna", from: "Luna from BrightCo", count: 15, time: "09:30", snippet: "Hi! I've just uploaded the newest b…", pinned: true },
-  { id: "liam", from: "Liam", count: 10, time: "09:50", snippet: "It's still bit rough, but I'm open to…", unread: true },
-  { id: "helena", from: "Helena Ross", count: 4, time: "09:50", snippet: "Sorry, my bad. Those projects wer…" },
-  { id: "coinbase", from: "Coinbase", time: "15 Jun", snippet: "You have received a transfer from…" },
-  { id: "wise", from: "Wise", time: "09:55", snippet: "You received an incoming transfer…" },
-  { id: "tripadvisor", from: "TripAdvisor", time: "8 Jun", snippet: "Good news incoming" },
-  { id: "figma", from: "Figma", time: "09:40", snippet: "Your request to view “Coptera” ha…" },
-  { id: "webflow", from: "Webflow", time: "15 Jun", snippet: "Exciting news ahead! Your templa…" },
-  { id: "binance", from: "Binance", time: "8 Jun", snippet: "You received an incoming transfer…" },
-];
-
-const MESSAGES: Record<string, EmailMessage[]> = {
-  sitemap: [
-    {
-      id: "m1",
-      author: "Ava Thompson",
-      email: "ava.thompson@uxerflow.com",
-      time: "10:15",
-      to: ["Ethan"],
-      cc: ["Sophia", "Liam"],
-      body: "Hello Team, I have gathered the latest updates regarding our project based on the recent feedback from our users. The focus is on enhancing usability, minimizing clutter, and ensuring a seamless experience for our primary users. I look forward to your thoughts and any additional suggestions for improvement.",
-      attachments: [
-        { name: "user-feedback.pdf", size: "1.5 MB" },
-        { name: "project-overview.fig", size: "5.2 MB" },
-      ],
-    },
-    {
-      id: "m2",
-      author: "Ethan Carter",
-      email: "ethan.carter@uxerflow.com",
-      time: "10:24",
-      to: ["Me"],
-      cc: ["Sophia", "Liam"],
-      body: "Hi everyone, I've revamped the navigation layout and introduced a new section for quick access to frequently used features. I also adjusted the margins to align with our updated design standards. Please review and share your feedback before we proceed!",
-      attachments: [
-        { name: "frequently used features.pdf", size: "1.5 MB" },
-        { name: "navigation flow & scenario.pdf", size: "1.5 MB" },
-      ],
-    },
-    {
-      id: "m3",
-      author: "Sophia Lee",
-      email: "sophia.lee@uxerflow.com",
-      time: "10:30",
-      to: ["Me", "Ethan"],
-      cc: ["Liam"],
-      body: "Looks good to me. The quick-access section reads clearly on mobile now — ship it after Liam's pass on the margins.",
-    },
-  ],
-};
-
-const LABEL_COLORS: Record<string, string> = {
-  marketing: "bg-blue-500",
-  finance: "bg-rose-400",
-  operation: "bg-amber-300",
-};
-
-export interface LabelDef {
-  id: string;
-  label: string;
-  count: number;
-  dotClass: string;
-}
-
-const LABELS: LabelDef[] = [
-  { id: "marketing", label: "Marketing", count: 35, dotClass: LABEL_COLORS.marketing },
-  { id: "finance", label: "Finance", count: 20, dotClass: LABEL_COLORS.finance },
-  { id: "operation", label: "Operation", count: 14, dotClass: LABEL_COLORS.operation },
-];
-
-/** Mock email client state — folders, thread list, reading pane selection, compose window. */
+/** Email client state: account + view/label scope, thread list paging, selection, compose and undo-send. */
 export function useEmailScene() {
-  const [folder, setFolder] = useState("inbox");
+  useEmailSocket();
+  const queryClient = useQueryClient();
+  const meta = useEmailMeta();
+  const accounts = useEmailAccounts();
+  const labels = useEmailLabels();
+
+  const [accountId, setAccountId] = useState<string | null>(null);
+  const [view, setViewState] = useState<EmailView>("inbox");
+  const [labelId, setLabelIdState] = useState<string | null>(null);
+  const [includeChildren, setIncludeChildren] = useState(true);
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<string | null>("sitemap");
-  const [composeOpen, setComposeOpen] = useState(false);
+  const q = useDebounced(query.trim(), 300);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [composeId, setComposeId] = useState<string | null>(null);
+  const [undo, setUndo] = useState<UndoState | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const { pinned, rest, activeThread, messages } = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const visible = THREADS.filter((t) => !q || t.from.toLowerCase().includes(q));
-    return {
-      pinned: visible.filter((t) => t.pinned),
-      rest: visible.filter((t) => !t.pinned),
-      activeThread: THREADS.find((t) => t.id === selected) ?? null,
-      messages: selected ? (MESSAGES[selected] ?? []) : [],
-    };
-  }, [query, selected]);
+  const setView = (v: EmailView) => {
+    setViewState(v);
+    setLabelIdState(null);
+    setSelected(null);
+    setChecked(new Set());
+  };
+  const setLabelId = (id: string | null) => {
+    setLabelIdState(id);
+    setSelected(null);
+    setChecked(new Set());
+  };
 
-  return { folder, setFolder, query, setQuery, selected, setSelected, composeOpen, setComposeOpen, pinned, rest, activeThread, messages, labels: LABELS };
+  const counts = useQuery({
+    queryKey: emailKeys.counts(accountId),
+    queryFn: () => api<EmailCounts>(`/api/email/counts${accountId ? `?accountId=${accountId}` : ""}`),
+  });
+
+  const listParams = useMemo(() => {
+    const p = new URLSearchParams({ view });
+    if (accountId) p.set("accountId", accountId);
+    if (labelId) {
+      p.set("labelId", labelId);
+      p.set("includeChildren", String(includeChildren));
+    }
+    if (q) p.set("q", q);
+    return p.toString();
+  }, [view, accountId, labelId, includeChildren, q]);
+
+  const threads = useInfiniteQuery({
+    queryKey: [...emailKeys.threads, listParams],
+    queryFn: ({ pageParam }) => api<ThreadPage>(`/api/email/threads?${listParams}${pageParam ? `&cursor=${pageParam}` : ""}`),
+    initialPageParam: "",
+    getNextPageParam: (last) => last.next ?? undefined,
+  });
+
+  const pinned = threads.data?.pages[0]?.pinned ?? [];
+  const rest = useMemo(() => threads.data?.pages.flatMap((p) => p.threads) ?? [], [threads.data]);
+  const visibleIds = useMemo(() => [...pinned, ...rest].map((t) => t.id), [pinned, rest]);
+
+  const invalidateAll = () => {
+    void queryClient.invalidateQueries({ queryKey: emailKeys.threads });
+    void queryClient.invalidateQueries({ queryKey: ["email", "counts"] });
+    void queryClient.invalidateQueries({ queryKey: emailKeys.labels });
+  };
+
+  const act = useMutation({
+    mutationFn: ({ ids, action, payload }: { ids: string[]; action: ThreadAction; payload?: Record<string, unknown> }) => threadAction(ids, action, payload),
+    onMutate: () => setActionError(null),
+    onSuccess: (_d, { ids, action }) => {
+      invalidateAll();
+      for (const id of ids) void queryClient.invalidateQueries({ queryKey: emailKeys.thread(id) });
+      const leaves = ["archive", "inbox", "spam", "not_spam", "trash", "restore", "purge", "snooze"].includes(action);
+      if (leaves && selected && ids.includes(selected) && action !== "restore") setSelected(null);
+      setChecked(new Set());
+    },
+    onError: (e: Error) => setActionError(e.message),
+  });
+
+  const purgeView = useMutation({
+    mutationFn: (which: "trash" | "spam") => api(`/api/email/${which}${accountId ? `?accountId=${accountId}` : ""}`, { method: "DELETE" }),
+    onSuccess: () => {
+      setSelected(null);
+      invalidateAll();
+    },
+    onError: (e: Error) => setActionError(e.message),
+  });
+
+  const compose = useMutation({
+    mutationFn: (input: { composeKind: "new" | "reply" | "reply_all" | "forward"; sourceMessageId?: string }) =>
+      api<EmailMessage>("/api/email/drafts", { method: "POST", body: JSON.stringify({ ...input, accountId }) }),
+    onSuccess: (draft) => {
+      queryClient.setQueryData(emailKeys.draft(draft.id), draft);
+      setComposeId(draft.id);
+      invalidateAll();
+      void queryClient.invalidateQueries({ queryKey: emailKeys.thread(draft.threadId) });
+    },
+    onError: (e: Error) => setActionError(e.message),
+  });
+
+  const cancelUndo = useMutation({
+    mutationFn: (messageId: string) => api(`/api/email/messages/${messageId}/cancel`, { method: "POST", body: "{}" }),
+    onSuccess: (_d, messageId) => {
+      setUndo(null);
+      void queryClient.invalidateQueries({ queryKey: emailKeys.draft(messageId) });
+      setComposeId(messageId);
+      invalidateAll();
+    },
+    onError: (e: Error) => {
+      setUndo(null);
+      setActionError(e.message === "already_sending" ? "Too late — the message is already being sent." : e.message);
+    },
+  });
+
+  useEffect(() => {
+    if (!undo) return;
+    const t = setTimeout(() => setUndo(null), Math.max(0, undo.until - Date.now()));
+    return () => clearTimeout(t);
+  }, [undo]);
+
+  const toggleChecked = (id: string) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const selectedIndex = selected ? visibleIds.indexOf(selected) : -1;
+  const step = (delta: number) => {
+    const next = visibleIds[selectedIndex + delta];
+    if (next) setSelected(next);
+  };
+
+  const sendingAccounts = (accounts.data ?? []).filter((a) => a.role !== "viewer");
+
+  return {
+    meta,
+    accounts,
+    sendingAccounts,
+    labels,
+    counts,
+    accountId,
+    setAccountId: (id: string | null) => {
+      setAccountId(id);
+      setSelected(null);
+      setChecked(new Set());
+    },
+    view,
+    setView,
+    labelId,
+    setLabelId,
+    includeChildren,
+    setIncludeChildren,
+    query,
+    setQuery,
+    threads,
+    pinned,
+    rest,
+    selected,
+    setSelected,
+    selectedIndex,
+    visibleCount: visibleIds.length,
+    step,
+    checked,
+    toggleChecked,
+    setChecked,
+    allChecked: visibleIds.length > 0 && visibleIds.every((id) => checked.has(id)),
+    checkAll: (on: boolean) => setChecked(on ? new Set(visibleIds) : new Set()),
+    act,
+    purgeView,
+    compose,
+    composeId,
+    setComposeId,
+    undo,
+    setUndo,
+    cancelUndo,
+    actionError,
+    setActionError,
+  };
 }
+
+export type EmailSceneState = ReturnType<typeof useEmailScene>;
