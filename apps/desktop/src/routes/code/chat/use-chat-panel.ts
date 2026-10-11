@@ -399,6 +399,12 @@ export function useChatPanel(sessionId: string | null) {
       setStatusText(frame.text ?? null);
     } else if (frame.type === "session_updated") {
       void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
+    } else if (frame.type === "compaction_state") {
+      // Server-side compaction state — survives refresh/reconnect (the POST
+      // keeps running even if the viewer goes away).
+      setCompacting(Boolean(frame.active));
+      if (frame.active) setStatusText("compacting…");
+      else setStatusText(null);
     } else if (frame.type === "compaction_done") {
       // Another viewer (or this one) just compacted — refetch so the block renders.
       void queryClient.invalidateQueries({ queryKey: ["code", "session", sessionId] });

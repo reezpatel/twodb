@@ -9,7 +9,7 @@ import { fetchSessionMessageWindow, fetchSessionMessages, messageCursor } from "
 import { readAssetBytesById, storeAsset } from "../lib/assets";
 import { resolveSessionSystemPrompt } from "../lib/session-prompt";
 import { resolveAskUser, type AskUserAnswer } from "../lib/ask-user";
-import { broadcastSessionEvent, broadcastToSession, isSessionRunning } from "./code-ws";
+import { beginCompaction, broadcastSessionEvent, broadcastToSession, endCompaction, isSessionRunning } from "./code-ws";
 import { readGitStatus } from "../lib/git-status";
 import { runnerManager } from "../lib/runner-manager";
 import type { CodeSessionMode, CodeSessionType } from "../plugins/db";
@@ -977,6 +977,7 @@ export const codeRoutes = new Hono()
     const instructions = typeof body?.instructions === "string" ? body.instructions.trim().slice(0, 2000) : undefined;
 
     try {
+      beginCompaction(session.id);
       const row = await runCompaction({
         connection,
         model,
@@ -991,6 +992,8 @@ export const codeRoutes = new Hono()
       if (e instanceof NothingToCompactError) return c.json({ error: "nothing_to_compact" }, 400);
       logger.error({ err: e }, "code: compaction failed");
       return c.json({ error: (e as Error).message || "compaction_failed" }, 500);
+    } finally {
+      endCompaction(session.id);
     }
   })
 

@@ -75,6 +75,26 @@ interface ActiveRun {
 const activeRuns = new Map<string, ActiveRun>();
 const sockets = new Set<CodeSocket>();
 
+/** Sessions with a manual compaction POST in flight — viewers that connect
+ * (or refresh) mid-compaction resume the "compacting…" indicator from it. */
+const compactingSessions = new Set<string>();
+
+/** Marks a session as compacting and tells every current viewer. */
+export function beginCompaction(sessionId: string) {
+  compactingSessions.add(sessionId);
+  broadcastToSession(sessionId, { type: "compaction_state", active: true });
+}
+
+/** Compaction ended (done or failed) — clear the flag and tell the viewers. */
+export function endCompaction(sessionId: string) {
+  compactingSessions.delete(sessionId);
+  broadcastToSession(sessionId, { type: "compaction_state", active: false });
+}
+
+export function isCompacting(sessionId: string) {
+  return compactingSessions.has(sessionId);
+}
+
 // --- org-wide session list channel (sidebar realtime state) -----------------
 
 interface SessionListSocket {
@@ -485,6 +505,15 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
             // No run in flight — lets clients that missed `done` drop stale transient state.
             try {
               ws.send(JSON.stringify({ type: "run_state", active: false }));
+            } catch {
+              // socket gone; cleanup happens in onClose
+            }
+          }
+          // A manual compaction may be running without an agent run — resume
+          // the "compacting…" indicator for viewers that just (re)connected.
+          if (compactingSessions.has(sessionId)) {
+            try {
+              ws.send(JSON.stringify({ type: "compaction_state", active: true }));
             } catch {
               // socket gone; cleanup happens in onClose
             }
