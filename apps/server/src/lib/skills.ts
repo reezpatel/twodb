@@ -2,6 +2,7 @@ import { db } from "../auth";
 import type { Selectable } from "kysely";
 import type { SkillTable } from "../plugins/db";
 import { runnerManager } from "./runner-manager";
+import { spaceMatches } from "./spaces";
 
 // Skill resolution for code sessions. Two sources:
 // - DB skills (Settings → LLM → Skills): org-wide or directory-scoped, selected
@@ -34,8 +35,15 @@ export function dbSkillMatches(skill: Selectable<SkillTable>, sessionTags: strin
 }
 
 /** Scope- and tag-filtered DB skills for a session — AI-visible only (hidden
- * skills are user-only: /<name> expansion, never listed or readable). */
-export async function listSessionDbSkills(organizationId: string, codeDirectoryId: string | null, sessionTags: string[]): Promise<SessionSkill[]> {
+ * skills are user-only: /<name> expansion, never listed or readable). A
+ * null-space skill matches every session; a spaced skill only sessions in
+ * the same space (sessions in unspaced directories see only null-space skills). */
+export async function listSessionDbSkills(
+  organizationId: string,
+  codeDirectoryId: string | null,
+  sessionTags: string[],
+  sessionSpaceId: string | null,
+): Promise<SessionSkill[]> {
   const rows = await db
     .selectFrom("skill")
     .selectAll()
@@ -43,7 +51,7 @@ export async function listSessionDbSkills(organizationId: string, codeDirectoryI
     .where("aiVisible", "=", true)
     .where((eb) => eb.or([eb("codeDirectoryId", "is", null), ...(codeDirectoryId ? [eb("codeDirectoryId", "=", codeDirectoryId)] : [])]))
     .execute();
-  return rows.filter((r) => dbSkillMatches(r, sessionTags)).map((r) => ({ name: r.name, description: r.description, source: "db" }));
+  return rows.filter((r) => spaceMatches(r.spaceId, sessionSpaceId)).filter((r) => dbSkillMatches(r, sessionTags)).map((r) => ({ name: r.name, description: r.description, source: "db" }));
 }
 
 const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;

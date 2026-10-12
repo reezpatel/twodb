@@ -20,6 +20,8 @@ export interface LlmConnection {
   organizationId: string;
   provider: string;
   name: string;
+  /** Space this connection belongs to; null = all spaces. */
+  spaceId: string | null;
   config: Record<string, unknown>;
   enabled: boolean;
   createdAt: string;

@@ -1,364 +1,376 @@
-// Offscreen document: owns the MediaRecorders, OPFS byte store, IndexedDB
-// queue and the upload loop. The service worker only forwards stream ids and
-// lifecycle commands — everything long-lived lives here.
+// Offscreen document: owns the recorders, the on-disk chunk spool and the
+// upload loop. Lifecycle commands come from the service worker; progress goes
+// back to it (offscreen documents only get chrome.runtime).
+//
+// Tracks: "meeting" (tab video + tab audio mixed with the microphone) and an
+// optional "screen" (picked window/screen, video only). Chunks are 5s webm
+// slices; the server appends them in strict seq order per track, so each
+// track uploads sequentially and rewinds to the server's expected seq on 409.
 
 const CHUNK_MS = 5000;
-const UPLOAD_PARALLELISM = 2;
 const HEARTBEAT_MS = 15000;
+const DRAIN_IDLE_MS = 45000; // give up draining after this long without progress
+const MAX_BACKOFF_MS = 30000;
 
-const state = {
-  serverUrl: "",
-  apiKey: "",
-  recordingId: null,
-  clientSessionId: null,
-  platform: null,
-  meetingUrl: null,
-  recorders: new Map(), // trackId -> { recorder, seq, chunksReceived, startedAt }
-  closing: false,
-};
+let rec = null; // current recording, see startRecording
+
+// --- server ------------------------------------------------------------------------
 
 function api(path, init = {}) {
-  return fetch(`${state.serverUrl}/api/meetings${path}`, {
+  return fetch(`${rec.serverUrl}/api/meetings${path}`, {
     ...init,
-    headers: { "x-api-key": state.apiKey, ...(init.headers ?? {}) },
+    headers: { "x-api-key": rec.apiKey, ...(init.headers ?? {}) },
   });
 }
 
-// --- IndexedDB queue (chunk metadata) --------------------------------------
+// --- chunk spool (OPFS, one file per chunk; memory fallback) ------------------------
 
-const DB_NAME = "twodb-recorder";
-const STORE = "chunks";
-
-function openDb() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: ["trackId", "seq"] });
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function putChunkMeta(meta) {
-  const db = await openDb();
-  await new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).put(meta);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-async function clearChunkMeta(trackId) {
-  const db = await openDb();
-  await new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    const store = tx.objectStore(STORE);
-    const range = IDBKeyRange.bound([trackId, 0], [trackId, Number.MAX_SAFE_INTEGER]);
-    const req = store.openCursor(range);
-    req.onsuccess = () => {
-      const cursor = req.result;
-      if (cursor) { cursor.delete(); cursor.continue(); }
-    };
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-// --- OPFS byte store --------------------------------------------------------
-
-async function opfsFile(trackId, create) {
+async function spoolDir(recordingId, create) {
   const root = await navigator.storage.getDirectory();
-  const dir = await root.getDirectoryHandle("recordings", { create: true });
-  return dir.getFileHandle(`${trackId}.webm`, { create });
+  const base = await root.getDirectoryHandle("recordings", { create: true });
+  return base.getDirectoryHandle(recordingId, { create });
 }
 
-async function appendChunkBytes(trackId, seq, bytes) {
-  const handle = await opfsFile(trackId, true);
-  const access = await handle.createSyncAccessHandle();
+async function spoolPut(track, seq, blob) {
   try {
-    access.write(bytes, { at: access.getSize() - bytes.byteLength });
-  } finally {
-    access.close();
+    const dir = await spoolDir(rec.recordingId, true);
+    const handle = await dir.getFileHandle(`${track.id}-${seq}.webm`, { create: true });
+    const w = await handle.createWritable();
+    await w.write(blob);
+    await w.close();
+    track.chunks.set(seq, { size: blob.size });
+  } catch (e) {
+    console.warn("[twodb-ext] OPFS unavailable, keeping chunk in memory", e);
+    track.chunks.set(seq, { size: blob.size, blob });
   }
-  await putChunkMeta({ trackId, seq, uploaded: false });
 }
-async function readChunkBytes(trackId, offset, length) {
-  const handle = await opfsFile(trackId, false);
-  const access = await handle.createSyncAccessHandle();
+
+async function spoolGet(track, seq) {
+  const entry = track.chunks.get(seq);
+  if (entry?.blob) return entry.blob;
+  const dir = await spoolDir(rec.recordingId, false);
+  return (await dir.getFileHandle(`${track.id}-${seq}.webm`)).getFile();
+}
+
+async function spoolDrop(track, seq) {
+  track.chunks.delete(seq);
   try {
-    const buf = new ArrayBuffer(length);
-    access.read(buf, { at: offset });
-    return new Uint8Array(buf);
-  } finally {
-    access.close();
-  }
-}
-async function truncateRecording(trackId) {
-  const root = await navigator.storage.getDirectory();
-  const dir = await root.getDirectoryHandle("recordings", { create: false });
-  await dir.removeEntry(`${trackId}.webm`).catch(() => {});
-  await clearChunkMeta(trackId);
+    const dir = await spoolDir(rec.recordingId, false);
+    await dir.removeEntry(`${track.id}-${seq}.webm`);
+  } catch {}
 }
 
-// Track byte offsets per chunk so retries can read exact ranges back.
-const offsets = new Map(); // trackId -> [{offset, length}]
-
-async function storeChunk(trackId, seq, bytes) {
-  const handle = await opfsFile(trackId, true);
-  const access = await handle.createSyncAccessHandle();
-  let offset;
+async function spoolClear(recordingId) {
   try {
-    offset = access.getSize();
-    access.write(bytes, { at: offset });
-    access.flush();
-  } finally {
-    access.close();
-  }
-  if (!offsets.has(trackId)) offsets.set(trackId, []);
-  offsets.get(trackId).push({ offset, length: bytes.byteLength });
-  await putChunkMeta({ trackId, seq, uploaded: false, offset, length: bytes.byteLength });
-  return { offset, length: bytes.byteLength };
+    const root = await navigator.storage.getDirectory();
+    const base = await root.getDirectoryHandle("recordings", { create: true });
+    if (recordingId) await base.removeEntry(recordingId, { recursive: true });
+    else for await (const name of base.keys()) await base.removeEntry(name, { recursive: true });
+  } catch {}
 }
 
-// --- Upload loop -------------------------------------------------------------
+// --- progress ----------------------------------------------------------------------
 
-async function uploadChunk(trackId, seq, bytes, digest) {
-  const headers = { "content-type": "application/octet-stream" };
-  if (digest) headers["x-chunk-sha256"] = digest;
-  const res = await api(`/recordings/${state.recordingId}/tracks/${trackId}/chunks?seq=${seq}`, { method: "POST", headers, body: bytes });
-  if (res.status === 409) {
-    const body = await res.json().catch(() => null);
-    if (body?.expectedSeq !== undefined) {
-      // rewind: re-serialize the track pointer to the server's position
-      const rec = state.recorders.get(trackId);
-      if (rec) rec.serverSeq = body.expectedSeq;
-      return body.expectedSeq;
+let reportTimer = null;
+function report(extra = {}) {
+  if (!rec) return;
+  Object.assign(rec.pendingReport, extra);
+  if (reportTimer) return;
+  reportTimer = setTimeout(() => {
+    reportTimer = null;
+    if (!rec) return;
+    let recorded = 0;
+    let uploaded = 0;
+    for (const t of rec.tracks.values()) {
+      recorded += t.lastSeq;
+      uploaded += t.serverNext - 1;
     }
-  }
-  if (!res.ok) throw new Error(`upload failed (${res.status})`);
-  const body = await res.json();
-  const rec = state.recorders.get(trackId);
-  if (rec) rec.serverSeq = body.nextSeq;
-  return body.nextSeq;
+    const patch = { chunks: { recorded, uploaded }, uploadError: rec.uploadError, ...rec.pendingReport };
+    rec.pendingReport = {};
+    chrome.runtime.sendMessage({ type: "twodb-progress", patch }).catch(() => {});
+  }, 750);
 }
 
-async function withBackoff(fn, tries = 5) {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await fn();
-    } catch (e) {
-      if (attempt >= tries - 1) throw e;
-      await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** attempt, 30000)));
-    }
-  }
-}
+// --- upload loop -------------------------------------------------------------------
 
-const pending = new Map(); // trackId -> seq-sorted [{seq, offset, length, digest}]
-const inFlight = new Set();
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function queueUpload(trackId, entry) {
-  if (!pending.has(trackId)) pending.set(trackId, []);
-  pending.get(trackId).push(entry);
-  pump();
-}
-
-async function pump() {
-  for (const [trackId, queue] of pending) {
-    while (queue.length && [...inFlight].filter((k) => k.startsWith(trackId)).length < UPLOAD_PARALLELISM) {
-      const entry = queue.shift();
-      const key = `${trackId}:${entry.seq}`;
-      if (inFlight.has(key)) continue;
-      inFlight.add(key);
-      (async () => {
-        try {
-          const bytes = await readChunkBytes(trackId, entry.offset, entry.length);
-          await withBackoff(() => uploadChunk(trackId, entry.seq, bytes, entry.digest));
-          await putChunkMeta({ trackId, seq: entry.seq, uploaded: true, offset: entry.offset, length: entry.length });
-        } catch (e) {
-          console.error("[twodb-ext] chunk upload failed", entry.seq, e);
-          queue.unshift(entry); // retry later — next pump
-        } finally {
-          inFlight.delete(key);
-          pump();
-        }
-      })();
-    }
-  }
-}
-
-// --- Recording lifecycle ------------------------------------------------------
-
-async function sha256Hex(bytes) {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
+async function sha256Hex(blob) {
+  const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function platformFor(url) {
+/** Uploads a track's chunks strictly in order, starting at the server's expected seq. */
+async function pump(track) {
+  if (track.pumping || !rec || rec.fatal) return;
+  track.pumping = true;
+  let failures = 0;
   try {
-    const u = new URL(url);
-    if (u.hostname === "meet.google.com") return "meet";
-    if (u.hostname.endsWith("teams.microsoft.com") || u.hostname.endsWith("teams.live.com")) return "teams";
-  } catch {}
-  return "other";
-}
+    while (rec && !rec.fatal && track.chunks.has(track.serverNext)) {
+      const seq = track.serverNext;
+      let res;
+      try {
+        const blob = await spoolGet(track, seq);
+        res = await api(`/recordings/${rec.recordingId}/tracks/${track.id}/chunks?seq=${seq}`, {
+          method: "POST",
+          headers: { "content-type": "application/octet-stream", "x-chunk-sha256": await sha256Hex(blob) },
+          body: blob,
+        });
+      } catch (e) {
+        res = { ok: false, status: 0, json: async () => ({ error: String(e?.message ?? e) }) };
+      }
+      const body = await res.json().catch(() => ({}));
 
-async function startRecording({ meetingStreamId, screenStreamId, serverUrl, apiKey, meetingUrl }) {
-  state.closing = false;
-  state.clientSessionId = crypto.randomUUID();
-  state.serverUrl = (serverUrl || "http://localhost:3001").replace(/\/+$/, "");
-  state.apiKey = apiKey || "";
-  state.meetingUrl = meetingUrl ?? null;
-  state.platform = platformFor(state.meetingUrl ?? "");
-
-  const tracks = ["meeting"];
-  if (screenStreamId) tracks.push("screen");
-  const startRes = await api("/recordings", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ platform: state.platform || "other", meetingUrl: state.meetingUrl, clientSessionId: state.clientSessionId, tracks: tracks.map((trackId) => ({ trackId })) }),
-  });
-  if (!startRes.ok) throw new Error(`session start failed (${startRes.status}): ${await startRes.text()}`);
-  const started = await startRes.json();
-  state.recordingId = started.recordingId;
-
-  await startTrack("meeting", meetingStreamId, started.tracks?.find((t) => t.trackId === "meeting")?.nextSeq ?? 1);
-  if (screenStreamId) await startTrack("screen", screenStreamId, started.tracks?.find((t) => t.trackId === "screen")?.nextSeq ?? 1);
-
-  heartbeatLoop();
-  return started;
-}
-
-async function startTrack(trackId, streamId, serverNextSeq) {
-  const constraints =
-    trackId === "screen"
-      ? {
-          audio: false,
-          video: { chromeMediaSource: "desktop", chromeMediaSourceId: streamId },
-        }
-      : {
-          audio: { chromeMediaSource: "tab", chromeMediaSourceId: streamId },
-          video: { chromeMediaSource: "tab", chromeMediaSourceId: streamId },
-        };
-  const stream = await navigator.mediaDevices.getUserMedia(constraints);
-  if (trackId === "screen") {
-    stream.getVideoTracks()[0]?.addEventListener("ended", () => chrome.runtime.sendMessage({ type: "twodb-screen-track-ended", trackId }));
+      if (res.ok) {
+        failures = 0;
+        rec.uploadError = null;
+        track.serverNext = body.nextSeq ?? seq + 1;
+        await spoolDrop(track, seq);
+        report();
+        continue;
+      }
+      if (res.status === 409 && body.error === "seq_conflict" && typeof body.expectedSeq === "number" && body.expectedSeq !== seq) {
+        // Server is elsewhere: ahead → it already has these chunks; behind → resend from there.
+        for (let s = seq; s < body.expectedSeq; s++) await spoolDrop(track, s);
+        track.serverNext = body.expectedSeq;
+        continue;
+      }
+      if (res.status === 401 || res.status === 404 || (res.status === 409 && body.error === "not_recording") || res.status === 413) {
+        rec.fatal = true;
+        rec.uploadError =
+          res.status === 401 ? "The server rejected the API key." : res.status === 413 ? "The recording is too large." : "The server closed this recording.";
+        report();
+        return;
+      }
+      failures += 1;
+      rec.uploadError = res.status ? `Upload failed (${res.status}), retrying…` : "Offline — chunks are kept and will upload when the connection returns.";
+      report();
+      await sleep(Math.min(1000 * 2 ** Math.min(failures, 5), MAX_BACKOFF_MS));
+    }
+  } finally {
+    track.pumping = false;
   }
-  const recorder = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp8,opus" });
-  const rec = { recorder, seq: 1, serverSeq: serverNextSeq, chunksReceived: 0, startedAt: Date.now() };
-  state.recorders.set(trackId, rec);
+}
 
-  recorder.ondataavailable = async (event) => {
-    if (event.data.size === 0) return;
-    const bytes = new Uint8Array(await event.data.arrayBuffer());
-    const seq = rec.seq++;
-    rec.chunksReceived += 1;
-    const digest = await sha256Hex(bytes);
-    const stored = await storeChunk(trackId, seq, bytes);
-    if (seq >= rec.serverSeq) queueUpload(trackId, { seq, offset: stored.offset, length: stored.length, digest });
+// --- recording -----------------------------------------------------------------------
+
+function newTrack(id, serverNext) {
+  return { id, recorder: null, lastSeq: 0, serverNext, chunks: new Map(), handlers: new Set(), pumping: false, startedAt: Date.now(), streams: [] };
+}
+
+function startRecorder(track, stream, mimeType, videoBitsPerSecond) {
+  const recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported(mimeType) ? mimeType : "video/webm", videoBitsPerSecond });
+  track.recorder = recorder;
+  recorder.ondataavailable = (event) => {
+    if (!event.data.size) return;
+    const seq = ++track.lastSeq;
+    // Tracked so stop() can wait for the final slice to be spooled before finalizing.
+    const job = spoolPut(track, seq, event.data).then(() => {
+      report();
+      void pump(track);
+    });
+    track.handlers.add(job);
+    void job.finally(() => track.handlers.delete(job));
   };
   recorder.start(CHUNK_MS);
+  track.startedAt = Date.now();
 }
 
-let heartbeatTimer = null;
-function heartbeatLoop() {
-  clearInterval(heartbeatTimer);
-  heartbeatTimer = setInterval(async () => {
-    if (!state.recordingId || state.closing) return;
+async function startMeetingTrack(track, streamId, withMic) {
+  const tab = await navigator.mediaDevices.getUserMedia({
+    audio: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId } },
+    video: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId, maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30 } },
+  });
+  track.streams.push(tab);
+
+  // Capturing a tab mutes it for the user — play its audio back so the meeting stays audible.
+  const ctx = new AudioContext();
+  await ctx.resume().catch(() => {});
+  rec.audioContext = ctx;
+  const mix = ctx.createMediaStreamDestination();
+  if (tab.getAudioTracks().length) {
+    const tabAudio = ctx.createMediaStreamSource(tab);
+    tabAudio.connect(ctx.destination);
+    tabAudio.connect(mix);
+  }
+
+  // The tab only carries other people's audio; add the user's own microphone.
+  let micError = null;
+  if (withMic) {
     try {
-      await withBackoff(() => api(`/recordings/${state.recordingId}/heartbeat`, { method: "POST" }), 2);
-    } catch {}
-  }, HEARTBEAT_MS);
-}
-
-async function stopRecording({ finalize = true } = {}) {
-  state.closing = true;
-  clearInterval(heartbeatTimer);
-
-  const stops = [...state.recorders.values()].map((rec) => rec.recorder.state !== "inactive" ? new Promise((resolve) => { rec.recorder.onstop = resolve; rec.recorder.stop(); }) : null);
-  await Promise.all(stops);
-
-  // wait for pending uploads to drain (bounded)
-  const deadline = Date.now() + 60000;
-  while (Date.now() < deadline && [...inFlight].length + [...pending.values()].reduce((n, q) => n + q.length, 0) > 0) {
-    await new Promise((r) => setTimeout(r, 500));
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      track.streams.push(mic);
+      ctx.createMediaStreamSource(mic).connect(mix);
+    } catch (e) {
+      micError = e?.name === "NotAllowedError" ? "permission" : e?.name === "NotFoundError" ? "no_device" : String(e?.message ?? e);
+    }
   }
 
-  let result = null;
-  if (finalize && state.recordingId) {
-    const tracks = [...state.recorders.entries()].map(([trackId, rec]) => ({
-      trackId,
-      totalChunks: rec.chunksReceived,
-      durationMs: Date.now() - rec.startedAt,
-      startedAt: new Date(rec.startedAt).toISOString(),
-    }));
-    const res = await withBackoff(() =>
-      api(`/recordings/${state.recordingId}/finalize`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ tracks }),
+  const video = tab.getVideoTracks()[0];
+  // Tab closed or navigated away: finish the recording instead of leaving it open.
+  video?.addEventListener("ended", () => chrome.runtime.sendMessage({ type: "twodb-meeting-ended" }).catch(() => {}));
+
+  startRecorder(track, new MediaStream([...tab.getVideoTracks(), ...mix.stream.getAudioTracks()]), "video/webm;codecs=vp8,opus", 2_500_000);
+  return { micError };
+}
+
+async function startScreenTrack(track, streamId) {
+  const screen = await navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: streamId, maxWidth: 1920, maxHeight: 1080, maxFrameRate: 15 } },
+  });
+  track.streams.push(screen);
+  // Stopped from Chrome's "Stop sharing" bar: the screen track ends, the meeting continues.
+  screen.getVideoTracks()[0]?.addEventListener("ended", () => report({ screenEnded: true }));
+  startRecorder(track, screen, "video/webm;codecs=vp8", 1_500_000);
+}
+
+async function startRecording(msg) {
+  if (rec) throw new Error("A recording is already running.");
+  await spoolClear(); // leftovers from a crashed session can't be resumed
+  rec = {
+    serverUrl: (msg.serverUrl || "").replace(/\/+$/, ""),
+    apiKey: msg.apiKey,
+    recordingId: null,
+    tracks: new Map(),
+    uploadError: null,
+    fatal: false,
+    pendingReport: {},
+    audioContext: null,
+    heartbeat: null,
+  };
+  try {
+    const trackIds = msg.screenStreamId ? ["meeting", "screen"] : ["meeting"];
+    const res = await api("/recordings", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        platform: msg.platform || "other",
+        title: msg.title || null,
+        meetingUrl: msg.meetingUrl,
+        clientSessionId: crypto.randomUUID(),
+        tracks: trackIds.map((trackId) => ({ trackId })),
       }),
-    );
-    result = await res.json().catch(() => null);
-    for (const trackId of state.recorders.keys()) await truncateRecording(trackId);
-  }
+    });
+    if (!res.ok) throw new Error(`Couldn't start the recording on the server (${res.status}).`);
+    const started = await res.json();
+    rec.recordingId = started.recordingId;
+    const nextSeq = (id) => started.tracks?.find((t) => t.trackId === id)?.nextSeq ?? 1;
 
-  for (const rec of state.recorders.values()) rec.recorder.stream.getTracks().forEach((t) => t.stop());
-  state.recorders.clear();
-  state.recordingId = null;
-  return result;
-}
+    const meeting = newTrack("meeting", nextSeq("meeting"));
+    rec.tracks.set("meeting", meeting);
+    const { micError } = await startMeetingTrack(meeting, msg.meetingStreamId, msg.withMic);
 
-async function abandon() {
-  if (state.recordingId) {
-    await api(`/recordings/${state.recordingId}/abandon`, { method: "POST" }).catch(() => {});
-  }
-  await stopRecording({ finalize: false }).catch(() => {});
-  for (const trackId of ["meeting", "screen"]) await truncateRecording(trackId).catch(() => {});
-}
-
-// --- Message plumbing -----------------------------------------------------------
-
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  (async () => {
-    switch (msg?.type) {
-      case "twodb-start": {
-        try {
-          const started = await startRecording(msg);
-          sendResponse({ ok: true, recordingId: started.recordingId });
-        } catch (e) {
-          sendResponse({ ok: false, error: String(e?.message ?? e) });
-        }
-        return;
-      }
-      case "twodb-stop": {
-        try {
-          const result = await stopRecording({ finalize: msg.finalize !== false });
-          sendResponse({ ok: true, result });
-        } catch (e) {
-          sendResponse({ ok: false, error: String(e?.message ?? e) });
-        }
-        return;
-      }
-      case "twodb-abandon": {
-        try {
-          await abandon();
-          sendResponse({ ok: true });
-        } catch (e) {
-          sendResponse({ ok: false, error: String(e?.message ?? e) });
-        }
-        return;
-      }
-      case "twodb-status": {
-        sendResponse({
-          recording: state.recordingId != null,
-          recordingId: state.recordingId,
-          platform: state.platform,
-        });
-        return;
+    let screen = false;
+    if (msg.screenStreamId) {
+      const track = newTrack("screen", nextSeq("screen"));
+      try {
+        await startScreenTrack(track, msg.screenStreamId);
+        rec.tracks.set("screen", track);
+        screen = true;
+      } catch (e) {
+        console.warn("[twodb-ext] screen track failed; recording the meeting only", e);
       }
     }
-  })();
-  return true; // async sendResponse
-});
 
-export {};
+    rec.heartbeat = setInterval(() => {
+      if (rec?.recordingId) api(`/recordings/${rec.recordingId}/heartbeat`, { method: "POST" }).catch(() => {});
+    }, HEARTBEAT_MS);
+
+    return { recordingId: rec.recordingId, startedAt: meeting.startedAt, tracks: { screen, mic: msg.withMic && !micError }, micError };
+  } catch (e) {
+    const failed = rec;
+    rec = null;
+    releaseMedia(failed);
+    if (failed.recordingId) {
+      await fetch(`${failed.serverUrl}/api/meetings/recordings/${failed.recordingId}/abandon`, { method: "POST", headers: { "x-api-key": failed.apiKey } }).catch(() => {});
+    }
+    throw e;
+  }
+}
+
+function releaseMedia(r) {
+  for (const t of r.tracks.values()) for (const s of t.streams) s.getTracks().forEach((x) => x.stop());
+  void r.audioContext?.close().catch(() => {});
+  clearInterval(r.heartbeat);
+}
+
+async function stopRecorders() {
+  const stoppedAt = Date.now();
+  await Promise.all(
+    [...rec.tracks.values()].map(
+      (t) => new Promise((resolve) => (t.recorder && t.recorder.state !== "inactive" ? ((t.recorder.onstop = resolve), t.recorder.stop()) : resolve())),
+    ),
+  );
+  // onstop fires after the last dataavailable; wait for those slices to reach the spool.
+  for (const t of rec.tracks.values()) await Promise.all([...t.handlers]);
+  releaseMedia(rec);
+  return stoppedAt;
+}
+
+function remainingChunks() {
+  let n = 0;
+  for (const t of rec.tracks.values()) n += t.lastSeq - (t.serverNext - 1);
+  return n;
+}
+
+async function stopRecording() {
+  if (!rec) throw new Error("Nothing is recording.");
+  const stoppedAt = await stopRecorders();
+
+  let left = remainingChunks();
+  let lastProgress = Date.now();
+  while (left > 0 && !rec.fatal && Date.now() - lastProgress < DRAIN_IDLE_MS) {
+    for (const t of rec.tracks.values()) void pump(t);
+    await sleep(500);
+    const now = remainingChunks();
+    if (now < left) lastProgress = Date.now();
+    left = now;
+  }
+
+  const r = rec;
+  const tracks = [...r.tracks.values()].map((t) => ({
+    trackId: t.id,
+    totalChunks: t.lastSeq,
+    durationMs: stoppedAt - t.startedAt,
+    startedAt: new Date(t.startedAt).toISOString(),
+  }));
+  let finalized = false;
+  for (let attempt = 0; attempt < 4 && !finalized; attempt++) {
+    const res = await api(`/recordings/${r.recordingId}/finalize`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tracks }),
+    }).catch(() => null);
+    finalized = !!res?.ok || res?.status === 409;
+    if (!finalized) await sleep(1000 * 2 ** attempt);
+  }
+  rec = null;
+  await spoolClear(r.recordingId);
+  if (!finalized) throw new Error("Couldn't finalize the recording on the server.");
+  return { durationMs: stoppedAt - (r.tracks.get("meeting")?.startedAt ?? stoppedAt), missingChunks: left };
+}
+
+async function abandonRecording() {
+  if (!rec) return;
+  const r = rec;
+  rec.fatal = true; // stop the upload loop
+  await stopRecorders().catch(() => {});
+  rec = null;
+  await fetch(`${r.serverUrl}/api/meetings/recordings/${r.recordingId}/abandon`, { method: "POST", headers: { "x-api-key": r.apiKey } }).catch(() => {});
+  await spoolClear(r.recordingId);
+}
+
+// --- messages --------------------------------------------------------------------
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.target !== "offscreen") return false;
+  const run = {
+    start: async () => ({ ok: true, ...(await startRecording(msg)) }),
+    stop: async () => ({ ok: true, ...(await stopRecording()) }),
+    abandon: async () => (await abandonRecording(), { ok: true }),
+  }[msg.type];
+  if (!run) return false;
+  run().then(sendResponse, (e) => sendResponse({ ok: false, error: String(e?.message ?? e) }));
+  return true;
+});

@@ -1,6 +1,7 @@
 import { Fragment, type ComponentType, type ReactNode } from "react";
 import {
   Calendar,
+  Clapperboard,
   Contact,
   CodeXml,
   Folder,
@@ -22,6 +23,7 @@ import { ChatProvider, ChatSidenav } from "../routes/chat/chat-provider";
 import { CodeProvider, CodeSidenav } from "../routes/code/code-provider";
 import { FilesProvider, FilesSidenav } from "../routes/files/files-provider";
 import { SettingsSidenav } from "../routes/settings/settings-sidenav";
+import { MeetingsProvider, MeetingsSidenav } from "../routes/meetings/meetings-provider";
 
 export interface AppEntry {
   id: string;
@@ -43,7 +45,8 @@ export const APPS: AppEntry[] = [
   { id: "notes", label: "Notes", icon: StickyNote, Provider: NotesProvider, Sidenav: NotesSidenav },
   { id: "chat", label: "Chat", icon: MessageSquare, Provider: ChatProvider, Sidenav: ChatSidenav },
   { id: "code", label: "Code", icon: CodeXml, Provider: CodeProvider, Sidenav: CodeSidenav },
-  { id: "meetings", label: "Meetings", icon: Video },
+  { id: "meetings", label: "Meetings", icon: Video, Provider: MeetingsProvider, Sidenav: MeetingsSidenav },
+  { id: "meetings-old", label: "Meetings (mock)", icon: Clapperboard },
   { id: "automations", label: "Automations", icon: Zap },
   { id: "showcase", label: "Showcase", icon: LayoutGrid },
   { id: "files", label: "Files", icon: Folder, Provider: FilesProvider, Sidenav: FilesSidenav },

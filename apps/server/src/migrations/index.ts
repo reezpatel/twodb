@@ -21,6 +21,8 @@ import { up as email } from "./0019-email";
 import { up as accountsContactsCalendar } from "./0020-accounts-contacts-calendar";
 import { up as agentWorkDirectory } from "./0021-agent-work-directory";
 import { up as skillAiVisible } from "./0022-skill-ai-visible";
+import { up as spaces } from "./0023-spaces";
+import { up as resourceSpaces } from "./0024-resource-spaces";
 
 // Keys sort lexicographically — prefix new migrations with the next number.
 export const migrations: Record<string, Migration> = {
@@ -46,4 +48,6 @@ export const migrations: Record<string, Migration> = {
   "0020_accounts_contacts_calendar": { up: accountsContactsCalendar },
   "0021_agent_work_directory": { up: agentWorkDirectory },
   "0022_skill_ai_visible": { up: skillAiVisible },
+  "0023_spaces": { up: spaces },
+  "0024_resource_spaces": { up: resourceSpaces },
 };

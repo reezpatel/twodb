@@ -2,45 +2,60 @@
 <html>
   <head>
     <meta charset="utf-8" />
+    <link rel="stylesheet" href="../ui.css" />
     <style>
-      body { font-family: system-ui, sans-serif; width: 300px; margin: 0; padding: 12px; background: #0a0a0a; color: #fafafa; }
-      h1 { font-size: 14px; margin: 0 0 10px; }
-      label { display: block; font-size: 11px; color: #a3a3a3; margin: 8px 0 3px; }
-      input[type="text"], input[type="password"] { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px;
-        border: 1px solid #ffffff26; background: #171717; color: #fafafa; font-size: 12px; }
-      .row { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; }
-      button { cursor: pointer; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600;
-        background: #fafafa; color: #0a0a0a; }
-      button:hover { background: #e5e5e5; }
-      .status { margin-top: 10px; font-size: 12px; padding: 8px; border-radius: 6px; background: #171717; }
-      .ok { color: #4ade80; } .err { color: #f87171; }
-      a { color: #7dd3fc; font-size: 11px; }
+      body { width: 340px; }
+      header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+      header img { width: 20px; height: 20px; border-radius: 5px; }
+      header h1 { font-size: 14px; font-weight: 600; margin: 0; flex: 1; color: var(--fg); }
+      main { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+      footer { padding: 0 14px 12px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+      .timer { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; color: var(--fg); }
+      .progress { height: 4px; border-radius: 4px; background: var(--accent); overflow: hidden; }
+      .progress > i { display: block; height: 100%; background: var(--primary); transition: width .3s; }
+      .tab { display: flex; align-items: center; gap: 8px; min-width: 0; }
+      .tab img { width: 16px; height: 16px; flex: none; }
+      .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      details summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+      details summary::-webkit-details-marker { display: none; }
+      details summary svg { transition: transform .15s; }
+      details[open] summary svg { transform: rotate(90deg); }
+      details .fields { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
     </style>
   </head>
   <body>
-    <h1>twodb Meeting Recorder</h1>
-    <label for="server">Server URL</label>
-    <input id="server" type="text" placeholder="http://localhost:3001" />
-    <label for="key">API key (org)</label>
-    <input id="key" type="password" placeholder="twodb_…" />
-    <div class="row">
-      <input id="screen" type="checkbox" checked />
-      <span>capture screen track by default</span>
-    </div>
-    <div class="row">
-      <button id="save">Save</button>
-      <button id="test">Test</button>
-    </div>
-    <div id="status" class="status">—</div>
-    <div class="row" style="justify-content: space-between">
-      <a href="#" id="keys">create API key →</a>
-    </div>
-    <div class="row">
-      <button id="record" style="background:#ef4444;color:#fff">● Record this tab</button>
-    </div>
-    <p style="font-size:10px;color:#737373;margin:8px 0 0">
-      Records the current tab (Meet/Teams). Also: right-click page → "Record this meeting", or Ctrl+Shift+R.
-    </p>
+    <header>
+      <img src="../icons/icon48.png" alt="" />
+      <h1>twodb Recorder</h1>
+      <span id="conn" class="badge"><i class="dot"></i><span>Checking…</span></span>
+    </header>
+    <main>
+      <div id="view"></div>
+      <details id="settings">
+        <summary>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6" /></svg>
+          Server settings
+        </summary>
+        <div class="fields">
+          <label class="field">
+            <span>twodb URL</span>
+            <input id="server" class="input" type="url" placeholder="https://app.example.com" />
+          </label>
+          <label class="field">
+            <span>Organization API key</span>
+            <input id="key" class="input" type="password" placeholder="twodb_…" autocomplete="off" />
+          </label>
+          <div class="row">
+            <button id="save" class="btn primary sm">Save & test</button>
+            <a id="keys" href="#" class="link">Create an API key</a>
+          </div>
+          <p id="settings-status" class="hint"></p>
+        </div>
+      </details>
+    </main>
+    <footer>
+      <span class="kbd" id="shortcut">Alt+Shift+R</span> starts or stops. You can also right-click the meeting page or the twodb icon.
+    </footer>
     <script type="module" src="popup.js"></script>
   </body>
 </html>

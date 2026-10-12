@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bot, ChevronUp, Circle, Flag, Folder, GitBranch, Link, Loader2, RefreshCw, Tag, User } from "lucide-react";
+import { Bot, Check, ChevronUp, Circle, Flag, Folder, GitBranch, Link, Loader2, RefreshCw, Tag, User } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ const MEMORIES = [
   { id: "m3", text: "Runners connect outbound; never expose runner ports.", scope: "global" },
 ];
 
-const SECTIONS = ["subagents", "memories", "workflow", "session", "git"] as const;
+const SECTIONS = ["subagents", "memories", "workflow", "session", "plan", "git"] as const;
 type SectionId = (typeof SECTIONS)[number];
 
 function Section({ title, open, onToggle, children }: { title: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
@@ -128,13 +128,15 @@ export function Sidebar() {
     memories: true,
     workflow: false,
     session: true,
+    plan: true,
     git: true,
   });
   const toggle = (id: SectionId) => setOpen((cur) => ({ ...cur, [id]: !cur[id] }));
 
   const git = useSidebarGit();
   const subagents = useSidebarSubagents();
-  const { openBtwSession } = useChat();
+  const { openBtwSession, session } = useChat();
+  const planSteps = (session.data?.plan as { steps?: { description: string; status: string }[] } | null | undefined)?.steps ?? [];
 
   return (
     <div className="flex h-full flex-col">
@@ -199,6 +201,32 @@ export function Sidebar() {
             {item.label}
           </SidebarItem>
         ))}
+      </Section>
+
+      <Section title={`Plan${planSteps.length ? ` (${planSteps.filter((s) => s.status === "done").length}/${planSteps.length})` : ""}`} open={open.plan} onToggle={() => toggle("plan")}>
+        {planSteps.length === 0 ? (
+          <div className="text-muted-foreground py-1 text-xs">no plan set — the agent calls update_plan for multi-step work</div>
+        ) : (
+          <ol className="flex flex-col gap-1">
+            {planSteps.map((step, i) => (
+              <li key={i} className="flex items-start gap-2 py-0.5 text-xs" title={step.status}>
+                <span
+                  className={cn(
+                    "mt-0.5 flex size-3.5 shrink-0 items-center justify-center rounded-full border text-[9px]",
+                    step.status === "done"
+                      ? "border-success text-success"
+                      : step.status === "in_progress"
+                        ? "border-primary text-primary"
+                        : "text-muted-foreground",
+                  )}
+                >
+                  {step.status === "done" ? <Check size={9} aria-hidden="true" /> : step.status === "in_progress" ? <Loader2 size={9} className="animate-spin" aria-hidden="true" /> : i + 1}
+                </span>
+                <span className={cn("min-w-0 flex-1", step.status === "done" && "text-muted-foreground line-through")}>{step.description}</span>
+              </li>
+            ))}
+          </ol>
+        )}
       </Section>
 
       <Section title={`Git Summary${git.files ? ` (${git.files.length})` : ""}`} open={open.git} onToggle={() => toggle("git")}>

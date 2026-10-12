@@ -5,6 +5,7 @@ import { useCodeDirectories, type CodeDirectory } from "./use-code-directories";
 export function useNewDirectoryDialog(onCreated: (dir: CodeDirectory) => void) {
   const [dirName, setDirName] = useState("");
   const [selection, setSelection] = useState<FinderSelection | null>(null);
+  const [spaceId, setSpaceId] = useState<string | null>(null);
   const { directories, createDirectory } = useCodeDirectories();
 
   const existing = useMemo(
@@ -15,16 +16,17 @@ export function useNewDirectoryDialog(onCreated: (dir: CodeDirectory) => void) {
   const submit = () => {
     if (!selection) return;
     createDirectory.mutate(
-      { displayName: dirName.trim() || existing?.displayName || "Untitled", cwd: selection.path, runnerId: selection.runnerId },
+      { displayName: dirName.trim() || existing?.displayName || "Untitled", cwd: selection.path, runnerId: selection.runnerId, spaceId },
       {
         onSuccess: (row) => {
           setDirName("");
           setSelection(null);
+          setSpaceId(null);
           onCreated(row);
         },
       },
     );
   };
 
-  return { dirName, setDirName, selection, setSelection, existing, createDirectory, submit };
+  return { dirName, setDirName, selection, setSelection, spaceId, setSpaceId, existing, createDirectory, submit };
 }

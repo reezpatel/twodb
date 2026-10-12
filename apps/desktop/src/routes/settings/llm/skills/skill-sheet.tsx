@@ -7,6 +7,7 @@ import { EditorSheet } from "../editor-sheet";
 import { TagInput } from "../tag-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { SpaceSelect } from "@/components/space-select";
 
 export const SKILLS_LIST_PATH = "/apps/settings/llm/skills";
 
@@ -48,7 +49,7 @@ export function SkillSheet() {
     void queryClient.invalidateQueries({ queryKey: ["workspace", "llm-tags"] });
   };
   const save = useMutation({
-    mutationFn: (input: { id: string; isNew: boolean; name: string; description: string; content: string; tags: string[]; aiVisible: boolean }) =>
+    mutationFn: (input: { id: string; isNew: boolean; name: string; description: string; content: string; tags: string[]; aiVisible: boolean; spaceId: string | null }) =>
       api<Skill>(input.isNew ? "/api/skills" : `/api/skills/${input.id}`, {
         method: input.isNew ? "POST" : "PATCH",
         body: JSON.stringify(input),
@@ -66,11 +67,13 @@ export function SkillSheet() {
 
   const [tags, setTags] = useState<string[]>(existing?.tags ?? []);
   const [aiVisible, setAiVisible] = useState(existing?.aiVisible ?? true);
+  const [spaceId, setSpaceId] = useState<string | null>(existing?.spaceId ?? null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setTags(existing?.tags ?? []);
     setAiVisible(existing?.aiVisible ?? true);
+    setSpaceId(existing?.spaceId ?? null);
     setError(null);
   }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -88,14 +91,14 @@ export function SkillSheet() {
       return;
     }
     save.mutate(
-      { id: skillId, isNew, name: frontmatter.title.trim(), description: frontmatter.description.trim(), content, tags, aiVisible },
+      { id: skillId, isNew, name: frontmatter.title.trim(), description: frontmatter.description.trim(), content, tags, aiVisible, spaceId },
       { onSuccess: close, onError: (e) => setError((e as Error).message) },
     );
   };
 
   const fieldsDirty = existing
-    ? JSON.stringify(tags) !== JSON.stringify(existing.tags) || aiVisible !== existing.aiVisible
-    : tags.length > 0 || !aiVisible;
+    ? JSON.stringify(tags) !== JSON.stringify(existing.tags) || aiVisible !== existing.aiVisible || spaceId !== (existing.spaceId ?? null)
+    : tags.length > 0 || !aiVisible || spaceId !== null;
 
   return (
     <EditorSheet
@@ -127,6 +130,9 @@ export function SkillSheet() {
             </span>
             <Switch checked={aiVisible} onCheckedChange={setAiVisible} />
           </label>
+          <div className="mt-3">
+            <SpaceSelect id="skill-space" value={spaceId} onChange={setSpaceId} />
+          </div>
         </div>
       }
     />

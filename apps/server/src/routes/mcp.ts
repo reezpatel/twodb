@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
+import { validateSpaceId } from "../lib/spaces";
 import { resolveScope } from "../lib/code-directory";
 import { parseTags, syncLlmTags } from "../lib/llm-tags";
 import { evictMcpClient, listMcpServerTools, parseMcpServersJson } from "../lib/mcp";
@@ -67,6 +68,8 @@ export const mcpRoutes = new Hono()
 
     const scope = await resolveScope(db, s.organizationId, body?.codeDirectoryId);
     if (!scope.ok) return c.json({ error: scope.error }, scope.error === "directory_not_found" ? 404 : 400);
+    const space = await validateSpaceId(s.organizationId, body?.spaceId);
+    if (!space.ok) return c.json({ error: space.error }, 400);
 
     const now = new Date();
     try {
@@ -76,6 +79,7 @@ export const mcpRoutes = new Hono()
           id: typeof body?.id === "string" && body.id.trim() ? body.id.trim() : crypto.randomUUID(),
           organizationId: s.organizationId,
           codeDirectoryId: scope.codeDirectoryId,
+          spaceId: space.spaceId,
           name: body.name.trim(),
           url,
           transport: typeof body?.transport === "string" ? body.transport : "auto",
@@ -116,7 +120,12 @@ export const mcpRoutes = new Hono()
     if (!existing) return c.json({ error: "mcp_server_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ name: string; url: string; transport: string; headers: Record<string, string>; enabled: boolean; tags: string[] }> = {};
+    const patch: Partial<{ name: string; url: string; transport: string; headers: Record<string, string>; enabled: boolean; tags: string[]; spaceId: string | null }> = {};
+    if (body?.spaceId !== undefined) {
+      const space = await validateSpaceId(s.organizationId, body.spaceId);
+      if (!space.ok) return c.json({ error: space.error }, 400);
+      patch.spaceId = space.spaceId;
+    }
     if (body?.name !== undefined) {
       if (typeof body.name !== "string" || !/^[\w][\w-]*$/.test(body.name.trim())) return c.json({ error: "invalid_name" }, 400);
       patch.name = body.name.trim();

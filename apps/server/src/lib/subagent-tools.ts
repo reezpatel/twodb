@@ -1,6 +1,7 @@
 import { db } from "../auth";
 import type { AgentTool } from "./agent";
 import { DEFAULT_SKILL_TAG } from "./skills";
+import { spaceMatches, getDirectorySpaceId } from "./spaces";
 import { isSessionRunning, startSessionRun, type SessionRow } from "../routes/code-ws";
 import { broadcastToSession } from "../routes/code-ws";
 import type { AgentType } from "../plugins/db";
@@ -42,16 +43,23 @@ export function canInvoke(callerAgentType: AgentType | null, targetType: AgentTy
 
 /** Agents visible to a session: non-sentinel, directory-compatible, and tagged
  * "default" or sharing a session tag — same matching as skills. */
-export async function listMatchingSubagents(organizationId: string, codeDirectoryId: string | null, sessionTags: string[], callerAgentType: AgentType | null) {
+export async function listMatchingSubagents(
+  organizationId: string,
+  codeDirectoryId: string | null,
+  sessionTags: string[],
+  callerAgentType: AgentType | null,
+  spaceId: string | null,
+) {
   const rows = await db
     .selectFrom("agent")
-    .select(["id", "description", "provider", "model", "type", "tools", "tags", "codeDirectoryId", "workDirectoryId"])
+    .select(["id", "description", "provider", "model", "type", "tools", "tags", "codeDirectoryId", "workDirectoryId", "spaceId"])
     .where("organizationId", "=", organizationId)
     .orderBy("createdAt", "asc")
     .execute();
   return rows
     .filter((a) => a.type !== "sentinel")
     .filter((a) => a.codeDirectoryId === null || a.codeDirectoryId === codeDirectoryId)
+    .filter((a) => spaceMatches(a.spaceId, spaceId))
     .filter((a) => a.tags.includes(DEFAULT_SKILL_TAG) || a.tags.some((t) => sessionTags.includes(t)))
     .filter((a) => canInvoke(callerAgentType, a.type));
 }
@@ -117,11 +125,13 @@ export interface SubagentExecution {
 }
 
 function agentMatchError(
-  target: { type: string; tags: string[]; codeDirectoryId: string | null },
+  target: { type: string; tags: string[]; codeDirectoryId: string | null; spaceId: string | null },
   sessionTags: string[],
   codeDirectoryId: string | null,
+  spaceId: string | null,
 ): string | null {
   if (target.codeDirectoryId !== null && target.codeDirectoryId !== codeDirectoryId) return "agent belongs to a different workspace";
+  if (!spaceMatches(target.spaceId, spaceId)) return "agent belongs to a different space";
   if (!target.tags.includes(DEFAULT_SKILL_TAG) && !target.tags.some((t) => sessionTags.includes(t))) return "agent tags do not match this session";
   return null;
 }
@@ -132,7 +142,8 @@ export function childDirectoryId(agent: { type: AgentType; workDirectoryId: stri
 }
 
 export async function executeListSubagents(ctx: SubagentContext): Promise<SubagentExecution> {
-  const agents = await listMatchingSubagents(ctx.organizationId, ctx.session.codeDirectoryId, ctx.session.tags ?? [], ctx.callerAgentType);
+  const spaceId = await getDirectorySpaceId(ctx.organizationId, ctx.session.codeDirectoryId);
+  const agents = await listMatchingSubagents(ctx.organizationId, ctx.session.codeDirectoryId, ctx.session.tags ?? [], ctx.callerAgentType, spaceId);
   if (agents.length === 0) {
     return {
       output: "no subagents configured for this session — add agents in Settings → LLM → Agents and tag them 'default' or a session tag",
@@ -170,7 +181,7 @@ export async function executeInvokeSubagent(ctx: SubagentContext, agentId: strin
   if (!canInvoke(ctx.callerAgentType, agent.type)) {
     return { output: `error: a ${ctx.callerAgentType ?? "main"} session cannot invoke a ${agent.type} agent`, failed: true };
   }
-  const matchError = agentMatchError(agent, ctx.session.tags ?? [], ctx.session.codeDirectoryId);
+  const matchError = agentMatchError(agent, ctx.session.tags ?? [], ctx.session.codeDirectoryId, await getDirectorySpaceId(ctx.organizationId, ctx.session.codeDirectoryId));
   if (matchError) return { output: `error: ${matchError}`, failed: true };
 
   const parent = ctx.session;

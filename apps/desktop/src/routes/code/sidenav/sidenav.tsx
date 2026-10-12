@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Loader2, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Loader2, MoreHorizontal, Pencil, Plus, Search, Trash2, Boxes } from "lucide-react";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { NewDirectoryDialog } from "../directories/new-directory-dialog";
 import { useSessionList, groupSessionsByDirectory, useSessionEvents } from "./use-session-list";
@@ -8,8 +8,10 @@ import type { CodeSession, SessionDirectoryGroup } from "./use-session-list";
 import { useCodeDirectories } from "../directories/use-code-directories";
 import type { CodeDirectory } from "../directories/use-code-directories";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SpaceSelect } from "@/components/space-select";
 import { SideNav } from "@/components/side-nav";
 import { cn } from "@/lib/utils";
 
@@ -31,15 +33,22 @@ function relativeTime(updatedAt: string) {
 
 function DirectoryGroupHeader({
   group,
+  directory,
   rename,
+  update,
   create,
 }: {
   group: SessionDirectoryGroup;
+  directory: CodeDirectory | undefined;
   rename: UseMutationResult<CodeDirectory, Error, { id: string; displayName: string }>;
+  update: UseMutationResult<CodeDirectory, Error, { id: string; patch: Record<string, unknown> }>;
   create: UseMutationResult<CodeSession, Error, string | null>;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [spaceOpen, setSpaceOpen] = useState(false);
+  const [spaceId, setSpaceId] = useState<string | null>(null);
 
   const commit = () => {
     setEditing(false);
@@ -99,18 +108,73 @@ function DirectoryGroupHeader({
       }}
     >
       <span className="truncate">{group.label}</span>
-      <button
-        className="text-muted-foreground/50 hover:bg-accent hover:text-foreground flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover/header:opacity-100 focus-visible:opacity-100"
-        title="New session in this directory"
-        disabled={create.isPending}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (group.id) create.mutate(group.id);
-        }}
-        onDoubleClick={(e) => e.stopPropagation()}
-      >
-        <Plus size={12} aria-hidden="true" />
-      </button>
+      <span className="flex shrink-0 items-center gap-1">
+        <button
+          className="text-muted-foreground/50 hover:bg-accent hover:text-foreground flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover/header:opacity-100 focus-visible:opacity-100"
+          title="New session in this directory"
+          disabled={create.isPending}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (group.id) create.mutate(group.id);
+          }}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <Plus size={12} aria-hidden="true" />
+        </button>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="text-muted-foreground/50 hover:bg-accent hover:text-foreground flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover/header:opacity-100 data-[state=open]:opacity-100"
+              title="Directory options"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal size={12} aria-hidden="true" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem
+              onSelect={() => {
+                setValue(group.label);
+                setEditing(true);
+              }}
+            >
+              <Pencil size={13} aria-hidden="true" /> Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
+                setSpaceId(directory?.spaceId ?? null);
+                setSpaceOpen(true);
+              }}
+            >
+              <Boxes size={13} aria-hidden="true" /> Edit space…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </span>
+
+      <Dialog open={spaceOpen} onOpenChange={setSpaceOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit space — {group.label}</DialogTitle>
+            <DialogDescription>
+              Directories in a space match that space's resources (connections, skills, agents, MCP…); directories with no space see only base resources.
+            </DialogDescription>
+          </DialogHeader>
+          <SpaceSelect id={`dir-space-${group.id}`} value={spaceId} onChange={setSpaceId} label="Space" />
+          <DialogFooter>
+            <Button
+              size="sm"
+              disabled={update.isPending || spaceId === (directory?.spaceId ?? null)}
+              onClick={() => {
+                if (!group.id) return;
+                update.mutate({ id: group.id, patch: { spaceId } }, { onSuccess: () => setSpaceOpen(false) });
+              }}
+            >
+              {update.isPending ? <Loader2 size={14} className="animate-spin" /> : null} Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -118,7 +182,7 @@ function DirectoryGroupHeader({
 export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps) {
   const { sessions, create, remove, rename } = useSessionList(onSelect);
   const live = useSessionEvents(true);
-  const { directories, renameDirectory } = useCodeDirectories();
+  const { directories, renameDirectory, updateDirectory } = useCodeDirectories();
   const [newDirOpen, setNewDirOpen] = useState(false);
   const [renaming, setRenaming] = useState<CodeSession | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -158,7 +222,13 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
         )}
         {directoryGroups.map((group) => (
           <div key={group.id ?? "none"}>
-            <DirectoryGroupHeader group={group} rename={renameDirectory} create={create} />
+            <DirectoryGroupHeader
+              group={group}
+              directory={(directories.data ?? []).find((d) => d.id === group.id)}
+              rename={renameDirectory}
+              update={updateDirectory}
+              create={create}
+            />
             {group.sessions.map((session) => {
               const isRenamingThis = renaming?.id === session.id;
               if (isRenamingThis) {

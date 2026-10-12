@@ -6,6 +6,7 @@ import type { LlmConnection, LlmProvider } from "../../../../lib/llm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SpaceSelect } from "@/components/space-select";
 
 interface ConnectionFormProps {
   providers: LlmProvider[];
@@ -48,6 +49,7 @@ const OAUTH_SIGNIN: Record<string, OAuthSigninConfig> = {
 export function ConnectionForm({ providers, connection, onSaved, onCancel }: ConnectionFormProps) {
   const editing = !!connection;
   const [providerId, setProviderId] = useState(connection?.provider ?? providers[0]?.id ?? "");
+  const [spaceId, setSpaceId] = useState<string | null>(connection?.spaceId ?? null);
   const [error, setError] = useState<string | null>(null);
   const [credNote, setCredNote] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
@@ -68,7 +70,7 @@ export function ConnectionForm({ providers, connection, onSaved, onCancel }: Con
         if (editing) {
           await api(`/api/llm/connections/${connection.id}`, {
             method: "PATCH",
-            body: JSON.stringify({ name: value.name, config: value.config }),
+            body: JSON.stringify({ name: value.name, config: value.config, spaceId }),
           });
         } else {
           await api("/api/llm/connections", {
@@ -77,6 +79,7 @@ export function ConnectionForm({ providers, connection, onSaved, onCancel }: Con
               provider: providerId,
               name: value.name,
               config: value.config,
+              spaceId,
             }),
           });
         }
@@ -219,6 +222,8 @@ export function ConnectionForm({ providers, connection, onSaved, onCancel }: Con
           </div>
         )}
       </form.Field>
+
+      <SpaceSelect id="conn-space" value={spaceId} onChange={setSpaceId} label="Space (optional)" />
 
       {oauth && (
         <div className="flex flex-col gap-1.5">

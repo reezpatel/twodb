@@ -4,7 +4,9 @@ import { Menu } from "lucide-react";
 import { NavRail } from "./nav-rail";
 import { MobileNavDrawer } from "./mobile-nav";
 import { FooterUsage } from "./footer-usage";
+import { FooterSpaces } from "./footer-spaces";
 import { MobileNavContext } from "./mobile-nav-context";
+import { SpaceProvider } from "./space-provider";
 import { useAppLayout } from "./use-app-layout";
 import { useMediaQuery } from "../lib/use-media-query";
 import { appShellFor, getApp } from "../lib/apps";
@@ -37,8 +39,9 @@ export function AppLayout() {
   }, [appId]);
 
   return (
-    <MobileNavContext.Provider value={{ isMobile, closeNav: () => setNavOpen(false), sideNavTarget, setSideNavActive }}>
-      <div className="bg-background flex h-screen flex-col">
+    <SpaceProvider>
+      <MobileNavContext.Provider value={{ isMobile, closeNav: () => setNavOpen(false), sideNavTarget, setSideNavActive }}>
+        <div className="bg-background flex h-screen flex-col">
         {isMobile && (
           <header className="bg-card flex h-12 shrink-0 items-center gap-3 border-b px-3">
             <button
@@ -77,7 +80,7 @@ export function AppLayout() {
 
         <footer className="bg-card text-muted-foreground flex h-6 items-center justify-between gap-4 border-t px-2 text-xs">
           <div className="flex min-w-0 items-center gap-4">
-            <span className="shrink-0">{activeOrg?.name ?? "twodb"}</span>
+            <FooterSpaces />
             <FooterUsage />
           </div>
         </footer>
@@ -95,7 +98,8 @@ export function AppLayout() {
             sideNavRef={setSideNavTarget}
           />
         )}
-      </div>
-    </MobileNavContext.Provider>
+        </div>
+      </MobileNavContext.Provider>
+    </SpaceProvider>
   );
 }

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
+import { resolveSpaceIds, validateSpaceId, getDirectorySpaceId } from "../lib/spaces";
 import { getCodeSettings, setCodeSettings, type CodeSettingsPatch } from "../lib/code-settings";
 import { parseTags, syncLlmTags } from "../lib/llm-tags";
 import { enabledRepoSources, listRepoSkills, readRepoSkill } from "../lib/skills";
@@ -465,7 +466,12 @@ export const codeRoutes = new Hono()
     const s = await requireOrgSession(c);
     if (!s) return c.json({ error: "unauthorized" }, 401);
 
-    const rows = await db.selectFrom("code_directory").selectAll().where("organizationId", "=", s.organizationId).orderBy("createdAt", "asc").execute();
+    let query = db.selectFrom("code_directory").selectAll().where("organizationId", "=", s.organizationId);
+    // Footer spaces filter: no header = all directories; a selection = only
+    // those spaces' directories (unspaced ones hide until "Show all").
+    const spaceIds = await resolveSpaceIds(c, s.organizationId);
+    if (spaceIds) query = query.where("spaceId", "in", spaceIds);
+    const rows = await query.orderBy("createdAt", "asc").execute();
     return c.json(rows);
   })
 
@@ -476,6 +482,8 @@ export const codeRoutes = new Hono()
     const body = await c.req.json().catch(() => null);
     if (typeof body?.runnerId !== "string" || !body.runnerId) return c.json({ error: "invalid_runner" }, 400);
     if (typeof body?.cwd !== "string" || !body.cwd.trim()) return c.json({ error: "invalid_cwd" }, 400);
+    const space = await validateSpaceId(s.organizationId, body?.spaceId);
+    if (!space.ok) return c.json({ error: space.error }, 400);
 
     const runner = await db
       .selectFrom("runner")
@@ -509,6 +517,7 @@ export const codeRoutes = new Hono()
         runnerId: runner.id,
         cwd: body.cwd.trim(),
         displayName: body.displayName.trim(),
+        spaceId: space.spaceId,
         createdAt: now,
         updatedAt: now,
       })
@@ -544,7 +553,12 @@ export const codeRoutes = new Hono()
     if (!existing) return c.json({ error: "directory_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ runnerId: string; cwd: string; displayName: string }> = {};
+    const patch: Partial<{ runnerId: string; cwd: string; displayName: string; spaceId: string | null }> = {};
+    if (body?.spaceId !== undefined) {
+      const space = await validateSpaceId(s.organizationId, body.spaceId);
+      if (!space.ok) return c.json({ error: space.error }, 400);
+      patch.spaceId = space.spaceId;
+    }
     if (body?.runnerId !== undefined) {
       if (typeof body.runnerId !== "string" || !body.runnerId) return c.json({ error: "invalid_runner" }, 400);
       const runner = await db
@@ -869,6 +883,7 @@ export const codeRoutes = new Hono()
       sessionId: session.id,
       codeDirectoryId: session.codeDirectoryId,
       sessionTags: [...(session.tags ?? []), ...(agent?.tags ?? [])],
+      spaceId: await getDirectorySpaceId(s.organizationId, session.codeDirectoryId),
       runnerId: agent ? null : (directory?.runnerId ?? null),
       cwd: directory?.cwd ?? null,
       systemPromptOverride: agent?.instruction ?? null,

@@ -5,6 +5,7 @@ import type { CodeDirectory } from "./use-code-directories";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { SpaceSelect } from "@/components/space-select";
 
 interface NewDirectoryDialogProps {
   open: boolean;
@@ -19,7 +20,7 @@ export function NewDirectoryDialog({ open, onOpenChange, onCreated, title, submi
     onOpenChange(false);
     onCreated(row);
   };
-  const { dirName, setDirName, selection, setSelection, existing, createDirectory, submit } = useNewDirectoryDialog(handleCreated);
+  const { dirName, setDirName, selection, setSelection, spaceId, setSpaceId, existing, createDirectory, submit } = useNewDirectoryDialog(handleCreated);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -31,6 +32,7 @@ export function NewDirectoryDialog({ open, onOpenChange, onCreated, title, submi
           <Input placeholder="Display name (e.g. twodb repo)" value={dirName} onChange={(e) => setDirName(e.target.value)} />
           <RunnerFinder mode="folder" onSelectionChange={setSelection} className="h-80" />
           {existing && <p className="text-muted-foreground text-xs">Already registered as “{existing.displayName}” — it will be reused.</p>}
+          <SpaceSelect id="dir-space" value={spaceId} onChange={setSpaceId} />
         </div>
         <DialogFooter>
           <Button size="sm" disabled={!selection || (!existing && !dirName.trim()) || createDirectory.isPending} onClick={submit}>

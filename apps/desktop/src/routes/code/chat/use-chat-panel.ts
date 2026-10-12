@@ -82,6 +82,8 @@ interface StreamFrame {
   askUser?: { id: string; questions: AskUserQuestion[] } | null;
   /** /btw frames — status while summarizing, ok when the side thread closed. */
   sendToMain?: boolean | null;
+  /** Live plan steps — update_plan broadcasts mid-run. */
+  steps?: { description: string; status: string }[];
 }
 
 export interface ToolEvent {
@@ -409,6 +411,11 @@ export function useChatPanel(sessionId: string | null) {
       setStatusText(frame.text ?? null);
     } else if (frame.type === "session_updated") {
       void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
+    } else if (frame.type === "plan_updated") {
+      // Live plan steps — patch the session query cache; the sidebar reads it.
+      queryClient.setQueryData<SessionDetail>(["code", "session", sessionId], (prev) =>
+        prev ? { ...prev, plan: { steps: frame.steps ?? [] } } : prev,
+      );
     } else if (frame.type === "compaction_state") {
       // Server-side compaction state — survives refresh/reconnect (the POST
       // keeps running even if the viewer goes away).

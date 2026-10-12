@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
+import { validateSpaceId } from "../lib/spaces";
 import { resolveScope } from "../lib/code-directory";
 import type { MemoryScope } from "../plugins/db";
 
@@ -53,6 +54,8 @@ export const memoryRoutes = new Hono()
 
     const scope = await resolveScope(db, s.organizationId, body?.codeDirectoryId);
     if (!scope.ok) return c.json({ error: scope.error }, scope.error === "directory_not_found" ? 404 : 400);
+    const space = await validateSpaceId(s.organizationId, body?.spaceId);
+    if (!space.ok) return c.json({ error: space.error }, 400);
 
     const now = new Date();
     const row = await db
@@ -61,6 +64,7 @@ export const memoryRoutes = new Hono()
         id: crypto.randomUUID(),
         organizationId: s.organizationId,
         codeDirectoryId: scope.codeDirectoryId,
+        spaceId: space.spaceId,
         scopeId: typeof body.scopeId === "string" && body.scopeId ? body.scopeId : null,
         scope: memoryScope,
         content: body.content.trim(),
@@ -94,7 +98,12 @@ export const memoryRoutes = new Hono()
     if (!existing) return c.json({ error: "memory_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ scopeId: string | null; scope: MemoryScope; content: string }> = {};
+    const patch: Partial<{ scopeId: string | null; scope: MemoryScope; content: string; spaceId: string | null }> = {};
+    if (body?.spaceId !== undefined) {
+      const space = await validateSpaceId(s.organizationId, body.spaceId);
+      if (!space.ok) return c.json({ error: space.error }, 400);
+      patch.spaceId = space.spaceId;
+    }
     if (body?.scopeId !== undefined) {
       if (body.scopeId !== null && (typeof body.scopeId !== "string" || !body.scopeId)) {
         return c.json({ error: "invalid_scope" }, 400);

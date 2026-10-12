@@ -13,6 +13,8 @@ export interface CodeSession {
   runtimeState: Record<string, unknown> | null;
   /** Run finished since this session was last opened — sidebar unread marker. */
   unseenUpdates?: boolean;
+  /** Session plan — { steps: [{ description, status }] } via update_plan. */
+  plan?: { steps: { description: string; status: string }[] } | null;
   createdAt: string;
   updatedAt: string;
 }

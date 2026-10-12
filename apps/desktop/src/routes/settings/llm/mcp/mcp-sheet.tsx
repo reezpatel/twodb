@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
+import { SpaceSelect } from "@/components/space-select";
 
 export const MCP_LIST_PATH = "/apps/settings/llm/mcp";
 
@@ -57,6 +58,7 @@ export function McpSheet() {
   const [headersJson, setHeadersJson] = useState("{}");
   const [enabled, setEnabled] = useState(true);
   const [tags, setTags] = useState<string[]>([]);
+  const [spaceId, setSpaceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
 
@@ -68,6 +70,7 @@ export function McpSheet() {
     setEnabled(existing?.enabled ?? true);
     // New servers default to the universal tag — empty tags match no session.
     setTags(existing?.tags?.length ? existing.tags : ["default"]);
+    setSpaceId(existing?.spaceId ?? null);
     setError(null);
     setTestResult(null);
   }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -95,7 +98,7 @@ export function McpSheet() {
       setError("URL is required");
       return;
     }
-    const body: Record<string, unknown> = { name: name.trim(), url: url.trim(), transport, headers, enabled, tags };
+    const body: Record<string, unknown> = { name: name.trim(), url: url.trim(), transport, headers, enabled, tags, spaceId };
     save.mutate(
       { id: mcpId, isNew, body },
       {
@@ -185,6 +188,8 @@ export function McpSheet() {
               </Label>
               <TagInput id="mcp-tags" value={tags} onChange={setTags} placeholder="default" />
             </div>
+
+            <SpaceSelect id="mcp-space" value={spaceId} onChange={setSpaceId} />
 
             {error && (
               <p className="text-destructive text-xs" role="alert">

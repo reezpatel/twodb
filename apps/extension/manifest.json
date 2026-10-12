@@ -1,17 +1,34 @@
 {
   "manifest_version": 3,
   "name": "twodb Meeting Recorder",
-  "version": "0.1.1",
-  "description": "Capture Google Meet / Teams meetings (tab + optional screen track) and upload them to a twodb server.",
+  "version": "0.2.0",
+  "description": "Record Google Meet, Teams and Zoom meetings — tab, your microphone and an optional screen — into twodb.",
   "minimum_chrome_version": "116",
-  "permissions": ["activeTab", "tabCapture", "desktopCapture", "offscreen", "storage", "alarms", "contextMenus"],
+  "permissions": [
+    "activeTab",
+    "tabCapture",
+    "desktopCapture",
+    "offscreen",
+    "storage",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*"
+  ],
   "commands": {
     "record-toggle": {
-      "suggested_key": { "default": "Ctrl+Shift+R", "linux": "Ctrl+Shift+R", "mac": "Command+Shift+R" },
-      "description": "Start/stop recording the current meeting tab"
+      "suggested_key": {
+        "default": "Alt+Shift+R",
+        "mac": "Alt+Shift+R"
+      },
+      "description": "Start or stop recording the current tab"
     }
   },
-  "host_permissions": ["http://localhost:3001/*", "https://*/*"],
   "action": {
     "default_popup": "popup/popup.html",
     "default_title": "twodb Meeting Recorder"
@@ -22,8 +39,16 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://meet.google.com/*", "https://teams.microsoft.com/*", "https://teams.live.com/*"],
-      "js": ["content/content.js"],
+      "matches": [
+        "https://meet.google.com/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*",
+        "https://app.zoom.us/wc/*",
+        "https://*.zoom.us/wc/*"
+      ],
+      "js": [
+        "content/content.js"
+      ],
       "run_at": "document_idle"
     }
   ],

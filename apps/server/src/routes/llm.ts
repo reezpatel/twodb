@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
+import { validateSpaceId } from "../lib/spaces";
 import { getProvider, LLM_PROVIDERS } from "../lib/llm-providers";
 import { refreshConnectionModels } from "../lib/refresh-models";
 import type { LlmConnectionTable } from "../plugins/db";
@@ -659,6 +660,8 @@ export const llmRoutes = new Hono()
       return c.json({ error: "unknown_provider" }, 400);
     }
     if (!name) return c.json({ error: "invalid_name" }, 400);
+    const space = await validateSpaceId(s.organizationId, body?.spaceId);
+    if (!space.ok) return c.json({ error: space.error }, 400);
 
     const now = new Date();
     const row = await db
@@ -668,6 +671,7 @@ export const llmRoutes = new Hono()
         organizationId: s.organizationId,
         provider,
         name,
+        spaceId: space.spaceId,
         config,
         enabled: true,
         createdAt: now,
@@ -694,6 +698,7 @@ export const llmRoutes = new Hono()
       name: string;
       config: Record<string, unknown>;
       enabled: boolean;
+      spaceId: string | null;
     }> = {};
 
     if (body?.name !== undefined) {
@@ -701,6 +706,11 @@ export const llmRoutes = new Hono()
         return c.json({ error: "invalid_name" }, 400);
       }
       patch.name = body.name.trim();
+    }
+    if (body?.spaceId !== undefined) {
+      const space = await validateSpaceId(s.organizationId, body.spaceId);
+      if (!space.ok) return c.json({ error: space.error }, 400);
+      patch.spaceId = space.spaceId;
     }
     if (body?.config !== undefined) {
       if (!isRecord(body.config)) return c.json({ error: "invalid_config" }, 400);

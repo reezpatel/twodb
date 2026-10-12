@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>twodb — microphone access</title>
+    <link rel="stylesheet" href="../ui.css" />
+    <style>
+      body { min-height: 100vh; display: grid; place-items: center; }
+      .card { width: 380px; padding: 20px; gap: 12px; }
+      h1 { margin: 0; font-size: 16px; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="row"><img src="../icons/icon48.png" alt="" width="24" height="24" style="border-radius: 6px" /><h1>Record your microphone</h1></div>
+      <p class="muted small" style="margin: 0">
+        Meeting tabs only carry other people's audio. Allow microphone access once so twodb can include your voice in recordings.
+        The microphone is only used while a recording is running.
+      </p>
+      <button id="allow" class="btn primary block">Allow microphone</button>
+      <p id="status" class="hint"></p>
+    </div>
+    <script type="module" src="mic.js"></script>
+  </body>
+</html>

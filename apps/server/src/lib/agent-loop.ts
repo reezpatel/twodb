@@ -13,6 +13,7 @@ import {
 } from "./agent";
 import { executeToolCall, toolsForScope, type CanvasArtifactResult, type ToolExecution } from "./agent-tools";
 import { executeCheckSubagentStatus, executeInvokeSubagent, executeListSubagents, SUBAGENT_TOOLS, type SubagentExecution } from "./subagent-tools";
+import { getDirectorySpaceId } from "./spaces";
 import { logger } from "./logger";
 import { callMcpTool, loadSessionMcpTools, MCP_TOOL_PREFIX } from "./mcp";
 import { MAX_IMAGE_BASE64, resolveImageBase64 } from "./assets";
@@ -107,8 +108,12 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
   const filterByAgent = <T extends { name: string }>(list: T[]): T[] =>
     !agentToolNames || agentToolNames.includes("all") ? list : list.filter((t) => agentToolNames.includes(t.name));
   const scopedTools = filterByAgent(scopedBase);
+  // The session's space drives resource matching: skills/instructions/
+  // memories/MCP/spaced connections of the same space join the run, null-space
+  // resources match everywhere, and unspaced directories see only null-space.
+  const sessionSpaceId = await getDirectorySpaceId(organizationId, session.codeDirectoryId);
   // MCP tools (Settings → LLM → MCP) ride along for code sessions; failures surface as a status note.
-  const mcpLoaded = toolScope === "code" ? await loadSessionMcpTools(organizationId, session.codeDirectoryId, session.tags ?? []) : { tools: [], failures: [] };
+  const mcpLoaded = toolScope === "code" ? await loadSessionMcpTools(organizationId, session.codeDirectoryId, session.tags ?? [], sessionSpaceId) : { tools: [], failures: [] };
   // Subagent tools — offered to every session; each call enforces the
   // invocation permission rules (main → anything; sub_agent → sub_agent; etc).
   const subagentTools = SUBAGENT_TOOLS;
@@ -204,7 +209,7 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
   /** MCP tool call — namespaced mcp__<server>__<tool>, executed server-side. */
   const runMcpCall = async (call: AgentToolCall): Promise<ToolExecution> => {
     try {
-      const output = await callMcpTool(organizationId, call.name, call.arguments ?? {});
+      const output = await callMcpTool(organizationId, call.name, call.arguments ?? {}, sessionSpaceId);
       return { output, code: 0, failed: false };
     } catch (e) {
       return { output: `error: ${(e as Error).message}`, code: null, failed: true };
@@ -304,6 +309,7 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
     sessionId: session.id,
     codeDirectoryId: session.codeDirectoryId,
     sessionTags: [...(session.tags ?? []), ...(agent?.tags ?? [])],
+    spaceId: sessionSpaceId,
     runnerId: agent ? null : runnerId,
     cwd,
     systemPromptOverride: input.systemPromptOverride !== undefined ? input.systemPromptOverride : (agent?.instruction ?? null),
@@ -437,7 +443,7 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
                   () => {
                     void emit({ type: "status", text: "runner is offline — waiting for it to come back (up to 60 min)…" });
                   },
-                  { organizationId, sessionId: session.id, codeDirectoryId: session.codeDirectoryId, supportsImages, imageToolResults },
+                  { organizationId, sessionId: session.id, codeDirectoryId: session.codeDirectoryId, spaceId: sessionSpaceId, supportsImages, imageToolResults },
                 ),
           signal,
         );

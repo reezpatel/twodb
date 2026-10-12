@@ -3,6 +3,7 @@ import { db } from "../auth";
 import type { CodeSessionArtifactType } from "../plugins/db";
 import { getCodeSettings } from "./code-settings";
 import { enabledRepoSources, readRepoSkill } from "./skills";
+import { spaceMatches } from "./spaces";
 import { readAssetForModel } from "./assets";
 import { runnerManager } from "./runner-manager";
 import { broadcastToSession, broadcastSessionEvent } from "../routes/code-ws";
@@ -493,6 +494,8 @@ export interface ToolContext {
   organizationId: string;
   sessionId: string;
   codeDirectoryId: string | null;
+  /** The session's space (directory spaceId) — resource matching happens by it. */
+  spaceId: string | null;
   /** Whether the current model can see images — read_asset inlines them when true. */
   supportsImages: boolean;
   /** Only the Anthropic wire renders images inside tool results; elsewhere the upload-time attachment carries them. */
@@ -575,6 +578,8 @@ async function executePlan(ctx: ToolContext | undefined, call: AgentToolCall): P
     .set({ plan: JSON.stringify({ steps }), updatedAt: new Date() })
     .where("id", "=", ctx.sessionId)
     .execute();
+  // Live plan updates reach viewers without waiting for the run to finish.
+  broadcastToSession(ctx.sessionId, { type: "plan_updated", steps });
   return { output: JSON.stringify({ steps }, null, 2), code: 0, failed: false };
 }
 
@@ -591,7 +596,7 @@ async function executeReadSkill(ctx: ToolContext | undefined, runnerId: string |
       .where("aiVisible", "=", true)
       .where((eb) => eb.or([eb("codeDirectoryId", "is", null), ...(ctx.codeDirectoryId ? [eb("codeDirectoryId", "=", ctx.codeDirectoryId)] : [])]))
       .execute();
-    const row = rows.find((r) => r.name === name);
+    const row = rows.find((r) => r.name === name && spaceMatches(r.spaceId, ctx.spaceId));
     if (row) return { output: `${row.name}\n\n${row.content}`, code: 0, failed: false };
     if (runnerId && cwd) {
       const settings = await getCodeSettings(ctx.organizationId);

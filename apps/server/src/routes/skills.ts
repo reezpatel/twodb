@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
+import { validateSpaceId, spaceMatches, getDirectorySpaceId } from "../lib/spaces";
 import { resolveScope } from "../lib/code-directory";
 import { parseTags, syncLlmTags } from "../lib/llm-tags";
 
@@ -12,12 +13,18 @@ export const skillRoutes = new Hono()
     let query = db.selectFrom("skill").selectAll().where("organizationId", "=", s.organizationId);
 
     const codeDirectoryId = c.req.query("codeDirectoryId");
+    let directorySpaceId: string | null = null;
     if (codeDirectoryId) {
       query = query.where((eb) => eb.or([eb("codeDirectoryId", "is", null), eb("codeDirectoryId", "=", codeDirectoryId)]));
+      // Session-scoped view (composer palette, code chat): the directory's
+      // space gates the list, same as the agent runtime's matching. Without the
+      // param (settings UI) everything is shown.
+      directorySpaceId = await getDirectorySpaceId(s.organizationId, codeDirectoryId);
     }
 
     const rows = await query.orderBy("name", "asc").execute();
-    return c.json(rows);
+    const filtered = directorySpaceId !== null ? rows.filter((r) => spaceMatches(r.spaceId, directorySpaceId)) : rows;
+    return c.json(filtered);
   })
 
   .post("/", async (c) => {
@@ -35,6 +42,8 @@ export const skillRoutes = new Hono()
     const scope = await resolveScope(db, s.organizationId, body?.codeDirectoryId);
     if (!scope.ok) return c.json({ error: scope.error }, scope.error === "directory_not_found" ? 404 : 400);
     if (body?.aiVisible !== undefined && typeof body.aiVisible !== "boolean") return c.json({ error: "invalid_ai_visible" }, 400);
+    const space = await validateSpaceId(s.organizationId, body?.spaceId);
+    if (!space.ok) return c.json({ error: space.error }, 400);
 
     const now = new Date();
     const row = await db
@@ -43,6 +52,7 @@ export const skillRoutes = new Hono()
         id: typeof body?.id === "string" && body.id.trim() ? body.id.trim() : crypto.randomUUID(),
         organizationId: s.organizationId,
         codeDirectoryId: scope.codeDirectoryId,
+        spaceId: space.spaceId,
         name: body.name.trim(),
         description: body.description,
         content: body.content,
@@ -79,10 +89,15 @@ export const skillRoutes = new Hono()
     if (!existing) return c.json({ error: "skill_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ name: string; description: string; content: string; tags: string[]; aiVisible: boolean }> = {};
+    const patch: Partial<{ name: string; description: string; content: string; tags: string[]; aiVisible: boolean; spaceId: string | null }> = {};
     if (body?.name !== undefined) {
       if (typeof body.name !== "string" || !body.name.trim()) return c.json({ error: "invalid_name" }, 400);
       patch.name = body.name.trim();
+    }
+    if (body?.spaceId !== undefined) {
+      const space = await validateSpaceId(s.organizationId, body.spaceId);
+      if (!space.ok) return c.json({ error: space.error }, 400);
+      patch.spaceId = space.spaceId;
     }
     if (body?.description !== undefined) {
       if (typeof body.description !== "string") return c.json({ error: "invalid_description" }, 400);

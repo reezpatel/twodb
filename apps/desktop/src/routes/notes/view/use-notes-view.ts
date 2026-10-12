@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { randomId } from "@/lib/utils";
 
 export const NOTE_PROPERTY_TYPES = [
   "text",
@@ -137,7 +138,7 @@ export function useNotesView(groupId: string | null) {
           ...(type === "select" || type === "multiselect" || type === "status"
             ? {
                 options: (options ?? DEFAULT_OPTIONS_BY_TYPE[type] ?? []).map((v) => ({
-                  id: crypto.randomUUID(),
+                  id: randomId(),
                   value: v,
                   label: v,
                 })),

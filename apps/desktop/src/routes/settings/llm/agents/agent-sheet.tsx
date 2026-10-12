@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { AGENT_TOOL_ALL, AGENT_TOOL_NAMES } from "@/lib/agent-tool-names";
 import { cn } from "@/lib/utils";
+import { SpaceSelect } from "@/components/space-select";
 import { useCodeDirectories } from "../../../code/directories/use-code-directories";
 
 export const AGENTS_LIST_PATH = "/apps/settings/llm/agents";
@@ -33,6 +34,7 @@ export function AgentSheet() {
   const [type, setType] = useState<AgentType>("sub_agent");
   const [tools, setTools] = useState<string[]>([]);
   const [workDirectoryId, setWorkDirectoryId] = useState<string | null>(null);
+  const [spaceId, setSpaceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export function AgentSheet() {
     setType(existing?.type ?? "sub_agent");
     setTools(existing?.tools ?? []);
     setWorkDirectoryId(existing?.workDirectoryId ?? null);
+    setSpaceId(existing?.spaceId ?? null);
     setError(null);
   }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -55,8 +58,9 @@ export function AgentSheet() {
       JSON.stringify(tags) !== JSON.stringify(existing.tags) ||
       type !== existing.type ||
       JSON.stringify(tools) !== JSON.stringify(existing.tools) ||
-      (type === "persona" && workDirectoryId !== existing.workDirectoryId)
-    : Boolean(provider || model || description || tags.length > 0 || tools.length > 0 || workDirectoryId);
+      (type === "persona" && workDirectoryId !== existing.workDirectoryId) ||
+      spaceId !== (existing.spaceId ?? null)
+    : Boolean(provider || model || description || tags.length > 0 || tools.length > 0 || workDirectoryId || spaceId);
 
   const allTools = tools.includes(AGENT_TOOL_ALL);
   const toggleTool = (name: string) => {
@@ -84,6 +88,7 @@ export function AgentSheet() {
         type,
         tools,
         workDirectoryId: type === "persona" ? workDirectoryId : null,
+        spaceId,
       },
       { onSuccess: close, onError: (e) => setError((e as Error).message) },
     );
@@ -206,6 +211,7 @@ export function AgentSheet() {
             </Label>
             <TagInput id="agent-tags" value={tags} onChange={setTags} />
           </div>
+          <SpaceSelect id="agent-space" value={spaceId} onChange={setSpaceId} />
         </>
       }
     />

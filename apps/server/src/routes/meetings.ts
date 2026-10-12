@@ -6,6 +6,7 @@ import {
   appendChunk,
   finalizeRecording,
   getRecording,
+  getTrackMedia,
   heartbeatRecording,
   listRecordings,
   startRecording,
@@ -84,11 +85,12 @@ export const meetingsRoutes = new Hono()
   .post("/recordings/:id/finalize", async (c) => {
     const s = (await requireOrgSession(c))!;
     const body = await c.req.json().catch(() => null);
-    const rawTracks: { trackId?: string; totalChunks?: unknown; durationMs?: unknown; startedAt?: unknown }[] = Array.isArray(body?.tracks)
-      ? body.tracks
-      : [];
+    const rawTracks: { trackId?: string; totalChunks?: unknown; durationMs?: unknown; startedAt?: unknown }[] = Array.isArray(body?.tracks) ? body.tracks : [];
     const tracks = rawTracks
-      .filter((t): t is { trackId: string; totalChunks?: unknown; durationMs?: unknown; startedAt?: unknown } => typeof t?.trackId === "string" && TRACK_IDS.has(t.trackId))
+      .filter(
+        (t): t is { trackId: string; totalChunks?: unknown; durationMs?: unknown; startedAt?: unknown } =>
+          typeof t?.trackId === "string" && TRACK_IDS.has(t.trackId),
+      )
       .map((t) => ({
         trackId: t.trackId,
         totalChunks: typeof t.totalChunks === "number" ? t.totalChunks : undefined,
@@ -124,6 +126,24 @@ export const meetingsRoutes = new Hono()
     const limit = Number(c.req.query("limit") ?? 100);
     const recordings = await listRecordings(s.organizationId, Number.isFinite(limit) ? limit : 100);
     return c.json({ recordings });
+  })
+
+  .get("/recordings/:id/tracks/:track/media", async (c) => {
+    const s = (await requireOrgSession(c))!;
+    const media = await getTrackMedia(s.organizationId, c.req.param("id"), c.req.param("track"));
+    if (!media) return c.json({ error: "not_found" }, 404);
+    const size = media.body.length;
+    const headers = { "content-type": media.contentType, "accept-ranges": "bytes", "cache-control": "private, max-age=3600" };
+    const range = /^bytes=(\d*)-(\d*)$/.exec(c.req.header("range") ?? "");
+    if (!range || size === 0) return c.body(new Uint8Array(media.body), 200, { ...headers, "content-length": String(size) });
+    const start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
+    const end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+    if (start >= size || start > end) return c.body(null, 416, { "content-range": `bytes */${size}` });
+    return c.body(new Uint8Array(media.body.subarray(start, end + 1)), 206, {
+      ...headers,
+      "content-range": `bytes ${start}-${end}/${size}`,
+      "content-length": String(end - start + 1),
+    });
   })
 
   .get("/recordings/:id", async (c) => {

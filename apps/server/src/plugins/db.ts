@@ -125,6 +125,8 @@ export interface LlmConnectionTable {
   organizationId: string;
   provider: string;
   name: string;
+  /** Space this resource belongs to; null = all spaces. */
+  spaceId: string | null;
   config: Record<string, unknown>;
   enabled: boolean;
   createdAt: Date;
@@ -157,6 +159,8 @@ export interface CodeDirectoryTable {
   runnerId: string;
   cwd: string;
   displayName: string;
+  /** Space this directory belongs to; sessions in it see matching-space resources. */
+  spaceId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -218,6 +222,8 @@ export interface SkillTable {
   id: string;
   organizationId: string;
   codeDirectoryId: string | null;
+  /** Space this skill belongs to; null = all spaces. */
+  spaceId: string | null;
   name: string;
   description: string;
   content: string;
@@ -234,6 +240,8 @@ export interface AgentTable {
   id: string;
   organizationId: string;
   codeDirectoryId: string | null;
+  /** Space this agent belongs to; null = all spaces. */
+  spaceId: string | null;
   provider: string;
   model: string;
   description: string | null;
@@ -255,6 +263,8 @@ export interface McpServerTable {
   id: string;
   organizationId: string;
   codeDirectoryId: string | null;
+  /** Space this server belongs to; null = all spaces. */
+  spaceId: string | null;
   /** Unique per scope; tools are namespaced with it (mcp__<name>__<tool>). */
   name: string;
   url: string;
@@ -273,6 +283,8 @@ export interface InstructionTable {
   id: string;
   organizationId: string;
   codeDirectoryId: string | null;
+  /** Space this instruction belongs to; null = all spaces. */
+  spaceId: string | null;
   instruction: string;
   instructionPath: string | null;
   hash: string;
@@ -287,6 +299,8 @@ export interface MemoryTable {
   id: string;
   organizationId: string;
   codeDirectoryId: string | null;
+  /** Space this memory belongs to; null = all spaces. */
+  spaceId: string | null;
   scopeId: string | null;
   /** workspace | project | session */
   scope: MemoryScope;
@@ -343,6 +357,14 @@ export interface FooterPreferenceTable {
   userId: string;
   key: string;
   value: ColumnType<Record<string, unknown>, string, string>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SpaceTable {
+  id: string;
+  organizationId: string;
+  name: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -1255,6 +1277,7 @@ export interface Database {
   llm_quota: LlmQuotaTable;
   llm_usage_event: LlmUsageEventTable;
   footer_preference: FooterPreferenceTable;
+  space: SpaceTable;
   llm_model: LlmModelTable;
   storage_backend: StorageBackendTable;
   storage_bucket: StorageBucketTable;

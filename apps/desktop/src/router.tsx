@@ -33,6 +33,7 @@ import { ContactsScene } from "./routes/contacts/contacts-scene";
 import { ChatScene } from "./routes/chat/chat-scene";
 import { CalendarScene } from "./routes/calendar/calendar-scene";
 import { MeetingsScene } from "./routes/meetings/meetings-scene";
+import { MeetingsOldScene } from "./routes/meetings-old/meetings-old-scene";
 import { AutomationsScene } from "./routes/automations/automations-scene";
 import { OverviewScene } from "./routes/overview/overview-scene";
 import { ShowcaseScene } from "./routes/showcase/showcase-scene";
@@ -113,6 +114,8 @@ export const router = createBrowserRouter([
       { path: "/apps/contacts", Component: ContactsScene },
       { path: "/apps/chat", Component: ChatScene },
       { path: "/apps/meetings", Component: MeetingsScene },
+      { path: "/apps/meetings/:recordingId", Component: MeetingsScene },
+      { path: "/apps/meetings-old", Component: MeetingsOldScene },
       { path: "/apps/automations", Component: AutomationsScene },
       { path: "/apps/showcase", Component: ShowcaseScene },
       { path: "/apps/notes", Component: NotesScene },

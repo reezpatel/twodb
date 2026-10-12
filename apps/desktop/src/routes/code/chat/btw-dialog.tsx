@@ -31,11 +31,11 @@ export function BtwDialog({ btwSessionId, seed, onClose, onStart }: BtwDialogPro
   const [question, setQuestion] = useState(seed ?? "");
 
   // ----- agent picker state -------------------------------------------------
-  const agents = useQuery({
-    queryKey: ["workspace", "agents"],
-    queryFn: () => api<Agent[]>("/api/agents"),
-  });
   const { directoryId } = useSessionDirectory();
+  const agents = useQuery({
+    queryKey: ["workspace", "agents", directoryId],
+    queryFn: () => api<Agent[]>(`/api/agents${directoryId ? `?codeDirectoryId=${directoryId}` : ""}`),
+  });
   const pickable = (agents.data ?? []).filter((a) => a.type !== "sentinel");
 
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);

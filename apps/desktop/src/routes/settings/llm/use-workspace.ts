@@ -5,6 +5,8 @@ export interface Skill {
   id: string;
   organizationId: string;
   codeDirectoryId: string | null;
+  /** Space this skill belongs to; null = all spaces. */
+  spaceId: string | null;
   name: string;
   description: string;
   content: string;
@@ -28,6 +30,8 @@ export interface Agent {
   id: string;
   organizationId: string;
   codeDirectoryId: string | null;
+  /** Space this agent belongs to; null = all spaces. */
+  spaceId: string | null;
   provider: string;
   model: string;
   description: string | null;
@@ -47,6 +51,8 @@ export interface McpServer {
   id: string;
   organizationId: string;
   codeDirectoryId: string | null;
+  /** Space this server belongs to; null = all spaces. */
+  spaceId: string | null;
   name: string;
   url: string;
   transport: string;
@@ -63,6 +69,8 @@ export interface Memory {
   id: string;
   organizationId: string;
   codeDirectoryId: string | null;
+  /** Space this memory belongs to; null = all spaces. */
+  spaceId: string | null;
   scopeId: string | null;
   scope: MemoryScope;
   content: string;
@@ -74,6 +82,8 @@ export interface Instruction {
   id: string;
   organizationId: string;
   codeDirectoryId: string | null;
+  /** Space this instruction belongs to; null = all spaces. */
+  spaceId: string | null;
   instruction: string;
   instructionPath: string | null;
   hash: string;

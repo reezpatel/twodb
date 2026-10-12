@@ -5,6 +5,7 @@ import { EditorSheet } from "../editor-sheet";
 import { TagInput } from "../tag-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SpaceSelect } from "@/components/space-select";
 
 export const INSTRUCTIONS_LIST_PATH = "/apps/settings/llm/instructions";
 
@@ -19,11 +20,13 @@ export function InstructionSheet() {
 
   const [instructionPath, setInstructionPath] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [spaceId, setSpaceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setInstructionPath(existing?.instructionPath ?? "");
     setTags(existing?.tags ?? []);
+    setSpaceId(existing?.spaceId ?? null);
     setError(null);
   }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -33,8 +36,8 @@ export function InstructionSheet() {
   );
 
   const fieldsDirty = existing
-    ? instructionPath !== (existing.instructionPath ?? "") || JSON.stringify(tags) !== JSON.stringify(existing.tags)
-    : Boolean(instructionPath || tags.length > 0);
+    ? instructionPath !== (existing.instructionPath ?? "") || JSON.stringify(tags) !== JSON.stringify(existing.tags) || spaceId !== (existing.spaceId ?? null)
+    : Boolean(instructionPath || tags.length > 0 || spaceId);
 
   const submit = (content: string) => {
     if (!instructionId) return;
@@ -48,6 +51,7 @@ export function InstructionSheet() {
         instruction: content,
         instructionPath: instructionPath.trim() || null,
         tags,
+        spaceId,
       })
       .then(close)
       .catch((e: Error) => setError(e.message));
@@ -88,6 +92,7 @@ export function InstructionSheet() {
             </Label>
             <TagInput id="instr-tags" value={tags} onChange={setTags} />
           </div>
+          <SpaceSelect id="instr-space" value={spaceId} onChange={setSpaceId} />
         </>
       }
     />

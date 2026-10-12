@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
+import { validateSpaceId, spaceMatches, getDirectorySpaceId } from "../lib/spaces";
 import { resolveScope } from "../lib/code-directory";
 import { parseTags, syncLlmTags } from "../lib/llm-tags";
 import type { AgentTable } from "../plugins/db";
@@ -31,12 +32,17 @@ export const agentRoutes = new Hono()
     let query = db.selectFrom("agent").selectAll().where("organizationId", "=", s.organizationId);
 
     const codeDirectoryId = c.req.query("codeDirectoryId");
+    let directorySpaceId: string | null = null;
     if (codeDirectoryId) {
       query = query.where((eb) => eb.or([eb("codeDirectoryId", "is", null), eb("codeDirectoryId", "=", codeDirectoryId)]));
+      // Session-scoped view (/btw picker): the directory's space gates the
+      // list. Without the param (settings UI) everything is shown.
+      directorySpaceId = await getDirectorySpaceId(s.organizationId, codeDirectoryId);
     }
 
     const rows = await query.orderBy("createdAt", "asc").execute();
-    return c.json(rows);
+    const filtered = directorySpaceId !== null ? rows.filter((r) => spaceMatches(r.spaceId, directorySpaceId)) : rows;
+    return c.json(filtered);
   })
 
   .post("/", async (c) => {
@@ -67,6 +73,8 @@ export const agentRoutes = new Hono()
         { error: work.error === "directory_not_found" ? "work_directory_not_found" : "invalid_work_directory" },
         work.error === "directory_not_found" ? 404 : 400,
       );
+    const space = await validateSpaceId(s.organizationId, body?.spaceId);
+    if (!space.ok) return c.json({ error: space.error }, 400);
 
     const now = new Date();
     const row = await db
@@ -75,6 +83,7 @@ export const agentRoutes = new Hono()
         id: crypto.randomUUID(),
         organizationId: s.organizationId,
         codeDirectoryId: scope.codeDirectoryId,
+        spaceId: space.spaceId,
         provider: body.provider.trim(),
         model: body.model.trim(),
         description: typeof body.description === "string" && body.description ? body.description : null,
@@ -125,7 +134,14 @@ export const agentRoutes = new Hono()
       tools: string;
       name: string | null;
       workDirectoryId: string | null;
+      spaceId: string | null;
     }> = {};
+
+    if (body?.spaceId !== undefined) {
+      const space = await validateSpaceId(s.organizationId, body.spaceId);
+      if (!space.ok) return c.json({ error: space.error }, 400);
+      patch.spaceId = space.spaceId;
+    }
     if (body?.name !== undefined) {
       if (body.name !== null && typeof body.name !== "string") return c.json({ error: "invalid_name" }, 400);
       patch.name = body.name && body.name.trim() ? body.name.trim() : null;

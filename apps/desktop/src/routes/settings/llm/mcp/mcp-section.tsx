@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { randomId } from "@/lib/utils";
 import type { McpServer } from "../use-workspace";
 import { Empty, PanelShell, ResourceTable } from "../workspace-panels";
 import { Button } from "@/components/ui/button";
@@ -67,7 +68,7 @@ export function McpSection() {
       <PanelShell
         title="MCP servers"
         hint="external tool servers offered to code-session agents as tool calls"
-        onNew={() => navigate(`${MCP_LIST_PATH}/${crypto.randomUUID()}`)}
+        onNew={() => navigate(`${MCP_LIST_PATH}/${randomId()}`)}
       >
         {list.isPending ? (
           <Empty pending label="MCP server" />

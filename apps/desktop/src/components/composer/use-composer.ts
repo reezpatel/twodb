@@ -124,6 +124,17 @@ export function useComposer({ files, disabled, placeholder, commands, onSkillCli
                 pluginKey: fileMentionKey,
                 items: ({ query }) =>
                   searchFiles(filesRef.current ?? [], query).map((path) => ({ id: path, label: path, folder: path.endsWith("/") }) satisfies SuggestionItem),
+                // Delete the typed @query before inserting, then place the
+                // mention node on the cleaned range.
+                command: ({ editor, range, props: item }) => {
+                  if (!item) return;
+                  editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .insertContentAt(range.from, { type: "mention", attrs: { id: item.id, label: item.label } })
+                    .run();
+                },
                 render: () => suggestionRenderer(popupOpenRef),
               },
             }),
@@ -146,9 +157,12 @@ export function useComposer({ files, disabled, placeholder, commands, onSkillCli
               group: c.group,
               kind: c.kind,
             }) satisfies SuggestionItem),
-          // Skill picks insert a chip; commands stay plain text.
-          command: ({ editor, props: item }) => {
+          // Skill picks insert a chip; commands stay plain text. Both must
+          // delete the typed query range first — otherwise "/com" + "/compact"
+          // concatenates into "/com/compact".
+          command: ({ editor, range, props: item }) => {
             const cmd = commandsRef.current?.find((c) => c.id === item?.id);
+            const chain = editor.chain().focus().deleteRange(range);
             if (cmd && isSkillCommand(cmd)) {
               const store = skillsRef.current;
               if (cmd.content) {
@@ -161,10 +175,11 @@ export function useComposer({ files, disabled, placeholder, commands, onSkillCli
                   if (content) store.set(cmd.label, { name: cmd.label, content });
                 });
               }
-              editor.chain().focus().insertContent({ type: "skillChip", attrs: { id: cmd.id, label: `/${cmd.label}` } }).run();
+              chain.insertContent({ type: "skillChip", attrs: { id: cmd.id, label: `/${cmd.label}` } }).run();
             } else if (item) {
-              // Default mention insertion: /<label> as plain text.
-              editor.chain().focus().insertContent(`/${item.label}`).run();
+              // Trailing space so the suggestion plugin doesn't re-fire on the
+              // freshly inserted "/" text.
+              chain.insertContent(`/${item.label} `).run();
             }
           },
           render: () => suggestionRenderer(popupOpenRef),

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
+import { validateSpaceId } from "../lib/spaces";
 import { resolveScope } from "../lib/code-directory";
 import { parseTags, syncLlmTags } from "../lib/llm-tags";
 
@@ -41,6 +42,8 @@ export const instructionRoutes = new Hono()
 
     const scope = await resolveScope(db, s.organizationId, body?.codeDirectoryId);
     if (!scope.ok) return c.json({ error: scope.error }, scope.error === "directory_not_found" ? 404 : 400);
+    const space = await validateSpaceId(s.organizationId, body?.spaceId);
+    if (!space.ok) return c.json({ error: space.error }, 400);
 
     const now = new Date();
     // Rows with a path are upserted by (scope, path); pathless rows always insert.
@@ -73,6 +76,7 @@ export const instructionRoutes = new Hono()
         id: crypto.randomUUID(),
         organizationId: s.organizationId,
         codeDirectoryId: scope.codeDirectoryId,
+        spaceId: space.spaceId,
         instruction: body.instruction,
         instructionPath,
         hash: body.hash.trim(),
@@ -113,7 +117,12 @@ export const instructionRoutes = new Hono()
     if (!existing) return c.json({ error: "instruction_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ instruction: string; hash: string; instructionPath: string | null; tags: string[] }> = {};
+    const patch: Partial<{ instruction: string; hash: string; instructionPath: string | null; tags: string[]; spaceId: string | null }> = {};
+    if (body?.spaceId !== undefined) {
+      const space = await validateSpaceId(s.organizationId, body.spaceId);
+      if (!space.ok) return c.json({ error: space.error }, 400);
+      patch.spaceId = space.spaceId;
+    }
     if (body?.instruction !== undefined) {
       if (typeof body.instruction !== "string") return c.json({ error: "invalid_instruction" }, 400);
       patch.instruction = body.instruction;

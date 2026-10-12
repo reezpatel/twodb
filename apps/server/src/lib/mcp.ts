@@ -7,6 +7,7 @@ import { db } from "../auth";
 import type { McpServerTable } from "../plugins/db";
 import type { AgentTool } from "./agent";
 import { DEFAULT_SKILL_TAG } from "./skills";
+import { spaceMatches } from "./spaces";
 
 // MCP server registry: rows from `mcp_server` (Settings → LLM → MCP) become
 // agent tools in code sessions. HTTP/sse transports only — the server process
@@ -123,15 +124,21 @@ export function mcpServerMatches(row: Selectable<McpServerTable>, codeDirectoryI
   return row.tags.some((t) => sessionTags.includes(t));
 }
 
-/** Matching servers for a session — org-wide or directory-scoped. */
-export async function listSessionMcpServers(organizationId: string, codeDirectoryId: string | null, sessionTags: string[]): Promise<Selectable<McpServerTable>[]> {
+/** Matching servers for a session — org-wide or directory-scoped, and
+ * space-matched (null-space servers match every session). */
+export async function listSessionMcpServers(
+  organizationId: string,
+  codeDirectoryId: string | null,
+  sessionTags: string[],
+  spaceId: string | null,
+): Promise<Selectable<McpServerTable>[]> {
   const rows = await db
     .selectFrom("mcp_server")
     .selectAll()
     .where("organizationId", "=", organizationId)
     .where((eb) => eb.or([eb("codeDirectoryId", "is", null), ...(codeDirectoryId ? [eb("codeDirectoryId", "=", codeDirectoryId)] : [])]))
     .execute();
-  return rows.filter((r) => mcpServerMatches(r, codeDirectoryId, sessionTags));
+  return rows.filter((r) => spaceMatches(r.spaceId, spaceId)).filter((r) => mcpServerMatches(r, codeDirectoryId, sessionTags));
 }
 
 /** Tool list for a session; unreachable servers are skipped with their error attached. */
@@ -139,8 +146,9 @@ export async function loadSessionMcpTools(
   organizationId: string,
   codeDirectoryId: string | null,
   sessionTags: string[],
+  spaceId: string | null,
 ): Promise<{ tools: McpTool[]; failures: { server: string; error: string }[] }> {
-  const rows = await listSessionMcpServers(organizationId, codeDirectoryId, sessionTags);
+  const rows = await listSessionMcpServers(organizationId, codeDirectoryId, sessionTags, spaceId);
   const settled = await Promise.allSettled(rows.map((row) => listMcpServerTools(row)));
   const tools: McpTool[] = [];
   const failures: { server: string; error: string }[] = [];
@@ -152,13 +160,15 @@ export async function loadSessionMcpTools(
 }
 
 /** Execute one namespaced MCP tool call. Unknown/unreachable → thrown, caught by the loop. */
-export async function callMcpTool(organizationId: string, name: string, args: Record<string, unknown>): Promise<string> {
+export async function callMcpTool(organizationId: string, name: string, args: Record<string, unknown>, spaceId: string | null = null): Promise<string> {
   // mcp__<server>__<tool> — find the server whose safe-mapped name prefixes the
   // call; exact tool match disambiguates (names may contain __ after mapping).
   const rest = name.startsWith(MCP_TOOL_PREFIX) ? name.slice(MCP_TOOL_PREFIX.length) : "";
   const safeName = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, MAX_TOOL_NAME);
   const rows = await db.selectFrom("mcp_server").selectAll().where("organizationId", "=", organizationId).execute();
-  const candidates = rows.filter((r) => rest.startsWith(`${safeName(r.name)}__`));
+  // Space gating: a spaced server only executes for sessions in that space —
+  // the tool list filters at prompt build, this enforces it at call time.
+  const candidates = rows.filter((r) => spaceMatches(r.spaceId, spaceId)).filter((r) => rest.startsWith(`${safeName(r.name)}__`));
   if (candidates.length === 0) throw new Error(`unknown MCP tool "${name}"`);
 
   for (const row of candidates) {

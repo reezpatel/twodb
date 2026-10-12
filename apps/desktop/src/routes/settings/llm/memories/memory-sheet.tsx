@@ -5,6 +5,7 @@ import { EditorSheet } from "../editor-sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SpaceSelect } from "@/components/space-select";
 
 export const MEMORIES_LIST_PATH = "/apps/settings/llm/memories";
 
@@ -25,11 +26,13 @@ export function MemorySheet() {
 
   const [scope, setScope] = useState<MemoryScope>("workspace");
   const [scopeId, setScopeId] = useState("");
+  const [spaceId, setSpaceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setScope(existing?.scope ?? "workspace");
     setScopeId(existing?.scopeId ?? "");
+    setSpaceId(existing?.spaceId ?? null);
     setError(null);
   }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -38,7 +41,9 @@ export function MemorySheet() {
     [memoryId, ws.memories.list.isSuccess, existing],
   );
 
-  const fieldsDirty = existing ? scope !== existing.scope || scopeId !== (existing.scopeId ?? "") : scope !== "workspace" || Boolean(scopeId);
+  const fieldsDirty = existing
+    ? scope !== existing.scope || scopeId !== (existing.scopeId ?? "") || spaceId !== (existing.spaceId ?? null)
+    : scope !== "workspace" || Boolean(scopeId) || spaceId !== null;
 
   const submit = (content: string) => {
     if (!memoryId) return;
@@ -52,6 +57,7 @@ export function MemorySheet() {
         content: content.trim(),
         scope,
         scopeId: scope === "session" && scopeId.trim() ? scopeId.trim() : null,
+        spaceId,
       },
       { onSuccess: close, onError: (e) => setError((e as Error).message) },
     );
@@ -101,6 +107,7 @@ export function MemorySheet() {
               </div>
             )}
           </div>
+          <SpaceSelect id="memory-space" value={spaceId} onChange={setSpaceId} />
         </div>
       }
     />

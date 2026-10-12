@@ -35,11 +35,7 @@ async function appendSpool(recordingId: string, trackId: string, bytes: Buffer):
 }
 
 async function removeSpool(recordingId: string, trackIds: string[]): Promise<void> {
-  await Promise.all(
-    trackIds.map((trackId) =>
-      fsp.rm(trackSpoolPath(recordingId, trackId), { force: true }).catch(() => undefined),
-    ),
-  );
+  await Promise.all(trackIds.map((trackId) => fsp.rm(trackSpoolPath(recordingId, trackId), { force: true }).catch(() => undefined)));
 }
 
 export interface StartTrackInput {
@@ -70,11 +66,7 @@ export async function startRecording(
       .where("status", "=", "recording")
       .executeTakeFirst();
     if (existing) {
-      const tracks = await db
-        .selectFrom("meeting_recording_track")
-        .selectAll()
-        .where("recordingId", "=", existing.id)
-        .execute();
+      const tracks = await db.selectFrom("meeting_recording_track").selectAll().where("recordingId", "=", existing.id).execute();
       logger.info({ recordingId: existing.id, organizationId }, "meeting recording resumed");
       return { recording: existing, tracks, resumed: true };
     }
@@ -148,11 +140,7 @@ export async function appendChunk(
     .executeTakeFirst();
   if (!track) return { notFound: true };
 
-  const recording = await db
-    .selectFrom("meeting_recording")
-    .select(["status"])
-    .where("id", "=", recordingId)
-    .executeTakeFirst();
+  const recording = await db.selectFrom("meeting_recording").select(["status"]).where("id", "=", recordingId).executeTakeFirst();
   if (!recording || recording.status !== "recording") return { notRecording: true };
 
   if (!Number.isInteger(seq) || seq < 1) return { conflict: { expectedSeq: track.nextSeq } };
@@ -162,7 +150,8 @@ export async function appendChunk(
     return { conflict: { expectedSeq: track.nextSeq } };
   }
   if (seq !== track.nextSeq) return { conflict: { expectedSeq: track.nextSeq } };
-  if (track.receivedBytes + bytes.length > MAX_TRACK_BYTES) return { tooLarge: true };
+  // receivedBytes is bigint, which pg returns as a string.
+  if (Number(track.receivedBytes) + bytes.length > MAX_TRACK_BYTES) return { tooLarge: true };
 
   const size = await appendSpool(recordingId, trackId, bytes);
   const now = new Date();
@@ -213,11 +202,7 @@ export async function finalizeRecording(
   if (!recording) return { notFound: true };
   if (recording.status !== "recording") return { notRecording: true };
 
-  const tracks = await db
-    .selectFrom("meeting_recording_track")
-    .selectAll()
-    .where("recordingId", "=", recordingId)
-    .execute();
+  const tracks = await db.selectFrom("meeting_recording_track").selectAll().where("recordingId", "=", recordingId).execute();
 
   const { backendId, prefix, driver } = await destinationForTrack();
 
@@ -258,11 +243,7 @@ export async function finalizeRecording(
       })
       .execute();
 
-    await db
-      .updateTable("meeting_recording_track")
-      .set({ durationMs, trackStartedAt, mediaAssetId: mediaId })
-      .where("id", "=", track.id)
-      .execute();
+    await db.updateTable("meeting_recording_track").set({ durationMs, trackStartedAt, mediaAssetId: mediaId }).where("id", "=", track.id).execute();
 
     assets.push({ trackId: track.trackId, mediaAssetId: mediaId, uri: `twodb://${backendId}/${mediaId}`, path: objectPath, size: body.length });
   }
@@ -296,16 +277,16 @@ export async function finalizeRecording(
     .returningAll()
     .executeTakeFirstOrThrow();
 
-  await removeSpool(recordingId, tracks.map((t) => t.trackId));
+  await removeSpool(
+    recordingId,
+    tracks.map((t) => t.trackId),
+  );
 
   logger.info({ recordingId, organizationId, assets: assets.length, bytes: assets.reduce((n, a) => n + a.size, 0) }, "meeting recording finalized");
   return { recording: finalized, assets };
 }
 
-export async function abandonRecording(
-  organizationId: string,
-  recordingId: string,
-): Promise<{ ok: true } | { notFound: true }> {
+export async function abandonRecording(organizationId: string, recordingId: string): Promise<{ ok: true } | { notFound: true }> {
   const recording = await db
     .selectFrom("meeting_recording")
     .selectAll()
@@ -315,12 +296,11 @@ export async function abandonRecording(
   if (!recording) return { notFound: true };
 
   const tracks = await db.selectFrom("meeting_recording_track").select(["trackId"]).where("recordingId", "=", recordingId).execute();
-  await removeSpool(recordingId, tracks.map((t) => t.trackId));
-  await db
-    .updateTable("meeting_recording")
-    .set({ status: "abandoned", endedAt: new Date() })
-    .where("id", "=", recordingId)
-    .execute();
+  await removeSpool(
+    recordingId,
+    tracks.map((t) => t.trackId),
+  );
+  await db.updateTable("meeting_recording").set({ status: "abandoned", endedAt: new Date() }).where("id", "=", recordingId).execute();
   logger.info({ recordingId, organizationId }, "meeting recording abandoned");
   return { ok: true };
 }
@@ -362,7 +342,11 @@ export async function listRecordings(organizationId: string, limit = 100): Promi
   const tracks = await db
     .selectFrom("meeting_recording_track")
     .selectAll()
-    .where("recordingId", "in", recordings.map((r) => r.id))
+    .where(
+      "recordingId",
+      "in",
+      recordings.map((r) => r.id),
+    )
     .execute();
 
   return recordings.map((r) => ({
@@ -400,7 +384,11 @@ export async function getRecording(organizationId: string, recordingId: string):
     const assets = await db
       .selectFrom("media_asset")
       .select(["id", "backendId"])
-      .where("id", "in", tracks.filter((t) => t.mediaAssetId).map((t) => t.mediaAssetId!))
+      .where(
+        "id",
+        "in",
+        tracks.filter((t) => t.mediaAssetId).map((t) => t.mediaAssetId!),
+      )
       .execute();
     for (const a of assets) backendByAsset.set(a.id, a.backendId);
   }
@@ -421,4 +409,20 @@ export async function getRecording(organizationId: string, recordingId: string):
       uri: t.mediaAssetId && backendByAsset.has(t.mediaAssetId) ? `twodb://${backendByAsset.get(t.mediaAssetId)}/${t.mediaAssetId}` : null,
     })),
   };
+}
+
+/** A finalized track's media, loaded from its storage backend. */
+export async function getTrackMedia(organizationId: string, recordingId: string, trackId: string): Promise<{ body: Buffer; contentType: string } | null> {
+  const asset = await db
+    .selectFrom("meeting_recording_track as t")
+    .innerJoin("media_asset as a", "a.id", "t.mediaAssetId")
+    .select(["a.backendId", "a.path", "a.contentType"])
+    .where("t.recordingId", "=", recordingId)
+    .where("t.trackId", "=", trackId)
+    .where("t.organizationId", "=", organizationId)
+    .executeTakeFirst();
+  if (!asset) return null;
+  const { driver } = await getStorageDriver(asset.backendId);
+  const { body } = await driver.get(asset.path);
+  return { body, contentType: asset.contentType ?? "video/webm" };
 }

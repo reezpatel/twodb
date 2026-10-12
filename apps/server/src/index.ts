@@ -40,6 +40,7 @@ import { runMigrations } from "./lib/migrate";
 import { logger } from "./lib/logger";
 import { notesRoutes } from "./routes/notes";
 import { notesContentRoutes } from "./routes/notes-content";
+import { spaceRoutes } from "./routes/spaces";
 
 const graph = createGraph(env.memgraph.url, env.memgraph.user, env.memgraph.password);
 
@@ -110,6 +111,7 @@ app.route("/api/meetings", meetingsRoutes);
 app.route("/api/email", emailRoutes);
 app.route("/api/calendar", calendarRoutes);
 app.route("/api/contacts", contactRoutes);
+app.route("/api/spaces", spaceRoutes);
 registerRunnerWs(app, upgradeWebSocket);
 registerCodeWs(app, upgradeWebSocket);
 registerChatWs(app, upgradeWebSocket);
