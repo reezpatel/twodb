@@ -7,7 +7,7 @@ import { db } from "../auth";
 import { logger } from "./logger";
 import { getStorageDestinations } from "./server-settings";
 import { getStorageDriver } from "./storage/registry";
-import type { StorageDriver } from "./storage/driver";
+import type { NodeStream, StorageDriver } from "./storage/driver";
 import type { MeetingRecordingTable, MeetingRecordingTrackTable } from "../plugins/db";
 
 // Meeting-recording ingestion: chunks spool to a temp file per track, and at
@@ -412,17 +412,51 @@ export async function getRecording(organizationId: string, recordingId: string):
 }
 
 /** A finalized track's media, loaded from its storage backend. */
-export async function getTrackMedia(organizationId: string, recordingId: string, trackId: string): Promise<{ body: Buffer; contentType: string } | null> {
+export interface TrackMedia {
+  /** Preferred: browser fetches straight from the backend (S3 presigned URL). */
+  redirectUrl?: string;
+  /** Fallback: server streams bytes (no full-object buffering). */
+  stream?: NodeStream;
+  contentType: string;
+  size: number;
+}
+
+export async function getTrackMedia(
+  organizationId: string,
+  recordingId: string,
+  trackId: string,
+  range?: { start: number; end: number },
+): Promise<TrackMedia | null> {
   const asset = await db
     .selectFrom("meeting_recording_track as t")
     .innerJoin("media_asset as a", "a.id", "t.mediaAssetId")
-    .select(["a.backendId", "a.path", "a.contentType"])
+    .innerJoin("meeting_recording as r", "r.id", "t.recordingId")
+    .select(["a.backendId", "a.path", "a.contentType", "r.title"])
     .where("t.recordingId", "=", recordingId)
     .where("t.trackId", "=", trackId)
     .where("t.organizationId", "=", organizationId)
     .executeTakeFirst();
   if (!asset) return null;
   const { driver } = await getStorageDriver(asset.backendId);
-  const { body } = await driver.get(asset.path);
-  return { body, contentType: asset.contentType ?? "video/webm" };
+  const contentType = asset.contentType ?? "video/webm";
+  const size = await objectSize(driver, asset.path);
+
+  if (driver.signedUrl && !range) {
+    const name = `${(asset.title ?? "recording").replace(/[^\w.-]+/g, "_").slice(0, 60) || "recording"}-${trackId}.webm`;
+    const redirectUrl = await driver.signedUrl(asset.path, { expiresIn: 900, downloadName: name });
+    return { redirectUrl, contentType, size };
+  }
+  const stream = (await driver.stream?.(asset.path, range)) ?? null;
+  return { stream: stream ?? undefined, contentType, size };
+}
+
+async function objectSize(driver: StorageDriver, objectPath: string): Promise<number> {
+  const objects = await driver.list(pathnameDir(objectPath));
+  const hit = objects.find((o) => o.path === objectPath);
+  return hit?.size ?? 0;
+}
+
+function pathnameDir(p: string): string {
+  const idx = p.lastIndexOf("/");
+  return idx <= 0 ? "" : p.slice(0, idx);
 }

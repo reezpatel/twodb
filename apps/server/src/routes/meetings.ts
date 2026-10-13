@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Readable } from "node:stream";
 import { requireOrgSession } from "../lib/session";
 import { logger } from "../lib/logger";
 import {
@@ -15,6 +16,12 @@ import {
 
 // Meeting-recorder ingestion API. Auth is the org session cookie or an org
 // API key (x-api-key) — the extension uses the latter.
+
+/** Pipes a node stream into a Hono response without buffering. */
+function streamResponse(stream: Readable | undefined, headers: Record<string, string>, status: 200 | 206) {
+  if (!stream) return new Response(null, { status: 416, headers: { "content-range": headers["content-range"] ?? "" } });
+  return new Response(stream as unknown as ReadableStream, { status, headers });
+}
 
 export const meetingsRoutes = new Hono()
   .use("*", async (c, next) => {
@@ -132,18 +139,23 @@ export const meetingsRoutes = new Hono()
     const s = (await requireOrgSession(c))!;
     const media = await getTrackMedia(s.organizationId, c.req.param("id"), c.req.param("track"));
     if (!media) return c.json({ error: "not_found" }, 404);
-    const size = media.body.length;
+    if (media.redirectUrl) return c.redirect(media.redirectUrl, 302);
     const headers = { "content-type": media.contentType, "accept-ranges": "bytes", "cache-control": "private, max-age=3600" };
     const range = /^bytes=(\d*)-(\d*)$/.exec(c.req.header("range") ?? "");
-    if (!range || size === 0) return c.body(new Uint8Array(media.body), 200, { ...headers, "content-length": String(size) });
+    const size = media.size;
+    if (!range || size === 0) {
+      return streamResponse(media.stream, { ...headers, "content-length": String(size) }, 200);
+    }
     const start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
     const end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
     if (start >= size || start > end) return c.body(null, 416, { "content-range": `bytes */${size}` });
-    return c.body(new Uint8Array(media.body.subarray(start, end + 1)), 206, {
+    const partial = await getTrackMedia(s.organizationId, c.req.param("id"), c.req.param("track"), { start, end });
+    if (!partial?.stream) return c.body(null, 416, { "content-range": `bytes */${size}` });
+    return streamResponse(partial.stream, {
       ...headers,
       "content-range": `bytes ${start}-${end}/${size}`,
       "content-length": String(end - start + 1),
-    });
+    }, 206);
   })
 
   .get("/recordings/:id", async (c) => {

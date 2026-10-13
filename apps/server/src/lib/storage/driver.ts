@@ -1,12 +1,17 @@
-import { promises as fs } from "node:fs";
+import { createReadStream, promises as fs } from "node:fs";
+import { Readable } from "node:stream";
 import path from "node:path";
 import { DeleteObjectsCommand, GetObjectCommand, HeadBucketCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 // ---------------------------------------------------------------------------
 // Storage drivers — every backend (S3 bucket or local path) implements this.
 // Paths are backend-root-relative, `/`-separated, no leading slash. Org
 // namespacing is applied by the caller (org files live under `<orgId>/…`).
 // ---------------------------------------------------------------------------
+
+// Streams are typed loosely so consumers don't need AWS SDK types.
+export type NodeStream = Readable;
 
 export interface RawObject {
   path: string;
@@ -18,6 +23,10 @@ export interface StorageDriver {
   /** Lists all objects under a prefix, recursively (used by sync). */
   list(prefix: string): Promise<RawObject[]>;
   get(path: string): Promise<{ body: Buffer; contentType?: string }>;
+  /** Streams an object without buffering it; range is [start, end] inclusive. */
+  stream?(path: string, range?: { start: number; end: number }): Promise<NodeStream | null>;
+  /** S3 drivers can hand out a time-limited direct URL, bypassing the server. */
+  signedUrl?(path: string, options?: { expiresIn?: number; downloadName?: string }): Promise<string>;
   put(path: string, data: Buffer, contentType?: string): Promise<void>;
   del(path: string): Promise<void>;
   /** Recursively deletes everything under a prefix; returns deleted count. */
@@ -80,6 +89,22 @@ export function createS3Driver(config: S3DriverConfig): StorageDriver {
       const bytes = await res.Body?.transformToByteArray();
       if (!bytes) throw new Error("empty object");
       return { body: Buffer.from(bytes), contentType: res.ContentType };
+    },
+
+    async stream(path, range) {
+      const res = await client.send(
+        new GetObjectCommand({ Bucket: bucket, Key: path, ...(range ? { Range: `bytes=${range.start}-${range.end}` } : {}) }),
+      );
+      return (Readable.fromWeb(res.Body as never)) ?? null;
+    },
+
+    async signedUrl(path, options) {
+      const command = new GetObjectCommand({
+        Bucket: bucket,
+        Key: path,
+        ...(options?.downloadName ? { ResponseContentDisposition: `attachment; filename="${options.downloadName}"` } : {}),
+      });
+      return getSignedUrl(client, command, { expiresIn: options?.expiresIn ?? 900 });
     },
 
     async put(path, data, contentType) {
@@ -158,6 +183,15 @@ export function createLocalDriver(config: LocalDriverConfig): StorageDriver {
     async get(rel: string) {
       const body = await fs.readFile(abs(rel));
       return { body };
+    },
+
+    async stream(rel, range) {
+      const target = abs(rel);
+      const size = (await fs.stat(target)).size;
+      const start = range?.start ?? 0;
+      const end = Math.min(range?.end ?? size - 1, size - 1);
+      if (start > end || start >= size) return null;
+      return createReadStream(target, { start, end });
     },
 
     async put(rel: string, data: Buffer) {
