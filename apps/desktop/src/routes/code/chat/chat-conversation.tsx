@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { CompactionBlock, type CompactionBlockMeta } from "@/components/compaction-block";
 import { ClearBlock, type ClearBlockMeta } from "@/components/clear-block";
 import { AskUserWizard } from "./ask-user-wizard";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { SystemPromptBlock } from "./system-prompt-block";
 import { BtwDialog } from "./btw-dialog";
 import { CHAT_COMPOSER_COMMANDS } from "@/components/composer/composer-commands";
@@ -756,7 +757,27 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
 
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
         {askUser ? (
-          <AskUserWizard questions={askUser.questions} onSubmit={answerAskUser} onStop={stop} />
+          <ErrorBoundary
+            name="ask-user-wizard"
+            resetKeys={[askUser.id]}
+            fallback={({ error, reset }) => (
+              <div className="bg-card border-destructive/50 flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-xs">
+                <p className="text-destructive font-semibold">The agent's question couldn't be displayed.</p>
+                <p className="text-muted-foreground font-mono break-words">{error.message}</p>
+                <div className="flex items-center gap-1.5">
+                  <Button variant="ghost" size="sm" onClick={reset}>
+                    Retry
+                  </Button>
+                  <Button variant="destructive" size="sm" className="ml-auto" title="Stop the run without answering" onClick={stop}>
+                    <Square size={12} /> Stop
+                  </Button>
+                </div>
+              </div>
+            )}
+          >
+            {/* keyed by tool-call id: a new question remounts with fresh step/answers state */}
+            <AskUserWizard key={askUser.id} questions={askUser.questions} onSubmit={answerAskUser} onStop={stop} />
+          </ErrorBoundary>
         ) : (
           <div className="flex flex-col gap-2">
             {steering.length > 0 && (

@@ -250,7 +250,26 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
       return { output: "error: ask_user is not available in non-interactive sessions — decide autonomously and report your choice", code: null, failed: true };
     }
     const raw = Array.isArray(call.arguments?.questions) ? (call.arguments.questions as unknown[]) : [];
-    const questions = raw.filter((q): q is AskUserQuestion => !!q && typeof (q as Record<string, unknown>).question === "string");
+    // Model output is untrusted shape-wise: options can arrive as objects
+    // ({label, description}) or numbers — coerce to strings so every client
+    // can render them.
+    const optionText = (o: unknown): string => {
+      if (typeof o === "string") return o.trim();
+      if (typeof o === "number" || typeof o === "boolean") return String(o);
+      if (o && typeof o === "object") {
+        const r = o as Record<string, unknown>;
+        const v = r.label ?? r.value ?? r.text ?? r.title ?? r.name;
+        if (typeof v === "string" || typeof v === "number") return String(v).trim();
+      }
+      return "";
+    };
+    const questions = raw.flatMap((q): AskUserQuestion[] => {
+      const r = q as Record<string, unknown> | null;
+      if (!r || typeof r.question !== "string" || !r.question.trim()) return [];
+      const options = Array.isArray(r.options) ? [...new Set(r.options.map(optionText).filter(Boolean))] : [];
+      const allowMultiple = r.allowMultiple === true || r.allowMultiple === "true";
+      return [{ question: r.question, ...(options.length > 0 ? { options } : {}), ...(allowMultiple ? { allowMultiple } : {}) } as AskUserQuestion];
+    });
     if (questions.length === 0) {
       return { output: "error: ask_user requires at least one question with a question field", code: null, failed: true };
     }
