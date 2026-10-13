@@ -124,15 +124,19 @@ export function useComposer({ files, disabled, placeholder, commands, onSkillCli
                 pluginKey: fileMentionKey,
                 items: ({ query }) =>
                   searchFiles(filesRef.current ?? [], query).map((path) => ({ id: path, label: path, folder: path.endsWith("/") }) satisfies SuggestionItem),
-                // Delete the typed @query before inserting, then place the
-                // mention node on the cleaned range.
+                // Replace the typed @query with the chip + a trailing space.
+                // The node type must be this extension's name ("fileMention") —
+                // "mention" isn't in the schema, so tiptap silently dropped the
+                // insert and only the query deletion ran.
                 command: ({ editor, range, props: item }) => {
                   if (!item) return;
                   editor
                     .chain()
                     .focus()
-                    .deleteRange(range)
-                    .insertContentAt(range.from, { type: "mention", attrs: { id: item.id, label: item.label } })
+                    .insertContentAt(range, [
+                      { type: "fileMention", attrs: { id: item.id, label: item.label, mentionSuggestionChar: "@" } },
+                      { type: "text", text: " " },
+                    ])
                     .run();
                 },
                 render: () => suggestionRenderer(popupOpenRef),
@@ -157,9 +161,9 @@ export function useComposer({ files, disabled, placeholder, commands, onSkillCli
               group: c.group,
               kind: c.kind,
             }) satisfies SuggestionItem),
-          // Skill picks insert a chip; commands stay plain text. Both must
-          // delete the typed query range first — otherwise "/com" + "/compact"
-          // concatenates into "/com/compact".
+          // Skill picks insert a skill chip; commands insert a styled command
+          // chip (getText() still yields "/compact"). Both must delete the
+          // typed query first — otherwise "/com" + "/compact" concatenates.
           command: ({ editor, range, props: item }) => {
             const cmd = commandsRef.current?.find((c) => c.id === item?.id);
             const chain = editor.chain().focus().deleteRange(range);
@@ -177,9 +181,13 @@ export function useComposer({ files, disabled, placeholder, commands, onSkillCli
               }
               chain.insertContent({ type: "skillChip", attrs: { id: cmd.id, label: `/${cmd.label}` } }).run();
             } else if (item) {
-              // Trailing space so the suggestion plugin doesn't re-fire on the
-              // freshly inserted "/" text.
-              chain.insertContent(`/${item.label} `).run();
+              // Trailing space so arguments ("/compact keep tests") follow naturally.
+              chain
+                .insertContent([
+                  { type: "commandMention", attrs: { id: item.id, label: item.label, mentionSuggestionChar: "/" } },
+                  { type: "text", text: " " },
+                ])
+                .run();
             }
           },
           render: () => suggestionRenderer(popupOpenRef),
