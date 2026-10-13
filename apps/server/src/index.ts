@@ -48,7 +48,7 @@ logger.info({ port: env.port, staticDir: env.staticDir ?? null }, "twodb server 
 
 const app = new Hono();
 
-const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
+const { injectWebSocket, upgradeWebSocket, wss } = createNodeWebSocket({ app });
 
 app.use(
   "/api/*",
@@ -142,11 +142,32 @@ const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
 });
 
 injectWebSocket(server);
+
+// Keepalive: proxies (nginx) drop idle sockets after ~60s. Ping every 30s and
+// terminate peers that missed the last pong (half-open TCP after network loss).
+const aliveSockets = new WeakSet<object>();
+wss.on("connection", (socket) => {
+  aliveSockets.add(socket);
+  socket.on("pong", () => aliveSockets.add(socket));
+});
+const heartbeat = setInterval(() => {
+  for (const socket of wss.clients) {
+    if (!aliveSockets.has(socket)) {
+      socket.terminate();
+      continue;
+    }
+    aliveSockets.delete(socket);
+    socket.ping();
+  }
+}, 30_000);
+heartbeat.unref();
+
 startEmailScheduler();
 startCalendarScheduler();
 
 process.on("SIGINT", async () => {
   logger.info("shutting down (SIGINT)");
+  clearInterval(heartbeat);
   stopEmailScheduler();
   stopCalendarScheduler();
   await graph.close();
