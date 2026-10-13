@@ -86,6 +86,15 @@ function report(extra = {}) {
       uploaded += t.serverNext - 1;
     }
     const patch = { chunks: { recorded, uploaded }, uploadError: rec.uploadError, ...rec.pendingReport };
+    if (rec.micMonitor) {
+      patch.mic = {
+        level: Math.min(1, rec.micMonitor.level / 0.08), // ≈ full bar at RMS 0.08
+        peak: Math.min(1, rec.micMonitor.peak / 0.08),
+        muted: !!rec.micMonitor.muted,
+        heardVoice: rec.micMonitor.heardVoice,
+        silent: !!rec.micMonitor.silencedAt,
+      };
+    }
     rec.pendingReport = {};
     chrome.runtime.sendMessage({ type: "twodb-progress", patch }).catch(() => {});
   }, 750);
@@ -158,6 +167,73 @@ function newTrack(id, serverNext) {
   return { id, recorder: null, lastSeq: 0, serverNext, chunks: new Map(), handlers: new Set(), pumping: false, startedAt: Date.now(), streams: [] };
 }
 
+// --- mic monitor ------------------------------------------------------------------
+// Live level + silence/device-lost detection, so the user learns mid-meeting
+// that their voice isn't being captured instead of finding out afterwards.
+
+function startMicMonitor(stream, ctx) {
+  if (rec?.micMonitor) return;
+  const monitor = { peak: 0, level: 0, heardVoice: false, silencedAt: null, lastVoiceAt: Date.now(), tracker: null, timer: null };
+  rec.micMonitor = monitor;
+  try {
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    ctx.createMediaStreamSource(stream).connect(analyser);
+    const buf = new Float32Array(analyser.fftSize);
+    const VOICE_THRESHOLD = 0.006; // RMS above this = voice
+    const SILENCE_AFTER_MS = 45_000; // 45s without voice → nudge
+    // Track muted/ended events cover most device failures (OS mute, unplug).
+    const offs = [];
+    for (const t of stream.getAudioTracks()) {
+      const onBad = () => {
+        if (rec?.micMonitor) rec.micMonitor.muted = t.muted || t.readyState === "ended";
+      };
+      const onGood = () => {
+        if (rec?.micMonitor) rec.micMonitor.muted = false;
+      };
+      t.addEventListener("mute", onBad);
+      t.addEventListener("ended", onBad);
+      t.addEventListener("unmute", onGood);
+      offs.push(() => {
+        t.removeEventListener("mute", onBad);
+        t.removeEventListener("ended", onBad);
+        t.removeEventListener("unmute", onGood);
+      });
+    }
+    monitor.tracker = offs;
+    monitor.timer = setInterval(() => {
+      analyser.getFloatTimeDomainData(buf);
+      let sum = 0;
+      let peak = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const a = Math.abs(buf[i]);
+        sum += a * a;
+        if (a > peak) peak = a;
+      }
+      const rms = Math.sqrt(sum / buf.length);
+      monitor.level = rms;
+      monitor.peak = Math.max(monitor.peak * 0.95, peak); // decay so the bar falls
+      if (rms > VOICE_THRESHOLD) {
+        monitor.lastVoiceAt = Date.now();
+        monitor.heardVoice = true;
+      } else if (monitor.silencedAt === null && monitor.heardVoice && Date.now() - monitor.lastVoiceAt > SILENCE_AFTER_MS) {
+        monitor.silencedAt = Date.now();
+      }
+      report();
+    }, 500);
+  } catch (e) {
+    console.warn("[twodb-ext] mic monitor unavailable", e);
+  }
+}
+
+function stopMicMonitor() {
+  const m = rec?.micMonitor;
+  if (!m) return;
+  clearInterval(m.timer);
+  for (const off of m.tracker ?? []) off?.();
+  rec.micMonitor = null;
+}
+
 function startRecorder(track, stream, mimeType, videoBitsPerSecond) {
   const recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported(mimeType) ? mimeType : "video/webm", videoBitsPerSecond });
   track.recorder = recorder;
@@ -201,6 +277,7 @@ async function startMeetingTrack(track, streamId, withMic) {
       const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       track.streams.push(mic);
       ctx.createMediaStreamSource(mic).connect(mix);
+      startMicMonitor(mic, ctx);
     } catch (e) {
       micError = e?.name === "NotAllowedError" ? "permission" : e?.name === "NotFoundError" ? "no_device" : String(e?.message ?? e);
     }
@@ -290,6 +367,7 @@ async function startRecording(msg) {
 }
 
 function releaseMedia(r) {
+  stopMicMonitor();
   for (const t of r.tracks.values()) for (const s of t.streams) s.getTracks().forEach((x) => x.stop());
   void r.audioContext?.close().catch(() => {});
   clearInterval(r.heartbeat);

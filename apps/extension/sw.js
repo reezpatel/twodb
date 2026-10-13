@@ -33,6 +33,7 @@ const IDLE = {
   screenEnded: false,
   chunks: { recorded: 0, uploaded: 0 },
   uploadError: null,
+  mic: null,
 };
 
 // --- state ----------------------------------------------------------------------

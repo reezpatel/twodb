@@ -73,6 +73,14 @@
     .note.err svg:first-child { color: var(--destructive); flex: none; margin-top: 1px; }
     .note .x { height: 18px; width: 18px; padding: 0; justify-content: center; color: var(--muted); flex: none; }
     .title { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+    .micmeter { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 8px; border-radius: 999px; color: var(--muted); }
+    .micmeter.on { color: var(--primary); background: oklch(0.734 0.067 295.7 / 0.14); }
+    .micmeter .bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
+    .micmeter .bars i { width: 3px; border-radius: 1px; background: oklch(0.698 0.015 299.7 / 0.45); }
+    .micmeter .bars i:nth-child(1) { height: 4px; } .micmeter .bars i:nth-child(2) { height: 6px; }
+    .micmeter .bars i:nth-child(3) { height: 9px; } .micmeter .bars i:nth-child(4) { height: 12px; }
+    .micmeter.on .bars i.on { background: var(--primary); }
+    .micmeter .bars i.on { background: var(--muted); }
   </style><div class="root"></div>`;
   const root = shadow.querySelector(".root");
 
@@ -93,6 +101,25 @@
     if (hostname.endsWith("zoom.us")) return pathname.startsWith("/wc/");
     return true;
   };
+
+  function micWidget(s) {
+    if (!s.tracks?.mic) return "";
+    const m = s.mic;
+    if (!m) return `<span class="icon on" title="Recording your microphone">${icon("mic")}</span>`;
+    if (m.muted) return `<span class="icon" title="Microphone muted or disconnected — your voice isn't being recorded" style="color:var(--warning)">${icon("mic")}</span>`;
+    const bars = [0, 1, 2, 3].map((i) => `<i class="${m.peak > (i + 1) / 4 ? "on" : ""}"></i>`).join("");
+    return `<span class="micmeter ${m.heardVoice ? "on" : ""}" title="Live microphone level${m.heardVoice ? " — hearing you" : " — listening for your voice"}">${icon("mic", 12)}<span class="bars">${bars}</span></span>`;
+  }
+
+  function micNote(s) {
+    const m = s.mic;
+    if (!m) return s.micError === "permission" ? "Your microphone isn't being recorded — allow it from the twodb popup." : "";
+    const elapsed = Date.now() - (s.startedAt ?? Date.now());
+    if (m.muted) return "Your microphone is muted or disconnected — your voice isn't in the recording. Unmute it to continue.";
+    if (m.silent && elapsed > 60_000) return "Not hearing you on the microphone. If you're speaking, check that the right device is selected.";
+    if (!m.heardVoice && elapsed > 90_000 && m.level < 0.005 && m.peak < 0.02) return "The microphone is picking up silence — speak now to confirm it's working.";
+    return "";
+  }
 
   function render() {
     if (!state) return;
@@ -115,14 +142,13 @@
         ${mine && s.title ? `<span class="title" title="${esc(s.title)}">${esc(s.title)}</span>` : ""}
         <span class="sep"></span>${upload}
         ${s.tracks?.screen && !s.screenEnded ? `<span class="icon on" title="Recording your screen">${icon("screen")}</span>` : ""}
-        ${s.tracks?.mic ? `<span class="icon on" title="Recording your microphone">${icon("mic")}</span>` : ""}
+        ${micWidget(s)}
         <button data-act="discard" class="${confirmDiscard ? "rec" : "icon"}" title="Discard this recording">${icon("trash")}${confirmDiscard ? "Discard?" : ""}</button>
         <button data-act="stop" class="primary" ${busy ? "disabled" : ""}>${icon("stop", 12)} Stop & save</button>
       </div>`);
-      if (s.micError) {
-        parts.push(
-          `<div class="note">${icon("mic")}<span>Your microphone isn't being recorded${s.micError === "permission" ? " — allow it from the twodb popup" : ""}.</span></div>`,
-        );
+      if (s.tracks?.mic) {
+        const note = micNote(s);
+        if (note) parts.push(`<div class="note">${icon("alert")}<span>${esc(note)}</span></div>`);
       }
     } else if (s.status === "starting") {
       parts.push(`<div class="bar">${grip}<span class="meta"><i class="spin"></i> ${settings.screenDefault ? "Pick a screen to share…" : "Starting…"}</span></div>`);

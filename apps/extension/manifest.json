@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "twodb Meeting Recorder",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Record Google Meet, Teams and Zoom meetings — tab, your microphone and an optional screen — into twodb.",
   "minimum_chrome_version": "116",
   "permissions": [

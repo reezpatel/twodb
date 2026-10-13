@@ -170,8 +170,9 @@ function recordingView() {
     <div class="row" style="flex-wrap:wrap;gap:6px">
       <span class="chip on">Meeting</span>
       <span class="chip ${rec.tracks?.screen && !rec.screenEnded ? "on" : ""}">${rec.screenEnded ? "Screen (stopped)" : rec.tracks?.screen ? "Screen" : "No screen"}</span>
-      <span class="chip ${rec.tracks?.mic ? "on" : ""}">${rec.tracks?.mic ? "Microphone" : "No microphone"}</span>
+      ${rec.tracks?.mic ? micChip() : `<span class="chip">No microphone</span>`}
     </div>
+    ${rec.tracks?.mic && micNudge()}
     <div>
       <div class="row between hint" style="margin-bottom:4px"><span>Uploaded ${uploaded} of ${recorded} chunks</span><span>${pct}%</span></div>
       <div class="progress"><i style="width:${pct}%"></i></div>
@@ -186,6 +187,27 @@ function recordingView() {
     </div>
   </div>
   ${actionError ? `<div class="note err"><span>${esc(actionError)}</span></div>` : ""}`;
+}
+
+function micChip() {
+  const m = rec.mic;
+  if (!m) return `<span class="chip on">Microphone</span>`;
+  if (m.muted) return `<span class="chip err">Microphone muted</span>`;
+  const bars = Array.from({ length: 5 }, (_, i) => `<i class="${m.peak > (i + 1) / 5 ? "on" : ""}"></i>`).join("");
+  const label = m.heardVoice ? "You" : "Listening…";
+  return `<span class="chip ${m.heardVoice ? "on" : ""}" title="Live microphone level${m.muted ? " — muted" : ""}"><span class="meter">${bars}</span>${label}</span>`;
+}
+
+function micNudge() {
+  const m = rec.mic;
+  if (!m) return "";
+  const elapsed = Date.now() - (rec.startedAt ?? Date.now());
+  if (m.muted) return `<div class="note warn"><span>Your microphone is muted or disconnected — your voice isn't in the recording. Unmute it to continue.</span></div>`;
+  if (m.silent && elapsed > 60_000)
+    return `<div class="note warn"><span>Not hearing you on the microphone. If you're speaking, check that the right device is selected — recordings only pick up the mic that was active when recording started.</span></div>`;
+  if (!m.heardVoice && elapsed > 90_000 && m.level < 0.005 && m.peak < 0.02)
+    return `<div class="note warn"><span>The microphone is picking up silence. Speak now to confirm it's working, or pick a different device before your next recording.</span></div>`;
+  return "";
 }
 
 function micErrorNote() {
@@ -256,6 +278,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
 setInterval(() => {
   const el = document.getElementById("timer");
   if (el && rec.status === "recording") el.textContent = clock(Date.now() - rec.startedAt);
+  // Mic level bar + nudges are time-dependent; refresh the view while recording.
+  if (rec.status === "recording") render();
 }, 1000);
 
 render();
