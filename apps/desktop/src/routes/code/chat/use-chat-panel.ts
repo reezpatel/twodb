@@ -58,6 +58,8 @@ interface StreamFrame {
   round?: number;
   text?: string;
   message?: string;
+  /** error frames: true when the failure was also persisted as a transcript row. */
+  persisted?: boolean;
   id?: string;
   name?: string;
   args?: Record<string, unknown>;
@@ -402,8 +404,13 @@ export function useChatPanel(sessionId: string | null) {
       setOptimistic(null);
       setDraft(lastSentRef.current);
       setError("The agent is already working on this session — your message wasn't sent.");
+    } else if (frame.type === "run_error") {
+      // A provider failure was written to the transcript — refetch so it renders inline.
+      void queryClient.invalidateQueries({ queryKey: ["code", "session", sessionId] });
     } else if (frame.type === "error") {
-      setError(frame.message ?? "stream error");
+      // Run failures already live in the transcript as an error row; only
+      // transient (non-persisted) errors use the corner message.
+      setError(frame.persisted ? null : (frame.message ?? "stream error"));
       setOptimistic(null);
       setStatusText(null);
       invalidateAfterRun();

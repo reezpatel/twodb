@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowUp, Bot, ChevronDown, Clock, Loader2, Lock, MessagesSquare, Paperclip, Send, Square, SquarePen, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowUp, Bot, ChevronDown, Clock, Loader2, Lock, MessagesSquare, Paperclip, Send, Square, SquarePen, Trash2 } from "lucide-react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useChat, type ToolEvent } from "./use-chat-panel";
 import type { CodeMessage } from "../sidenav/use-session-list";
@@ -476,6 +476,32 @@ function ChatMessageList(props: ChatMessageListProps) {
             </span>
             <Lock size={12} className="text-muted-foreground shrink-0" aria-hidden="true" />
           </button>
+        </div>
+      );
+    }
+    if (m.role === "error") {
+      // Provider failure / retry attempt — UI-only, never sent to the model.
+      const meta = m.meta as { attempt?: number; maxRetries?: number; delayMs?: number; status?: number; final?: boolean } | null;
+      const retrying = !meta?.final && meta?.attempt != null;
+      return (
+        <div
+          className={cn(
+            "flex items-start gap-2 rounded-md border px-3 py-2 text-xs",
+            retrying ? "border-amber-500/40 bg-amber-500/5" : "border-destructive/40 bg-destructive/5",
+            row.dimmed && "opacity-60",
+          )}
+          role="alert"
+        >
+          <AlertTriangle size={13} className={cn("mt-0.5 shrink-0", retrying ? "text-amber-500" : "text-destructive")} aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className={cn("font-medium", retrying ? "text-amber-600 dark:text-amber-400" : "text-destructive")}>
+              {retrying
+                ? `Request failed — retry ${meta!.attempt}/${meta!.maxRetries ?? "?"}${meta?.delayMs != null ? ` in ${Math.max(1, Math.round(meta.delayMs / 1000))}s` : ""}`
+                : "Agent run failed"}
+            </span>
+            <span className="text-muted-foreground mt-0.5 block font-mono text-[11px] break-all whitespace-pre-wrap">{m.content}</span>
+          </span>
+          <span className="text-muted-foreground/70 shrink-0 text-[10px]">{new Date(m.createdAt).toLocaleTimeString()}</span>
         </div>
       );
     }

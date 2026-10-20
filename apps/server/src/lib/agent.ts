@@ -92,6 +92,82 @@ export interface RoundEvents {
   onThinkingStart?: () => void;
   onThinkingDelta?: DeltaSink;
   onThinkingEnd?: () => void;
+  /** A provider request failed and will be retried after delayMs. */
+  onRetry?: (info: ProviderRetryInfo) => void | Promise<void>;
+}
+
+export interface ProviderRetryInfo {
+  /** 1-based number of the failed attempt. */
+  attempt: number;
+  maxRetries: number;
+  delayMs: number;
+  /** HTTP status for retryable responses; absent for network errors. */
+  status?: number;
+  message: string;
+}
+
+// --- Provider fetch with retry ----------------------------------------------
+// Network failures (ETIMEDOUT, ECONNRESET, DNS…) and transient HTTP statuses
+// (408/425/429/5xx) are retried with exponential backoff + jitter. Only the
+// request is retried — once a 2xx stream is returned we never replay it.
+
+const MAX_RETRIES = 20;
+const BASE_DELAY_MS = 1000;
+const MAX_DELAY_MS = 30_000;
+
+function isRetryableStatus(status: number) {
+  return status === 408 || status === 425 || status === 429 || (status >= 500 && status !== 501);
+}
+
+function abortableSleep(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const t = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(signal!.reason);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function backoffMs(attempt: number, retryAfterHeader: string | null) {
+  const retryAfter = Number(retryAfterHeader);
+  if (retryAfter > 0) return Math.min(retryAfter * 1000, MAX_DELAY_MS);
+  const exp = Math.min(BASE_DELAY_MS * 2 ** attempt, MAX_DELAY_MS);
+  return exp / 2 + Math.random() * (exp / 2);
+}
+
+async function providerFetch(
+  url: string,
+  init: RequestInit & { body: string },
+  onRetry?: RoundEvents["onRetry"],
+): Promise<Response> {
+  const signal = init.signal ?? undefined;
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      if (signal?.aborted || attempt >= MAX_RETRIES) throw err;
+      const delay = backoffMs(attempt, null);
+      const cause = (err as { cause?: { code?: string; message?: string } }).cause;
+      const causeText = cause?.code ?? cause?.message;
+      logger.warn({ url, attempt: attempt + 1, maxRetries: MAX_RETRIES, delayMs: Math.round(delay), err: (err as Error).message, cause: causeText }, "provider fetch failed, retrying");
+      await onRetry?.({ attempt: attempt + 1, maxRetries: MAX_RETRIES, delayMs: Math.round(delay), message: `${(err as Error).message}${causeText ? ` (${causeText})` : ""}` });
+      await abortableSleep(delay, signal);
+      continue;
+    }
+    if (res.ok || !isRetryableStatus(res.status) || attempt >= MAX_RETRIES) return res;
+    const delay = backoffMs(attempt, res.headers.get("retry-after"));
+    logger.warn({ url, attempt: attempt + 1, maxRetries: MAX_RETRIES, status: res.status, delayMs: Math.round(delay) }, "provider returned retryable status, retrying");
+    const body = await res.text().catch(() => "");
+    await onRetry?.({ attempt: attempt + 1, maxRetries: MAX_RETRIES, delayMs: Math.round(delay), status: res.status, message: `provider returned ${res.status}${body ? `: ${body.slice(0, 300)}` : ""}` });
+    await abortableSleep(delay, signal);
+  }
 }
 
 function safeJson(data: string): Record<string, unknown> | null {
@@ -194,7 +270,7 @@ async function anthropicRound(
       ? [{ type: "text", text: "You are Claude Code, Anthropic's official CLI for Claude." }, ...(system ? [{ type: "text", text: system }] : [])]
       : system || undefined;
 
-  const res = await fetch(`${baseUrl}/v1/messages`, {
+  const res = await providerFetch(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -220,7 +296,7 @@ async function anthropicRound(
         : {}),
     }),
     signal: events.signal,
-  });
+  }, events.onRetry);
 
   if (!res.ok || !res.body) {
     const body = await res.text();
@@ -300,6 +376,11 @@ async function anthropicRound(
 
 function openaiMessages(messages: AgentMessage[]) {
   return messages.map((m) => {
+    // meta.thinking is deliberately NOT replayed here: chat-completions wires
+    // have no signed reasoning container, and providers either ignore the
+    // reasoning_content field or, worse, treat pasted thinking as visible
+    // assistant text. (pi drops it the same way.) The Responses wire replays
+    // encrypted reasoning via thinking[].signature instead.
     if (m.role === "assistant" && m.meta?.toolCalls?.length) {
       return {
         role: "assistant",
@@ -344,7 +425,7 @@ async function openaiRound(
   const isZai = connection.provider === "zai";
   const thinkingLevel = events.thinkingLevel ?? "medium";
 
-  const res = await fetch(`${baseUrl}/chat/completions`, {
+  const res = await providerFetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -380,7 +461,7 @@ async function openaiRound(
         : {}),
     }),
     signal: events.signal,
-  });
+  }, events.onRetry);
 
   if (!res.ok || !res.body) {
     const body = await res.text();
@@ -480,6 +561,14 @@ function responsesInput(messages: AgentMessage[]) {
   for (const m of messages) {
     if (m.role === "system") continue;
     if (m.role === "assistant") {
+      // Encrypted reasoning items (captured in `signature` during the round
+      // that produced them) replay before the turn's text and calls — Codex
+      // pairs a reasoning item with the function calls that follow it, and
+      // store:false conversations must send reasoning back explicitly.
+      for (const t of m.meta?.thinking ?? []) {
+        const item = t.signature ? safeJson(t.signature) : null;
+        if (item?.type === "reasoning") input.push(item);
+      }
       if (m.content) input.push({ role: "assistant", content: m.content });
       for (const tc of m.meta?.toolCalls ?? []) {
         input.push({
@@ -522,7 +611,7 @@ async function responsesRound(
   const baseUrl = providerBaseUrl(provider, config);
   const { instructions, input } = responsesInput(messages);
 
-  const res = await fetch(`${baseUrl}/responses`, {
+  const res = await providerFetch(`${baseUrl}/responses`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -555,7 +644,7 @@ async function responsesRound(
         : {}),
     }),
     signal: events.signal,
-  });
+  }, events.onRetry);
 
   if (!res.ok || !res.body) {
     const body = await res.text();
@@ -566,6 +655,7 @@ async function responsesRound(
   let text = "";
   let reasoningText = "";
   let reasoningOpen = false;
+  const reasoningItems: Record<string, unknown>[] = [];
   const toolCalls: AgentToolCall[] = [];
   const usage = { inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
 
@@ -598,6 +688,12 @@ async function responsesRound(
         reasoningOpen = false;
         events.onThinkingEnd?.();
       }
+      // Capture the full reasoning item (id + encrypted_content + summary) so
+      // the next round of this run can replay it verbatim instead of forcing
+      // the model to re-reason. It rides meta.thinking[].signature.
+      if (item.type === "reasoning" && typeof item.encrypted_content === "string" && item.encrypted_content) {
+        reasoningItems.push(item);
+      }
       if (item.type === "function_call") {
         toolCalls.push({
           id: String(item.call_id ?? ""),
@@ -623,7 +719,14 @@ async function responsesRound(
   }
 
   if (reasoningOpen) events.onThinkingEnd?.();
-  return { content: text || null, toolCalls, usage, ...(reasoningText ? { thinking: [{ text: reasoningText }] } : {}) };
+  // Attach the encrypted reasoning item to the thinking entry so it survives
+  // in meta.thinking[0].signature; the summary text stays the display copy.
+  const thinking = reasoningItems.length
+    ? [{ text: reasoningText, signature: JSON.stringify(reasoningItems[0]) }]
+    : reasoningText
+      ? [{ text: reasoningText }]
+      : undefined;
+  return { content: text || null, toolCalls, usage, ...(thinking ? { thinking } : {}) };
 }
 
 /** Runs a single streaming agent-completion round against the connection's provider. */

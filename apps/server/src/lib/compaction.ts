@@ -202,11 +202,12 @@ function projectRows(rows: MessageRow[]): ProjectedItem[] {
 /** History for the next agent round — compaction/clear-aware. */
 export function projectHistory(rows: MessageRow[]): AgentMessage[] {
   // ask_user rows are UI markers (the wizard's durable state), never LLM context.
+  // error rows (provider failures / retries) are UI-only history, never sent to the model.
   // btw/btw_done/subagent rows are UI blocks too — the send-to-main summary
   // reaches the model as the user message that carried it, and the subagent's
   // summary arrives as its tool result.
   const projected = projectRows(rows)
-    .filter((item) => !["ask_user", "btw", "btw_done", "subagent"].includes(item.row?.role ?? ""))
+    .filter((item) => !["ask_user", "btw", "btw_done", "subagent", "error"].includes(item.row?.role ?? ""))
     .map((item) => item.message);
   // A crash or restart between tool_use and tool_result leaves history that
   // providers reject — synthesize a placeholder result for every dangling call.
@@ -232,7 +233,9 @@ export function projectHistory(rows: MessageRow[]): AgentMessage[] {
 
 function estimateTokens(message: AgentMessage): number {
   let chars = message.content.length;
-  for (const t of message.meta?.thinking ?? []) chars += t.text.length;
+  // Thinking is not replayed from history (agent-loop strips it for DB-loaded
+  // turns; only the live run's tool turns carry it), so it never becomes model
+  // context — don't count it toward compaction triggers or context estimates.
   for (const tc of message.meta?.toolCalls ?? []) chars += tc.name.length + JSON.stringify(tc.arguments).length;
   return Math.ceil(chars / 4);
 }
@@ -278,16 +281,21 @@ function truncateForSummary(text: string, maxChars: number): string {
   return `${text.slice(0, maxChars)}\n\n[... ${text.length - maxChars} more characters truncated]`;
 }
 
-/** Flatten history to tagged text so the model summarizes instead of continuing it. */
+/** Flatten history to tagged text so the model summarizes instead of continuing it.
+ *
+ * Thinking is omitted (pi parity): providers return summaries of the real
+ * reasoning and replayed thinking is usually dropped from the model's live
+ * context, so including it can make the summarization request larger than the
+ * context it summarizes. Visible text, tool calls and results record what
+ * happened.
+ */
 function serializeConversation(messages: AgentMessage[]): string {
   const parts: string[] = [];
   for (const m of messages) {
     if (m.role === "user") {
       if (m.content) parts.push(`[User]: ${m.content}`);
     } else if (m.role === "assistant") {
-      const thinking = (m.meta?.thinking ?? []).map((t) => t.text).join("\n");
       const toolCalls = (m.meta?.toolCalls ?? []).map((tc) => `${tc.name}(${JSON.stringify(tc.arguments)})`).join("; ");
-      if (thinking) parts.push(`[Assistant thinking]: ${thinking}`);
       if (m.content) parts.push(`[Assistant]: ${m.content}`);
       if (toolCalls) parts.push(`[Assistant tool calls]: ${toolCalls}`);
     } else if (m.role === "tool") {
@@ -406,7 +414,11 @@ export async function runCompaction(input: CompactionInput): Promise<MessageRow>
   const cutIndex = findCutPoint(projected, boundaryStart);
   if (cutIndex <= boundaryStart) throw new NothingToCompactError();
 
-  const toSummarize = projected.slice(boundaryStart, cutIndex).map((item) => item.message);
+  // error rows are UI-only (provider failures/retries) — never part of the summary prompt.
+  const toSummarize = projected
+    .slice(boundaryStart, cutIndex)
+    .filter((item) => item.row?.role !== "error")
+    .map((item) => item.message);
   const kept = projected.slice(cutIndex);
   const firstKept = projected[cutIndex].row!;
   if (toSummarize.length === 0) throw new NothingToCompactError();

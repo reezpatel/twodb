@@ -35,6 +35,7 @@ function parseLine(l: LogLine): LogEntry {
 }
 
 const POLL_MS = 2500;
+const MAX_ENTRIES = 5000;
 
 export function useLogs() {
   const [entries, setEntries] = useState<LogEntry[]>([]);
@@ -52,22 +53,39 @@ export function useLogs() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
+    const fetchLines = (afterLine: number, limit: number) =>
+      api<LogsResponse>(`/api/logs?afterLine=${afterLine}&limit=${limit}`);
+
     const poll = async () => {
       try {
-        const afterLine = followRef.current ? lastLineRef.current : 0;
-        const limit = followRef.current ? 500 : 300;
-        const res = await api<LogsResponse>(`/api/logs?afterLine=${afterLine}&limit=${limit}`);
+        // Paused: keep what's on screen, don't fetch (after the initial load).
+        if (!followRef.current && lastLineRef.current > 0) return;
+
+        const initial = lastLineRef.current === 0;
+        let res = await fetchLines(lastLineRef.current, initial ? 300 : 500);
+        let reset = initial;
+        // Log file was truncated/rotated: our cursor is past its end — reload the tail.
+        if (!initial && res.total < lastLineRef.current) {
+          lastLineRef.current = 0;
+          res = await fetchLines(0, 300);
+          reset = true;
+        }
         if (cancelled) return;
         setError(null);
         setTotal(res.total);
         setFile(res.file);
         const parsed = res.lines.map(parseLine);
-        if (followRef.current && lastLineRef.current > 0 && parsed.length > 0) {
-          setEntries((prev) => [...prev, ...parsed]);
-        } else {
+        if (reset) {
           setEntries(parsed);
+        } else if (parsed.length > 0) {
+          // Append only; an empty poll must never clear existing lines.
+          setEntries((prev) => {
+            const next = [...prev, ...parsed];
+            return next.length > MAX_ENTRIES ? next.slice(next.length - MAX_ENTRIES) : next;
+          });
         }
-        const last = res.lines.length ? res.lines[res.lines.length - 1].line : lastLineRef.current;
+        // Advance the cursor to the end of what we've read; if the file had no lines, use total.
+        const last = res.lines.length ? res.lines[res.lines.length - 1].line : res.total;
         lastLineRef.current = Math.max(lastLineRef.current, last);
         setLoading(false);
       } catch (e) {

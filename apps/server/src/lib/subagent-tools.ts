@@ -241,6 +241,18 @@ export async function executeInvokeSubagent(ctx: SubagentContext, agentId: strin
     return { output: "error: subagent session is already running", failed: true };
   }
 
+  // A run that ended in a provider failure leaves a final error row last.
+  const lastRow = await db
+    .selectFrom("code_session_message")
+    .select(["role", "content", "meta"])
+    .where("sessionId", "=", child.id)
+    .orderBy("createdAt", "desc")
+    .limit(1)
+    .executeTakeFirst();
+  if (lastRow?.role === "error" && (lastRow.meta as { final?: boolean } | null)?.final) {
+    return { output: `error: subagent run failed (session: ${child.id}): ${lastRow.content.slice(0, 400)}`, failed: true };
+  }
+
   // The child's final assistant message is the summary handed back.
   const rows = await db
     .selectFrom("code_session_message")
@@ -277,7 +289,7 @@ export async function executeCheckSubagentStatus(ctx: SubagentContext, sessionId
       .orderBy("createdAt", "desc")
       .limit(1)
       .executeTakeFirst();
-    const status = running ? "running" : last?.role === "assistant" ? "done" : "no output yet";
+    const status = running ? "running" : last?.role === "assistant" ? "done" : last?.role === "error" ? "failed" : "no output yet";
     lines.push(
       `- session_id: ${child.id}\n  title: ${child.title}\n  status: ${status}${last?.content && !running ? `\n  last message: ${last.content.slice(0, 400)}` : ""}`,
     );

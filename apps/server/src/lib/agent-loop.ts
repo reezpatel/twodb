@@ -45,7 +45,9 @@ export type AgentFrame =
   | { type: "status"; text: string }
   | { type: "compaction_done" }
   | { type: "round_done"; round: number; usage: RoundUsage; durationMs: number }
-  | { type: "error"; message: string }
+  | { type: "error"; message: string; persisted?: boolean }
+  /** A provider failure was written to the transcript as a role="error" row (UI-only, never sent to the model). */
+  | { type: "run_error"; message: string; final: boolean; attempt?: number; maxRetries?: number; delayMs?: number }
   | { type: "done"; usage: RoundUsage; contextTokens: number; stopped?: boolean };
 
 export type FrameSink = (frame: AgentFrame) => void | Promise<void>;
@@ -72,6 +74,19 @@ export interface AgentLoopInput {
 
 const ABORTED = Symbol("aborted");
 
+/**
+ * Drops `meta.thinking` from history entries loaded from the database. The
+ * current run's own rounds keep their thinking — Anthropic requires the final
+ * assistant turn of an open tool loop to carry its signed thinking block — but
+ * thinking from previous runs is dead weight: the Anthropic API only ever
+ * reads it from the most recent assistant turn (older signed blocks are
+ * stripped or counted as input depending on model), and openai-compatible /
+ * Responses wires never replay thinking text at all.
+ */
+function stripPastRunThinking(history: AgentMessage[]): AgentMessage[] {
+  return history.map((m) => (m.role === "assistant" && m.meta?.thinking?.length ? { ...m, meta: { ...m.meta, thinking: undefined } } : m));
+}
+
 /** Resolves to ABORTED as soon as the signal fires instead of waiting for p. */
 function raceAbort<T>(p: Promise<T>, signal?: AbortSignal): Promise<T | typeof ABORTED> {
   if (!signal) return p;
@@ -89,7 +104,11 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
   const signal = input.signal;
   const thinkingLevel = input.thinkingLevel ?? "medium";
   const messages: AgentMessage[] = [
-    ...input.history,
+    // Thinking from earlier runs is never replayed: only the final assistant
+    // turn of an in-progress tool loop needs it (Anthropic), and replaying old
+    // thinking bills it as input on every provider that keeps it. The live
+    // rounds below keep theirs — see maybeCompact for the one exception.
+    ...stripPastRunThinking(input.history),
     { role: "user", content: userContent, meta: null, ...(input.userImages?.length ? { images: input.userImages } : {}) },
   ];
   // Directory-less sessions are assistant-style chats: no runner tools, canvas available.
@@ -190,7 +209,7 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
       const rows = await db.selectFrom("code_session_message").selectAll().where("sessionId", "=", session.id).orderBy("createdAt", "asc").execute();
       const compactionRow = await runCompaction({ connection, model, rows, store: codeCompactionStore(session, connection, model, organizationId) });
       messages.length = 0;
-      messages.push(...projectHistory([...rows, compactionRow]));
+      messages.push(...stripPastRunThinking(projectHistory([...rows, compactionRow])));
       // The next round re-measures the compacted context from its own usage.
       contextTokens = 0;
       logger.info({ sessionId: session.id, contextTokens: current }, "auto-compaction complete");
@@ -343,8 +362,10 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
   );
   const runStartedAt = Date.now();
 
+  let currentRound = 0;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
+      currentRound = round;
       if (signal?.aborted) {
         stopped = true;
         break;
@@ -387,6 +408,13 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
             onThinkingEnd: () => {
               roundThinkingMs = Math.max(1, Date.now() - roundThinkingStart);
               void emit({ type: "thinking_end", round });
+            },
+            onRetry: async (info) => {
+              // Each failed attempt becomes a transcript row (UI-only — projectHistory drops it).
+              const meta = { round, attempt: info.attempt, maxRetries: info.maxRetries, delayMs: info.delayMs, ...(info.status ? { status: info.status } : {}), final: false };
+              await insertMessage("error", info.message, meta);
+              await emit({ type: "run_error", message: info.message, final: false, attempt: info.attempt, maxRetries: info.maxRetries, delayMs: info.delayMs });
+              await emit({ type: "status", text: `provider unreachable — retry ${info.attempt}/${info.maxRetries} in ${Math.round(info.delayMs / 1000)}s` });
             },
           },
         );
@@ -499,8 +527,17 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
       if (stopped) break;
     }
   } catch (e) {
-    logger.error({ sessionId: session.id, err: e, round: 0, elapsedMs: Date.now() - runStartedAt }, "agent run failed");
-    await emit({ type: "error", message: (e as Error).message });
+    logger.error({ sessionId: session.id, err: e, round: currentRound, elapsedMs: Date.now() - runStartedAt }, "agent run failed");
+    const message = (e as Error).message;
+    let persisted = false;
+    try {
+      await insertMessage("error", message, { round: currentRound, final: true });
+      persisted = true;
+      await emit({ type: "run_error", message, final: true });
+    } catch (dbErr) {
+      logger.error({ sessionId: session.id, err: dbErr }, "failed to persist run error row");
+    }
+    await emit({ type: "error", message, persisted });
   }
 
   await emit({ type: "done", usage: totals, contextTokens, ...(stopped ? { stopped: true } : {}) });

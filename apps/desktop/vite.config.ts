@@ -15,7 +15,8 @@ export default defineConfig({
         name: "twodb",
         short_name: "twodb",
         description: "twodb desktop workspace",
-        display: "standalone",
+        display: "fullscreen",
+        display_override: ["fullscreen", "standalone", "browser"],
         background_color: "#111111",
         theme_color: "#111111",
         icons: [
