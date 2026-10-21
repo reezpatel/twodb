@@ -13,6 +13,7 @@ import { resolveAskUser, type AskUserAnswer } from "../lib/ask-user";
 import { beginCompaction, broadcastSessionEvent, broadcastToSession, endCompaction, isSessionRunning } from "./code-ws";
 import { readGitStatus } from "../lib/git-status";
 import { runnerManager } from "../lib/runner-manager";
+import { listJobs, killBackgroundJob } from "../lib/background-jobs";
 import type { CodeSessionMode, CodeSessionType } from "../plugins/db";
 import { logger } from "../lib/logger";
 
@@ -612,6 +613,11 @@ export const codeRoutes = new Hono()
     else if (type === "all") query = query.where("type", "<>", "chat");
     else query = query.where("type", "=", "main_agent");
 
+    // Archived sessions are hidden by default; archive mode (bottom toggle)
+    // lists ONLY archived ones.
+    if (c.req.query("archived") === "1") query = query.where("archivedAt", "is not", null);
+    else query = query.where("archivedAt", "is", null);
+
     const parentSessionId = c.req.query("parentSessionId");
     if (parentSessionId) query = query.where("parentSessionId", "=", parentSessionId);
 
@@ -1121,7 +1127,13 @@ export const codeRoutes = new Hono()
       mode: string | null;
       tags: string[];
       runtimeState: string | null;
+      archivedAt: Date | null;
     }> = {};
+
+    if (body?.archived !== undefined) {
+      if (typeof body.archived !== "boolean") return c.json({ error: "invalid_archived" }, 400);
+      patch.archivedAt = body.archived ? new Date() : null;
+    }
 
     if (body?.title !== undefined) {
       if (typeof body.title !== "string" || !body.title.trim()) {
@@ -1247,6 +1259,67 @@ export const codeRoutes = new Hono()
     if (patch.tags) await syncLlmTags(s.organizationId, patch.tags);
     if (row) broadcastSessionEvent(s.organizationId, { type: "session_updated", session: { id: row.id, title: row.title, updatedAt: row.updatedAt.toISOString() } });
     return c.json(row);
+  })
+
+  // ----- background jobs -----------------------------------------------------
+
+  .get("/sessions/:id/jobs", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+    const session = await db
+      .selectFrom("code_session")
+      .select(["id"])
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!session) return c.json({ error: "session_not_found" }, 404);
+    return c.json({ jobs: await listJobs(session.id) });
+  })
+
+  .post("/sessions/:id/jobs/:jobId/kill", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+    const job = await db
+      .selectFrom("code_session_job")
+      .select(["id", "runnerId", "status"])
+      .where("id", "=", c.req.param("jobId"))
+      .where("sessionId", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!job) return c.json({ error: "job_not_found" }, 404);
+    if (job.status !== "running") return c.json({ error: "job_not_running" }, 409);
+    try {
+      const message = await killBackgroundJob(job.runnerId, job.id);
+      // The exit watcher flips the row when jobResult arrives; the kill signal
+      // itself resolves immediately.
+      return c.json({ ok: true, message });
+    } catch (e) {
+      return c.json({ error: (e as Error).message }, 502);
+    }
+  })
+
+  .delete("/sessions/:id/jobs", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+    const sessionId = c.req.param("id");
+    // Kill anything still running before clearing the list.
+    const running = await db
+      .selectFrom("code_session_job")
+      .select(["id", "runnerId"])
+      .where("sessionId", "=", sessionId)
+      .where("organizationId", "=", s.organizationId)
+      .where("status", "=", "running")
+      .execute();
+    for (const job of running) {
+      try {
+        await killBackgroundJob(job.runnerId, job.id);
+      } catch {
+        // runner offline — the row gets cleared anyway
+      }
+    }
+    await db.deleteFrom("code_session_job").where("sessionId", "=", sessionId).execute();
+    await broadcastToSession(sessionId, { type: "jobs", jobs: await listJobs(sessionId) });
+    return c.json({ ok: true });
   })
 
   .delete("/sessions/:id", async (c) => {

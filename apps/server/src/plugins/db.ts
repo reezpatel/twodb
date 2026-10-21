@@ -199,6 +199,8 @@ export interface CodeSessionTable {
   depthCount: ColumnType<number, number | undefined, number | undefined>;
   /** Run finished since the user last opened this session — sidebar unread marker. */
   unseenUpdates: ColumnType<boolean, boolean | undefined, boolean | undefined>;
+  /** null = active; set = archived (hidden unless archive mode is on). */
+  archivedAt: ColumnType<Date, Date | null, Date | null>;
   /** Set for chat sessions — binds the per-(channel × agent) session to its channel. */
   chatChannelId: string | null;
   createdAt: Date;
@@ -324,6 +326,24 @@ export interface CodeSessionMessageTable {
   content: string;
   meta: Record<string, unknown> | null;
   createdAt: Date;
+}
+
+export type CodeSessionJobStatus = "running" | "done" | "failed" | "killed" | "lost";
+
+export interface CodeSessionJobTable {
+  id: string;
+  sessionId: string;
+  organizationId: string;
+  runnerId: string;
+  command: string;
+  cwd: string | null;
+  /** running | done | failed | killed | lost */
+  status: CodeSessionJobStatus;
+  exitCode: number | null;
+  /** Absolute path of the job's combined-output log on the runner. */
+  logPath: string;
+  createdAt: Date;
+  finishedAt: Date | null;
 }
 
 export interface LlmQuotaTable {
@@ -1266,6 +1286,7 @@ export interface Database {
   code_directory: CodeDirectoryTable;
   code_session: CodeSessionTable;
   code_session_message: CodeSessionMessageTable;
+  code_session_job: CodeSessionJobTable;
   code_session_usage_event: CodeSessionUsageEventTable;
   code_checkpoint: CodeCheckpointTable;
   skill: SkillTable;

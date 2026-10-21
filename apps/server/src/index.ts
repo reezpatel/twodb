@@ -37,6 +37,7 @@ import { startCalendarScheduler, stopCalendarScheduler } from "./lib/calendar/sc
 import "./lib/calendar/imip";
 import { getServerSettings } from "./lib/server-settings";
 import { runMigrations } from "./lib/migrate";
+import { reconcileOrphanJobs } from "./lib/background-jobs";
 import { logger } from "./lib/logger";
 import { notesRoutes } from "./routes/notes";
 import { notesContentRoutes } from "./routes/notes-content";
@@ -134,6 +135,13 @@ if (env.skipAutoMigration) {
   } catch (error) {
     logger.error({ err: error }, "database migration failed");
     process.exit(1);
+  }
+  // Background jobs that were running when this server last stopped have no
+  // watcher anymore — mark old ones lost (fresh ones get the grace period).
+  try {
+    await reconcileOrphanJobs();
+  } catch (err) {
+    logger.warn({ err }, "background job reconcile failed (non-fatal)");
   }
 }
 

@@ -6,6 +6,7 @@ import { enabledRepoSources, readRepoSkill } from "./skills";
 import { spaceMatches } from "./spaces";
 import { readAssetForModel } from "./assets";
 import { runnerManager } from "./runner-manager";
+import { startBackgroundJob, readJobLogs, formatJobStatuses } from "./background-jobs";
 import { broadcastToSession, broadcastSessionEvent } from "../routes/code-ws";
 
 export type ToolOutputSink = (stream: "stdout" | "stderr", data: string) => void;
@@ -176,13 +177,14 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     name: "read_file",
     scope: ["code"],
-    description: "Reads a file on the runner machine. Relative paths resolve against the session's working directory. Use offset/limit for large files.",
+    description:
+      "Reads a file on the runner machine. Relative paths resolve against the session's working directory. Returns the first 100 lines by default — a <trimmed> marker shows how to continue. Use offset (1-based line) and limit (line count, no maximum) to read any range; offset=1 limit=1000000 reads the entire file.",
     parameters: {
       type: "object",
       properties: {
         path: { type: "string", description: "File path" },
         offset: { type: "number", description: "First line to read (1-based, default 1)" },
-        limit: { type: "number", description: "Maximum number of lines to read (default: whole file)" },
+        limit: { type: "number", description: "Maximum number of lines to read (default 100; no maximum — use a large number for whole-file reads)" },
       },
       required: ["path"],
     },
@@ -256,6 +258,43 @@ export const AGENT_TOOLS: AgentTool[] = [
     },
   },
   {
+    name: "run_background",
+    scope: ["code"],
+    description:
+      "Runs a shell command in the background on the session's runner — returns a job id immediately instead of waiting. Use for long-running work (dev servers, builds, watchers, test suites). The output is delivered into the thread automatically when the job finishes (success or failure); poll it sooner with job_logs.",
+    parameters: {
+      type: "object",
+      properties: {
+        command: { type: "string", description: "Shell command to run detached" },
+      },
+      required: ["command"],
+    },
+  },
+  {
+    name: "job_logs",
+    scope: ["code"],
+    description:
+      "Reads a background job's log by job id (from run_background). Returns the last N lines — default 10.",
+    parameters: {
+      type: "object",
+      properties: {
+        job_id: { type: "string", description: "Job id returned by run_background" },
+        lines: { type: "number", description: "Last N lines to return (default 10, max 200)" },
+      },
+      required: ["job_id"],
+    },
+  },
+  {
+    name: "background_job_status",
+    scope: ["code"],
+    description:
+      "Lists this session's background jobs with id, status (running | completed | failed | killed | lost), exit code and duration — start→now while running, start→finish otherwise.",
+    parameters: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
     name: "web_fetch",
     scope: ["code"],
     description: "Fetches a URL and returns readable text. Placeholder — not wired up yet.",
@@ -282,8 +321,10 @@ export const AGENT_TOOLS: AgentTool[] = [
 ];
 
 const MAX_OUTPUT = 8000;
+/** Default read_file window — enough to orient without flooding context. */
+const DEFAULT_READ_LINES = 100;
 
-/** update_file body — node, guaranteed since the runner itself is a node process (python3 is absent on NixOS runners). Inputs arrive base64 in env so no shell quoting is involved. */
+/** update_file body — node, guaranteed since the runner itself is a node process (python3 is absent on NixOS runners). Inputs arrive base64 in env so no shell quoting is involved. After the edit it prints a __T2DB_DIFF__<base64> marker carrying a unified diff (3 context lines) — the server strips the marker from the model-visible output and saves the diff for the UI. */
 const UPDATE_FILE_JS = `
 const b64 = (v) => Buffer.from(v ?? "", "base64").toString("utf8");
 const file = b64(process.env.U_FILE), oldS = b64(process.env.U_OLD), newS = b64(process.env.U_NEW);
@@ -292,8 +333,30 @@ const s = fs.readFileSync(file, "utf8");
 const n = s.split(oldS).length - 1;
 if (n === 0) { console.error("error: old_string not found in " + file); process.exit(1); }
 if (n > 1) { console.error("error: old_string matches " + n + " times in " + file + " — make it more specific"); process.exit(1); }
-fs.writeFileSync(file, s.replace(oldS, newS));
+// function replacer: $-patterns in newS must be inserted verbatim, not interpreted
+const after = s.replace(oldS, () => newS);
+fs.writeFileSync(file, after);
 console.log("updated " + file);
+try {
+  const before = s.split("\\n"), next = after.split("\\n");
+  let start = 0;
+  while (start < before.length && start < next.length && before[start] === next[start]) start++;
+  let eb = before.length - 1, ea = next.length - 1;
+  while (eb >= start && ea >= start && before[eb] === next[ea]) { eb--; ea--; }
+  if (eb >= start || ea >= start) {
+    const cs = Math.max(0, start - 3);
+    const ceb = Math.min(before.length - 1, eb + 3);
+    const cea = Math.min(next.length - 1, ea + 3);
+    const hunk = [];
+    hunk.push("@@ -" + (cs + 1) + "," + (ceb - cs + 1) + " +" + (cs + 1) + "," + (cea - cs + 1) + " @@");
+    for (let i = cs; i < start; i++) hunk.push(" " + before[i]);
+    for (let i = start; i <= eb; i++) hunk.push("-" + before[i]);
+    for (let i = start; i <= ea; i++) hunk.push("+" + next[i]);
+    for (let i = eb + 1; i <= ceb; i++) hunk.push(" " + before[i]);
+    const diff = "--- a/" + file + "\\n+++ b/" + file + "\\n" + hunk.join("\\n") + "\\n";
+    console.log("__T2DB_DIFF__" + Buffer.from(diff, "utf8").toString("base64"));
+  }
+} catch (e) { /* diff is cosmetic — never fail the edit */ }
 `;
 
 /**
@@ -398,6 +461,38 @@ patch "$@" < "$__twodb_p"
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
+const DIFF_MARKER = "__T2DB_DIFF__";
+
+/** Split an update_file stdout into its clean text and the smuggled diff. */
+function extractDiffMarker(stdout: string): { stdout: string; diff?: string } {
+  const idx = stdout.indexOf(DIFF_MARKER);
+  if (idx === -1) return { stdout };
+  let b64 = "";
+  const rest = stdout.slice(idx + DIFF_MARKER.length);
+  const nl = rest.indexOf("\n");
+  if (nl === -1) b64 = rest;
+  else b64 = rest.slice(0, nl);
+  const line = rest.slice(nl === -1 ? rest.length : nl + 1);
+  try {
+    const diff = Buffer.from(b64, "base64").toString("utf8");
+    const cleaned = (stdout.slice(0, idx) + line).replace(/\n$/, "");
+    return { stdout: cleaned, diff: diff || undefined };
+  } catch {
+    return { stdout };
+  }
+}
+
+/** New-file diff — every line added. Cap the body so huge writes don't bloat
+ * the persisted tool row. */
+function newFileDiff(path: string, content: string): string | undefined {
+  if (!path) return undefined;
+  const lines = content.split("\n");
+  const MAX_DIFF_LINES = 500;
+  const body = lines.slice(0, MAX_DIFF_LINES).map((l) => `+${l}`);
+  const tail = lines.length > MAX_DIFF_LINES ? `\n+…(${lines.length - MAX_DIFF_LINES} more lines)` : "";
+  return `--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${Math.max(1, lines.length)} @@\n${body.join("\n")}${tail}\n`;
+}
+
 /** Translates a tool call into the bash script executed on the runner. Throws on invalid arguments. */
 function buildCommand(call: AgentToolCall): string {
   const args = call.arguments ?? {};
@@ -412,10 +507,20 @@ function buildCommand(call: AgentToolCall): string {
     case "read_file": {
       const path = str(args.path);
       if (!path) throw new Error("path is required");
+      // Default window: first 100 lines, trimmed marker showing what's left.
+      // offset/limit (1-based start, count) let the agent read any range with
+      // no cap — 0:1000000-style whole-file reads included.
       const offset = Math.max(1, Number(args.offset) || 1);
-      const limit = Math.max(0, Number(args.limit) || 0);
-      const reader = offset > 1 || limit > 0 ? `sed -n ${shq(`${offset},${limit > 0 ? offset + limit - 1 : "$"}p`)} -- ${shq(path)}` : `cat -- ${shq(path)}`;
-      return `if [ ! -f ${shq(path)} ]; then echo ${shq(`error: not a file: ${path}`)} >&2; exit 1; fi; ${reader}`;
+      const requested = args.limit === undefined ? DEFAULT_READ_LINES : Math.max(1, Number(args.limit) || 1);
+      const sedEnd = offset - 1 + requested;
+      const reader = `sed -n ${shq(`${offset},${sedEnd}p`)} -- ${shq(path)}`;
+      const rest = `\n…<trimmed — pass offset=${shq(String(offset + requested))} to continue, or offset=1 limit=1000000 for the whole file>`;
+      return (
+        `if [ ! -f ${shq(path)} ]; then echo ${shq(`error: not a file: ${path}`)} >&2; exit 1; fi; ` +
+        // total line count drives the <trimmed> marker: print it only when the
+        // window didn't reach EOF
+        `TOTAL=$(wc -l < ${shq(path)}); ${reader}; [ "${sedEnd}" -lt "$TOTAL" ] && printf %s\\n ${shq(rest)} || true`
+      );
     }
 
     case "write_file": {
@@ -487,6 +592,8 @@ export interface ToolExecution {
   artifact?: CanvasArtifactResult;
   /** Set by read_asset on images — transient wire parts for vision models. */
   imageParts?: AgentImagePart[];
+  /** Set by update_file / write_file / apply_patch — unified diff for the UI. */
+  diff?: string;
 }
 
 /** Server-side context for tools that resolve beyond the runner (read_skill, update_canvas, read_asset). */
@@ -615,6 +722,43 @@ export async function executeToolCall(
   onWaiting?: () => void,
   ctx?: ToolContext,
 ): Promise<ToolExecution> {
+  if (call.name === "run_background" || call.name === "job_logs" || call.name === "background_job_status") {
+    // Job tools need session context (job rows are per-session) plus a live runner.
+    if (!ctx) return { output: "error: background jobs require session context", code: null, failed: true };
+    const command = str(call.arguments?.command).trim();
+    const jobId = str(call.arguments?.job_id).trim();
+    const lines = Math.max(1, Math.min(200, Number(call.arguments?.lines) || 10));
+    if (call.name === "run_background" && !command) return { output: "error: command is required", code: null, failed: true };
+    if (call.name === "job_logs" && !jobId) return { output: "error: job_id is required", code: null, failed: true };
+    if (call.name === "background_job_status") {
+      try {
+        return { output: await formatJobStatuses(ctx.sessionId), code: 0, failed: false };
+      } catch (e) {
+        return { output: `error: ${(e as Error).message}`, code: null, failed: true };
+      }
+    }
+    if (!runnerId) return { output: "error: no runner assigned to this session", code: null, failed: true };
+    try {
+      if (call.name === "run_background") {
+        const started = await startBackgroundJob({
+          sessionId: ctx.sessionId,
+          organizationId: ctx.organizationId,
+          runnerId,
+          command,
+          cwd,
+        });
+        return {
+          output: `job started: ${started.jobId}\nstatus: running in the background\nuse job_logs with this job id to check output; its result is delivered into the thread when it finishes.`,
+          code: 0,
+          failed: false,
+        };
+      }
+      const logs = await readJobLogs(runnerId, jobId, lines);
+      return { output: logs, code: 0, failed: false };
+    } catch (e) {
+      return { output: `error: ${(e as Error).message}`, code: null, failed: true };
+    }
+  }
   if (call.name === "read_skill") {
     try {
       return await executeReadSkill(ctx, runnerId, cwd, call);
@@ -674,11 +818,25 @@ export async function executeToolCall(
       for (let i = 0; i < content.length; i += 4000) onChunk("stdout", content.slice(i, i + 4000));
     }
     const result = await runnerManager.execOnRunner(runnerId, command, onChunk, { onWaiting });
-    const text = `exit code: ${result.code}\n\nstdout:\n${result.stdout}\n\nstderr:\n${result.stderr}`;
+    // update_file smuggles its unified diff out as a base64 marker line —
+    // keep it out of the model-visible output, hand it to the UI instead.
+    const { stdout, diff } = extractDiffMarker(result.stdout);
+    let extraDiff: string | undefined;
+    if (!diff && result.code === 0) {
+      if (call.name === "write_file") extraDiff = newFileDiff(str(call.arguments?.path), str(call.arguments?.content));
+      if (call.name === "apply_patch") {
+        const patch = recountHunks(stripPatchFences(str(call.arguments?.patch)));
+        // Trim context-only patches? No — the patch IS the diff; show it as-is.
+        extraDiff = patch;
+      }
+    }
+    const text = `exit code: ${result.code}\n\nstdout:\n${stdout}\n\nstderr:\n${result.stderr}`;
+    const capped = text.length > MAX_OUTPUT ? `${text.slice(0, MAX_OUTPUT)}\n…(truncated)` : text;
     return {
-      output: text.length > MAX_OUTPUT ? `${text.slice(0, MAX_OUTPUT)}\n…(truncated)` : text,
+      output: capped,
       code: result.code,
       failed: result.code !== 0,
+      ...((diff ?? extraDiff) ? { diff: diff ?? extraDiff } : {}),
     };
   } catch (e) {
     return { output: `error: ${(e as Error).message}`, code: null, failed: true };

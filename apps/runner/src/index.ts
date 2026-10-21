@@ -63,7 +63,94 @@ interface ServerMessage {
   data?: string;
   cwd?: string;
   tmuxName?: string;
+  jobId?: string;
+  lines?: number;
 }
+
+// Background jobs: detached processes whose output lands in a log file. The
+// server tracks them by jobId and asks for tail lines on demand — the runner
+// stays the source of truth for the process itself.
+const jobs = new Map<string, { child: ReturnType<typeof spawn>; logPath: string; command: string; startedAt: number }>();
+const JOBS_DIR = () => `${os.tmpdir()}/twodb-jobs`;
+
+function handleSpawnJob(jobId: string, command: string, cwd?: string) {
+  try {
+    fs.mkdirSync(JOBS_DIR(), { recursive: true });
+    const logPath = `${JOBS_DIR()}/${jobId}.log`;
+    const workDir = cwd && fs.existsSync(cwd) ? cwd : os.homedir();
+    const out = fs.openSync(logPath, "a");
+    // setsid detaches: the job survives its parent and never blocks the runner.
+    const child = spawn("/bin/sh", ["-c", command], {
+      cwd: workDir,
+      env: spawnEnv(),
+      detached: process.platform !== "win32",
+      stdio: ["ignore", out, out],
+    });
+    child.on("error", (error) => {
+      fs.appendFileSync(logPath, `\n[twodb] failed to start: ${error.message}\n`);
+      send({ type: "jobResult", jobId, code: null, message: error.message });
+    });
+    child.on("close", (code, signal) => {
+      try {
+        fs.closeSync(out);
+      } catch {
+        // already closed
+      }
+      // signal set = killed externally (panel kill, runner shutdown) — the
+      // server maps that to "killed" instead of misreading 128+n as an error.
+      send({ type: "jobResult", jobId, code, ...(signal ? { signal } : {}) });
+    });
+    jobs.set(jobId, { child, logPath, command, startedAt: Date.now() });
+    send({ type: "jobStarted", jobId, logPath });
+  } catch (e) {
+    send({ type: "jobError", jobId, message: (e as Error).message });
+  }
+}
+
+function tailFile(logPath: string, lines: number): string {
+  try {
+    const content = fs.readFileSync(logPath, "utf8");
+    const rows = content.length ? content.replace(/\n$/, "").split("\n") : [];
+    const start = Math.max(0, rows.length - lines);
+    return rows.slice(start).join("\n");
+  } catch {
+    return "";
+  }
+}
+
+function handleJobOutput(jobId: string, lines: number) {
+  const job = jobs.get(jobId);
+  if (!job) return send({ type: "jobOutput", jobId, output: "", unknown: true });
+  send({ type: "jobOutput", jobId, output: tailFile(job.logPath, Math.max(1, lines)) });
+}
+
+/** On disconnect, mark tracked jobs in the log so the server can distinguish a
+ * finished job (has exit marker) from a lost one (log ends without it). */
+/** Mark tracked jobs in the log so a restarted server can distinguish a
+ * finished job (clean exit marker) from a lost one. */
+function stampJobsShutdown() {
+  for (const [jobId, job] of jobs) {
+    try {
+      fs.appendFileSync(job.logPath, `\n[twodb-job ${jobId}] runner disconnected before job exit was observed\n`);
+    } catch {
+      // log already gone
+    }
+  }
+}
+
+function handleJobKill(jobId: string) {
+  const job = jobs.get(jobId);
+  if (!job) return send({ type: "jobKilled", jobId, unknown: true });
+  try {
+    // Negative pid = the whole detached process group.
+    if (job.child.pid) process.kill(-job.child.pid, "SIGTERM");
+    else job.child.kill("SIGTERM");
+  } catch {
+    // already gone — treat as killed
+  }
+  send({ type: "jobKilled", jobId });
+}
+
 
 function handleExec(execId: string, command: string) {
   const isWin = process.platform === "win32";
@@ -130,6 +217,15 @@ function handle(msg: ServerMessage) {
     case "exec":
       if (msg.execId && msg.command) handleExec(msg.execId, msg.command);
       break;
+    case "spawnJob":
+      if (msg.jobId && msg.command) handleSpawnJob(msg.jobId, msg.command, msg.cwd);
+      break;
+    case "jobOutput":
+      if (msg.jobId) handleJobOutput(msg.jobId, msg.lines ?? 10);
+      break;
+    case "jobKill":
+      if (msg.jobId) handleJobKill(msg.jobId);
+      break;
   }
 }
 
@@ -158,6 +254,8 @@ function connect() {
   ws.on("close", (code, reason) => {
     console.log(`disconnected (${code} ${reason})`);
     cleanupTerminals();
+    stampJobsShutdown();
+    jobs.clear();
     setTimeout(connect, backoff);
     backoff = Math.min(backoff * 2, 30_000);
   });
