@@ -147,6 +147,23 @@ if (env.skipAutoMigration) {
 
 const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
   logger.info({ port: info.port }, "server listening");
+  // Embedded runner: this machine registers as a runner (no key, in-process).
+  // Self-hosted deployments are typically single-org — the local runner binds
+  // to the first org at boot. (Multi-org hosts can disable it via env.)
+  if (process.env.TWODB_LOCAL_RUNNER !== "off") {
+    void (async () => {
+      try {
+        const { startLocalRunner, touchLocalRunner } = await import("./lib/local-runner");
+        const org = await db.selectFrom("organization").select("id").orderBy("createdAt", "asc").executeTakeFirst();
+        if (org) {
+          await startLocalRunner(org.id);
+          setInterval(() => touchLocalRunner(), 60_000).unref();
+        }
+      } catch (err) {
+        logger.warn({ err }, "local runner failed to start (non-fatal)");
+      }
+    })();
+  }
 });
 
 injectWebSocket(server);

@@ -3,6 +3,7 @@ import type { WSContext } from "hono/ws";
 import type { createNodeWebSocket } from "@hono/node-ws";
 import { auth, db } from "../auth";
 import { runnerManager } from "../lib/runner-manager";
+import { ingestRunnerMetrics, type RunnerMetricsPayload } from "../lib/runner-metrics";
 import { logger } from "../lib/logger";
 
 type UpgradeWebSocket = ReturnType<typeof createNodeWebSocket>["upgradeWebSocket"];
@@ -17,6 +18,8 @@ interface WsMessage {
   code?: number;
   cwd?: string;
   tmuxName?: string;
+  /** metrics stream (10s cadence). */
+  metrics?: RunnerMetricsPayload;
 }
 
 function parseMessage(data: unknown): WsMessage | null {
@@ -84,12 +87,20 @@ export function registerRunnerWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) 
           });
           logger.info({ runnerId: runner.id, organizationId: keyRow.organizationId, name, hostname }, "runner connected");
           ws.send(JSON.stringify({ type: "welcome", runnerId: runner.id }));
+          // Push the disk-path config so the first metrics sample covers it.
+          if (runner.diskPaths?.length) ws.send(JSON.stringify({ type: "metricsConfig", diskPaths: runner.diskPaths }));
         },
 
         onMessage(evt: { data: unknown }) {
           if (!runnerId) return;
           const msg = parseMessage(evt.data);
-          if (msg) runnerManager.fromRunner(runnerId, msg);
+          if (!msg) return;
+          // Metrics ride the control socket — ingest before the general routing.
+          if (msg.type === "metrics" && msg.metrics) {
+            ingestRunnerMetrics(runnerId, runnerManager.orgOf(runnerId) ?? "", msg.metrics);
+            return;
+          }
+          runnerManager.fromRunner(runnerId, msg);
         },
 
         async onClose() {

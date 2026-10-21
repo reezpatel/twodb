@@ -11,9 +11,7 @@
  * replay a `run_state` sync so panels recover live runs seamlessly.
  */
 
-type RoomFrame = { type: "room"; room: string; frame: unknown };
 type OrgFrame = { type: string; [k: string]: unknown };
-
 type RoomHandler = (frame: unknown) => void;
 type OrgHandler = (frame: OrgFrame) => void;
 
@@ -48,6 +46,7 @@ function connect() {
     // (Re)subscribe every joined room — the server replies with run_state /
     // compaction_state / jobs sync per room, which panels use to recover.
     for (const room of rooms.keys()) sock.send(JSON.stringify({ type: "subscribe", session: room.slice("session:".length) }));
+    if (resourcesRefCount > 0) sock.send(JSON.stringify({ type: "resources:subscribe" }));
     pingTimer = setInterval(() => {
       if (sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify({ type: "ping" }));
     }, PING_INTERVAL);
@@ -60,12 +59,15 @@ function connect() {
     } catch {
       return;
     }
-    const frame = parsed as RoomFrame & OrgFrame;
+    const frame = parsed as { type?: string; room?: string; frame?: unknown; runnerId?: string; metrics?: unknown; at?: string; [k: string]: unknown };
     if (frame?.type === "room" && typeof frame.room === "string") {
       const entry = rooms.get(frame.room);
       if (entry) entry.handlers.forEach((h) => h(frame.frame));
+    } else if (frame?.type === "resources") {
+      dispatchResources({ runnerId: frame.runnerId ?? "", at: frame.at ?? "", metrics: frame.metrics });
+      orgHandlers.forEach((h) => h(frame as OrgFrame));
     } else {
-      orgHandlers.forEach((h) => h(frame));
+      orgHandlers.forEach((h) => h(frame as OrgFrame));
     }
   };
 
@@ -91,7 +93,7 @@ function ensureOpen() {
 }
 
 function maybeClose() {
-  if (refTotal > 0 || rooms.size > 0) return;
+  if (refTotal > 0 || rooms.size > 0 || resourcesRefCount > 0) return;
   wantOpen = false;
   if (retryTimer) clearTimeout(retryTimer);
   if (pingTimer) clearInterval(pingTimer);
@@ -157,4 +159,31 @@ export function sendToSession(sessionId: string, message: Record<string, unknown
   if (!ws || ws.readyState !== WebSocket.OPEN) return false;
   ws.send(JSON.stringify({ ...message, session: sessionId }));
   return true;
+}
+
+// --- resources room -----------------------------------------------------------
+
+type ResourcesHandler = (frame: { runnerId: string; at: string; metrics: unknown }) => void;
+let resourcesHandlers = new Set<ResourcesHandler>();
+let resourcesRefCount = 0;
+
+/** Subscribe to live runner metrics (resources room on the shared socket). */
+export function subscribeResources(onFrame?: ResourcesHandler): () => void {
+  if (onFrame) resourcesHandlers.add(onFrame);
+  resourcesRefCount += 1;
+  ensureOpen();
+  if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "resources:subscribe" }));
+  return () => {
+    if (onFrame) resourcesHandlers.delete(onFrame);
+    resourcesRefCount -= 1;
+    if (resourcesRefCount <= 0) {
+      resourcesRefCount = 0;
+      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "resources:unsubscribe" }));
+    }
+  };
+}
+
+/** Dispatch hook for the onmessage router (below). */
+function dispatchResources(frame: { runnerId: string; at: string; metrics: unknown }) {
+  for (const h of resourcesHandlers) h(frame);
 }

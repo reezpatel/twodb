@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Activity, Loader2 } from "lucide-react";
 import { RunnerTerminal } from "./runner-terminal";
+import { RunnerMetrics } from "./runner-metrics";
 import { useRunners } from "./use-runners";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ export function RunnersSection() {
   const { runners, keys, newKey, setNewKey, terminalRunner, setTerminalRunner, actionError, createKey, revokeKey, deleteRunner } = useRunners();
 
   const [keyName, setKeyName] = useState("");
+  const [metricsRunner, setMetricsRunner] = useState<string | null>(null);
 
   if (terminalRunner) {
     return <RunnerTerminal runnerId={terminalRunner.id} runnerName={terminalRunner.name} onClose={() => setTerminalRunner(null)} />;
@@ -88,31 +90,43 @@ export function RunnersSection() {
           ) : runners.data && runners.data.length > 0 ? (
             <ul className="flex flex-col gap-2">
               {runners.data.map((runner) => (
-                <li key={runner.id} className="flex items-center gap-3">
-                  <Badge variant={runner.online ? "success" : "secondary"}>{runner.online ? "online" : "offline"}</Badge>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">{runner.name}</div>
-                    <div className="text-muted-foreground text-xs">
-                      {runner.hostname ?? "—"} · last seen {new Date(runner.lastSeenAt).toLocaleString()}
+                <li key={runner.id} className="flex flex-col gap-1">
+                  <div className="flex items-center gap-3">
+                    <Badge variant={runner.online ? "success" : "secondary"}>{runner.online ? "online" : "offline"}</Badge>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium">{runner.name}</div>
+                      <div className="text-muted-foreground text-xs">
+                        {runner.hostname ?? "—"} · last seen {new Date(runner.lastSeenAt).toLocaleString()}
+                      </div>
                     </div>
-                  </div>
-                  {runner.online && (
-                    <Button variant="outline" size="sm" onClick={() => setTerminalRunner(runner)}>
-                      Terminal
+                    <Button variant="outline" size="sm" onClick={() => setMetricsRunner(metricsRunner === runner.id ? null : runner.id)}>
+                      <Activity size={13} aria-hidden="true" />
+                      Metrics
                     </Button>
+                    {runner.online && (
+                      <Button variant="outline" size="sm" onClick={() => setTerminalRunner(runner)}>
+                        Terminal
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (window.confirm(`Remove runner "${runner.name}"?`)) {
+                          deleteRunner.mutate(runner.id);
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                  {metricsRunner === runner.id && (
+                    <div className="border-muted mt-2 rounded-lg border p-3">
+                      <div className="mb-2 text-xs font-semibold">30-day metrics</div>
+                      <RunnerMetrics runner={runner} />
+                    </div>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => {
-                      if (window.confirm(`Remove runner "${runner.name}"?`)) {
-                        deleteRunner.mutate(runner.id);
-                      }
-                    }}
-                  >
-                    Delete
-                  </Button>
                 </li>
               ))}
             </ul>

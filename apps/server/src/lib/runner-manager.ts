@@ -237,6 +237,11 @@ class RunnerManager {
     this.notifyChanged();
   }
 
+  /** Owning org of a live runner (metrics ingest routing). */
+  orgOf(runnerId: string) {
+    return this.runners.get(runnerId)?.organizationId ?? null;
+  }
+
   removeRunner(runnerId: string) {
     this.runners.delete(runnerId);
     this.notifyChanged();
@@ -273,6 +278,12 @@ class RunnerManager {
   disconnect(runnerId: string) {
     const conn = this.runners.get(runnerId);
     if (conn) send(conn.ws, { type: "close" });
+  }
+
+  /** Raw server→runner message (metricsConfig etc.) — no-op when offline. */
+  sendToRunnerRaw(runnerId: string, msg: unknown) {
+    const conn = this.runners.get(runnerId);
+    if (conn) send(conn.ws, msg);
   }
 
   openTerminal(sessionId: string, runnerId: string, client: WSContext) {

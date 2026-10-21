@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
 import { runnerManager } from "../lib/runner-manager";
+import { latestMetrics, runnerMetricsHistory } from "../lib/runner-metrics";
 
 export const runnerRoutes = new Hono()
   .get("/runners", async (c) => {
@@ -73,6 +74,72 @@ export const runnerRoutes = new Hono()
 
     runnerManager.disconnect(row.id);
     return c.json({ ok: true });
+  })
+
+  // Disk paths reported in this runner's metrics — configured from the UI.
+  .patch("/runners/:id/disks", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const runnerId = c.req.param("id");
+    const body = await c.req.json().catch(() => null);
+    const raw = Array.isArray(body?.paths) ? body.paths : null;
+    if (!raw) return c.json({ error: "paths_required" }, 400);
+    // Absolute paths only, deduped, capped at a sane number.
+    const paths = [...new Set(raw.filter((p: unknown) => typeof p === "string" && p.startsWith("/")))].slice(0, 16) as string[];
+
+    const row = await db
+      .updateTable("runner")
+      .set({ diskPaths: JSON.stringify(paths) })
+      .where("id", "=", runnerId)
+      .where("organizationId", "=", s.organizationId)
+      .where("deletedAt", "is", null)
+      .returningAll()
+      .executeTakeFirst();
+    if (!row) return c.json({ error: "runner_not_found" }, 404);
+
+    // Push to a connected runner so the next 10s sample covers it.
+    runnerManager.sendToRunnerRaw(runnerId, { type: "metricsConfig", diskPaths: paths });
+    const { setLocalDiskPaths, localRunnerId } = await import("../lib/local-runner");
+    if (localRunnerId() === runnerId) setLocalDiskPaths(paths);
+    return c.json({ ok: true, paths });
+  })
+
+  // Metrics history for charts — ?hours=720 (30d default, capped there).
+  .get("/runners/:id/metrics", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const runnerId = c.req.param("id");
+    const owned = await db
+      .selectFrom("runner")
+      .select("id")
+      .where("id", "=", runnerId)
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!owned) return c.json({ error: "runner_not_found" }, 404);
+
+    const hoursRaw = Number(c.req.query("hours") ?? "720");
+    const hours = Number.isFinite(hoursRaw) ? Math.min(Math.max(hoursRaw, 1), 720) : 720;
+    const rows = await runnerMetricsHistory(runnerId, hours);
+    return c.json(rows.map((r) => ({ at: r.at, cpu: r.cpu, memory: r.memory, gpus: r.gpus, disks: r.disks })));
+  })
+
+  // Latest live sample (null when the runner has never reported).
+  .get("/runners/:id/metrics/latest", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const runnerId = c.req.param("id");
+    const owned = await db
+      .selectFrom("runner")
+      .select("id")
+      .where("id", "=", runnerId)
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!owned) return c.json({ error: "runner_not_found" }, 404);
+
+    return c.json(latestMetrics(runnerId));
   })
 
   .get("/runner-keys", async (c) => {

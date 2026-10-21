@@ -10,6 +10,7 @@ import { projectHistory } from "../lib/compaction";
 import { runAgentRound, type ThinkingLevel } from "../lib/agent";
 import { resolveAskUser, type AskUserAnswer, type AskUserQuestion } from "../lib/ask-user";
 import { readGitStatus } from "../lib/git-status";
+import { onMetrics, allLatestMetrics } from "../lib/runner-metrics";
 import { runnerManager } from "../lib/runner-manager";
 
 type UpgradeWebSocket = ReturnType<typeof createNodeWebSocket>["upgradeWebSocket"];
@@ -47,6 +48,8 @@ interface CodeSocket {
   organizationId: string;
   /** Joined session rooms — `session:<id>`. The org room is implicit (auth). */
   rooms: Set<string>;
+  /** Subscribed to live runner metrics (resources room). */
+  resourcesSubscribed: boolean;
 }
 
 /** Room name for a session's viewers. */
@@ -468,6 +471,28 @@ async function pushRunners(targets: CodeSocket[]) {
 export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
   runnerManager.onChange(() => void pushRunners([...sockets]));
 
+  // Resources room: live runner metrics pushed to subscribers of "resources".
+  // Org-level routing (the org room is implicit) with its own join message.
+  const pushMetrics = (update: { runnerId: string; at: string; metrics: unknown }) => {
+    const data = JSON.stringify({ type: "resources", ...update });
+    for (const s of sockets) {
+      if (s.organizationId !== (orgOfRunner(update.runnerId) ?? "")) continue;
+      if (!s.resourcesSubscribed) continue;
+      try {
+        s.ws.send(data);
+      } catch {
+        sockets.delete(s);
+      }
+    }
+  };
+  let metricsUnsub: (() => void) | null = null;
+  const orgOfRunner = (runnerId: string) => runnerManager.orgOf(runnerId);
+  const ensureMetricsTap = () => {
+    if (!metricsUnsub) {
+      metricsUnsub = onMetrics((u) => pushMetrics({ runnerId: u.runnerId, at: u.at, metrics: u.metrics }));
+    }
+  };
+
   app.get(
     "/api/code/ws",
     upgradeWebSocket((c: Context) => {
@@ -517,7 +542,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
             ws.close(4401, "unauthorized");
             return;
           }
-          socket = { ws, organizationId, rooms: new Set() };
+          socket = { ws, organizationId, rooms: new Set(), resourcesSubscribed: false };
           sockets.add(socket);
           logger.info({ organizationId }, "code ws connected");
           await pushRunners([socket]);
@@ -539,6 +564,27 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
 
           if (msg.type === "ping") {
             ws.send(JSON.stringify({ type: "pong" }));
+            return;
+          }
+
+          // Resources room — live runner metrics. Join sends the latest
+          // snapshot per (online) runner of the org.
+          if (msg.type === "resources:subscribe" || msg.type === "resources:unsubscribe") {
+            if (!socket) return;
+            if (msg.type === "resources:subscribe") {
+              socket.resourcesSubscribed = true;
+              ensureMetricsTap();
+              for (const live of allLatestMetrics()) {
+                if (orgOfRunner(live.runnerId) !== organizationId) continue;
+                try {
+                  ws.send(JSON.stringify({ type: "resources", runnerId: live.runnerId, at: live.at, metrics: live.metrics }));
+                } catch {
+                  // socket gone
+                }
+              }
+            } else {
+              socket.resourcesSubscribed = false;
+            }
             return;
           }
 

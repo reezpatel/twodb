@@ -148,9 +148,24 @@ export interface RunnerTable {
   accessKeyId: string;
   name: string;
   hostname: string | null;
+  /** Mount points to report in metrics — configured in Settings → Runners. */
+  diskPaths: ColumnType<string[] | null, string | null | undefined, string | null | undefined>;
   lastSeenAt: Date;
   createdAt: Date;
   deletedAt: Date | null;
+}
+
+/** One persisted metrics sample per runner per 10-minute window; jsonb payload mirrors the runner's RunnerMetrics minus `at`. */
+export interface RunnerMetricTable {
+  id: string;
+  runnerId: string;
+  organizationId: string;
+  at: Date;
+  /** jsonb columns bind as strings; pg parses them back to objects on read. */
+  cpu: ColumnType<{ busy: number; load1: number; cores: number; perCore: number[] }, string, string>;
+  memory: ColumnType<{ used: number; total: number }, string, string>;
+  gpus: ColumnType<{ vendor: string; index: number; name: string; utilization: number; memoryUsed: number; memoryTotal: number; temperature: number | null }[], string, string>;
+  disks: ColumnType<{ path: string; used: number; total: number; inodeUsedRatio: number | null; error?: string }[], string, string>;
 }
 
 export interface CodeDirectoryTable {
@@ -1283,6 +1298,7 @@ export interface Database {
   llm_connection: LlmConnectionTable;
   runner_access_key: RunnerAccessKeyTable;
   runner: RunnerTable;
+  runner_metric: RunnerMetricTable;
   code_directory: CodeDirectoryTable;
   code_session: CodeSessionTable;
   code_session_message: CodeSessionMessageTable;

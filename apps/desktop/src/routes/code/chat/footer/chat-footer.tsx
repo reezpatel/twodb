@@ -1,5 +1,6 @@
 import { GitBranch } from "lucide-react";
 import { StatsRow } from "@/components/model-picker/stats-row";
+import { FooterResources } from "./footer-resources";
 import type { GitLine, SessionStats } from "../use-chat-panel";
 
 interface ChatFooterProps {
@@ -21,6 +22,8 @@ export function ChatFooter({ stats, contextWindow, model, effectiveModel, thinki
           {model || effectiveModel || "no model"}&nbsp;&nbsp; &bull;&nbsp;&nbsp; {thinkingLevel === "medium" ? "med" : thinkingLevel}
         </button>
       </StatsRow>
+
+      <FooterResources />
 
       {gitStatus && (
         <div className="text-muted-foreground flex items-center gap-3 px-1 font-mono text-[11px]">

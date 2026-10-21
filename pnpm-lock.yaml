@@ -271,6 +271,9 @@ importers:
       '@hono/node-server':
         specifier: ^1.19.0
         version: 1.19.17(hono@4.13.9)
+      '@twodb/runner-core':
+        specifier: workspace:*
+        version: link:../../packages/runner-core
       hono:
         specifier: ^4.10.0
         version: 4.13.9
@@ -317,6 +320,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.0
         version: 1.32.0(zod@4.6.5)
+      '@twodb/runner-core':
+        specifier: workspace:*
+        version: link:../../packages/runner-core
       better-auth:
         specifier: ^1.7.5
         version: 1.7.5(@prisma/client@5.22.0)(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(tsx@4.23.12)(yaml@2.9.0))
@@ -368,6 +374,15 @@ importers:
         version: 8.21.0
       typescript:
         specifier: ^5.8.0
+        version: 5.9.3
+
+  packages/runner-core:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+      typescript:
+        specifier: ^5.9.3
         version: 5.9.3
 
 packages:
