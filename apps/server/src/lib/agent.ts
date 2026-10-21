@@ -711,6 +711,14 @@ async function responsesRound(
       usage.inputTokens = u.input_tokens ?? usage.inputTokens;
       usage.outputTokens = u.output_tokens ?? usage.outputTokens;
       usage.cachedTokens = u.input_tokens_details?.cached_tokens ?? 0;
+      // Azure can omit encrypted_content from output_item.done and provide it
+      // only here — backfill so store:false replay keeps working (pi #6409).
+      for (const item of (Array.isArray(response.output) ? response.output : []) as Record<string, unknown>[]) {
+        if (item.type !== "reasoning" || typeof item.encrypted_content !== "string" || !item.encrypted_content) continue;
+        const idx = reasoningItems.findIndex((r) => r.id === item.id);
+        if (idx === -1) reasoningItems.push(item);
+        else if (!reasoningItems[idx].encrypted_content) reasoningItems[idx] = { ...reasoningItems[idx], encrypted_content: item.encrypted_content };
+      }
     } else if (type === "response.failed" || type === "error") {
       const err = (evt.error ?? evt.response ?? {}) as Record<string, unknown>;
       logger.error({ provider: connection.provider, model, err: JSON.stringify(err).slice(0, 300) }, "responses stream failed");
@@ -719,10 +727,11 @@ async function responsesRound(
   }
 
   if (reasoningOpen) events.onThinkingEnd?.();
-  // Attach the encrypted reasoning item to the thinking entry so it survives
-  // in meta.thinking[0].signature; the summary text stays the display copy.
+  // Attach encrypted reasoning items to thinking entries so they survive in
+  // meta.thinking[].signature; the summary text stays the display copy. All
+  // items replay (a turn may interleave several with tool calls).
   const thinking = reasoningItems.length
-    ? [{ text: reasoningText, signature: JSON.stringify(reasoningItems[0]) }]
+    ? reasoningItems.map((item, i) => ({ text: i === 0 ? reasoningText : "", signature: JSON.stringify(item) }))
     : reasoningText
       ? [{ text: reasoningText }]
       : undefined;

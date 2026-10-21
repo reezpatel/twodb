@@ -81,10 +81,16 @@ const ABORTED = Symbol("aborted");
  * thinking from previous runs is dead weight: the Anthropic API only ever
  * reads it from the most recent assistant turn (older signed blocks are
  * stripped or counted as input depending on model), and openai-compatible /
- * Responses wires never replay thinking text at all.
+ * Responses wires never replay thinking text at all. A stopped-round row that
+ * held nothing but thinking collapses to an empty message, which providers
+ * reject — those drop out entirely.
  */
 function stripPastRunThinking(history: AgentMessage[]): AgentMessage[] {
-  return history.map((m) => (m.role === "assistant" && m.meta?.thinking?.length ? { ...m, meta: { ...m.meta, thinking: undefined } } : m));
+  return history.flatMap((m) => {
+    if (m.role !== "assistant" || !m.meta?.thinking?.length) return [m];
+    const stripped: AgentMessage = { ...m, meta: { ...m.meta, thinking: undefined } };
+    return stripped.content || stripped.meta?.toolCalls?.length ? [stripped] : [];
+  });
 }
 
 /** Resolves to ABORTED as soon as the signal fires instead of waiting for p. */
@@ -512,8 +518,9 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
           completedAt,
           status: exec.failed ? ("failed" as const) : ("ok" as const),
           ...(exec.code !== null ? { exitCode: exec.code } : {}),
+          ...(exec.diff ? { diff: exec.diff } : {}),
         };
-        await emit({ type: "tool_result", id: call.id, name: call.name, output: exec.output, status: toolMeta.status, exitCode: exec.code ?? undefined });
+        await emit({ type: "tool_result", id: call.id, name: call.name, output: exec.output, status: toolMeta.status, exitCode: exec.code ?? undefined, ...(exec.diff ? { diff: exec.diff } : {}) });
         await insertMessage("tool", exec.output, toolMeta);
         // Transient image parts (read_asset on images) ride the wire only — the
         // persisted row keeps the text output.
