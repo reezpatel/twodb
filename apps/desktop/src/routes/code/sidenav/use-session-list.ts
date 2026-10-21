@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { CodeDirectory } from "../directories/use-code-directories";
+import { onOrgFrames } from "../code-room-ws";
 import { api } from "@/lib/api";
 
 export interface CodeSession {
@@ -67,66 +68,39 @@ export interface SessionLiveState {
   unseenUpdates: boolean;
 }
 
-type SessionListEvent =
-  | { type: "session_created"; session: { id: string; title: string; codeDirectoryId: string | null; updatedAt: string } }
-  | { type: "session_updated"; session: { id: string; title: string; updatedAt: string } }
-  | { type: "session_deleted"; id: string }
-  | { type: "session_state"; id: string; running: boolean; needsInput: boolean; unseenUpdates: boolean };
-
 /**
- * Org-wide sidebar channel: one socket per tab carrying coarse session state
- * (running / needsInput / unseen) and create/update/delete notifications.
- * Overlays are keyed by session id and reset whenever the list refetches.
+ * Org-wide sidebar channel: coarse per-session state (running / needsInput /
+ * unseen) and create/update/delete notifications, riding the shared code
+ * room socket (one per tab). Overlays are keyed by session id and reset
+ * whenever the list refetches.
  */
 export function useSessionEvents(enabled: boolean) {
   const queryClient = useQueryClient();
   const [live, setLive] = useState<Map<string, SessionLiveState>>(new Map());
-  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
-    let disposed = false;
-    let attempt = 0;
-    const connect = () => {
-      if (disposed) return;
-      const proto = location.protocol === "https:" ? "wss" : "ws";
-      const ws = new WebSocket(`${proto}://${location.host}/api/code/sessions-ws`);
-      ws.onmessage = (evt) => {
-        let frame: SessionListEvent;
-        try {
-          frame = JSON.parse(evt.data as string) as SessionListEvent;
-        } catch {
-          return;
-        }
-        if (frame.type === "session_state") {
-          setLive((prev) => {
-            const next = new Map(prev);
-            next.set(frame.id, { running: frame.running, needsInput: frame.needsInput, unseenUpdates: frame.unseenUpdates });
-            return next;
-          });
-        } else if (frame.type === "session_deleted") {
-          setLive((prev) => {
-            const next = new Map(prev);
-            next.delete(frame.id);
-            return next;
-          });
-          void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
-        } else {
-          // created / renamed — the REST list is the source of truth.
-          void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
-        }
-      };
-      ws.onclose = () => {
-        if (disposed) return;
-        attempt += 1;
-        retryRef.current = setTimeout(connect, Math.min(1000 * 2 ** (attempt - 1), 15_000));
-      };
-    };
-    connect();
-    return () => {
-      disposed = true;
-      if (retryRef.current) clearTimeout(retryRef.current);
-    };
+    return onOrgFrames((frame) => {
+      if (frame.type === "session_state") {
+        const f = frame as unknown as { id: string; running: boolean; needsInput: boolean; unseenUpdates: boolean };
+        setLive((prev) => {
+          const next = new Map(prev);
+          next.set(f.id, { running: f.running, needsInput: f.needsInput, unseenUpdates: f.unseenUpdates });
+          return next;
+        });
+      } else if (frame.type === "session_deleted") {
+        const f = frame as unknown as { id: string };
+        setLive((prev) => {
+          const next = new Map(prev);
+          next.delete(f.id);
+          return next;
+        });
+        void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
+      } else if (frame.type === "session_created" || frame.type === "session_updated") {
+        // created / renamed — the REST list is the source of truth.
+        void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
+      }
+    });
   }, [enabled, queryClient]);
 
   return live;

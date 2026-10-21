@@ -16,6 +16,8 @@ type UpgradeWebSocket = ReturnType<typeof createNodeWebSocket>["upgradeWebSocket
 
 interface ClientMessage {
   type: string;
+  /** Session the message targets (room protocol — one socket serves many sessions). */
+  session?: string;
   content?: string;
   connectionId?: string;
   model?: string;
@@ -43,7 +45,17 @@ function parseMessage(data: unknown): ClientMessage | null {
 interface CodeSocket {
   ws: WSContext;
   organizationId: string;
-  sessionId: string;
+  /** Joined session rooms — `session:<id>`. The org room is implicit (auth). */
+  rooms: Set<string>;
+}
+
+/** Room name for a session's viewers. */
+const sessionRoom = (sessionId: string) => `session:${sessionId}`;
+
+/** Wrap a frame in its room envelope — every routed frame uses this, direct
+ * replies included, so panels sharing one socket never cross-talk. */
+function roomFrame(room: string, frame: unknown) {
+  return JSON.stringify({ type: "room", room, frame });
 }
 
 interface LiveTool {
@@ -63,6 +75,7 @@ interface LiveTool {
 interface ActiveRun {
   /** Aborted by the client's stop message; the loop unwinds gracefully. */
   controller: AbortController;
+  /** Rooms to broadcast to — mirrors the session room membership. */
   sockets: Set<WSContext>;
   round: number;
   text: string;
@@ -99,28 +112,22 @@ export function isCompacting(sessionId: string) {
 
 // --- org-wide session list channel (sidebar realtime state) -----------------
 
-interface SessionListSocket {
-  ws: WSContext;
-  organizationId: string;
-}
-
-const sessionListSockets = new Set<SessionListSocket>();
-
 export type SessionListEvent =
   | { type: "session_created"; session: { id: string; title: string; codeDirectoryId: string | null; updatedAt: string } }
   | { type: "session_updated"; session: { id: string; title: string; updatedAt: string } }
   | { type: "session_deleted"; id: string }
   | { type: "session_state"; id: string; running: boolean; needsInput: boolean; unseenUpdates: boolean };
 
-/** Fan a sidebar event out to every socket of the owning org. */
+/** Fan a sidebar event out to every socket of the owning org — the org room
+ * is implicit: every connected socket of the org is in it. */
 export function broadcastSessionEvent(organizationId: string, event: SessionListEvent) {
   const data = JSON.stringify(event);
-  for (const s of sessionListSockets) {
+  for (const s of sockets) {
     if (s.organizationId !== organizationId) continue;
     try {
       s.ws.send(data);
     } catch {
-      sessionListSockets.delete(s);
+      sockets.delete(s);
     }
   }
 }
@@ -175,8 +182,8 @@ function accumulate(run: ActiveRun, frame: AgentFrame) {
   }
 }
 
-function broadcast(run: ActiveRun, frame: AgentFrame) {
-  const data = JSON.stringify(frame);
+function broadcast(run: ActiveRun, frame: AgentFrame, sessionId: string) {
+  const data = roomFrame(sessionRoom(sessionId), frame);
   for (const target of run.sockets) {
     try {
       target.send(data);
@@ -187,10 +194,10 @@ function broadcast(run: ActiveRun, frame: AgentFrame) {
 }
 
 /** Snapshot a late-joining socket can use to render the run as if it had been watching from the start. */
-function sendRunState(run: ActiveRun, ws: WSContext) {
+function sendRunState(run: ActiveRun, ws: WSContext, sessionId: string) {
   try {
     ws.send(
-      JSON.stringify({
+      roomFrame(sessionRoom(sessionId), {
         type: "run_state",
         active: true,
         round: run.round,
@@ -310,16 +317,17 @@ export async function startSessionRun(organizationId: string, session: SessionRo
     status: null,
     askUser: null,
   };
-  // The initiating socket joins the broadcast set; any sockets already viewing
-  // this session (e.g. the main thread behind a /btw dialog) join in too.
+  // The initiating socket joins the broadcast set; any sockets in the
+  // session's room (e.g. the main thread behind a /btw dialog) join in too.
+  const room = sessionRoom(session.id);
   if (opts.ws) run.sockets.add(opts.ws);
-  for (const s of sockets) if (s.sessionId === session.id) run.sockets.add(s.ws);
+  for (const s of sockets) if (s.rooms.has(room)) run.sockets.add(s.ws);
   activeRuns.set(session.id, run);
   logger.info({ sessionId: session.id, organizationId, model: opts.model, connectionId: opts.connectionId, sessionType: session.type }, "session run started");
   pushSessionState(organizationId, session.id);
   const emit = (frame: AgentFrame) => {
     accumulate(run, frame);
-    broadcast(run, frame);
+    broadcast(run, frame, session.id);
     if (opts.onFrame) opts.onFrame(frame);
     if (frame.type === "ask_user") pushSessionState(organizationId, session.id, { needsInput: true });
     else if (frame.type === "tool_result" && run.askUser?.id === frame.id) pushSessionState(organizationId, session.id, { needsInput: false });
@@ -361,7 +369,7 @@ export async function startSessionRun(organizationId: string, session: SessionRo
       if (!directory) return;
       const result = await readGitStatus(directory.runnerId, directory.cwd);
       if ("error" in result) return;
-      const data = JSON.stringify({ type: "gitStatus", ...result });
+      const data = roomFrame(sessionRoom(session.id), { type: "gitStatus", ...result });
       for (const target of run.sockets) {
         try {
           target.send(data);
@@ -398,16 +406,27 @@ export function pushSessionState(organizationId: string, sessionId: string, over
   broadcastSessionEvent(organizationId, { type: "session_state", id: sessionId, running, needsInput, unseenUpdates });
 }
 
-/** Fan a frame out to every socket currently viewing this session. */
+/** Fan a frame out to every socket currently viewing this session (room members). */
 export function broadcastToSession(sessionId: string, frame: unknown) {
-  const data = JSON.stringify(frame);
+  const room = sessionRoom(sessionId);
+  const data = roomFrame(room, frame);
   for (const s of sockets) {
-    if (s.sessionId !== sessionId) continue;
+    if (!s.rooms.has(room)) continue;
     try {
       s.ws.send(data);
     } catch {
       sockets.delete(s);
     }
+  }
+}
+
+/** Direct reply to one socket in a session's room — errors, busy, btw acks.
+ * Routed through the room envelope so panels sharing a socket stay separated. */
+function replyTo(ws: WSContext, sessionId: string, frame: unknown) {
+  try {
+    ws.send(roomFrame(sessionRoom(sessionId), frame));
+  } catch {
+    // socket gone; cleanup happens in onClose
   }
 }
 
@@ -423,16 +442,15 @@ async function runnersForOrg(organizationId: string) {
   return rows.map((r) => ({ ...r, online: online.has(r.id) }));
 }
 
-async function pushRunners(targets: CodeSocket[], only?: CodeSocket) {
-  const org = only?.organizationId;
-  const group = only ? targets.filter((s) => s.organizationId === org) : targets;
-  const orgs = new Set(group.map((s) => s.organizationId));
+async function pushRunners(targets: CodeSocket[]) {
+  const orgs = new Set(targets.map((s) => s.organizationId));
   for (const organizationId of orgs) {
     const runners = await runnersForOrg(organizationId);
-    for (const s of group) {
+    const data = JSON.stringify({ type: "runners", runners });
+    for (const s of targets) {
       if (s.organizationId !== organizationId) continue;
       try {
-        s.ws.send(JSON.stringify({ type: "runners", runners }));
+        s.ws.send(data);
       } catch {
         // socket gone; cleanup happens in onClose
       }
@@ -441,54 +459,18 @@ async function pushRunners(targets: CodeSocket[], only?: CodeSocket) {
 }
 
 /**
- * Live channel for one code session. The browser opens this when a session is
- * selected and sends `send` messages; the agent loop streams every frame
- * (model deltas, tool output chunks, results) back over the socket.
+ * One websocket per browser tab (rooms protocol). The org room is implicit —
+ * every socket gets sidebar events (session list state) for its organization.
+ * Panels subscribe to `session:<id>` rooms as the user opens them; all frames
+ * arrive wrapped as {type:"room", room, frame} so a shared socket routes
+ * correctly between the main panel and any /btw dialogs.
  */
 export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
   runnerManager.onChange(() => void pushRunners([...sockets]));
 
-  // Org-wide sidebar channel: coarse per-session state (running, needsInput,
-  // unseen) plus created/updated/deleted notifications. One socket per browser
-  // tab regardless of how many sessions exist.
   app.get(
-    "/api/code/sessions-ws",
+    "/api/code/ws",
     upgradeWebSocket((c: Context) => {
-      const orgReady = auth.api
-        .getSession({ headers: c.req.raw.headers })
-        .then((s) => s?.session.activeOrganizationId ?? null)
-        .catch(() => null);
-      let socket: SessionListSocket | null = null;
-      return {
-        async onOpen(_evt: unknown, ws: WSContext) {
-          const organizationId = await orgReady;
-          if (!organizationId) {
-            ws.close(4401, "unauthorized");
-            return;
-          }
-          socket = { ws, organizationId };
-          sessionListSockets.add(socket);
-        },
-        onClose() {
-          if (socket) sessionListSockets.delete(socket);
-        },
-        async onMessage(evt: { data: unknown }, ws: WSContext) {
-          if (parseMessage(evt.data)?.type === "ping") {
-            try {
-              ws.send(JSON.stringify({ type: "pong" }));
-            } catch {
-              // socket gone
-            }
-          }
-        },
-      };
-    }),
-  );
-
-  app.get(
-    "/api/code/sessions/:id/ws",
-    upgradeWebSocket((c: Context) => {
-      const sessionId = c.req.param("id") ?? "";
       const orgReady = auth.api
         .getSession({ headers: c.req.raw.headers })
         .then((s) => s?.session.activeOrganizationId ?? null)
@@ -496,6 +478,38 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
 
       let socket: CodeSocket | null = null;
 
+      /** State to sync a newly joined session room to. */
+      const syncRoom = async (ws: WSContext, sessionId: string) => {
+        const run = activeRuns.get(sessionId);
+        if (run) {
+          run.sockets.add(ws);
+          sendRunState(run, ws, sessionId);
+        } else {
+          // No run in flight — lets clients that missed `done` drop stale transient state.
+          try {
+            ws.send(roomFrame(sessionRoom(sessionId), { type: "run_state", active: false }));
+          } catch {
+            // socket gone; cleanup happens in onClose
+          }
+        }
+        // A manual compaction may be running without an agent run — resume
+        // the "compacting…" indicator for viewers that just (re)connected.
+        if (compactingSessions.has(sessionId)) {
+          try {
+            ws.send(roomFrame(sessionRoom(sessionId), { type: "compaction_state", active: true }));
+          } catch {
+            // socket gone; cleanup happens in onClose
+          }
+        }
+        // Live jobs for the session (db-backed; works even for late joiners).
+        try {
+          const { listJobs } = await import("../lib/background-jobs");
+          ws.send(roomFrame(sessionRoom(sessionId), { type: "jobs", jobs: await listJobs(sessionId) }));
+        } catch {
+          // non-fatal — the panel falls back to the REST list
+        }
+      };
+
       return {
         async onOpen(_evt: unknown, ws: WSContext) {
           const organizationId = await orgReady;
@@ -503,31 +517,10 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
             ws.close(4401, "unauthorized");
             return;
           }
-          socket = { ws, organizationId, sessionId };
+          socket = { ws, organizationId, rooms: new Set() };
           sockets.add(socket);
-          logger.info({ sessionId, organizationId }, "code session ws connected");
-          await pushRunners([...sockets], socket);
-          const run = activeRuns.get(sessionId);
-          if (run) {
-            run.sockets.add(ws);
-            sendRunState(run, ws);
-          } else {
-            // No run in flight — lets clients that missed `done` drop stale transient state.
-            try {
-              ws.send(JSON.stringify({ type: "run_state", active: false }));
-            } catch {
-              // socket gone; cleanup happens in onClose
-            }
-          }
-          // A manual compaction may be running without an agent run — resume
-          // the "compacting…" indicator for viewers that just (re)connected.
-          if (compactingSessions.has(sessionId)) {
-            try {
-              ws.send(JSON.stringify({ type: "compaction_state", active: true }));
-            } catch {
-              // socket gone; cleanup happens in onClose
-            }
-          }
+          logger.info({ organizationId }, "code ws connected");
+          await pushRunners([socket]);
         },
 
         onClose() {
@@ -535,7 +528,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
             sockets.delete(socket);
             for (const run of activeRuns.values()) run.sockets.delete(socket.ws);
           }
-          logger.info({ sessionId }, "code session ws disconnected");
+          logger.info("code ws disconnected");
         },
 
         async onMessage(evt: { data: unknown }, ws: WSContext) {
@@ -546,6 +539,44 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
 
           if (msg.type === "ping") {
             ws.send(JSON.stringify({ type: "pong" }));
+            return;
+          }
+
+          // Room membership — panels subscribe to the sessions they view.
+          if (msg.type === "subscribe" || msg.type === "unsubscribe") {
+            const sessionId = typeof msg.session === "string" ? msg.session : "";
+            if (!sessionId) return;
+            const room = sessionRoom(sessionId);
+            if (msg.type === "subscribe") {
+              // Join synchronously so a follow-up message (stop/send) in the
+              // same burst isn't rejected while the ownership check is in
+              // flight; roll back if the check fails.
+              socket?.rooms.add(room);
+              const owned = await db
+                .selectFrom("code_session")
+                .select("id")
+                .where("id", "=", sessionId)
+                .where("organizationId", "=", organizationId)
+                .executeTakeFirst();
+              if (!owned) {
+                socket?.rooms.delete(room);
+                replyTo(ws, sessionId, { type: "error", message: "session_not_found" });
+                return;
+              }
+              await syncRoom(ws, sessionId);
+            } else {
+              socket?.rooms.delete(room);
+              activeRuns.get(sessionId)?.sockets.delete(ws);
+            }
+            return;
+          }
+
+          // Everything below targets one session room — subscribe first.
+          const sessionId = typeof msg.session === "string" ? msg.session : "";
+          if (!sessionId) return;
+          const room = sessionRoom(sessionId);
+          if (!socket?.rooms.has(room)) {
+            replyTo(ws, sessionId, { type: "error", message: "not_subscribed" });
             return;
           }
 
@@ -576,7 +607,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               const model = (msg.model ?? "").trim();
               const sendToMain = msg.sendToMain !== false;
               if (!connectionId || !model) {
-                ws.send(JSON.stringify({ type: "error", message: "connection_and_model_required" }));
+                replyTo(ws, sessionId, { type: "error", message: "connection_and_model_required" });
                 return;
               }
 
@@ -587,23 +618,23 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
                 .where("organizationId", "=", organizationId)
                 .executeTakeFirst();
               if (!btw) {
-                ws.send(JSON.stringify({ type: "error", message: "session_not_found" }));
+                replyTo(ws, sessionId, { type: "error", message: "session_not_found" });
                 return;
               }
               if (!btw.parentSessionId) {
-                ws.send(JSON.stringify({ type: "error", message: "not_a_btw_session" }));
+                replyTo(ws, sessionId, { type: "error", message: "not_a_btw_session" });
                 return;
               }
               if (btw.locked) {
-                ws.send(JSON.stringify({ type: "error", message: "btw_already_done" }));
+                replyTo(ws, sessionId, { type: "error", message: "btw_already_done" });
                 return;
               }
               if (activeRuns.has(sessionId)) {
-                ws.send(JSON.stringify({ type: "error", message: "btw_run_in_progress" }));
+                replyTo(ws, sessionId, { type: "error", message: "btw_run_in_progress" });
                 return;
               }
 
-              ws.send(JSON.stringify({ type: "btw_status", text: sendToMain ? "summarizing…" : "closing" }));
+              replyTo(ws, sessionId, { type: "btw_status", text: sendToMain ? "summarizing…" : "closing" });
 
               const agent = btw.agentId
                 ? await db
@@ -624,11 +655,11 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
                   .where("organizationId", "=", organizationId)
                   .executeTakeFirst();
                 if (!connection) {
-                  ws.send(JSON.stringify({ type: "error", message: "connection_not_found" }));
+                  replyTo(ws, sessionId, { type: "error", message: "connection_not_found" });
                   return;
                 }
                 if (!connection.enabled) {
-                  ws.send(JSON.stringify({ type: "error", message: "connection_disabled" }));
+                  replyTo(ws, sessionId, { type: "error", message: "connection_disabled" });
                   return;
                 }
 
@@ -664,7 +695,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
                 );
                 summary = (result.content ?? "").trim();
                 if (!summary) {
-                  ws.send(JSON.stringify({ type: "error", message: "btw_summary_failed" }));
+                  replyTo(ws, sessionId, { type: "error", message: "btw_summary_failed" });
                   return;
                 }
               }
@@ -709,9 +740,9 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
                     ws,
                     userMeta: { btw: { agentName, btwSessionId: btw.id, sendToMain: true } },
                   });
-                  if ("error" in started) ws.send(JSON.stringify({ type: "error", message: started.error }));
-                  else if ("busy" in started) ws.send(JSON.stringify({ type: "error", message: "main_run_in_progress" }));
-                  else ws.send(JSON.stringify({ type: "btw_done_ok", sendToMain: true }));
+                  if ("error" in started) replyTo(ws, sessionId, { type: "error", message: started.error });
+                  else if ("busy" in started) replyTo(ws, sessionId, { type: "error", message: "main_run_in_progress" });
+                  else replyTo(ws, sessionId, { type: "btw_done_ok", sendToMain: true });
                 } else {
                   // "done" only (or main busy): a clickable block in the main
                   // transcript; no round until the next user message.
@@ -727,16 +758,16 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
                     })
                     .execute();
                   broadcastToSession(main.id, { type: "session_updated" });
-                  ws.send(JSON.stringify({ type: "btw_done_ok", sendToMain: sendToMain && activeRuns.has(main.id) ? null : false }));
+                  replyTo(ws, sessionId, { type: "btw_done_ok", sendToMain: sendToMain && activeRuns.has(main.id) ? null : false });
                 }
               } else {
-                ws.send(JSON.stringify({ type: "btw_done_ok", sendToMain: false }));
+                replyTo(ws, sessionId, { type: "btw_done_ok", sendToMain: false });
               }
               broadcastToSession(btw.id, { type: "session_updated" });
             } catch (e) {
               logger.error({ err: e, sessionId }, "code-ws: btw_done failed");
               try {
-                ws.send(JSON.stringify({ type: "error", message: (e as Error).message }));
+                replyTo(ws, sessionId, { type: "error", message: (e as Error).message });
               } catch {
                 // socket gone
               }
@@ -754,7 +785,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
                 ? msg.thinkingLevel
                 : null;
             if (!content || !connectionId || !model) {
-              ws.send(JSON.stringify({ type: "error", message: "connection_and_model_required" }));
+              replyTo(ws, sessionId, { type: "error", message: "connection_and_model_required" });
               return;
             }
 
@@ -765,12 +796,12 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               .where("organizationId", "=", organizationId)
               .executeTakeFirst();
             if (!session) {
-              ws.send(JSON.stringify({ type: "error", message: "session_not_found" }));
+              replyTo(ws, sessionId, { type: "error", message: "session_not_found" });
               return;
             }
 
             if (session.locked) {
-              ws.send(JSON.stringify({ type: "error", message: "session_locked" }));
+              replyTo(ws, sessionId, { type: "error", message: "session_locked" });
               return;
             }
 
@@ -789,23 +820,23 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
                 : [],
             });
             if ("error" in started) {
-              ws.send(JSON.stringify({ type: "error", message: started.error }));
+              replyTo(ws, sessionId, { type: "error", message: started.error });
               return;
             }
             if ("busy" in started) {
               const existingRun = activeRuns.get(session.id);
               if (existingRun) {
                 existingRun.sockets.add(ws);
-                sendRunState(existingRun, ws);
+                sendRunState(existingRun, ws, session.id);
               }
-              ws.send(JSON.stringify({ type: "busy" }));
+              replyTo(ws, sessionId, { type: "busy" });
               return;
             }
-            if (await historyWasEmpty(session.id)) ws.send(JSON.stringify({ type: "session_updated" }));
+            if (await historyWasEmpty(session.id)) broadcastToSession(session.id, { type: "session_updated" });
           } catch (e) {
             logger.error({ err: e, sessionId }, "code-ws: send failed");
             try {
-              ws.send(JSON.stringify({ type: "error", message: (e as Error).message }));
+              replyTo(ws, sessionId, { type: "error", message: (e as Error).message });
             } catch {
               // socket gone
             }

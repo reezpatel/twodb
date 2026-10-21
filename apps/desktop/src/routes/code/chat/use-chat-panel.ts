@@ -4,6 +4,7 @@ import type { CodeMessage, CodeSession } from "../sidenav/use-session-list";
 import type { GitStatus } from "../directories/use-git-status";
 import type { ComposerCommand } from "@/components/composer/composer-commands";
 import type { AskUserAnswer, AskUserQuestion } from "./ask-user-wizard";
+import { joinSessionRoom, onWsStatus, sendToSession, getWsStatus } from "../code-room-ws";
 import { api } from "@/lib/api";
 
 interface DbSkill {
@@ -128,11 +129,6 @@ const COMPACT_ERRORS: Record<string, string> = {
   session_busy: "Wait for the current run to finish before compacting.",
 };
 
-function wsUrl(sessionId: string) {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  return `${proto}://${location.host}/api/code/sessions/${sessionId}/ws`;
-}
-
 /** Big photos/PNGs blow past provider image caps — shrink to a model-friendly
  * size in the browser before upload (long edge 1568, JPEG 0.9; keeps the
  * original when the re-encode isn't smaller). GIFs/SVGs pass through. */
@@ -210,10 +206,6 @@ export function useChatPanel(sessionId: string | null) {
   const lastConnectionRef = useRef<string | undefined>(undefined);
   const lastModelRef = useRef<string | undefined>(undefined);
   const lastThinkingRef = useRef<string | undefined>(undefined);
-  const wsRef = useRef<WebSocket | null>(null);
-  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const attemptRef = useRef(0);
 
   // ----- steering queue -----------------------------------------------------
   // Messages typed while a round is running are queued (steering), not sent.
@@ -593,55 +585,37 @@ export function useChatPanel(sessionId: string | null) {
       .catch(() => {});
   }, [session.data?.codeDirectoryId]);
 
+  // Room socket: one shared ws per tab; this panel subscribes to its session's
+  // room. Reconnects resubscribe server-side and replay run_state so a mid-run
+  // drop recovers without user action.
   useEffect(() => {
     if (!sessionId) {
       setWsStatus("closed");
       return;
     }
 
-    let disposed = false;
-    const connect = () => {
-      if (disposed) return;
-      setWsStatus("connecting");
-      const ws = new WebSocket(wsUrl(sessionId));
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        if (disposed) return;
+    const offFrames = joinSessionRoom(sessionId, (raw) => {
+      let frame: StreamFrame;
+      try {
+        frame = raw as StreamFrame;
+      } catch {
+        return;
+      }
+      if (frame && typeof frame === "object" && typeof frame.type === "string") applyFrame(frame);
+    });
+    let wasOpen = false;
+    const offStatus = onWsStatus((s) => {
+      setWsStatus(s);
+      if (s === "open" && wasOpen) {
         // A reconnect may have missed a `done` frame — refresh persisted state.
-        if (attemptRef.current > 0) invalidateAfterRun();
-        attemptRef.current = 0;
-        setWsStatus("open");
         setError(null);
-        pingRef.current = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
-        }, 30_000);
-      };
-
-      ws.onmessage = (evt) => {
-        try {
-          applyFrame(JSON.parse(evt.data as string) as StreamFrame);
-        } catch {
-          // skip malformed frame
-        }
-      };
-
-      ws.onclose = () => {
-        if (pingRef.current) clearInterval(pingRef.current);
-        if (disposed) return;
-        setWsStatus("closed");
-        attemptRef.current += 1;
-        const delay = Math.min(1000 * 2 ** (attemptRef.current - 1), 15_000);
-        retryRef.current = setTimeout(connect, delay);
-      };
-    };
-
-    connect();
+        invalidateAfterRun();
+      }
+      wasOpen = wasOpen || s === "open";
+    });
     return () => {
-      disposed = true;
-      if (retryRef.current) clearTimeout(retryRef.current);
-      if (pingRef.current) clearInterval(pingRef.current);
-      wsRef.current?.close();
+      offFrames();
+      offStatus();
       // Session switched — ALL transient state from the previous thread drops,
       // otherwise its compaction/stream/status leaks into every other thread
       // (the hook lives in CodeScene, shared by all panels).
@@ -744,12 +718,11 @@ export function useChatPanel(sessionId: string | null) {
     assets: PendingAsset[] = [],
     skills: { name: string; content: string }[] = [],
   ): boolean => {
-    const ws = wsRef.current;
     if (!sendConnectionId || !sendModel) {
       setError("Pick a connection and model first");
       return false;
     }
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
+    if (!sessionId || getWsStatus() !== "open") {
       setError("Chat socket is not connected — retrying…");
       return false;
     }
@@ -779,17 +752,15 @@ export function useChatPanel(sessionId: string | null) {
           : null,
       createdAt: new Date().toISOString(),
     });
-    ws.send(
-      JSON.stringify({
-        type: "send",
-        content: fullContent,
-        connectionId: sendConnectionId,
-        model: sendModel,
-        thinkingLevel,
-        ...(skills.length > 0 ? { skills } : {}),
-        ...(assets.length > 0 ? { assets: assets.map(({ uri, filename, contentType }) => ({ uri, filename, contentType })) } : {}),
-      }),
-    );
+    sendToSession(sessionId, {
+      type: "send",
+      content: fullContent,
+      connectionId: sendConnectionId,
+      model: sendModel,
+      thinkingLevel,
+      ...(skills.length > 0 ? { skills } : {}),
+      ...(assets.length > 0 ? { assets: assets.map(({ uri, filename, contentType }) => ({ uri, filename, contentType })) } : {}),
+    });
     return true;
   };
 
@@ -878,9 +849,8 @@ export function useChatPanel(sessionId: string | null) {
   };
 
   const stop = () => {
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN && streaming !== null) {
-      ws.send(JSON.stringify({ type: "stop" }));
+    if (sessionId && getWsStatus() === "open" && streaming !== null) {
+      sendToSession(sessionId, { type: "stop" });
       setAskUser(null);
       setStatusText("stopping…");
       return;
@@ -907,8 +877,7 @@ export function useChatPanel(sessionId: string | null) {
   const flushSteering = (connectionId: string | undefined, model: string | undefined, thinkingLevelArg?: string) => {
     const items = steeringRef.current;
     if (items.length === 0 || drainRef.current) return;
-    const ws = wsRef.current;
-    if (!connectionId || !model || !ws || ws.readyState !== WebSocket.OPEN) return; // keep queued — retry when the socket recovers
+    if (!sessionId || !connectionId || !model || getWsStatus() !== "open") return; // keep queued — retry when the socket recovers
     drainRef.current = true;
     try {
       // One user message: the queued texts joined, attachments merged. All
@@ -943,9 +912,7 @@ export function useChatPanel(sessionId: string | null) {
   /** Submits wizard answers — resolves the agent's pending ask_user call. */
   const answerAskUser = (answers: AskUserAnswer[]) => {
     if (!askUser) return;
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "ask_user_response", id: askUser.id, answers }));
+    if (sessionId && sendToSession(sessionId, { type: "ask_user_response", id: askUser.id, answers })) {
       setAskUser(null);
       return;
     }
@@ -972,8 +939,7 @@ export function useChatPanel(sessionId: string | null) {
    * and hand the result to the main thread. Server handles the LLM round +
    * main-session insert; the ws on the btw session carries it. */
   const btwDone = (sendToMain: boolean) => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
+    if (!sessionId || getWsStatus() !== "open") {
       setError("Chat socket is not connected — retrying…");
       return;
     }
@@ -984,7 +950,7 @@ export function useChatPanel(sessionId: string | null) {
       return;
     }
     setStatusText(sendToMain ? "summarizing…" : "closing…");
-    ws.send(JSON.stringify({ type: "btw_done", sendToMain, ...(sendToMain && connId && model ? { connectionId: connId, model } : {}) }));
+    sendToSession(sessionId, { type: "btw_done", sendToMain, ...(sendToMain && connId && model ? { connectionId: connId, model } : {}) });
   };
 
   return {
