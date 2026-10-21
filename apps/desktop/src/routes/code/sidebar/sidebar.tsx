@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Bot, Check, ChevronUp, Circle, Flag, Folder, GitBranch, Link, Loader2, RefreshCw, Tag, User } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bot, Check, ChevronUp, Circle, Flag, Folder, GitBranch, Link, Loader2, RefreshCw, Tag, User, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useChat } from "../chat/use-chat-panel";
+import type { BackgroundJob } from "../chat/use-chat-panel";
 import { useSessionDirectory } from "../chat/use-session-directory";
 import { useGitStatus } from "../directories/use-git-status";
 
@@ -27,7 +28,7 @@ const MEMORIES = [
   { id: "m3", text: "Runners connect outbound; never expose runner ports.", scope: "global" },
 ];
 
-const SECTIONS = ["subagents", "memories", "workflow", "session", "plan", "git"] as const;
+const SECTIONS = ["subagents", "jobs", "memories", "workflow", "session", "plan", "git"] as const;
 type SectionId = (typeof SECTIONS)[number];
 
 function Section({ title, open, onToggle, children }: { title: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
@@ -91,10 +92,77 @@ function useSidebarGit() {
   };
 }
 
+/** Background jobs (run_background tool) — REST fetch on mount; afterwards the
+ * session ws "jobs" frames write straight into this query's cache (see
+ * use-chat-panel), which this query observes. */
+function useSidebarJobs() {
+  const { session } = useChat();
+  const sessionId = session.data?.id ?? null;
+  const jobs = useQuery({
+    queryKey: ["code", "session", sessionId, "jobs"],
+    queryFn: () => api<{ jobs: BackgroundJob[] }>(`/api/code/sessions/${sessionId}/jobs`).then((r) => r.jobs ?? []),
+    enabled: !!sessionId,
+    // A running job's exit arrives as a ws push, not a poll — but a refocus
+    // refetch is cheap and heals any missed frame.
+    refetchOnWindowFocus: true,
+  });
+  return { jobs: jobs.data ?? [], isPending: jobs.isPending };
+}
+
+function JobRow({ job }: { job: BackgroundJob }) {
+  const { session } = useChat();
+  const sessionId = session.data?.id ?? null;
+  const kill = useMutation({
+    mutationFn: () => api(`/api/code/sessions/${sessionId}/jobs/${job.id}/kill`, { method: "POST" }),
+  });
+  const icon =
+    job.status === "running" ? (
+      <Loader2 size={12} className="text-primary shrink-0 animate-spin" aria-hidden="true" />
+    ) : (
+      <Circle
+        size={12}
+        className={cn(
+          "shrink-0",
+          job.status === "done" && "text-success",
+          job.status === "failed" && "text-destructive",
+          (job.status === "lost" || job.status === "killed") && "text-muted-foreground",
+        )}
+        aria-hidden="true"
+      />
+    );
+  return (
+    <div className="bg-muted/40 flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left text-xs">
+      {icon}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-mono text-[11px]" title={job.command}>
+          {job.command}
+        </span>
+        <span className="text-muted-foreground block font-mono text-[10px]">
+          {job.id.slice(0, 8)} · {job.status}
+          {job.exitCode !== null && ` · exit ${job.exitCode}`}
+          {job.status === "running" && " · use job_logs for output"}
+        </span>
+      </span>
+      {job.status === "running" && (
+        <button
+          className="text-muted-foreground hover:bg-accent hover:text-foreground shrink-0 rounded p-1"
+          title="Kill job"
+          aria-label="Kill job"
+          onClick={(e) => {
+            e.stopPropagation();
+            kill.mutate();
+          }}
+        >
+          {kill.isPending ? <Loader2 size={11} className="animate-spin" aria-hidden="true" /> : <X size={11} aria-hidden="true" />}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** Child sessions (subagents + /btw) of the current session, with live running
  * state. Polls while any child runs so the sidebar shows live progress. */
-function useSidebarSubagents() {
-  const { session } = useChat();
+function useSidebarSubagents() {  const { session } = useChat();
   const sessionId = session.data?.id ?? null;
   const children = useQuery({
     queryKey: ["code", "session", sessionId, "children"],
@@ -125,6 +193,7 @@ function useSidebarSubagents() {
 export function Sidebar() {
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     subagents: true,
+    jobs: true,
     memories: true,
     workflow: false,
     session: true,
@@ -135,6 +204,7 @@ export function Sidebar() {
 
   const git = useSidebarGit();
   const subagents = useSidebarSubagents();
+  const backgroundJobs = useSidebarJobs();
   const { openBtwSession, session } = useChat();
   const planSteps = (session.data?.plan as { steps?: { description: string; status: string }[] } | null | undefined)?.steps ?? [];
 
@@ -171,6 +241,24 @@ export function Sidebar() {
                   </span>
                 </span>
               </button>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section
+        title={`Jobs${backgroundJobs.jobs.length ? ` (${backgroundJobs.jobs.filter((j) => j.status === "running").length} active)` : ""}`}
+        open={open.jobs}
+        onToggle={() => toggle("jobs")}
+      >
+        {backgroundJobs.isPending ? (
+          <div className="text-muted-foreground py-1 text-xs">loading…</div>
+        ) : backgroundJobs.jobs.length === 0 ? (
+          <div className="text-muted-foreground py-1 text-xs">none — run_background starts detached jobs</div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {backgroundJobs.jobs.map((job) => (
+              <JobRow key={job.id} job={job} />
             ))}
           </div>
         )}

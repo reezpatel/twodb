@@ -33,7 +33,7 @@ export function PanelBody({ panel }: { panel: CodePanelId }) {
 
 export function CodeScene() {
   useCode(); // CodeProvider (rendered by the app shell) owns the chat panel state.
-  const { panel, rightBarVisible, closePanel } = useCode();
+  const { panel, rightBarVisible, closePanel, toggleRightBar } = useCode();
   const isMobile = useMediaQuery("(max-width: 1279px)");
 
   const rightBar = (
@@ -61,9 +61,27 @@ export function CodeScene() {
           </div>
         </>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <Sidebar />
-        </div>
+        <>
+          {/* The floating mobile overlay has no nearby toggle when no panel is
+              open (the chat header button is underneath it) — give the default
+              sections sidebar its own close row. Desktop keeps the bar in-flow
+              and toggled from the chat header. */}
+          {isMobile && (
+            <header className="border-b flex items-center justify-end border-b px-3 py-2">
+              <button
+                aria-label="Close sidebar"
+                title="Close sidebar"
+                className="text-muted-foreground hover:bg-accent hover:text-foreground flex h-6 w-6 items-center justify-center rounded-md"
+                onClick={toggleRightBar}
+              >
+                <X size={14} />
+              </button>
+            </header>
+          )}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <Sidebar />
+          </div>
+        </>
       )}
     </aside>
   );

@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowUp, Bot, ChevronDown, Clock, Loader2, Lock, Message
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useChat, type ToolEvent } from "./use-chat-panel";
 import type { CodeMessage } from "../sidenav/use-session-list";
+import { DiffView } from "./screens/diff-view";
 import { Badge } from "@/components/ui/badge";
 import { CompactionBlock, type CompactionBlockMeta } from "@/components/compaction-block";
 import { ClearBlock, type ClearBlockMeta } from "@/components/clear-block";
@@ -29,6 +30,9 @@ import { cn } from "@/lib/utils";
 
 const cmdMap: Record<string, string> = {
   run_command: "$",
+  run_background: "bg$",
+  job_logs: "log",
+  background_job_status: "jobs",
   read_skill: "read-skill",
 };
 
@@ -46,6 +50,7 @@ function ToolBlock({
   name,
   args,
   output,
+  diff,
   running,
   startedAt,
   completedAt,
@@ -55,16 +60,24 @@ function ToolBlock({
   name: string;
   args?: Record<string, unknown>;
   output?: string;
+  diff?: string;
   running?: boolean;
   startedAt?: number;
   completedAt?: number;
   failed?: boolean;
   defaultOpen?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(defaultOpen ?? false);
-  // The global Ctrl+O flip overrides individual blocks.
-  useEffect(() => setExpanded(defaultOpen ?? false), [defaultOpen]);
+  const [expanded, setExpanded] = useState(false);
+  // The global Ctrl+O flip overrides individual blocks; diff-bearing blocks
+  // show their body until collapsed — the diff IS the result.
+  const [overridden, setOverridden] = useState(false);
+  useEffect(() => {
+    setExpanded(defaultOpen ?? false);
+    setOverridden(false);
+  }, [defaultOpen]);
+  const hasDiff = !!diff && diff.trim().length > 0;
   const hasOutput = output !== undefined && output !== "";
+  const showBody = overridden ? expanded : (defaultOpen ?? false) || hasDiff;
   const preview =
     typeof args?.command === "string"
       ? args.command
@@ -82,20 +95,31 @@ function ToolBlock({
 
   return (
     <div className={cn("rounded-lg border text-xs", failed ? "bg-destructive/10 border-destructive/40" : "bg-muted/60")}>
-      <button className="hover:bg-accent/50 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left font-mono" onClick={() => setExpanded((v) => !v)}>
+      <button
+        className="hover:bg-accent/50 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left font-mono"
+        onClick={() => {
+          setExpanded((v) => !v);
+          setOverridden(true);
+        }}
+      >
         {running ? <Loader2 size={12} className="text-primary animate-spin" aria-hidden="true" /> : null}
         <span className="font-medium">{cmdName}</span>
         {preview && <span className="text-muted-foreground truncate">{preview}</span>}
         <ToolDuration startedAt={startedAt} completedAt={completedAt} />
-        {hasOutput && (
+        {(hasOutput || hasDiff) && (
           <ChevronDown
             size={12}
-            className={cn("text-muted-foreground/70 ml-auto shrink-0 transition-transform", !expanded && "-rotate-90")}
+            className={cn("text-muted-foreground/70 ml-auto shrink-0 transition-transform", !showBody && "-rotate-90")}
             aria-hidden="true"
           />
         )}
       </button>
-      {expanded && hasOutput && <pre className="text-muted-foreground max-h-80 overflow-y-auto border-t px-3 py-2 whitespace-pre-wrap">{output}</pre>}
+      {showBody && hasDiff && (
+        <div className="max-h-80 overflow-auto border-t">
+          <DiffView text={diff!} />
+        </div>
+      )}
+      {showBody && hasOutput && <pre className="text-muted-foreground max-h-80 overflow-y-auto border-t px-3 py-2 whitespace-pre-wrap">{output}</pre>}
     </div>
   );
 }
@@ -197,6 +221,7 @@ interface ChatMessageListProps {
   resolveAssetUrl: (uri: string) => string | undefined;
   toolOutputs: Map<string, string>;
   toolTimings: Map<string, { startedAt?: number; completedAt?: number; status?: string }>;
+  toolDiffs: Map<string, string>;
   orphanToolIds: Set<string>;
   /** Opens the /btw side thread when its block is clicked (main thread only). */
   onOpenBtw?: (sessionId: string) => void;
@@ -224,6 +249,7 @@ function ChatMessageList(props: ChatMessageListProps) {
     resolveAssetUrl,
     toolOutputs,
     toolTimings,
+    toolDiffs,
     orphanToolIds,
     onOpenBtw,
     onSkillClick,
@@ -379,6 +405,7 @@ function ChatMessageList(props: ChatMessageListProps) {
                         name={t.name}
                         args={t.args}
                         output={t.output}
+                        diff={t.diff}
                         running={!t.done}
                         startedAt={t.startedAt}
                         completedAt={t.completedAt}
@@ -535,12 +562,13 @@ function ChatMessageList(props: ChatMessageListProps) {
       );
     }
     if (m.role === "tool") {
-      const meta = m.meta as { name?: string; startedAt?: number; completedAt?: number; status?: string } | null;
+      const meta = m.meta as { name?: string; startedAt?: number; completedAt?: number; status?: string; diff?: string } | null;
       return (
         <div className={row.dimmed ? "opacity-60" : undefined}>
           <ToolBlock
             name={meta?.name ?? "tool"}
             output={m.content}
+            diff={meta?.diff}
             startedAt={meta?.startedAt}
             completedAt={meta?.completedAt}
             failed={meta?.status === "failed"}
@@ -575,12 +603,14 @@ function ChatMessageList(props: ChatMessageListProps) {
           if (tc.name === "update_canvas") return <CanvasChip key={tc.id} title={String(tc.arguments.title ?? "")} />;
           if (tc.name === "read_asset") return <ReadAssetChip key={tc.id} uri={String(tc.arguments.uri ?? "")} />;
           const timing = toolTimings.get(tc.id);
+          const toolDiff = toolDiffs.get(tc.id);
           return (
             <ToolBlock
               key={tc.id}
               name={tc.name}
               args={tc.arguments}
               output={toolOutputs.get(tc.id)}
+              diff={toolDiff}
               startedAt={timing?.startedAt}
               completedAt={timing?.completedAt}
               failed={timing?.status === "failed"}
@@ -699,16 +729,18 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
   // Committed tool calls render as ONE block: the assistant message's
   // meta.toolCalls carry the request, the following role="tool" messages carry
   // the output. Two O(n) passes, memoized on the accumulated history identity.
-  const { toolOutputs, toolTimings, orphanToolIds } = useMemo(() => {
+  const { toolOutputs, toolTimings, toolDiffs, orphanToolIds } = useMemo(() => {
     const outputs = new Map<string, string>();
     const timings = new Map<string, { startedAt?: number; completedAt?: number; status?: string }>();
+    const diffs = new Map<string, string>();
     const callIds = new Set<string>();
     for (const m of messages) {
       if (m.role === "tool") {
-        const meta = m.meta as { toolCallId?: string; startedAt?: number; completedAt?: number; status?: string } | null;
+        const meta = m.meta as { toolCallId?: string; startedAt?: number; completedAt?: number; status?: string; diff?: string } | null;
         if (meta?.toolCallId) {
           outputs.set(meta.toolCallId, m.content);
           timings.set(meta.toolCallId, { startedAt: meta.startedAt, completedAt: meta.completedAt, status: meta.status });
+          if (meta.diff) diffs.set(meta.toolCallId, meta.diff);
         }
       } else {
         const meta = m.meta as { toolCalls?: { id: string }[] } | null;
@@ -721,7 +753,7 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
       const meta = m.meta as { toolCallId?: string } | null;
       if (!meta?.toolCallId || !callIds.has(meta.toolCallId)) orphans.add(m.id);
     }
-    return { toolOutputs: outputs, toolTimings: timings, orphanToolIds: orphans };
+    return { toolOutputs: outputs, toolTimings: timings, toolDiffs: diffs, orphanToolIds: orphans };
   }, [messages]);
 
   const running = streaming !== null;
@@ -775,6 +807,7 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
         round={round}
         resolveAssetUrl={resolveAssetUrl}
         toolOutputs={toolOutputs}
+        toolDiffs={toolDiffs}
         toolTimings={toolTimings}
         orphanToolIds={orphanToolIds}
         onOpenBtw={openBtwSession}

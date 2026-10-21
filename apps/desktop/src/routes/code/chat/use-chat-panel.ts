@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CodeMessage, CodeSession } from "../sidenav/use-session-list";
 import type { GitStatus } from "../directories/use-git-status";
@@ -80,12 +80,25 @@ interface StreamFrame {
   ahead?: number | null;
   behind?: number | null;
   exitCode?: number;
+  /** update_file / write_file / apply_patch — unified diff for inline rendering. */
+  diff?: string;
   questions?: AskUserQuestion[];
   askUser?: { id: string; questions: AskUserQuestion[] } | null;
   /** /btw frames — status while summarizing, ok when the side thread closed. */
   sendToMain?: boolean | null;
   /** Live plan steps — update_plan broadcasts mid-run. */
   steps?: { description: string; status: string }[];
+  /** Background jobs list — pushed whenever a job starts or finishes. */
+  jobs?: BackgroundJob[];
+}
+
+export interface BackgroundJob {
+  id: string;
+  command: string;
+  status: "running" | "done" | "failed" | "killed" | "lost";
+  exitCode: number | null;
+  createdAt: string;
+  finishedAt: string | null;
 }
 
 export interface ToolEvent {
@@ -97,6 +110,8 @@ export interface ToolEvent {
   startedAt?: number;
   completedAt?: number;
   status?: string;
+  /** Unified diff (update_file / write_file / apply_patch) for inline rendering. */
+  diff?: string;
 }
 
 export interface BtwState {
@@ -144,9 +159,28 @@ async function shrinkImage(file: File): Promise<File> {
   }
 }
 
+/**
+ * Drafts live outside React so switching sessions never shares or resets them:
+ * each session keeps its own half-typed prompt for as long as the app is open
+ * (in-memory only — a reload starts clean, nothing hits localStorage).
+ */
+const sessionDrafts = new Map<string, string>();
+
 export function useChatPanel(sessionId: string | null) {
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState("");
+  const [draft, setDraftState] = useState("");
+  // Session switch: load the incoming session's parked draft. Parking happens
+  // inside setDraft on every change — a cleanup here would capture a stale
+  // closure and clobber the store.
+  useEffect(() => {
+    if (!sessionId) return;
+    setDraftState(sessionDrafts.get(sessionId) ?? "");
+  }, [sessionId]);
+
+  const setDraft = useCallback((value: string) => {
+    setDraftState(value);
+    if (sessionId) sessionDrafts.set(sessionId, value);
+  }, [sessionId]);
   const [streaming, setStreaming] = useState<string | null>(null);
   const [liveTools, setLiveTools] = useState<ToolEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -368,7 +402,9 @@ export function useChatPanel(sessionId: string | null) {
     } else if (frame.type === "tool_result") {
       setLiveTools((prev) =>
         prev.map((t) =>
-          t.id === frame.id ? { ...t, output: frame.output ?? t.output, done: true, completedAt: Date.now(), status: frame.status ?? undefined } : t,
+          t.id === frame.id
+            ? { ...t, output: frame.output ?? t.output, done: true, completedAt: Date.now(), status: frame.status ?? undefined, ...(frame.diff ? { diff: frame.diff } : {}) }
+            : t,
         ),
       );
     } else if (frame.type === "run_state") {
@@ -416,8 +452,15 @@ export function useChatPanel(sessionId: string | null) {
       invalidateAfterRun();
     } else if (frame.type === "status") {
       setStatusText(frame.text ?? null);
+    } else if (frame.type === "jobs") {
+      // Background job list pushed by the server — feed the panel's query cache
+      // directly so it renders instantly without a refetch.
+      if (frame.jobs && sessionId) {
+        queryClient.setQueryData(["code", "session", sessionId, "jobs"], frame.jobs);
+      }
     } else if (frame.type === "session_updated") {
       void queryClient.invalidateQueries({ queryKey: ["code", "sessions"] });
+      void queryClient.invalidateQueries({ queryKey: ["code", "session", sessionId] });
     } else if (frame.type === "plan_updated") {
       // Live plan steps — patch the session query cache; the sidebar reads it.
       queryClient.setQueryData<SessionDetail>(["code", "session", sessionId], (prev) =>
