@@ -34,11 +34,23 @@ export function LogsSection() {
             </div>
             <div className="flex items-center gap-2">
               {(["all", "info", "warn", "error"] as const).map((lvl) => (
-                <Button key={lvl} variant={levelFilter === lvl ? "default" : "outline"} size="sm" className="h-7 px-2.5 text-xs capitalize" onClick={() => setLevelFilter(lvl)}>
+                <Button
+                  key={lvl}
+                  variant={levelFilter === lvl ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 px-2.5 text-xs capitalize"
+                  onClick={() => setLevelFilter(lvl)}
+                >
                   {lvl}
                 </Button>
               ))}
-              <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setFollow(!follow)} title={follow ? "Pause tailing" : "Resume tailing"}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2.5 text-xs"
+                onClick={() => setFollow(!follow)}
+                title={follow ? "Pause tailing" : "Resume tailing"}
+              >
                 {follow ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
                 {follow ? "Following" : "Paused"}
               </Button>
@@ -57,21 +69,31 @@ export function LogsSection() {
                 <Loader2 className="size-4 animate-spin" /> loading logs…
               </div>
             )}
-            {!loading && entries.length === 0 && <p className="text-muted-foreground p-2">No log lines{levelFilter !== "all" ? ` at ${levelFilter} level` : ""}.</p>}
-            {entries.map((e) => (
-              <div key={e.line} className="flex gap-2 whitespace-pre-wrap break-all hover:bg-accent/40">
-                <span className="text-muted-foreground/50 w-10 shrink-0 text-right">{e.line}</span>
-                {e.time && <span className="text-muted-foreground/70 shrink-0">{e.time.slice(11, 23)}</span>}
-                {e.level && <span className={`w-10 shrink-0 font-semibold uppercase ${LEVEL_COLOR[e.level] ?? ""}`}>{e.level}</span>}
-                <span className="min-w-0">
-                  {e.message}
-                  {e.context && <span className="text-muted-foreground/70"> {e.context}</span>}
-                </span>
-              </div>
-            ))}
+            {!loading && entries.length === 0 && (
+              <p className="text-muted-foreground p-2">No log lines{levelFilter !== "all" ? ` at ${levelFilter} level` : ""}.</p>
+            )}
+            {entries.map((e) =>
+              e.divider ? (
+                <div key={e.key} className="text-muted-foreground my-1 flex items-center gap-2 text-[10px] uppercase">
+                  <span className="bg-border h-px flex-1" /> {e.message} <span className="bg-border h-px flex-1" />
+                </div>
+              ) : (
+                <div key={e.key} className="flex gap-2 whitespace-pre-wrap break-all hover:bg-accent/40">
+                  <span className="text-muted-foreground/50 w-10 shrink-0 text-right">{e.line}</span>
+                  {e.time && <span className="text-muted-foreground/70 shrink-0">{e.time.slice(11, 23)}</span>}
+                  {e.level && <span className={`w-10 shrink-0 font-semibold uppercase ${LEVEL_COLOR[e.level] ?? ""}`}>{e.level}</span>}
+                  <span className="min-w-0">
+                    {e.message}
+                    {e.context && <span className="text-muted-foreground/70"> {e.context}</span>}
+                  </span>
+                </div>
+              ),
+            )}
           </div>
           <p className="text-muted-foreground mt-2 text-xs">
-            <Badge variant="outline" className="mr-1.5 h-4 px-1.5 text-[10px]">admin</Badge>
+            <Badge variant="outline" className="mr-1.5 h-4 px-1.5 text-[10px]">
+              admin
+            </Badge>
             Only server admins can read logs. One JSON line per event; poll every 2.5s.
           </p>
         </CardContent>

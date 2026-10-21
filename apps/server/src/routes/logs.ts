@@ -13,13 +13,18 @@ interface LogLine {
   raw: string;
 }
 
-function readLines(afterLine: number, limit: number): { lines: LogLine[]; total: number } {
+function readLines(afterLine: number, limit: number): { lines: LogLine[]; total: number; fileId: string | null } {
   const file = logFilePath();
   let content: string;
+  let fileId: string | null = null;
   try {
+    // Identity of the file (device + inode + birth time) lets the viewer tell
+    // a rotated/recreated file apart from one that merely has no new lines.
+    const st = fs.statSync(file);
+    fileId = `${st.dev}:${st.ino}:${Math.round(st.birthtimeMs)}`;
     content = fs.readFileSync(file, "utf8");
   } catch {
-    return { lines: [], total: 0 };
+    return { lines: [], total: 0, fileId };
   }
   const all = content.split("\n");
   // Trailing newline produces one empty tail entry — drop it only if empty.
@@ -32,7 +37,7 @@ function readLines(afterLine: number, limit: number): { lines: LogLine[]; total:
   const lines = slice
     .map((raw, i) => ({ line: start + i + 1, raw: raw.trim() === "" ? "" : raw }))
     .filter((l) => l.raw !== "");
-  return { lines, total };
+  return { lines, total, fileId };
 }
 
 export const logsRoutes = new Hono()
@@ -50,6 +55,7 @@ export const logsRoutes = new Hono()
     if (!Number.isFinite(afterLine) || afterLine < 0 || !Number.isFinite(limit) || limit < 1) {
       return c.json({ error: "invalid_query" }, 400);
     }
-    const { lines, total } = readLines(afterLine, limit);
-    return c.json({ lines, total, file: logFilePath() });
+    const { lines, total, fileId } = readLines(afterLine, limit);
+    c.header("cache-control", "no-store");
+    return c.json({ lines, total, fileId, file: logFilePath() });
   });
