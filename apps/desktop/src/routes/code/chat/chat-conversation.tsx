@@ -585,7 +585,7 @@ function ChatMessageList(props: ChatMessageListProps) {
     } | null;
     return (
       <div className={cn("flex flex-col gap-4", row.dimmed && "opacity-60")}>
-        {meta?.thinking?.map((t, i) => (
+        {meta?.thinking?.filter((t) => t.text?.trim()).map((t, i) => (
           <ThinkingBlock key={i} text={t.text} live={false} durationMs={t.durationMs} visible={showThinking} />
         ))}
         {m.content && (

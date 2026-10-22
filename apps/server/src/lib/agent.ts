@@ -263,6 +263,30 @@ async function anthropicRound(
     /claude-(?:3-7|[4-9])/.test(model) || /claude-(?:sonnet|opus|haiku|fable)-(?:[4-9]|latest)/.test(model);
   const budgetTokens = supportsThinking ? { off: 0, low: 1024, medium: 4096, high: 16384 }[events.thinkingLevel ?? "medium"] : 0;
 
+  // New params only for first-party Anthropic — third-party anthropic-wire
+  // providers (kimi, zai, minimax…) already return thinking text and may
+  // reject unknown fields.
+  const firstPartyAnthropic = /api\.anthropic\.com/.test(baseUrl);
+  // Adaptive-thinking models (Opus 4.7+, Mythos, …) use type:"adaptive" with
+  // effort, and default display to "omitted" — empty thinking text with the
+  // signature intact, which renders as an empty thinking box. Explicitly
+  // request "summarized" so the text always comes back.
+  const adaptiveModel = /claude-(?:opus-(?:4\.(?:[7-9]|1[0-9])|[5-9])|fable|mythos|sonnet-[5-9]|haiku-[5-9]|latest)/.test(model);
+  const effort = events.thinkingLevel ?? "medium";
+
+  let thinkingParam: Record<string, unknown> | undefined;
+  let outputConfig: Record<string, unknown> | undefined;
+  if (supportsThinking && effort === "off") {
+    // Omit entirely — the API default is fine and older models reject it.
+  } else if (supportsThinking && firstPartyAnthropic && adaptiveModel) {
+    thinkingParam = { type: "adaptive", display: "summarized" };
+    outputConfig = { effort };
+  } else if (supportsThinking && budgetTokens > 0) {
+    thinkingParam = firstPartyAnthropic
+      ? { type: "enabled", budget_tokens: budgetTokens, display: "summarized" }
+      : { type: "enabled", budget_tokens: budgetTokens };
+  }
+
   // OAuth (Claude Code subscription) requests must lead with the Claude Code
   // identity block or Anthropic bills them against API balance.
   const systemParam =
@@ -282,7 +306,8 @@ async function anthropicRound(
       // max_tokens must exceed the thinking budget.
       max_tokens: budgetTokens >= 8192 ? budgetTokens * 2 : 8192,
       stream: true,
-      ...(budgetTokens ? { thinking: { type: "enabled", budget_tokens: budgetTokens } } : {}),
+      ...(thinkingParam ? { thinking: thinkingParam } : {}),
+      ...(outputConfig ? { output_config: outputConfig } : {}),
       ...(systemParam ? { system: systemParam } : {}),
       messages: mapped,
       ...(tools.length
