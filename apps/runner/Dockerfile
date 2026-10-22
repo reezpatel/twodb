@@ -11,9 +11,11 @@ RUN corepack enable \
 WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/runner/package.json apps/runner/
+COPY packages/runner-core/package.json packages/runner-core/
 RUN pnpm install --frozen-lockfile --filter @twodb/runner
 
 COPY apps/runner apps/runner
+COPY packages/runner-core packages/runner-core
 WORKDIR /repo/apps/runner
 
 CMD ["pnpm", "start"]
