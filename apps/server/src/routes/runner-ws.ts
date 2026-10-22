@@ -91,10 +91,21 @@ export function registerRunnerWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) 
           if (runner.diskPaths?.length) ws.send(JSON.stringify({ type: "metricsConfig", diskPaths: runner.diskPaths }));
         },
 
-        onMessage(evt: { data: unknown }) {
+        onMessage(evt: { data: unknown }, ws: WSContext) {
           if (!runnerId) return;
           const msg = parseMessage(evt.data);
           if (!msg) return;
+          // App-level keepalive — the runner pings every 5s and force-reconnects
+          // when a pong doesn't arrive, catching half-open TCP faster than the
+          // 30s protocol-level heartbeat.
+          if (msg.type === "ping") {
+            try {
+              ws.send(JSON.stringify({ type: "pong" }));
+            } catch {
+              // socket gone; onClose cleans up
+            }
+            return;
+          }
           // Metrics ride the control socket — ingest before the general routing.
           if (msg.type === "metrics" && msg.metrics) {
             ingestRunnerMetrics(runnerId, runnerManager.orgOf(runnerId) ?? "", msg.metrics);

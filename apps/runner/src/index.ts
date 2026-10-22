@@ -25,6 +25,34 @@ let backoff = 1000;
 /** Disk paths pushed by the server (from the per-runner UI config). */
 let diskPaths: string[] = diskPathsEnv;
 
+// --- keepalive watchdog -------------------------------------------------------
+// Ping every 5s; a missed pong means the connection is half-open (NAT timeout,
+// silent network drop) — terminate immediately and let the reconnect logic
+// (exponential backoff) re-establish. The server replies {type:"pong"}.
+const PING_INTERVAL = 5_000;
+let pingTimer: ReturnType<typeof setInterval> | null = null;
+let gotPong = false;
+
+function startPinging() {
+  if (pingTimer) return;
+  gotPong = true; // open just happened; first ping hasn't flown yet
+  pingTimer = setInterval(() => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!gotPong) {
+      console.log("keepalive: no pong — terminating connection");
+      ws.terminate();
+      return;
+    }
+    gotPong = false;
+    send({ type: "ping" });
+  }, PING_INTERVAL);
+}
+
+function stopPinging() {
+  if (pingTimer) clearInterval(pingTimer);
+  pingTimer = null;
+}
+
 const core = new RunnerCore({
   send: (msg) => {
     if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
@@ -40,6 +68,9 @@ function handle(msg: ServerMessage) {
   switch (msg.type) {
     case "welcome":
       console.log(`registered as runner ${msg.runnerId}`);
+      break;
+    case "pong":
+      gotPong = true;
       break;
     case "metricsConfig":
       // Server-side disk-path config (Settings → Runners) overrides the env var.
@@ -72,6 +103,7 @@ function connect() {
     backoff = 1000;
     console.log(`connected to ${serverUrl} as "${name}"`);
     startMetrics();
+    startPinging();
   });
 
   ws.on("message", (raw) => {
@@ -87,6 +119,7 @@ function connect() {
     core.cleanupTerminals();
     core.stampJobsShutdown();
     stopMetrics();
+    stopPinging();
     setTimeout(connect, backoff);
     backoff = Math.min(backoff * 2, 30_000);
   });
