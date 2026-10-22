@@ -1,3 +1,5 @@
+import { Group, Panel, Separator } from "react-resizable-panels";
+import { useState } from "react";
 import { Outlet } from "react-router";
 import { X } from "lucide-react";
 import { Sidebar } from "./sidebar/sidebar";
@@ -7,7 +9,6 @@ import { TerminalScreen } from "./chat/screens/terminal-screen";
 import { CheckpointsScreen } from "./chat/screens/checkpoints-screen";
 import { ChangesScreen } from "./chat/screens/changes-screen";
 import { CanvasScreen } from "./chat/screens/canvas-screen";
-import { cn } from "@/lib/utils";
 
 const PANEL_TITLES: Record<CodePanelId, string> = {
   terminal: "Terminal",
@@ -36,14 +37,14 @@ export function CodeScene() {
   const { panel, rightBarVisible, closePanel, toggleRightBar } = useCode();
   const isMobile = useMediaQuery("(max-width: 1279px)");
 
-  const rightBar = (
-    <aside
-      className={cn(
-        "bg-card border-l flex h-full w-72 shrink-0 flex-col overflow-hidden border-l",
-        // Mobile: floats over the content instead of pushing it.
-        isMobile && "fixed inset-y-0 right-0 z-40 shadow-xl",
-      )}
-    >
+  // Persisted right-bar size in px (react-resizable-panels v4 Group layout).
+  const [barSize, setBarSize] = useState(() => {
+    const raw = Number(localStorage.getItem("twodb.rightBarSize"));
+    return Number.isFinite(raw) && raw >= 240 && raw <= 720 ? raw : 288;
+  });
+
+  const rightBarContents = (
+    <>
       {panel ? (
         <>
           <header className="border-b flex items-center justify-between border-b px-3 py-2">
@@ -83,15 +84,52 @@ export function CodeScene() {
           </div>
         </>
       )}
-    </aside>
+    </>
   );
 
-  return (
-    <div className="relative flex h-full min-h-0">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Outlet />
+  if (isMobile) {
+    // Mobile: the bar floats over the content instead of pushing it — no
+    // panel group, no resize.
+    return (
+      <div className="relative flex h-full min-h-0">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Outlet />
+        </div>
+        {rightBarVisible && (
+          <aside className="bg-card border-l fixed inset-y-0 right-0 z-40 flex h-full w-[90%] max-w-[900px] shrink-0 flex-col overflow-hidden border-l shadow-xl">
+            {rightBarContents}
+          </aside>
+        )}
       </div>
-      {rightBarVisible && rightBar}
-    </div>
+    );
+  }
+
+  // Desktop: resizable split — chat area | right bar (react-resizable-panels).
+  return (
+    <Group orientation="horizontal" className="h-full min-h-0">
+      <Panel minSize="40%" className="flex min-w-0 flex-col">
+        <Outlet />
+      </Panel>
+      {rightBarVisible && (
+        <>
+          <Separator className="bg-border hover:bg-primary/60 w-px cursor-col-resize transition-colors" />
+          <Panel
+            defaultSize={barSize}
+            minSize={240}
+            maxSize={720}
+            onResize={(size) => {
+              // inPixels — persist the px width; clamped by min/max props.
+              if (typeof size === "object" && size.inPixels) {
+                setBarSize(size.inPixels);
+                localStorage.setItem("twodb.rightBarSize", String(Math.round(size.inPixels)));
+              }
+            }}
+            className="flex min-w-0 flex-col"
+          >
+            <aside className="bg-card border-l flex h-full min-h-0 w-full flex-col overflow-hidden border-l">{rightBarContents}</aside>
+          </Panel>
+        </>
+      )}
+    </Group>
   );
 }
