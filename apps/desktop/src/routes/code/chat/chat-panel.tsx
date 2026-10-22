@@ -2,6 +2,7 @@ import { NavLink, useLocation, useNavigate, useParams } from "react-router";
 import { Loader2, PanelRight } from "lucide-react";
 import { useChat } from "./use-chat-panel";
 import { ChatConversationInner } from "./chat-conversation";
+import { AwsChip } from "./aws-chip";
 import { TOOL_SCREENS } from "./screens/mock-screens";
 import { useCode } from "../code-provider";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,7 @@ export function ChatPanel() {
             </NavLink>
           );
         })}
+        {sessionId && <AwsChip sessionId={sessionId} />}
         {running && (
           <Badge variant="secondary" className="ml-auto gap-1.5">
             <Loader2 size={11} className="animate-spin" aria-hidden="true" />

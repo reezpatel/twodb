@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Activity, Loader2 } from "lucide-react";
+import { Activity, Cloud, Loader2 } from "lucide-react";
 import { RunnerTerminal } from "./runner-terminal";
 import { RunnerMetrics } from "./runner-metrics";
+import { RunnerAwsConfig } from "./runner-aws-config";
 import { useRunners } from "./use-runners";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,8 @@ export function RunnersSection() {
   const { runners, keys, newKey, setNewKey, terminalRunner, setTerminalRunner, actionError, createKey, revokeKey, deleteRunner } = useRunners();
 
   const [keyName, setKeyName] = useState("");
-  const [metricsRunner, setMetricsRunner] = useState<string | null>(null);
+  const [metricsRunner, setMetricsRunner] = useState<string | null>(null); // runner id with metrics expander open
+  const [awsRunner, setAwsRunner] = useState<string | null>(null); // runner id with aws config open
 
   if (terminalRunner) {
     return <RunnerTerminal runnerId={terminalRunner.id} runnerName={terminalRunner.name} onClose={() => setTerminalRunner(null)} />;
@@ -103,6 +105,10 @@ export function RunnersSection() {
                       <Activity size={13} aria-hidden="true" />
                       Metrics
                     </Button>
+                    <Button variant="outline" size="sm" onClick={() => setAwsRunner(awsRunner === runner.id ? null : runner.id)}>
+                      <Cloud size={13} aria-hidden="true" />
+                      AWS
+                    </Button>
                     {runner.online && (
                       <Button variant="outline" size="sm" onClick={() => setTerminalRunner(runner)}>
                         Terminal
@@ -127,6 +133,7 @@ export function RunnersSection() {
                       <RunnerMetrics runner={runner} />
                     </div>
                   )}
+                  {awsRunner === runner.id && <RunnerAwsConfig runner={runner} />}
                 </li>
               ))}
             </ul>

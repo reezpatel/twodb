@@ -105,6 +105,28 @@ export const runnerRoutes = new Hono()
     return c.json({ ok: true, paths });
   })
 
+  // AWS SSO start-app config — one per runner (Settings → Runners).
+  .patch("/runners/:id/aws-config", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const body = await c.req.json().catch(() => null);
+    const startUrl = typeof body?.startUrl === "string" ? body.startUrl.trim() || null : null;
+    const ssoRegion = typeof body?.ssoRegion === "string" ? body.ssoRegion.trim() || null : null;
+    if (startUrl && !/^https?:\/\//.test(startUrl)) return c.json({ error: "invalid_start_url" }, 400);
+
+    const row = await db
+      .updateTable("runner")
+      .set({ awsStartUrl: startUrl, awsSsoRegion: ssoRegion })
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .where("deletedAt", "is", null)
+      .returning(["id", "awsStartUrl", "awsSsoRegion"])
+      .executeTakeFirst();
+    if (!row) return c.json({ error: "runner_not_found" }, 404);
+    return c.json({ ok: true, startUrl: row.awsStartUrl, ssoRegion: row.awsSsoRegion });
+  })
+
   // Metrics history for charts — ?hours=720 (30d default, capped there).
   .get("/runners/:id/metrics", async (c) => {
     const s = await requireOrgSession(c);

@@ -40,6 +40,16 @@ interface JobPending {
   onExit?: (info: { code: number | null; signal?: string; message?: string }) => void;
 }
 
+/** Pending AWS-bridge requests keyed by requestId. */
+interface AwsPending {
+  /** Resolves on awsStatusResult / awsLoginResult / awsSelectResult. */
+  resolve: (r: unknown) => void;
+  reject: (e: Error) => void;
+  /** Login is two-phase: code first (awsLoginCode), completion second. */
+  onCode?: (start: { userCode: string; verificationUri: string; verificationUriComplete: string | null; expiresInSeconds: number }) => void;
+  timer?: ReturnType<typeof setTimeout>;
+}
+
 function send(ws: WSContext, msg: unknown) {
   try {
     ws.send(JSON.stringify(msg));
@@ -54,6 +64,7 @@ class RunnerManager {
   private clientSessions = new Map<WSContext, string>();
   private execs = new Map<string, ExecHandlers>();
   private jobPending = new Map<string, JobPending>();
+  private awsPending = new Map<string, AwsPending>();
   private changeListeners = new Set<() => void>();
 
   /** Fires whenever a runner connects or disconnects. */
@@ -258,6 +269,11 @@ class RunnerManager {
       pending.kill = undefined;
       if (!pending.onExit) this.jobPending.delete(jobId);
     }
+    for (const [requestId, pending] of this.awsPending) {
+      if (pending.timer) clearTimeout(pending.timer);
+      pending.reject(new Error("runner offline"));
+      this.awsPending.delete(requestId);
+    }
     for (const [sessionId, t] of this.terminals) {
       if (t.runnerId === runnerId) {
         send(t.client, { type: "error", message: "runner disconnected" });
@@ -286,6 +302,77 @@ class RunnerManager {
     if (conn) send(conn.ws, msg);
   }
 
+  // --- AWS SSO bridge (server is just a router; state lives on the runner) ---
+
+  /** One-shot request over the runner socket with requestId correlation. */
+  private awsRequest<T>(runnerId: string, msg: Record<string, unknown>, timeoutMs = 20_000, onCode?: AwsPending["onCode"]): Promise<T> {
+    const runner = this.runners.get(runnerId);
+    if (!runner) return Promise.reject(new Error("runner offline"));
+    const requestId = crypto.randomUUID();
+    return new Promise((resolve, reject) => {
+      const pending: AwsPending = {
+        resolve: resolve as (r: unknown) => void,
+        reject,
+        ...(onCode ? { onCode } : {}),
+        timer: setTimeout(() => {
+          this.awsPending.delete(requestId);
+          reject(new Error("aws request timed out"));
+        }, timeoutMs),
+      };
+      this.awsPending.set(requestId, pending);
+      send(runner.ws, { ...msg, requestId });
+    });
+  }
+
+  async awsStatus(runnerId: string) {
+    return this.awsRequest<import("./runner-aws-types").AwsStatus>(runnerId, { type: "awsStatus" }, 15_000);
+  }
+
+  /** Device-code login — the code callback fires first; resolves when the
+   * token lands on the runner (poll may take minutes; generous timeout). */
+  async awsLogin(runnerId: string, startUrl: string | undefined, ssoRegion: string | undefined, onCode: NonNullable<AwsPending["onCode"]>) {
+    return this.awsRequest<{ ok: boolean; error?: string }>(runnerId, { type: "awsLogin", startUrl, ssoRegion }, 15 * 60_000, onCode);
+  }
+
+  async awsSelect(runnerId: string, profile: string) {
+    return this.awsRequest<{ ok: boolean; error?: string }>(runnerId, { type: "awsSelect", profile }, 15_000);
+  }
+
+  private handleAwsMessage(msg: {
+    type: string;
+    requestId?: string;
+    status?: unknown;
+    ok?: boolean;
+    error?: string;
+    userCode?: string;
+    verificationUri?: string;
+    verificationUriComplete?: string | null;
+    expiresInSeconds?: number;
+  }) {
+    if (!msg.requestId) return;
+    const pending = this.awsPending.get(msg.requestId);
+    if (!pending) return;
+    switch (msg.type) {
+      case "awsLoginCode":
+        pending.onCode?.({
+          userCode: msg.userCode ?? "",
+          verificationUri: msg.verificationUri ?? "",
+          verificationUriComplete: msg.verificationUriComplete ?? null,
+          expiresInSeconds: msg.expiresInSeconds ?? 600,
+        });
+        return; // login still pending
+      case "awsStatusResult":
+      case "awsLoginResult":
+      case "awsSelectResult":
+        if (pending.timer) clearTimeout(pending.timer);
+        this.awsPending.delete(msg.requestId);
+        if (msg.type === "awsStatusResult") pending.resolve(msg.status);
+        else if (msg.ok === false && msg.error) pending.reject(new Error(msg.error));
+        else pending.resolve({ ok: true });
+        return;
+    }
+  }
+
   openTerminal(sessionId: string, runnerId: string, client: WSContext) {
     const runner = this.runners.get(runnerId);
     if (!runner) return false;
@@ -308,6 +395,10 @@ class RunnerManager {
     }
     if (msg.type === "execResult") {
       this.handleExecResult(msg);
+      return;
+    }
+    if (msg.type.startsWith("aws")) {
+      this.handleAwsMessage(msg as Parameters<RunnerManager["handleAwsMessage"]>[0]);
       return;
     }
     if (msg.type.startsWith("job")) {

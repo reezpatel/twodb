@@ -3,7 +3,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import * as pty from "node-pty";
 import WebSocket from "ws";
-import { RunnerCore, collectMetrics, type ServerMessage } from "@twodb/runner-core";
+import { RunnerCore, collectMetrics, awsStatus, awsLogin, awsSelectProfile, type ServerMessage } from "@twodb/runner-core";
 
 const serverUrl = process.env.TWODB_SERVER_URL ?? "http://localhost:3001";
 const key = process.env.TWODB_RUNNER_KEY;
@@ -75,6 +75,20 @@ function handle(msg: ServerMessage) {
     case "metricsConfig":
       // Server-side disk-path config (Settings → Runners) overrides the env var.
       if (Array.isArray(msg.diskPaths)) diskPaths = msg.diskPaths.map(String);
+      break;
+    case "awsStatus":
+      void awsStatus().then((status) => send({ type: "awsStatusResult", requestId: msg.requestId, status }));
+      break;
+    case "awsLogin":
+      // Device-code login: the code goes to the UI immediately, completion later.
+      void awsLogin({ startUrl: msg.startUrl, ssoRegion: msg.ssoRegion }, (start) => {
+        send({ type: "awsLoginCode", requestId: msg.requestId, userCode: start.userCode, verificationUri: start.verificationUri, verificationUriComplete: start.verificationUriComplete, expiresInSeconds: start.expiresInSeconds });
+      }, (ok, error) => {
+        send({ type: "awsLoginResult", requestId: msg.requestId, ok, ...(error ? { error } : {}) });
+      });
+      break;
+    case "awsSelect":
+      void awsSelectProfile(msg.profile ?? "").then((r) => send({ type: "awsSelectResult", requestId: msg.requestId, ...r }));
       break;
     default:
       core.handle(msg);

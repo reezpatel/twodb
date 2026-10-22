@@ -1335,4 +1335,97 @@ export const codeRoutes = new Hono()
     if (!row) return c.json({ error: "session_not_found" }, 404);
     broadcastSessionEvent(s.organizationId, { type: "session_deleted", id: row.id });
     return c.json({ ok: true });
-  });
+  })
+  // --- AWS SSO bridge (widget state lives on the runner; server only routes) ---
+
+  .get("/sessions/:id/aws", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const session = await db
+      .selectFrom("code_session")
+      .innerJoin("code_directory", "code_directory.id", "code_session.codeDirectoryId")
+      .select(["code_directory.runnerId as runnerId"])
+      .where("code_session.id", "=", c.req.param("id"))
+      .where("code_session.organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!session?.runnerId) return c.json({ available: false });
+
+    if (!runnerManager.isOnline(session.runnerId)) {
+      return c.json({ available: true, installed: true, authenticated: false, profiles: [], selectedProfile: null, offline: true });
+    }
+    try {
+      const status = await runnerManager.awsStatus(session.runnerId);
+      return c.json({ available: true, ...status, offline: false });
+    } catch (e) {
+      return c.json({ available: true, installed: true, authenticated: false, profiles: [], selectedProfile: null, offline: false, error: (e as Error).message });
+    }
+  })
+
+  .post("/sessions/:id/aws/login", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const session = await db
+      .selectFrom("code_session")
+      .innerJoin("code_directory", "code_directory.id", "code_session.codeDirectoryId")
+      .innerJoin("runner", "runner.id", "code_directory.runnerId")
+      .select(["code_directory.runnerId as runnerId", "runner.awsStartUrl", "runner.awsSsoRegion"])
+      .where("code_session.id", "=", c.req.param("id"))
+      .where("code_session.organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!session?.runnerId) return c.json({ error: "session_has_no_runner" }, 400);
+
+    // The code arrives via the onCode callback (a few seconds); the login
+    // itself keeps running on the runner — completion is picked up by polling
+    // GET /aws (authenticated flips true once the token lands).
+    const code = await new Promise<{ userCode: string; verificationUri: string; verificationUriComplete: string | null; expiresInSeconds: number } | null>(
+      (resolveCode) => {
+        let settled = false;
+        void runnerManager
+          .awsLogin(
+            session.runnerId!,
+            session.awsStartUrl ?? undefined,
+            session.awsSsoRegion ?? undefined,
+            (start) => {
+              settled = true;
+              resolveCode(start);
+            },
+          )
+          .catch(() => {
+            if (!settled) resolveCode(null);
+          });
+        setTimeout(() => {
+          if (!settled) resolveCode(null);
+        }, 12_000);
+      },
+    );
+    if (!code) return c.json({ error: "failed to start device login (runner offline or aws not configured)" }, 502);
+    return c.json(code);
+  })
+
+  .post("/sessions/:id/aws/select", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+
+    const body = await c.req.json().catch(() => null);
+    const profile = typeof body?.profile === "string" ? body.profile : "";
+    if (!profile) return c.json({ error: "profile_required" }, 400);
+
+    const session = await db
+      .selectFrom("code_session")
+      .innerJoin("code_directory", "code_directory.id", "code_session.codeDirectoryId")
+      .select(["code_directory.runnerId as runnerId"])
+      .where("code_session.id", "=", c.req.param("id"))
+      .where("code_session.organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!session?.runnerId) return c.json({ error: "session_has_no_runner" }, 400);
+
+    try {
+      const r = await runnerManager.awsSelect(session.runnerId, profile);
+      return c.json(r);
+    } catch (e) {
+      return c.json({ error: (e as Error).message }, 502);
+    }
+  })
+;

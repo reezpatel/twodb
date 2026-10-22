@@ -3,7 +3,7 @@ import { db } from "../auth";
 import { logger } from "./logger";
 import { runnerManager } from "./runner-manager";
 import { ingestRunnerMetrics } from "./runner-metrics";
-import { RunnerCore, collectMetrics } from "@twodb/runner-core";
+import { RunnerCore, collectMetrics, awsStatus, awsLogin, awsSelectProfile } from "@twodb/runner-core";
 
 /**
  * Embedded runner: the main app acts as a runner for its own machine — no
@@ -34,8 +34,34 @@ export function localRunnerId(): string | null {
 const localSink = {
   send: (data: string) => {
     try {
-      const msg = JSON.parse(data) as { type: string };
-      core?.handle(msg as Parameters<RunnerCore["handle"]>[0]);
+      const msg = JSON.parse(data) as { type: string; requestId?: string };
+      // AWS bridge — handled here, replies route back through the manager.
+      switch (msg.type) {
+        case "awsStatus":
+          void awsStatus().then((status) => runnerManager.fromRunner(localId!, { type: "awsStatusResult", requestId: msg.requestId, ...({ status } as object) } as never));
+          break;
+        case "awsLogin":
+          void awsLogin({}, (start) => {
+            runnerManager.fromRunner(localId!, {
+              type: "awsLoginCode",
+              requestId: msg.requestId,
+              userCode: start.userCode,
+              verificationUri: start.verificationUri,
+              verificationUriComplete: start.verificationUriComplete,
+              expiresInSeconds: start.expiresInSeconds,
+            } as never);
+          }, (ok, error) => {
+            runnerManager.fromRunner(localId!, { type: "awsLoginResult", requestId: msg.requestId, ok, ...(error ? { error } : {}) } as never);
+          });
+          break;
+        case "awsSelect":
+          void awsSelectProfile((msg as unknown as { profile?: string }).profile ?? "").then((r) =>
+            runnerManager.fromRunner(localId!, { type: "awsSelectResult", requestId: msg.requestId, ...r } as never),
+          );
+          break;
+        default:
+          core?.handle(msg as Parameters<RunnerCore["handle"]>[0]);
+      }
     } catch {
       // ignore malformed
     }

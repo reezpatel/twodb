@@ -150,6 +150,9 @@ export interface RunnerTable {
   hostname: string | null;
   /** Mount points to report in metrics — configured in Settings → Runners. */
   diskPaths: ColumnType<string[] | null, string | null | undefined, string | null | undefined>;
+  /** AWS SSO start-app URL (one per runner) — the AWS widget's device-code login uses it. */
+  awsStartUrl: ColumnType<string | null, string | null | undefined, string | null | undefined>;
+  awsSsoRegion: ColumnType<string | null, string | null | undefined, string | null | undefined>;
   lastSeenAt: Date;
   createdAt: Date;
   deletedAt: Date | null;

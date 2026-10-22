@@ -4,6 +4,7 @@ import { Menu } from "lucide-react";
 import { NavRail } from "./nav-rail";
 import { MobileNavDrawer } from "./mobile-nav";
 import { FooterUsage } from "./footer-usage";
+import { FooterRunnerResources } from "./footer-runner-resources";
 import { FooterSpaces } from "./footer-spaces";
 import { MobileNavContext } from "./mobile-nav-context";
 import { SpaceProvider } from "./space-provider";
@@ -82,6 +83,7 @@ export function AppLayout() {
           <div className="flex min-w-0 items-center gap-4">
             <FooterSpaces />
             <FooterUsage />
+            <FooterRunnerResources />
           </div>
         </footer>
 

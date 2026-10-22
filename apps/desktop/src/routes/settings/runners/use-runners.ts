@@ -9,6 +9,9 @@ export interface Runner {
   lastSeenAt: string;
   createdAt: string;
   online: boolean;
+  /** AWS SSO start-app config (one per runner) — the AWS widget's login uses it. */
+  awsStartUrl?: string | null;
+  awsSsoRegion?: string | null;
 }
 
 export interface RunnerKey {

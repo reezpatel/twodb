@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Cpu, HardDrive, MemoryStick, Plus, X } from "lucide-react";
-import { useRunnerMetricsHistory } from "@/routes/code/use-runner-metrics";
+import { useLiveRunnerMetrics, useRunnerMetricsHistory } from "@/routes/code/use-runner-metrics";
 import type { MetricsSample } from "@/routes/code/use-runner-metrics";
 import { api } from "@/lib/api";
 import type { Runner } from "./use-runners";
@@ -61,6 +61,8 @@ function fmtBytes(n: number) {
 
 export function RunnerMetrics({ runner }: { runner: Runner }) {
   const history = useRunnerMetricsHistory(runner.id, 720);
+  const live = useLiveRunnerMetrics(true);
+  const liveSample = live.get(runner.id) ?? null;
   const queryClient = useQueryClient();
   const [newPath, setNewPath] = useState("");
   const [pathError, setPathError] = useState<string | null>(null);
@@ -78,24 +80,50 @@ export function RunnerMetrics({ runner }: { runner: Runner }) {
   const rows = (history.data ?? []) as MetricsSample[];
 
   const cols = useMemo(() => {
-    // GPU columns: one per gpu index seen in the latest sample.
-    const latest = rows[rows.length - 1];
-    return latest?.gpus ?? [];
-  }, [rows]);
+    // GPU columns: from the live sample when present, else the newest history row.
+    return liveSample?.metrics.gpus ?? rows[rows.length - 1]?.gpus ?? [];
+  }, [liveSample, rows]);
 
   const diskPaths = useMemo(() => {
-    const latest = rows[rows.length - 1];
-    return latest?.disks.map((d) => d.path) ?? [];
-  }, [rows]);
+    return liveSample?.metrics.disks.map((d) => d.path) ?? rows[rows.length - 1]?.disks.map((d) => d.path) ?? [];
+  }, [liveSample, rows]);
 
   const empty = rows.length === 0;
 
   return (
     <div className="space-y-4">
       {history.isPending && <p className="text-muted-foreground text-xs">loading metrics…</p>}
-      {!history.isPending && empty && (
+
+      {/* Live strip — appears the moment the runner reports (10s cadence), no
+          waiting for the first persisted history window. */}
+      {liveSample && (
+        <div className="bg-accent/40 rounded-lg px-3 py-2 font-mono text-[11px]">
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="font-sans text-[10px] font-semibold uppercase tracking-wide">live</span>
+            <span>cpu {Math.round(liveSample.metrics.cpu.busy * 100)}% ({liveSample.metrics.cpu.cores}c, load {liveSample.metrics.cpu.load1.toFixed(1)})</span>
+            <span>mem {fmtBytes(liveSample.metrics.memory.used)}/{fmtBytes(liveSample.metrics.memory.total)}</span>
+            {liveSample.metrics.gpus.map((g) => (
+              <span key={g.index}>
+                gpu{g.index} {Math.round(g.utilization)}% {fmtBytes(g.memoryUsed)}/{fmtBytes(g.memoryTotal)}
+                {g.temperature !== null ? ` ${g.temperature}°` : ""}
+              </span>
+            ))}
+            {liveSample.metrics.disks
+              .filter((d) => !d.error)
+              .map((d) => (
+                <span key={d.path}>
+                  {d.path} {fmtBytes(d.used)}/{fmtBytes(d.total)}
+                </span>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {!liveSample && empty && !history.isPending && (
         <p className="text-muted-foreground text-xs">
-          No samples yet — the runner reports every 10s and the first window persists within 10 minutes.
+          {runner.online
+            ? "Online but not reporting metrics — the runner needs v0.2.29+ (it streams every 10s; history persists one sample per 10-minute window)."
+            : "Offline — metrics resume when the runner reconnects."}
         </p>
       )}
 

@@ -2,8 +2,10 @@ import os from "node:os";
 import fs from "node:fs";
 import { dirname } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { awsEnv } from "./aws";
 
 export * from "./metrics";
+export * from "./aws";
 
 /**
  * Runner core: everything the standalone runner process does that the main
@@ -42,6 +44,11 @@ export interface ServerMessage {
   jobId?: string;
   lines?: number;
   diskPaths?: string[];
+  /** AWS bridge (request/reply with requestId). */
+  requestId?: string;
+  startUrl?: string;
+  ssoRegion?: string;
+  profile?: string;
 }
 
 export interface RunnerCoreOptions {
@@ -71,7 +78,9 @@ export function spawnEnv(): Record<string, string> {
   ]
     .filter(Boolean)
     .join(":");
-  return { ...process.env, PATH: path } as Record<string, string>;
+  // The selected AWS SSO profile (if any) applies to every spawn — execs,
+  // jobs, terminals — so the widget's choice is what the agent uses too.
+  return { ...process.env, PATH: path, ...awsEnv() } as Record<string, string>;
 }
 
 // tmux gives terminals persistence: closing a tab detaches instead of killing
