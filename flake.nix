@@ -275,7 +275,7 @@
         # Native runner package built from the release tarball (node-pty is a
         # native module, so each platform's tarball carries its own build).
         # Bump runnerVersion -- and the hashes, which `nix build` prints -- per release.
-        runnerVersion = "0.2.33";
+        runnerVersion = "0.2.34";
         # node-pty is a native module — each system needs its platform tarball.
         runnerTarballFor =
           sys:
@@ -285,22 +285,22 @@
                 x86_64-linux = {
                   os = "linux";
                   arch = "x64";
-                  hash = "sha256-X983YkaubHN454D9NCZ9sIr2arqjwfICmzZJ5xkZqWg=";
+                  hash = "sha256-bLRObKFf/1GFRpD9O+8wm2cuFSeDa0qpkzKg3WkPgjA=";
                 };
                 aarch64-linux = {
                   os = "linux";
                   arch = "arm64";
-                  hash = "sha256-DSeezbLbu5wBeXf5pQCf1u1WtcDQiNtvzSezlUELvCs=";
+                  hash = "sha256-xzLAxV+ewWdz2GUneWeSOfqUOwb4uqkG/sGE7xUnowI=";
                 };
                 aarch64-darwin = {
                   os = "macos";
                   arch = "arm64";
-                  hash = "sha256-SxgdRALFppbeiAzFrbPi5jQ5/FGU4vFmJT0IpjSwMeU=";
+                  hash = "sha256-K00OPIfqcMtmeqefC6c35bBYInNQNBbPF8iX31f2JTw=";
                 };
                 x86_64-darwin = {
                   os = "macos";
                   arch = "x64";
-                  hash = "sha256-gP3C5IKKn3vHk9mmX+z0D55a9DbCL/RM2FsW/LJb3Bc=";
+                  hash = "sha256-LeLfj3uw5nCrIgw4hFN9SrPjcVjfa1eATROW6VEZTgk=";
                 };
               }
               .${sys};
@@ -341,9 +341,9 @@
           }.tar.gz";
           hash =
             if pkgs.stdenv.hostPlatform.isAarch64 then
-              "sha256-/adI7E0PQulzqdjyxxWX1TmxSyiAm1abuBhAbNyG9bE="
+              "sha256-m6NVI0hBfVz7iw6lsWX7oZYQwDOtscEqAEESm+ffwl8="
             else
-              "sha256-V1wWjQCbzm60Q5Pb2EdfxjGlNzKVWW5gMY907FeQmaY=";
+              "sha256-VvVw0lLFyNEN2fbYEVFyy5SATbHyK0wT+Jcle1muN/o=";
         };
         serverPackage =
           src:
