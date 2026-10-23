@@ -398,6 +398,7 @@ jobs:
           node-version: 22
 
       - name: Deploy runner with dependencies
+        shell: bash # pwsh can't parse `rm -rf`; bash is available on all runners
         run: |
           pnpm install --frozen-lockfile --filter @twodb/runner
           pnpm --filter @twodb/runner deploy --legacy stage/twodb-runner
