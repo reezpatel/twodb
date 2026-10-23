@@ -594,7 +594,8 @@ jobs:
           git add flake.nix
           git commit -m "flake: v${version} tarballs (runner + server hashes)"
           git push -f origin "$branch"
-          if gh pr view "$branch" >/dev/null 2>&1; then
+          # `gh pr view` also succeeds on merged PRs — only edit if one is OPEN
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[0].number')" ]; then
             gh pr edit "$branch" \
               --title "flake: v${version} tarballs" \
               --body "Automated flake.nix bump for the ${GITHUB_REF_NAME} release tarballs. Merge, then run \`nix flake update twodb\` in infra and deploy."
