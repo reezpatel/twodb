@@ -29,6 +29,8 @@ export interface NoteGroup {
   type: NoteGroupType;
   position: number;
   isFavorite: boolean;
+  /** Page decorations — icon/cover as twodb:// uris. */
+  metadata?: { icon?: string | null; cover?: string | null } & Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -126,6 +128,16 @@ export function useNotesScene(opts: UseNotesSceneOpts = {}) {
     onSuccess: invalidate,
   });
 
+  /** Icon/cover page decorations for the group header (stored in node metadata). */
+  const setGroupDecorations = useMutation({
+    mutationFn: ({ id, icon, cover }: { id: string; icon?: string | null; cover?: string | null }) =>
+      api(`/api/notes/groups/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ ...(icon !== undefined ? { icon } : {}), ...(cover !== undefined ? { cover } : {}) }),
+      }),
+    onSuccess: invalidate,
+  });
+
   const toggleFavorite = useMutation({
     mutationFn: ({ id, isFavorite }: { id: string; isFavorite: boolean }) =>
       api(`/api/notes/groups/${id}`, { method: "PATCH", body: JSON.stringify({ isFavorite }) }),
@@ -157,6 +169,7 @@ export function useNotesScene(opts: UseNotesSceneOpts = {}) {
     renameGroup,
     moveGroup,
     setGroupType,
+    setGroupDecorations,
     toggleFavorite,
     deleteGroup,
     reorder,

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
+import { readAssetBytesById, storeNoteAsset } from "../lib/assets";
 import type { NoteGroupMetadata, NoteNodeTable, NotePropertyDef, NotePropertyOption, NotePropertyType, NoteViewDef, NoteViewType } from "../plugins/db";
 import type { NoteRow } from "../lib/notes-tables";
 import { logger } from "../lib/logger";
@@ -176,6 +177,53 @@ export const notesContentRoutes = new Hono()
     const noteId = crypto.randomUUID();
     await insertNote(db, group.id, noteId, title, content, preview, checked.values);
     return c.json({ noteId }, 201);
+  })
+
+  // Cover/icon upload — stored in the note_assets destination, referenced by
+  // twodb:// uri in the note's content JSON. Same shape as the chat upload.
+  .post("/groups/:id/notes/:noteId/assets", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+    const group = await requireGroup(s.organizationId, c.req.param("id"));
+    if (!group) return c.json({ error: "group_not_found" }, 404);
+
+    const form = await c.req.parseBody().catch(() => null);
+    const file = form?.["file"];
+    if (!file || typeof file === "string") return c.json({ error: "invalid_file" }, 400);
+    if (file.size === 0) return c.json({ error: "empty_file" }, 400);
+    if (file.size > 25 * 1024 * 1024) return c.json({ error: "file_too_large" }, 413);
+    if (file.type && !file.type.startsWith("image/")) return c.json({ error: "images_only" }, 400);
+
+    try {
+      const asset = await storeNoteAsset({
+        organizationId: s.organizationId,
+        filename: file.name || "note-asset",
+        contentType: file.type || null,
+        data: Buffer.from(await file.arrayBuffer()),
+      });
+      return c.json({ ...asset, previewUrl: `/api/notes/assets/${asset.id}` }, 201);
+    } catch (e) {
+      const message = (e as Error).message;
+      if (message === "note_assets_not_configured") return c.json({ error: message }, 409);
+      logger.error({ err: e }, "notes: asset upload failed");
+      return c.json({ error: message || "upload_failed" }, 500);
+    }
+  })
+
+  .get("/assets/:mediaId", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+    try {
+      const asset = await readAssetBytesById(s.organizationId, c.req.param("mediaId") ?? "");
+      return c.body(new Uint8Array(asset.body), 200, {
+        "content-type": asset.contentType,
+        "content-disposition": `inline; filename="${asset.filename.replace(/"/g, "")}"`,
+      });
+    } catch (e) {
+      const message = (e as Error).message;
+      if (message === "asset_not_found") return c.json({ error: message }, 404);
+      return c.json({ error: message || "read_failed" }, 500);
+    }
   })
 
   .patch("/groups/:id/notes/:noteId", async (c) => {

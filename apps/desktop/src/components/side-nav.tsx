@@ -2,10 +2,21 @@ import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { NavLink } from "react-router";
 import type { LucideIcon } from "lucide-react";
+import { Resizable } from "re-resizable";
 import { cn } from "@/lib/utils";
 import { useMobileNav } from "./mobile-nav-context";
 
-function SideNav({ className, children }: { className?: string; children: ReactNode }) {
+interface SideNavProps {
+  className?: string;
+  children: ReactNode;
+  /** Desktop width in px — when set with onWidthChange the nav is resizable (right edge). */
+  width?: number;
+  onWidthChange?: (width: number) => void;
+  minNavWidth?: number;
+  maxNavWidth?: number;
+}
+
+function SideNav({ className, children, width, onWidthChange, minNavWidth = 180, maxNavWidth = 420 }: SideNavProps) {
   const { isMobile, sideNavTarget, setSideNavActive } = useMobileNav();
 
   useEffect(() => {
@@ -18,8 +29,38 @@ function SideNav({ className, children }: { className?: string; children: ReactN
     if (!sideNavTarget) return null;
     return createPortal(<aside className={cn("flex flex-col gap-3", className)}>{children}</aside>, sideNavTarget);
   }
+
+  const resizable = width !== undefined && onWidthChange !== undefined;
+
+  // Non-resizable apps keep the simple aside.
+  if (!resizable) {
+    return (
+      <aside className={cn("bg-muted/20 flex h-full min-h-0 w-[220px] shrink-0 flex-col gap-3 overflow-y-auto border-r p-4 px-3", className)}>
+        {children}
+      </aside>
+    );
+  }
+
   return (
-    <aside className={cn("bg-muted/20 flex h-full min-h-0 w-[220px] shrink-0 flex-col gap-3 overflow-y-auto border-r p-4 px-3", className)}>{children}</aside>
+    <Resizable
+      size={{ width, height: "100%" }}
+      minWidth={minNavWidth}
+      maxWidth={maxNavWidth}
+      enable={{ right: true }}
+      handleStyles={{ right: { width: "5px", right: "-2px", height: "100%", cursor: "col-resize" } }}
+      handleComponent={{
+        right: (
+          <div
+            className="bg-border hover:bg-primary/60 absolute inset-y-0 right-0 z-10 w-1 translate-x-1/2 cursor-col-resize transition-colors"
+            title="Drag to resize"
+          />
+        ),
+      }}
+      onResizeStop={(_e, _dir, _ref, delta) => onWidthChange(width + delta.width)}
+      className="shrink-0"
+    >
+      <aside className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}>{children}</aside>
+    </Resizable>
   );
 }
 

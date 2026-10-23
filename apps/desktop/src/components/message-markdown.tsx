@@ -37,7 +37,7 @@ export function MessageMarkdown({
           h2: ({ children }) => <h2 className="text-foreground mt-3 mb-1 text-sm font-semibold">{children}</h2>,
           h3: ({ children }) => <h3 className="text-foreground mt-2 mb-1 text-[13px] font-semibold">{children}</h3>,
           ul: ({ children }) => <ul className="mb-2 list-disc pl-4 last:mb-0">{children}</ul>,
-          ol: ({ children }) => <ol className="mb-2 list-decimal pl-4 last:mb-0">{children}</ol>,
+          ol: ({ children }) => <ol className="mb-2 ms-2 list-decimal pl-4 last:mb-0">{children}</ol>,
           li: ({ children }) => <li className="my-0.5">{children}</li>,
           strong: ({ children }) => <strong className="font-medium">{children}</strong>,
           a: ({ href, children }) => {

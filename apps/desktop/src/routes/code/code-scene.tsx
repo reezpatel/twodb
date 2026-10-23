@@ -1,7 +1,7 @@
-import { Group, Panel, Separator } from "react-resizable-panels";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Outlet } from "react-router";
 import { X } from "lucide-react";
+import { Resizable } from "re-resizable";
 import { Sidebar } from "./sidebar/sidebar";
 import { useCode, type CodePanelId } from "./code-provider";
 import { useMediaQuery } from "@/lib/use-media-query";
@@ -32,16 +32,23 @@ export function PanelBody({ panel }: { panel: CodePanelId }) {
   }
 }
 
+function readStoredWidth(key: string, fallback: number, min: number, max: number) {
+  const raw = Number(localStorage.getItem(key));
+  return Number.isFinite(raw) && raw >= min && raw <= max ? raw : fallback;
+}
+
 export function CodeScene() {
   useCode(); // CodeProvider (rendered by the app shell) owns the chat panel state.
   const { panel, rightBarVisible, closePanel, toggleRightBar } = useCode();
   const isMobile = useMediaQuery("(max-width: 1279px)");
 
-  // Persisted right-bar size in px (react-resizable-panels v4 Group layout).
-  const [barSize, setBarSize] = useState(() => {
-    const raw = Number(localStorage.getItem("twodb.rightBarSize"));
-    return Number.isFinite(raw) && raw >= 240 && raw <= 720 ? raw : 288;
-  });
+  // Persisted right-bar width in px (re-resizable drag handle on its left edge).
+  const [barWidth, setBarWidth] = useState(() => readStoredWidth("twodb.rightBarSize", 288, 240, 720));
+  const persistBarWidth = useCallback((w: number) => {
+    const clamped = Math.min(720, Math.max(240, w));
+    setBarWidth(clamped);
+    localStorage.setItem("twodb.rightBarSize", String(Math.round(clamped)));
+  }, []);
 
   const rightBarContents = (
     <>
@@ -89,7 +96,7 @@ export function CodeScene() {
 
   if (isMobile) {
     // Mobile: the bar floats over the content instead of pushing it — no
-    // panel group, no resize.
+    // resize handle, fixed 90% width.
     return (
       <div className="relative flex h-full min-h-0">
         <div className="flex min-w-0 flex-1 flex-col">
@@ -104,32 +111,32 @@ export function CodeScene() {
     );
   }
 
-  // Desktop: resizable split — chat area | right bar (react-resizable-panels).
+  // Desktop: chat area flexes; the right bar is a px-width Resizable whose
+  // drag handle is its left edge. Sibling widths stay in sync because the
+  // chat column is flex-1 and re-resizable sets an explicit width.
   return (
-    <Group orientation="horizontal" className="h-full min-h-0">
-      <Panel minSize="40%" className="flex min-w-0 flex-col">
+    <div className="flex h-full min-h-0">
+      <div className="flex min-w-0 flex-1 flex-col">
         <Outlet />
-      </Panel>
+      </div>
       {rightBarVisible && (
-        <>
-          <Separator className="bg-border hover:bg-primary/60 w-px cursor-col-resize transition-colors" />
-          <Panel
-            defaultSize={barSize}
-            minSize={240}
-            maxSize={720}
-            onResize={(size) => {
-              // inPixels — persist the px width; clamped by min/max props.
-              if (typeof size === "object" && size.inPixels) {
-                setBarSize(size.inPixels);
-                localStorage.setItem("twodb.rightBarSize", String(Math.round(size.inPixels)));
-              }
-            }}
-            className="flex min-w-0 flex-col"
-          >
-            <aside className="bg-card border-l flex h-full min-h-0 w-full flex-col overflow-hidden border-l">{rightBarContents}</aside>
-          </Panel>
-        </>
+        <Resizable
+          size={{ width: barWidth, height: "100%" }}
+          minWidth={240}
+          maxWidth={720}
+          enable={{ left: true }}
+          handleComponent={{
+            left: (
+              <div className="bg-border hover:bg-primary/60 group absolute inset-y-0 left-0 z-10 flex w-1 -translate-x-1/2 cursor-col-resize items-center justify-center transition-colors" title="Drag to resize" />
+            ),
+          }}
+          handleStyles={{ left: { width: "5px", left: "-2px", height: "100%", cursor: "col-resize" } }}
+          onResizeStop={(_e, _dir, _ref, d) => persistBarWidth(barWidth + d.width)}
+          className="bg-card border-l flex shrink-0 flex-col overflow-hidden border-l"
+        >
+          {rightBarContents}
+        </Resizable>
       )}
-    </Group>
+    </div>
   );
 }

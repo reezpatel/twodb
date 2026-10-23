@@ -83,7 +83,10 @@ export function ColumnControls({ columns, columnOrder, columnVisibility, onColum
   };
 
   const ordered = columnOrder.length
-    ? columnOrder.map((id) => columns.find((c) => c.id === id) ?? { id, label: id }).filter((c): c is ColumnOption => Boolean(c))
+    ? columnOrder
+        .filter((id) => !id.startsWith("__")) // internal columns (add-property +) stay hidden from the picker
+        .map((id) => columns.find((c) => c.id === id) ?? { id, label: id })
+        .filter((c): c is ColumnOption => Boolean(c))
     : columns;
 
   return (

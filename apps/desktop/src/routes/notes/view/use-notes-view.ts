@@ -65,6 +65,7 @@ export interface NoteView {
 
 export interface NoteRecord {
   noteId: string;
+  title: string;
   content: { text?: string; doc?: unknown } & Record<string, unknown>;
   preview: string;
   createdAt: string;
@@ -107,10 +108,11 @@ export function useNotesView(groupId: string | null) {
   });
 
   const updateNote = useMutation({
-    mutationFn: ({ noteId, content, preview, props }: { noteId: string; content?: unknown; preview?: string; props?: Record<string, unknown> }) =>
+    mutationFn: ({ noteId, title, content, preview, props }: { noteId: string; title?: string; content?: unknown; preview?: string; props?: Record<string, unknown> }) =>
       api(`/api/notes/groups/${groupId}/notes/${noteId}`, {
         method: "PATCH",
         body: JSON.stringify({
+          ...(title !== undefined ? { title } : {}),
           ...(content !== undefined ? { content } : {}),
           ...(preview !== undefined ? { preview } : {}),
           ...(props !== undefined ? { props } : {}),
@@ -198,6 +200,7 @@ export function useNotesView(groupId: string | null) {
   });
 
   return {
+    groupId,
     payload,
     views,
     activeView,

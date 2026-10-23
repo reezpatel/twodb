@@ -37,7 +37,7 @@ export const TYPE_META: Record<NoteGroupType, { label: string; icon: typeof Stic
   canvas: { label: "Canvas", icon: PenTool },
 };
 
-export const ROW_HEIGHT = 28;
+export const ROW_HEIGHT = 26;
 
 export interface TreeNodeData {
   id: string;
@@ -129,10 +129,37 @@ export function SectionTree({
     return map;
   }, [nodes]);
 
-  // treeRef is set after the first commit; on that first pass every folder is
-  // closed, so only root rows are visible.
-  const height = (treeRef.current?.visibleNodes.length ?? nodes.length) * ROW_HEIGHT;
+  // Which folders are open — mirrored from the tree's own state so the
+  // container height is computed synchronously with the visible rows.
+  // (Reading treeRef.current?.visibleNodes during render lags one commit
+  // behind, which made the expanding tree show its own inner scrollbar.)
+  const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
+  const visibleCount = useMemo(() => {
+    const count = (list: TreeNodeData[]): number => {
+      let n = 0;
+      for (const node of list) {
+        n += 1;
+        if (node.kind === "folder" && openFolders.has(node.id)) n += count(node.children ?? []);
+      }
+      return n;
+    };
+    return count(nodes);
+  }, [nodes, openFolders]);
+  const height = visibleCount * ROW_HEIGHT;
   void tick;
+
+  const handleToggle = (id: string) => {
+    // The tree toggles its own state first; isOpen is the *new* state, read
+    // back from the api so our mirrored set stays in sync.
+    setOpenFolders((prev) => {
+      const next = new Set(prev);
+      const willBeOpen = !prev.has(id);
+      if (willBeOpen) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    bump();
+  };
 
   const handleMove = async ({
     dragNodes,
@@ -192,8 +219,8 @@ export function SectionTree({
         ref={dragHandle}
         style={style}
         className={cn(
-          "group flex h-7 cursor-pointer items-center gap-1.5 pr-1.5 text-sm hover:bg-accent",
-          isSelected && "bg-accent font-medium",
+          "group flex h-[26px] cursor-pointer items-center gap-1 pr-1 text-[13px] text-muted-foreground hover:bg-accent hover:text-foreground",
+          isSelected && "bg-accent font-medium text-foreground",
           node.isDragging && "opacity-50",
           node.willReceiveDrop && "bg-primary/10 ring-1 ring-primary",
         )}
@@ -204,11 +231,11 @@ export function SectionTree({
         onDoubleClick={() => tree.edit(node.id)}
       >
         {isFolder ? (
-          <ChevronRight size={13} className={cn("text-muted-foreground shrink-0 transition-transform", node.isOpen && "rotate-90")} aria-hidden="true" />
+          <ChevronRight size={12} className={cn("text-muted-foreground/60 shrink-0 transition-transform", node.isOpen && "rotate-90")} aria-hidden="true" />
         ) : (
-          <span className="w-[13px] shrink-0" />
+          <span className="w-3 shrink-0" />
         )}
-        <Icon size={14} className="text-muted-foreground shrink-0" aria-hidden="true" />
+        <Icon size={14} className="text-muted-foreground/70 shrink-0" aria-hidden="true" />
 
         {node.isEditing ? (
           <TreeRenameInput node={node} />
@@ -301,12 +328,14 @@ export function SectionTree({
       width="100%"
       height={height}
       rowHeight={ROW_HEIGHT}
-      indent={14}
+      indent={12}
+      paddingTop={2}
+      paddingBottom={2}
       openByDefault={false}
       dndRootElement={scrollRoot.current}
       onMove={handleMove}
       onRename={handleRename}
-      onToggle={bump}
+      onToggle={handleToggle}
       disableMultiSelection
     >
       {renderNode}

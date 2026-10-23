@@ -569,6 +569,10 @@ export interface NoteViewDef {
 export interface NoteGroupMetadata {
   columns: NotePropertyDef[];
   views: NoteViewDef[];
+  /** Page decorations — header icon/cover as twodb:// uris. */
+  icon?: string | null;
+  cover?: string | null;
+  [key: string]: unknown;
 }
 
 export interface NoteNodeTable {

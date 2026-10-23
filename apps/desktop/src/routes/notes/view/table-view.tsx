@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ColumnDef, VisibilityState } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
 import { CellDisplayFor, CellEditFor } from "@/components/ui/property-cell";
-import { MockTable } from "@/components/ui/mock-table";
-import { ColumnControls, type ColumnOption } from "./column-controls";
+import { DataGridTable } from "@/components/ui/data-grid-table";
 import { ColumnMenu } from "./column-menu";
 import type { NoteProperty, NoteRecord, NotesViewHook } from "./use-notes-view";
+import { cn } from "@/lib/utils";
 
 const PREVIEW_COLUMN_ID = "preview";
 const UPDATED_COLUMN_ID = "updated";
@@ -27,25 +27,37 @@ export function TableView({
   view,
   setOpenNoteId,
   onAddProperty,
+  columnOrder,
+  columnVisibility,
+  onColumnOrderChange,
+  onColumnVisibilityChange,
 }: {
   notes: NoteRecord[];
   columns: NoteProperty[];
   view: NotesViewHook;
   setOpenNoteId: (id: string | null) => void;
   onAddProperty: () => void;
+  /** Column order/visibility owned by the parent view bar (shared across views). */
+  columnOrder: string[];
+  columnVisibility: VisibilityState;
+  onColumnOrderChange: (updater: string[] | ((prev: string[]) => string[])) => void;
+  onColumnVisibilityChange: (updater: VisibilityState | ((prev: VisibilityState) => VisibilityState)) => void;
 }) {
+  // New row — creates an empty note (same as the toolbar "Note" button).
+  const addRow = () => view.createNote.mutate({ text: "" });
+
   const insertProperty = (side: "left" | "right", pivotId: string) => {
     void view.addProperty.mutateAsync({ name: "New property", type: "text" }).then((row) => {
       if (side === "right") {
         const idx = columns.findIndex((c) => c.id === pivotId);
         if (idx === -1) return;
         const newOrder = [...columns.map((c) => c.id).slice(0, idx + 1), row.id, ...columns.map((c) => c.id).slice(idx + 1)];
-        setColumnOrder(newOrder);
+        onColumnOrderChange(newOrder);
       } else {
         const idx = columns.findIndex((c) => c.id === pivotId);
         if (idx <= 0) return;
         const newOrder = [...columns.map((c) => c.id).slice(0, idx), row.id, ...columns.map((c) => c.id).slice(idx)];
-        setColumnOrder(newOrder);
+        onColumnOrderChange(newOrder);
       }
     });
   };
@@ -109,17 +121,17 @@ export function TableView({
         cell: ({ row }) => <span className="text-muted-foreground text-xs">{relativeTime(row.original.updatedAt)}</span>,
       },
       {
+        // add-column strip — plain fixed-width cell, always last
         id: ADD_PROPERTY_COLUMN_ID,
-        meta: { flexible: true },
         enableHiding: false,
         enableSorting: false,
         enableResizing: false,
-        size: 60,
+        size: 44,
         header: () => (
           <button
             type="button"
             onClick={onAddProperty}
-            className="hover:bg-accent text-muted-foreground hover:text-foreground flex h-full w-full items-center justify-center rounded text-xs"
+            className="hover:bg-accent text-muted-foreground hover:text-foreground flex h-full w-full items-center justify-center text-xs"
             title="Add property"
           >
             <Plus size={13} />
@@ -131,23 +143,24 @@ export function TableView({
     [columns, view, setOpenNoteId, onAddProperty],
   );
 
-  const [columnOrder, setColumnOrder] = useState<string[]>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-
   // sync columnOrder whenever the set of column ids changes: preserve user
   // reordering for ids that still exist, append any new ids to the tail, and
-  // keep the "+" add-column pinned to the very end.
+  // keep the "+" add-column pinned to the very end. (Order/visibility state
+  // lives in the parent view bar so all views share it.)
   useEffect(() => {
     const currentIds = tableColumns.map((c) => c.id as string);
-    setColumnOrder((prev) => {
-      const filtered = prev.filter((id) => currentIds.includes(id));
-      const additions = currentIds.filter((id) => !prev.includes(id));
-      let next = additions.length === 0 && filtered.length === prev.length ? prev : [...filtered, ...additions];
-      if (next.includes(ADD_PROPERTY_COLUMN_ID) && next[next.length - 1] !== ADD_PROPERTY_COLUMN_ID) {
-        next = [...next.filter((id) => id !== ADD_PROPERTY_COLUMN_ID), ADD_PROPERTY_COLUMN_ID];
-      }
-      return next;
-    });
+    onColumnOrderChange(
+      (() => {
+        const prev = columnOrder;
+        const filtered = prev.filter((id) => currentIds.includes(id));
+        const additions = currentIds.filter((id) => !prev.includes(id));
+        let next = additions.length === 0 && filtered.length === prev.length ? prev : [...filtered, ...additions];
+        if (next.includes(ADD_PROPERTY_COLUMN_ID) && next[next.length - 1] !== ADD_PROPERTY_COLUMN_ID) {
+          next = [...next.filter((id) => id !== ADD_PROPERTY_COLUMN_ID), ADD_PROPERTY_COLUMN_ID];
+        }
+        return next;
+      })(),
+    );
   }, [tableColumns]);
 
   // Keep the editor's `prop` in sync with the latest `columns` so that newly
@@ -160,37 +173,87 @@ export function TableView({
     }
   }, [columns, activeEdit]);
 
-  const columnOptions = useMemo<ColumnOption[]>(
-    () => [
-      { id: PREVIEW_COLUMN_ID, label: "Preview" },
-      ...columns.map((prop) => ({ id: prop.id, label: prop.name })),
-      { id: UPDATED_COLUMN_ID, label: "Updated" },
-    ],
-    [columns],
-  );
+  // Live column sizes from the grid (post-resize) — the summary/count row
+  // subscribes so its cells track column resizing.
+  const [liveSizes, setLiveSizes] = useState<Record<string, number>>({});
+  const handleColumnSizing = useCallback((sizes: { id: string; size: number }[]) => {
+    setLiveSizes(Object.fromEntries(sizes.map((s) => [s.id, s.size])));
+  }, []);
+
+  // Per-column count of non-empty cells, aligned to the visible column order
+  // (checkbox true / non-null / non-undefined counts as filled). Width fields
+  // mirror the grid's cellStyle so the count row stays column-aligned.
+  const countRow = useMemo(() => {
+    const cellFilled = (colId: string, note: NoteRecord): boolean => {
+      if (colId === PREVIEW_COLUMN_ID) return Boolean(note.preview?.trim());
+      if (colId === UPDATED_COLUMN_ID) return true;
+      if (colId === ADD_PROPERTY_COLUMN_ID) return false;
+      const prop = columns.find((c) => c.id === colId);
+      if (prop?.type === "checkbox") return note.props[colId] === true;
+      const v = note.props[colId];
+      return v !== null && v !== undefined && String(v).trim() !== "";
+    };
+    const byId = new Map(tableColumns.map((c) => [c.id as string, c]));
+    return columnOrder
+      .filter((id) => byId.has(id) && (columnVisibility[id] !== false || id === ADD_PROPERTY_COLUMN_ID))
+      .map((id) => ({
+        id,
+        size: liveSizes[id] ?? ((byId.get(id)!.size as number | undefined) ?? 200),
+        minWidth: ((byId.get(id)!.minSize as number | undefined) ?? 100),
+        count: notes.filter((n) => cellFilled(id, n)).length,
+      }));
+  }, [columnOrder, columnVisibility, tableColumns, columns, notes, liveSizes]);
 
   return (
-    <div className="flex flex-col w-full overflow-hidden">
-      <div className="border-b flex items-center justify-between gap-2 border-b px-3 py-1.5">
-        <span className="text-muted-foreground/70 text-[11px] font-semibold tracking-wide uppercase">Table</span>
-        <ColumnControls
-          columns={columnOptions}
-          columnOrder={columnOrder}
-          columnVisibility={columnVisibility}
-          onColumnOrderChange={setColumnOrder}
-          onColumnVisibilityChange={setColumnVisibility}
-        />
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col">
-        <MockTable
+    <div className="flex w-full flex-col overflow-visible px-4 pt-4 lg:px-32">
+      {/* Table area — the grid spills horizontally with the page; the header
+          sticks below the tab bar, the footer (New + counts) to the bottom. */}
+      <div className="flex flex-col">
+        <DataGridTable
           data={notes}
           columns={tableColumns}
           columnOrder={columnOrder}
-          onColumnOrderChange={setColumnOrder}
+          onColumnOrderChange={onColumnOrderChange}
           columnVisibility={columnVisibility}
-          onColumnVisibilityChange={setColumnVisibility}
+          onColumnVisibilityChange={onColumnVisibilityChange}
+          onColumnSizing={handleColumnSizing}
           emptyMessage='No notes yet — hit "Note" to create the first one.'
-          className="min-h-0 flex-1 "
+          stickyHeaderTop={36}
+          rowHeightClass="h-9"
+          footer={
+            <div className="bg-background w-full">
+              {/* New — the row spans the grid; the button itself is
+                  sticky-left so it floats in place during horizontal scroll */}
+              <div className="border-y">
+                <button
+                  type="button"
+                  onClick={addRow}
+                  disabled={view.createNote.isPending}
+                  className="bg-background hover:bg-accent text-muted-foreground hover:text-foreground sticky left-32 z-10 flex h-8 w-44 items-center gap-1.5 px-2 text-left text-xs"
+                  title="Add row"
+                >
+                  <Plus size={13} /> New
+                </button>
+              </div>
+              {/* summary — grid-aligned count cells; widths track column
+                  resizes via liveSizes */}
+              <div className="flex border-b">
+                {countRow.map((col) => (
+                  <div
+                    key={col.id}
+                    className={cn(
+                      "text-muted-foreground/70 flex h-7 shrink-0 items-center overflow-hidden px-2 text-[11px] tabular-nums",
+                      col.id !== ADD_PROPERTY_COLUMN_ID && "border-r",
+                    )}
+                    style={{ width: col.size, minWidth: col.minWidth }}
+                    title={`${col.count} filled`}
+                  >
+                    {col.id === ADD_PROPERTY_COLUMN_ID ? "" : col.count}
+                  </div>
+                ))}
+              </div>
+            </div>
+          }
         />
       </div>
       {activeEdit && (

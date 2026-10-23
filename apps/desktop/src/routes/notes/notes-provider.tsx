@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useNotesScene, type NoteFolder, type NoteGroup } from "./use-notes-scene";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { Sidebar } from "./scene/sidebar";
 
 interface NotesState {
@@ -11,6 +12,8 @@ interface NotesState {
   closeCreate: () => void;
   groupFromUrl: string | null;
   noteFromUrl: string | null;
+  /** Mobile never opens the side editor — note clicks go to the full page. */
+  isMobile: boolean;
   setSelectedGroupId: (id: string | null) => void;
   setOpenNoteId: (id: string | null) => void;
 }
@@ -22,6 +25,7 @@ export const NotesContext = createContext<NotesState | null>(null);
 export function NotesProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useMediaQuery("(max-width: 1023px)");
   // /apps/notes/:groupId/:noteId — params come from the path since this
   // provider renders above the route element.
   const [, , , groupId, noteId] = location.pathname.split("/");
@@ -38,9 +42,15 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const setOpenNoteId = useCallback(
     (id: string | null) => {
       if (!groupFromUrl) return;
+      // Mobile: opening a note navigates to the full page instead of the
+      // side-by-side editor (too cramped). Closing returns to the group.
+      if (id && isMobile) {
+        navigate(`/apps/notes/${groupFromUrl}/${id}/page`);
+        return;
+      }
       navigate(id ? `/apps/notes/${groupFromUrl}/${id}` : `/apps/notes/${groupFromUrl}`, { replace: true });
     },
-    [navigate, groupFromUrl],
+    [navigate, groupFromUrl, isMobile],
   );
 
   const notes = useNotesScene({ selectedGroupId: groupFromUrl, onSelectGroupId: setSelectedGroupId });
@@ -50,8 +60,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const closeCreate = useCallback(() => setCreateView(null), []);
 
   const value = useMemo(
-    () => ({ notes, scrollRoot, createView, openCreate, closeCreate, groupFromUrl, noteFromUrl, setSelectedGroupId, setOpenNoteId }),
-    [notes, scrollRoot, createView, openCreate, closeCreate, groupFromUrl, noteFromUrl, setSelectedGroupId, setOpenNoteId],
+    () => ({ notes, scrollRoot, createView, openCreate, closeCreate, groupFromUrl, noteFromUrl, isMobile, setSelectedGroupId, setOpenNoteId }),
+    [notes, scrollRoot, createView, openCreate, closeCreate, groupFromUrl, noteFromUrl, isMobile, setSelectedGroupId, setOpenNoteId],
   );
   return <NotesContext.Provider value={value}>{children}</NotesContext.Provider>;
 }

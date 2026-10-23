@@ -7,6 +7,12 @@ import type { NoteRecord, NotesViewHook } from "../view/use-notes-view";
 import { ResizableImage } from "./resizable-image";
 import { useSlashCommand } from "./slash-command";
 
+/** Page decoration fields kept beside {doc} in the note's content JSON. */
+export interface NoteDecorations {
+  icon?: string | null;
+  cover?: string | null;
+}
+
 /** Legacy notes stored {text}; newer ones store {doc} from the tiptap JSON. */
 function toTiptapDoc(content: NoteRecord["content"]): JSONContent | "" {
   if (content?.doc && typeof content.doc === "object") return content.doc as JSONContent;
@@ -21,20 +27,28 @@ function toTiptapDoc(content: NoteRecord["content"]): JSONContent | "" {
   };
 }
 
+export function readDecorations(content: NoteRecord["content"]): NoteDecorations {
+  const icon = (content as Record<string, unknown>)?.icon;
+  const cover = (content as Record<string, unknown>)?.cover;
+  return { icon: typeof icon === "string" ? icon : null, cover: typeof cover === "string" ? cover : null };
+}
+
 /** Tiptap-backed editor for one note with debounced autosave of {doc} + preview. */
 export function useNoteEditor(note: NoteRecord, update: NotesViewHook["updateNote"]) {
   const slash = useSlashCommand();
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaved = useRef<string>("");
+  const decorations = useRef<NoteDecorations>(readDecorations(note.content));
 
   const persist = (editor: Editor) => {
     const doc = editor.getJSON();
-    const json = JSON.stringify(doc);
+    const content = { doc, ...decorations.current };
+    const json = JSON.stringify(content);
     if (json === lastSaved.current) return;
     lastSaved.current = json;
     update.mutate({
       noteId: note.noteId,
-      content: { doc },
+      content,
       preview: editor.getText().trim().slice(0, 120),
     });
   };
@@ -56,10 +70,11 @@ export function useNoteEditor(note: NoteRecord, update: NotesViewHook["updateNot
 
   // flush pending text when switching notes or leaving the editor
   useEffect(() => {
+    decorations.current = readDecorations(note.content);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [note.noteId]);
+  }, [note.noteId, note.content]);
 
   const saveNow = () => {
     if (!editor) return;
@@ -67,10 +82,16 @@ export function useNoteEditor(note: NoteRecord, update: NotesViewHook["updateNot
     persist(editor);
   };
 
+  /** Persist icon/cover immediately (they live outside the tiptap doc). */
+  const setDecorations = (patch: NoteDecorations) => {
+    decorations.current = { ...decorations.current, ...patch };
+    if (editor) persist(editor);
+  };
+
   const setProp = (propId: string, value: unknown) => {
     saveNow();
     update.mutate({ noteId: note.noteId, props: { [propId]: value } });
   };
 
-  return { editor, slashPopup: slash.popup, saveNow, setProp, saving: update.isPending };
+  return { editor, slashPopup: slash.popup, saveNow, setProp, setDecorations, saving: update.isPending };
 }

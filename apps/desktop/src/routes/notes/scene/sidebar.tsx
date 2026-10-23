@@ -108,7 +108,7 @@ export function Sidebar({
           const hasContent = (sectionNodes.get(section.id) ?? []).length > 0;
           return (
             <div key={section.id} className="mb-1">
-              <div className="group flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-1.5 hover:bg-accent" onClick={() => toggleSection(section.id)}>
+              <div className="group flex h-7 cursor-pointer items-center gap-1.5 px-1.5 text-[13px] font-medium hover:bg-accent" onClick={() => toggleSection(section.id)}>
                 <ChevronRight
                   size={13}
                   className={cn("text-muted-foreground shrink-0 transition-transform", !isCollapsed && "rotate-90", !hasContent && "invisible")}

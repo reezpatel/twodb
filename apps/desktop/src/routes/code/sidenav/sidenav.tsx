@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Archive, Bot, Check, ChevronRight, Loader2, MoreHorizontal, Pencil, Plus, Search, Trash2, Boxes } from "lucide-react";
-import type { UseMutationResult } from "@tanstack/react-query";
+import { Archive, Bot, Check, ChevronRight, Loader2, MoreHorizontal, Pencil, Plus, Search, Trash2, Boxes } from "lucide-react";import type { UseMutationResult } from "@tanstack/react-query";
 import { NewDirectoryDialog } from "../directories/new-directory-dialog";
 import { useSessionList, groupSessionsByDirectory, useSessionEvents } from "./use-session-list";
 import type { AgentListItem, CodeSession, SessionDirectoryGroup } from "./use-session-list";
@@ -422,6 +421,17 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
   const [tab, setTab] = useState<SidenavTab>("code");
   const navigate = useNavigate();
 
+  // Persisted sidenav width — resizable via its right edge (desktop only).
+  const [sidenavWidth, setSidenavWidth] = useState(() => {
+    const raw = Number(localStorage.getItem("twodb.codeSidenavWidth"));
+    return Number.isFinite(raw) && raw >= 180 && raw <= 420 ? raw : 240;
+  });
+  const persistSidenavWidth = (w: number) => {
+    const clamped = Math.min(420, Math.max(180, w));
+    setSidenavWidth(clamped);
+    localStorage.setItem("twodb.codeSidenavWidth", String(Math.round(clamped)));
+  };
+
   const directoryGroups = groupSessionsByDirectory(sessions.data ?? [], directories.data ?? []);
 
   // The Assistant group (directory-less) is its own tab; the code tab keeps
@@ -450,7 +460,7 @@ export function Sidenav({ selectedId, onSelect, activeStreaming }: SidenavProps)
   }
 
   return (
-    <SideNav className="bg-card w-60 gap-0 overflow-hidden border-r p-0">
+    <SideNav className="bg-card gap-0 overflow-hidden border-r p-0" width={sidenavWidth} onWidthChange={persistSidenavWidth}>
       <div className="border-b flex items-center justify-between border-b px-3 py-2">
         <span className="text-sm font-semibold">Sessions</span>
         <div className="flex gap-1">

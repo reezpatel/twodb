@@ -6,7 +6,7 @@ export function FavoriteRow({ group, notes, isSelected }: { group: TreeNodeData;
   const Icon = TYPE_META[group.type ?? "notes"]?.icon ?? TYPE_META.notes.icon;
   return (
     <div
-      className={cn("group flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-sm hover:bg-accent", isSelected && "bg-accent font-medium")}
+      className={cn("group flex h-[26px] cursor-pointer items-center gap-1 px-2 text-[13px] text-muted-foreground hover:bg-accent hover:text-foreground", isSelected && "bg-accent font-medium text-foreground")}
       onClick={() => notes.setSelectedGroupId(group.id)}
     >
       <Icon size={14} className="text-muted-foreground shrink-0" aria-hidden="true" />

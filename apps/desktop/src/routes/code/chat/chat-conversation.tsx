@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowUp, Bot, ChevronDown, Clock, Loader2, Lock, MessagesSquare, Paperclip, Send, Square, SquarePen, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowUp, Bot, ChevronDown, Clock, Loader2, Lock, MessagesSquare, Paperclip, Send, Square, Trash2 } from "lucide-react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useChat, type ToolEvent } from "./use-chat-panel";
 import type { CodeMessage } from "../sidenav/use-session-list";
-import { DiffView } from "./screens/diff-view";
+import { ToolView } from "./tools/tool-views";
 import { Badge } from "@/components/ui/badge";
 import { CompactionBlock, type CompactionBlockMeta } from "@/components/compaction-block";
 import { ClearBlock, type ClearBlockMeta } from "@/components/clear-block";
@@ -15,7 +15,7 @@ import { SystemPromptBlock } from "./system-prompt-block";
 import { BtwDialog } from "./btw-dialog";
 import { CHAT_COMPOSER_COMMANDS } from "@/components/composer/composer-commands";
 import { MessageMarkdown } from "@/components/message-markdown";
-import { ThinkingBlock, ToolDuration } from "@/components/thinking-block";
+import { ThinkingBlock } from "@/components/thinking-block";
 import { useModelConfig } from "@/components/model-picker/use-model-config";
 import { ChatFooter } from "./footer/chat-footer";
 import { ModelDialog } from "@/components/model-picker/model-dialog";
@@ -27,102 +27,6 @@ import type { PasteRef } from "@/components/composer/paste-chip";
 import { useDirectoryFiles } from "./composer/use-directory-files";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-
-const cmdMap: Record<string, string> = {
-  run_command: "$",
-  run_background: "bg$",
-  job_logs: "log",
-  background_job_status: "jobs",
-  read_skill: "read-skill",
-};
-
-function CanvasChip({ title }: { title: string }) {
-  return (
-    <div className="bg-muted/60 flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs font-mono">
-      <SquarePen size={12} className="text-lavender-400 shrink-0" aria-hidden="true" />
-      <span className="font-medium">update_canvas</span>
-      <span className="text-muted-foreground truncate">· {title}</span>
-    </div>
-  );
-}
-
-function ToolBlock({
-  name,
-  args,
-  output,
-  diff,
-  running,
-  startedAt,
-  completedAt,
-  failed,
-  defaultOpen,
-}: {
-  name: string;
-  args?: Record<string, unknown>;
-  output?: string;
-  diff?: string;
-  running?: boolean;
-  startedAt?: number;
-  completedAt?: number;
-  failed?: boolean;
-  defaultOpen?: boolean;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  // The global Ctrl+O flip overrides individual blocks; diff-bearing blocks
-  // show their body until collapsed — the diff IS the result.
-  const [overridden, setOverridden] = useState(false);
-  useEffect(() => {
-    setExpanded(defaultOpen ?? false);
-    setOverridden(false);
-  }, [defaultOpen]);
-  const hasDiff = !!diff && diff.trim().length > 0;
-  const hasOutput = output !== undefined && output !== "";
-  const showBody = overridden ? expanded : (defaultOpen ?? false) || hasDiff;
-  const preview =
-    typeof args?.command === "string"
-      ? args.command
-      : typeof args?.path === "string"
-        ? args.path
-        : typeof args?.pattern === "string"
-          ? args.pattern
-          : typeof args?.url === "string"
-            ? args.url
-            : typeof args?.query === "string"
-              ? args.query
-              : undefined;
-
-  const cmdName = cmdMap[name] ?? name;
-
-  return (
-    <div className={cn("rounded-lg border text-xs", failed ? "bg-destructive/10 border-destructive/40" : "bg-muted/60")}>
-      <button
-        className="hover:bg-accent/50 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left font-mono"
-        onClick={() => {
-          setExpanded((v) => !v);
-          setOverridden(true);
-        }}
-      >
-        {running ? <Loader2 size={12} className="text-primary animate-spin" aria-hidden="true" /> : null}
-        <span className="font-medium">{cmdName}</span>
-        {preview && <span className="text-muted-foreground truncate">{preview}</span>}
-        <ToolDuration startedAt={startedAt} completedAt={completedAt} />
-        {(hasOutput || hasDiff) && (
-          <ChevronDown
-            size={12}
-            className={cn("text-muted-foreground/70 ml-auto shrink-0 transition-transform", !showBody && "-rotate-90")}
-            aria-hidden="true"
-          />
-        )}
-      </button>
-      {showBody && hasDiff && (
-        <div className="max-h-80 overflow-auto border-t">
-          <DiffView text={diff!} />
-        </div>
-      )}
-      {showBody && hasOutput && <pre className="text-muted-foreground max-h-80 overflow-y-auto border-t px-3 py-2 whitespace-pre-wrap">{output}</pre>}
-    </div>
-  );
-}
 
 /** Expanded skills on a user message render as chips — content stays in the
  * dialog (click), never inline. */
@@ -159,8 +63,8 @@ function Message({
     // Skill blocks hide from the rendered message — chips stand in for them.
     const stripped = skills?.length ? content.replace(/<skill name="[\w.-]+">[\s\S]*?<\/skill>/g, "").trim() : content;
     return (
-      <div className="flex flex-col items-end">
-        <div className="bg-card max-w-[85%] rounded-lg px-3 py-2 text-right">
+      <div className="flex flex-col mt-10">
+        <div className="bg-primary/15 rounded-sm px-3 py-2">
           <span className="text-primary text-[11px] w-full font-semibold tracking-wide uppercase">{label ?? "You"}</span>
           {skills?.length ? (
             <div className="flex flex-wrap justify-end gap-1.5 pb-1">
@@ -178,22 +82,6 @@ function Message({
     <div className="flex flex-col gap-0.5">
       <span className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">{label ?? "Agent"}</span>
       <MessageMarkdown text={content} resolveAssetUrl={resolveAssetUrl} />
-    </div>
-  );
-}
-
-/** read_asset calls render compactly: read <file> from <backend> at <path> — content stays collapsed. */
-function ReadAssetChip({ uri }: { uri: string }) {
-  const match = /^twodb:\/\/([^/]+)\/([^/]+)$/.exec(uri);
-  const backend = match?.[1] ?? "storage";
-  const mediaId = match?.[2] ?? uri;
-  return (
-    <div className="bg-muted/60 flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs font-mono">
-      <Paperclip size={12} className="text-lavender-400 shrink-0" aria-hidden="true" />
-      <span className="font-medium">read-asset</span>
-      <span className="text-muted-foreground truncate">
-        read {mediaId.length > 8 ? `${mediaId.slice(0, 8)}…` : mediaId} from {backend}
-      </span>
     </div>
   );
 }
@@ -396,24 +284,20 @@ function ChatMessageList(props: ChatMessageListProps) {
                     <Loader2 size={10} className="animate-spin" aria-hidden="true" />
                     Live{round !== null ? ` · round ${round}` : ""}
                   </div>
-                  {liveTools.map((t) =>
-                    t.name === "read_asset" ? (
-                      <ReadAssetChip key={t.id} uri={String(t.args?.uri ?? "")} />
-                    ) : (
-                      <ToolBlock
-                        key={t.id}
-                        name={t.name}
-                        args={t.args}
-                        output={t.output}
-                        diff={t.diff}
-                        running={!t.done}
-                        startedAt={t.startedAt}
-                        completedAt={t.completedAt}
-                        failed={t.status === "failed"}
-                        defaultOpen={toolOutputsOpen}
-                      />
-                    ),
-                  )}
+                  {liveTools.map((t) => (
+                    <ToolView
+                      key={t.id}
+                      name={t.name}
+                      args={t.args}
+                      output={t.output}
+                      diff={t.diff}
+                      running={!t.done}
+                      startedAt={t.startedAt}
+                      completedAt={t.completedAt}
+                      failed={t.status === "failed"}
+                      defaultOpen={toolOutputsOpen}
+                    />
+                  ))}
                   {thinking !== null && (
                     <ThinkingBlock
                       text={thinking}
@@ -442,7 +326,7 @@ function ChatMessageList(props: ChatMessageListProps) {
           EmptyPlaceholder: () => <SystemPromptBlock />,
         }}
         data={rows}
-        itemContent={(_, row) => <div className="mx-auto flex max-w-4xl flex-col gap-4 px-4 py-2">{renderRow(row)}</div>}
+        itemContent={(_, row) => <div className="mx-auto flex max-w-8xl flex-col gap-4 px-6 py-2">{renderRow(row)}</div>}
       />
       {showJump && (
         <button
@@ -565,7 +449,7 @@ function ChatMessageList(props: ChatMessageListProps) {
       const meta = m.meta as { name?: string; startedAt?: number; completedAt?: number; status?: string; diff?: string } | null;
       return (
         <div className={row.dimmed ? "opacity-60" : undefined}>
-          <ToolBlock
+          <ToolView
             name={meta?.name ?? "tool"}
             output={m.content}
             diff={meta?.diff}
@@ -585,9 +469,11 @@ function ChatMessageList(props: ChatMessageListProps) {
     } | null;
     return (
       <div className={cn("flex flex-col gap-4", row.dimmed && "opacity-60")}>
-        {meta?.thinking?.filter((t) => t.text?.trim()).map((t, i) => (
-          <ThinkingBlock key={i} text={t.text} live={false} durationMs={t.durationMs} visible={showThinking} />
-        ))}
+        {meta?.thinking
+          ?.filter((t) => t.text?.trim())
+          .map((t, i) => (
+            <ThinkingBlock key={i} text={t.text} live={false} durationMs={t.durationMs} visible={showThinking} />
+          ))}
         {m.content && (
           <Message
             role={m.role}
@@ -600,12 +486,10 @@ function ChatMessageList(props: ChatMessageListProps) {
         )}
         {meta?.stopped && <span className="text-muted-foreground/70 text-[11px] italic">stopped</span>}
         {meta?.toolCalls?.map((tc) => {
-          if (tc.name === "update_canvas") return <CanvasChip key={tc.id} title={String(tc.arguments.title ?? "")} />;
-          if (tc.name === "read_asset") return <ReadAssetChip key={tc.id} uri={String(tc.arguments.uri ?? "")} />;
           const timing = toolTimings.get(tc.id);
           const toolDiff = toolDiffs.get(tc.id);
           return (
-            <ToolBlock
+            <ToolView
               key={tc.id}
               name={tc.name}
               args={tc.arguments}
@@ -814,7 +698,7 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
         onSkillClick={setViewSkill}
       />
 
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
+      <div className="mx-auto flex w-full max-w-9xl flex-col gap-2 px-6">
         {askUser ? (
           <ErrorBoundary
             name="ask-user-wizard"

@@ -25,7 +25,7 @@ function extensionOf(filename: string): string {
   return dot > 0 && dot < filename.length - 1 ? filename.slice(dot + 1).toLowerCase() : "";
 }
 
-export type DestinationId = "agent_assets" | "chat_assets" | "email_attachments";
+export type DestinationId = "agent_assets" | "chat_assets" | "email_attachments" | "note_assets";
 
 /** Driver for a configured storage destination — throws when unset. */
 export async function destinationDriver(destinationId: DestinationId): Promise<{ backendId: string; prefix: string; driver: Awaited<ReturnType<typeof getStorageDriver>>["driver"] }> {
@@ -114,6 +114,16 @@ export async function storeChatAsset(input: {
   data: Buffer;
 }): Promise<StoredAsset> {
   return storeAssetAt("chat_assets", input);
+}
+
+/** Note asset upload — lands in the note_assets destination (covers, icons). */
+export async function storeNoteAsset(input: {
+  organizationId: string;
+  filename: string;
+  contentType: string | null;
+  data: Buffer;
+}): Promise<StoredAsset> {
+  return storeAssetAt("note_assets", input);
 }
 
 /** Parses a twodb:// uri into its backend + media id. */

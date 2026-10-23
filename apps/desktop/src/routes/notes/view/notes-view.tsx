@@ -1,10 +1,13 @@
-import { useMemo, useState } from "react";
-import { KanbanSquare, List, Loader2, Plus, Table2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import type { VisibilityState } from "@tanstack/react-table";
+import { KanbanSquare, List, Loader2, Plus, SlidersHorizontal, Table2 } from "lucide-react";
 import { useNotesView, NOTE_PROPERTY_TYPES, NOTE_VIEW_TYPES, type NoteProperty, type NoteViewType } from "./use-notes-view";
 import { TableView } from "./table-view";
 import { ListView } from "./list-view";
 import { KanbanView } from "./kanban-view";
 import { FloatNoteEditor } from "./float-note-editor";
+import { ColumnControls, type ColumnOption } from "./column-controls";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -18,11 +21,34 @@ export function NotesView({ groupId, openNoteId, setOpenNoteId }: { groupId: str
   const notes = payload.data?.notes ?? [];
   const columns = payload.data?.columns ?? [];
   const activeView = view.activeView;
+  const isMobile = useMediaQuery("(max-width: 1023px)");
 
   const [addingProperty, setAddingProperty] = useState(false);
   const [propName, setPropName] = useState("");
   const [propType, setPropType] = useState<string>("text");
   const [propOptions, setPropOptions] = useState("");
+
+  // Column order/visibility — owned here so the Columns popover in the view
+  // bar and every view (table/list/kanban) share one configuration.
+  const [columnOrder, setColumnOrder] = useState<string[]>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+
+  // Page scroller width — the sticky tab bar spans exactly the visible
+  // width so it ignores horizontal spill (stays put during h-scroll).
+  const [scrollerWidth, setScrollerWidth] = useState(0);
+  useEffect(() => {
+    const el = document.querySelector("main [class*='overflow-auto']");
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setScrollerWidth(el.clientWidth));
+    ro.observe(el);
+    setScrollerWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+
+  const columnOptions: ColumnOption[] = useMemo(
+    () => [{ id: "preview", label: "Preview" }, ...columns.map((prop) => ({ id: prop.id, label: prop.name })), { id: "updated", label: "Updated" }],
+    [columns],
+  );
 
   const openNote = notes.find((n) => n.noteId === openNoteId) ?? null;
 
@@ -37,9 +63,12 @@ export function NotesView({ groupId, openNoteId, setOpenNoteId }: { groupId: str
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* view bar */}
-      <div className="border-b flex items-center gap-1 border-b px-3 py-1.5">
+    <div className="flex w-max min-w-full flex-col">
+      {/* view bar — pinned in both axes: sticky top-0 (under the breadcrumb
+          bar) + sticky left-0, sized to the scroller's visible width so wide
+          tables scroll under it. */}
+      <div className="bg-background sticky left-0 top-0 z-20" style={{ width: scrollerWidth || undefined }}>
+        <div className="flex items-center gap-1 px-4 py-1 lg:px-32">
         {view.views.map((v) => {
           const Icon = VIEW_ICON[v.type];
           return (
@@ -96,9 +125,21 @@ export function NotesView({ groupId, openNoteId, setOpenNoteId }: { groupId: str
                 ))}
             </select>
           )}
+          {/* Filter — placeholder, wired up later. Same bar for every view. */}
+          <Button variant="outline" size="sm" className="text-muted-foreground h-7 text-xs" disabled title="Filter (coming soon)">
+            <SlidersHorizontal size={13} /> Filter
+          </Button>
+          <ColumnControls
+            columns={columnOptions}
+            columnOrder={columnOrder}
+            columnVisibility={columnVisibility}
+            onColumnOrderChange={setColumnOrder}
+            onColumnVisibilityChange={setColumnVisibility}
+          />
           <Button size="sm" className="h-7 text-xs" onClick={() => view.createNote.mutate({ text: "" })} disabled={view.createNote.isPending}>
             <Plus size={13} /> Note
           </Button>
+        </div>
         </div>
       </div>
 
@@ -158,14 +199,27 @@ export function NotesView({ groupId, openNoteId, setOpenNoteId }: { groupId: str
       {/* body */}
       <div className="flex min-h-0 flex-1">
         {activeView?.type === "table" && (
-          <TableView notes={notes} columns={columns} view={view} setOpenNoteId={setOpenNoteId} onAddProperty={() => setAddingProperty(true)} />
+          <TableView
+            notes={notes}
+            columns={columns}
+            view={view}
+            setOpenNoteId={setOpenNoteId}
+            onAddProperty={() => setAddingProperty(true)}
+            columnOrder={columnOrder}
+            columnVisibility={columnVisibility}
+            onColumnOrderChange={setColumnOrder}
+            onColumnVisibilityChange={setColumnVisibility}
+          />
         )}
         {activeView?.type === "list" && <ListView notes={notes} columns={columns} view={view} openNoteId={openNoteId} setOpenNoteId={setOpenNoteId} />}
         {activeView?.type === "kanban" && <KanbanView notes={notes} columns={columns} view={view} groupByProp={groupByProp} setOpenNoteId={setOpenNoteId} />}
       </div>
 
-      {/* floating editor for table / kanban */}
-      {openNote && activeView?.type !== "list" && <FloatNoteEditor note={openNote} columns={columns} view={view} onClose={() => setOpenNoteId(null)} />}
+      {/* floating editor for table / kanban — desktop only; mobile note clicks
+          navigate to the full page (see notes-provider setOpenNoteId). */}
+      {!isMobile && openNote && activeView?.type !== "list" && (
+        <FloatNoteEditor note={openNote} columns={columns} view={view} onClose={() => setOpenNoteId(null)} />
+      )}
     </div>
   );
 }

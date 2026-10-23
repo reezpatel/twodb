@@ -46,7 +46,7 @@ export function ThinkingBlock({
 
   if (visible) {
     return (
-      <div className="text-sm mb-3 bg-info/5 p-4 opacity-70">
+      <div className="text-sm mb-3 opacity-70">
         <MessageMarkdown text={text} />
       </div>
     );

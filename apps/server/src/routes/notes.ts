@@ -2,7 +2,9 @@ import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
 import { defaultMetadata, dropGroupTable, ensureGroupTable, LEAF_KINDS } from "../lib/notes-tables";
-import type { NoteKind, NoteNodeTable } from "../plugins/db";
+import { readAssetBytesById, storeNoteAsset } from "../lib/assets";
+import { logger } from "../lib/logger";
+import type { NoteGroupMetadata, NoteKind, NoteNodeTable } from "../plugins/db";
 
 const isLeafKind = (kind: string) => (LEAF_KINDS as readonly string[]).includes(kind);
 
@@ -349,7 +351,7 @@ export const notesRoutes = new Hono()
     if (!group || !isLeafKind(group.kind)) return c.json({ error: "group_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ name: string; kind: NoteKind; isFavorite: boolean; parentId: string }> = {};
+    const patch: Partial<{ name: string; kind: NoteKind; isFavorite: boolean; parentId: string; metadata: NoteGroupMetadata }> = {};
     if (body?.name !== undefined) {
       const name = typeof body.name === "string" ? body.name.trim() : "";
       if (!name) return c.json({ error: "invalid_name" }, 400);
@@ -360,6 +362,15 @@ export const notesRoutes = new Hono()
       patch.kind = body.type as NoteKind;
     }
     if (body?.isFavorite !== undefined) patch.isFavorite = Boolean(body.isFavorite);
+    // Page decorations (icon/cover) live in metadata; merged so unrelated
+    // keys (views/columns defaults) survive.
+    if (body?.icon !== undefined || body?.cover !== undefined) {
+      const base = (group.metadata as Record<string, unknown> | null) ?? {};
+      const next = { ...base } as NoteGroupMetadata;
+      if (body?.icon !== undefined) next.icon = typeof body.icon === "string" ? body.icon : null;
+      if (body?.cover !== undefined) next.cover = typeof body.cover === "string" ? body.cover : null;
+      patch.metadata = next;
+    }
 
     const movesFolder = typeof body?.folderId === "string" && body.folderId !== group.parentId;
     if (movesFolder) {
@@ -401,6 +412,41 @@ export const notesRoutes = new Hono()
     await dropGroupTable(db, group.id);
     await db.deleteFrom("note_node").where("id", "=", group.id).execute();
     return c.json({ ok: true });
+  })
+
+  // Group-page assets (header cover/icon) — same shape as note assets.
+  .post("/groups/:id/assets", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+    const group = await db
+      .selectFrom("note_node")
+      .select(["id", "kind"])
+      .where("id", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!group || !isLeafKind(group.kind)) return c.json({ error: "group_not_found" }, 404);
+
+    const form = await c.req.parseBody().catch(() => null);
+    const file = form?.["file"];
+    if (!file || typeof file === "string") return c.json({ error: "invalid_file" }, 400);
+    if (file.size === 0) return c.json({ error: "empty_file" }, 400);
+    if (file.size > 25 * 1024 * 1024) return c.json({ error: "file_too_large" }, 413);
+    if (file.type && !file.type.startsWith("image/")) return c.json({ error: "images_only" }, 400);
+
+    try {
+      const asset = await storeNoteAsset({
+        organizationId: s.organizationId,
+        filename: file.name || "group-asset",
+        contentType: file.type || null,
+        data: Buffer.from(await file.arrayBuffer()),
+      });
+      return c.json({ ...asset, previewUrl: `/api/notes/assets/${asset.id}` }, 201);
+    } catch (e) {
+      const message = (e as Error).message;
+      if (message === "note_assets_not_configured") return c.json({ error: message }, 409);
+      logger.error({ err: e }, "notes: group asset upload failed");
+      return c.json({ error: message || "upload_failed" }, 500);
+    }
   })
 
   /** Renumber the given ordered id list: position = array index. */
