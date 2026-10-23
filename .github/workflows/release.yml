@@ -344,7 +344,9 @@ jobs:
           pnpm install --frozen-lockfile --filter @twodb/server --filter @twodb/desktop
           pnpm --filter @twodb/desktop build
           pnpm --filter @twodb/server deploy --legacy stage/twodb-server
-          rm -rf stage/twodb-server/node_modules/@twodb stage/twodb-server/node_modules/.pnpm/node_modules/@twodb
+          # Only drop the pnpm hoist dir (it symlinks back into the workspace);
+          # node_modules/@twodb is runner-core, a real runtime dep — keep it.
+          rm -rf stage/twodb-server/node_modules/.pnpm/node_modules/@twodb
           cp -r apps/desktop/dist stage/twodb-server/public
           cp -r apps/server/src stage/twodb-server/src
           mkdir -p stage/twodb-server/bin
@@ -399,7 +401,9 @@ jobs:
         run: |
           pnpm install --frozen-lockfile --filter @twodb/runner
           pnpm --filter @twodb/runner deploy --legacy stage/twodb-runner
-          rm -rf stage/twodb-runner/node_modules/@twodb stage/twodb-runner/node_modules/.pnpm/node_modules/@twodb
+          # Only drop the pnpm hoist dir (it symlinks back into the workspace);
+          # node_modules/@twodb is runner-core, a real runtime dep — keep it.
+          rm -rf stage/twodb-runner/node_modules/.pnpm/node_modules/@twodb
 
       - name: Add launcher and archive (unix)
         if: matrix.os != 'windows'
