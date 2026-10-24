@@ -40,10 +40,10 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: --target aarch64
+            args: --target aarch64-apple-darwin
             rust-targets: aarch64-apple-darwin
           - platform: macos-latest
-            args: --target x86_64
+            args: --target x86_64-apple-darwin
             rust-targets: x86_64-apple-darwin
           - platform: windows-latest
           - platform: ubuntu-24.04
