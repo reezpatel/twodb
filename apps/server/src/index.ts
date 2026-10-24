@@ -26,10 +26,13 @@ import { storageAdminRoutes } from "./routes/storage-admin";
 import { serverSettingsRoutes } from "./routes/server-settings";
 import { apiKeyRoutes } from "./routes/api-keys";
 import { logsRoutes } from "./routes/logs";
+import { ticketsRoutes } from "./routes/projects";
+import { projectsSyncRoutes } from "./routes/projects-sync";
 import { meetingsRoutes } from "./routes/meetings";
 import { emailRoutes } from "./routes/email";
 import { registerEmailWs } from "./routes/email-ws";
 import { startEmailScheduler, stopEmailScheduler } from "./lib/email/scheduler";
+import { startSharedContentScheduler, stopSharedContentScheduler } from "./lib/shared-content-processor";
 import { calendarRoutes } from "./routes/calendar";
 import { registerCalendarWs } from "./routes/calendar-ws";
 import { contactRoutes } from "./routes/contacts";
@@ -41,6 +44,7 @@ import { reconcileOrphanJobs } from "./lib/background-jobs";
 import { logger } from "./lib/logger";
 import { notesRoutes } from "./routes/notes";
 import { notesContentRoutes } from "./routes/notes-content";
+import { sharedContentRoutes } from "./routes/shared-content";
 import { spaceRoutes } from "./routes/spaces";
 
 const graph = createGraph(env.memgraph.url, env.memgraph.user, env.memgraph.password);
@@ -117,9 +121,12 @@ app.route("/api/storage", storageRoutes);
 app.route("/api/storage-backends", storageAdminRoutes);
 app.route("/api/notes", notesRoutes);
 app.route("/api/notes", notesContentRoutes);
+app.route("/api/shared-content", sharedContentRoutes);
 app.route("/api/server-settings", serverSettingsRoutes);
 app.route("/api/api-keys", apiKeyRoutes);
 app.route("/api/logs", logsRoutes);
+app.route("/api/projects", ticketsRoutes);
+app.route("/api/projects/sync", projectsSyncRoutes);
 
 // Public subset (register page reads this before showing the form).
 app.get("/api/public-settings", async (c) => c.json(await getServerSettings()));
@@ -204,12 +211,14 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 
 startEmailScheduler();
+startSharedContentScheduler();
 startCalendarScheduler();
 
 process.on("SIGINT", async () => {
   logger.info("shutting down (SIGINT)");
   clearInterval(heartbeat);
   stopEmailScheduler();
+  stopSharedContentScheduler();
   stopCalendarScheduler();
   await graph.close();
   await db.destroy();

@@ -156,6 +156,7 @@ export const notesContentRoutes = new Hono()
     return c.json({
       columns: schema.columns,
       views: schema.views,
+      schemaLockedBy: database.schemaLockedBy,
       notes: rows.map((row) => serializeNote(row, schema.columns)),
     });
   })
@@ -241,6 +242,7 @@ export const notesContentRoutes = new Hono()
     if (!s) return c.body(null, 401);
     const database = await requireDatabase(s.organizationId, c.req.param("id"));
     if (!database) return c.json({ error: "database_not_found" }, 404);
+    if (database.schemaLockedBy) return c.json({ error: "schema_locked", lockedBy: database.schemaLockedBy }, 403);
 
     const schema = await ensureInitialized(database);
     const body = await c.req.json().catch(() => null);
@@ -273,6 +275,7 @@ export const notesContentRoutes = new Hono()
     if (!s) return c.body(null, 401);
     const database = await requireDatabase(s.organizationId, c.req.param("id"));
     if (!database) return c.json({ error: "database_not_found" }, 404);
+    if (database.schemaLockedBy) return c.json({ error: "schema_locked", lockedBy: database.schemaLockedBy }, 403);
 
     const schema = await ensureInitialized(database);
     const propId = c.req.param("propId");
@@ -336,6 +339,7 @@ export const notesContentRoutes = new Hono()
     if (!s) return c.body(null, 401);
     const database = await requireDatabase(s.organizationId, c.req.param("id"));
     if (!database) return c.json({ error: "database_not_found" }, 404);
+    if (database.schemaLockedBy) return c.json({ error: "schema_locked", lockedBy: database.schemaLockedBy }, 403);
 
     const schema = await ensureInitialized(database);
     const propId = c.req.param("propId");

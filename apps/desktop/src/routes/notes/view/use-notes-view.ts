@@ -90,6 +90,8 @@ interface NotesPayload {
   notes: NoteRecord[];
   columns: NoteProperty[];
   views: NoteView[];
+  /** Owning app/feature when the schema is locked (e.g. "twodb:shared_content"). */
+  schemaLockedBy: string | null;
 }
 
 type ViewHook = ReturnType<typeof useNotesView>;
@@ -210,6 +212,8 @@ export function useNotesView(databaseId: string | null) {
     views,
     activeView,
     setActiveViewId,
+    /** Owning app/feature when this database's schema is locked. */
+    schemaLockedBy: payload.data?.schemaLockedBy ?? null,
     createNote,
     updateNote,
     deleteNote,

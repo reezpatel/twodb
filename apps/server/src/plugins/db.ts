@@ -346,6 +346,176 @@ export interface CodeSessionMessageTable {
   createdAt: Date;
 }
 
+
+export type ProjectExternalSource = "linear" | "plane";
+export type ProjectRole = "owner" | "admin" | "member";
+export type StatusCategory = "backlog" | "todo" | "in_progress" | "done" | "canceled";
+export type TicketType = "issue" | "epic" | "bug" | "task" | "feature" | "chore";
+export type TicketPriority = "none" | "low" | "medium" | "high" | "urgent";
+export type SprintStatus = "planned" | "active" | "closed";
+
+export interface ProjectTable {
+  id: string;
+  organizationId: string;
+  spaceId: string | null;
+  name: string;
+  /** Uppercase identifier key ("PRO"); unique per org. */
+  key: string;
+  description: string;
+  icon: string | null;
+  color: string | null;
+  nextTicketNumber: number;
+  externalSource: ProjectExternalSource | null;
+  externalRef: Record<string, unknown> | null;
+  syncFilter: Record<string, unknown> | null;
+  lastSyncAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ProjectMemberTable {
+  projectId: string;
+  userId: string;
+  role: ProjectRole;
+  createdAt: Date;
+}
+
+export interface SubprojectTable {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  position: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ProjectStatusTable {
+  id: string;
+  projectId: string;
+  /** null = project-level set; set = subproject override set. */
+  subprojectId: string | null;
+  name: string;
+  color: string;
+  category: StatusCategory;
+  position: number;
+  /** "sync" = locked, copied from Linear/Plane. */
+  editable: "yes" | "sync";
+  createdAt: Date;
+}
+
+export interface LabelGroupTable {
+  id: string;
+  projectId: string;
+  name: string;
+  position: number;
+}
+
+export interface LabelTable {
+  id: string;
+  projectId: string;
+  groupId: string | null;
+  name: string;
+  color: string;
+  editable: "yes" | "sync";
+  externalRef: Record<string, unknown> | null;
+}
+
+export interface ProjectTagTable {
+  id: string;
+  projectId: string;
+  name: string;
+  color: string;
+}
+
+export interface MilestoneTable {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  targetDate: string | null;
+  status: "open" | "closed";
+  position: number;
+  createdAt: Date;
+}
+
+export interface SprintTable {
+  id: string;
+  projectId: string;
+  name: string;
+  startDate: string | null;
+  endDate: string | null;
+  status: SprintStatus;
+  completedPoints: number | null;
+  createdAt: Date;
+}
+
+export interface ProjectLinkTable {
+  projectId: string;
+  linkedProjectId: string;
+  createdAt: Date;
+}
+
+export interface TicketTable {
+  id: string;
+  organizationId: string;
+  projectId: string;
+  subprojectId: string;
+  number: number;
+  title: string;
+  description: string;
+  type: TicketType;
+  statusId: string;
+  priority: TicketPriority;
+  estimate: number | null;
+  parentTicketId: string | null;
+  epicId: string | null;
+  sprintId: string | null;
+  milestoneId: string | null;
+  assigneeUserId: string | null;
+  inBacklog: boolean;
+  position: number;
+  externalRef: Record<string, unknown> | null;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TicketDependencyTable {
+  ticketId: string;
+  dependsOnTicketId: string;
+  createdAt: Date;
+}
+
+export interface TicketLabelTable {
+  ticketId: string;
+  labelId: string;
+}
+
+export interface TicketTagTable {
+  ticketId: string;
+  tagId: string;
+}
+
+export interface TicketCommentTable {
+  id: string;
+  ticketId: string;
+  userId: string;
+  body: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TicketChecklistItemTable {
+  id: string;
+  ticketId: string;
+  parentItemId: string | null;
+  text: string;
+  done: boolean;
+  position: number;
+  createdAt: Date;
+}
+
 export type CodeSessionJobStatus = "running" | "done" | "failed" | "killed" | "lost";
 
 export interface CodeSessionJobTable {
@@ -587,6 +757,10 @@ export interface NoteNodeTable {
   preview: Generated<string>;
   /** Databases only. */
   schema: ColumnType<NoteDatabaseSchema | null, NoteDatabaseSchema | null | undefined, NoteDatabaseSchema | null>;
+  /** Databases only: owning app/feature (e.g. "twodb:shared_content"). When
+   *  set, the schema (property definitions) is locked — users can still edit
+   *  rows, views, title and placement. */
+  schemaLockedBy: ColumnType<string | null, string | null | undefined, string | null>;
   /** Database embedded as a block in its parent page's content. */
   inline: Generated<boolean>;
   position: Generated<number>;
@@ -1340,6 +1514,22 @@ export interface Database {
   chat_draft: ChatDraftTable;
   chat_read_state: ChatReadStateTable;
   note_node: NoteNodeTable;
+  project: ProjectTable;
+  project_member: ProjectMemberTable;
+  subproject: SubprojectTable;
+  project_status: ProjectStatusTable;
+  label_group: LabelGroupTable;
+  label: LabelTable;
+  project_tag: ProjectTagTable;
+  milestone: MilestoneTable;
+  sprint: SprintTable;
+  project_link: ProjectLinkTable;
+  ticket: TicketTable;
+  ticket_dependency: TicketDependencyTable;
+  ticket_label: TicketLabelTable;
+  ticket_tag: TicketTagTable;
+  ticket_comment: TicketCommentTable;
+  ticket_checklist_item: TicketChecklistItemTable;
   server_setting: ServerSettingTable;
   api_key: OrgApiKeyTable;
   device: DeviceTable;

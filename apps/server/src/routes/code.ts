@@ -13,7 +13,7 @@ import { resolveAskUser, type AskUserAnswer } from "../lib/ask-user";
 import { beginCompaction, broadcastSessionEvent, broadcastToSession, endCompaction, isSessionRunning } from "./code-ws";
 import { readGitStatus } from "../lib/git-status";
 import { runnerManager } from "../lib/runner-manager";
-import { listJobs, killBackgroundJob } from "../lib/background-jobs";
+import { listJobs, killBackgroundJob, killBackgroundJobByUser, readJobLogs } from "../lib/background-jobs";
 import type { CodeSessionMode, CodeSessionType } from "../plugins/db";
 import { logger } from "../lib/logger";
 
@@ -1289,10 +1289,37 @@ export const codeRoutes = new Hono()
     if (!job) return c.json({ error: "job_not_found" }, 404);
     if (job.status !== "running") return c.json({ error: "job_not_running" }, 409);
     try {
-      const message = await killBackgroundJob(job.runnerId, job.id);
-      // The exit watcher flips the row when jobResult arrives; the kill signal
-      // itself resolves immediately.
+      // UI kill = user action: also writes the "terminated by the user" note
+      // (with output tail) to the transcript so the agent knows.
+      const message = await killBackgroundJobByUser(job.runnerId, job.id);
       return c.json({ ok: true, message });
+    } catch (e) {
+      return c.json({ error: (e as Error).message }, 502);
+    }
+  })
+
+  .get("/sessions/:id/jobs/:jobId/logs", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+    const job = await db
+      .selectFrom("code_session_job")
+      .select(["id", "runnerId"])
+      .where("id", "=", c.req.param("jobId"))
+      .where("sessionId", "=", c.req.param("id"))
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!job) return c.json({ error: "job_not_found" }, 404);
+    const lines = Math.max(1, Math.min(200, Number(c.req.query("lines") ?? 100) || 100));
+    const qNum = (k: string) => {
+      const n = Number(c.req.query(k));
+      return c.req.query(k) !== undefined && Number.isFinite(n) ? Math.max(1, Math.floor(n)) : undefined;
+    };
+    const from = qNum("from");
+    const to = qNum("to");
+    try {
+      const res = await readJobLogs(job.runnerId, job.id, from !== undefined || to !== undefined ? { from, to } : { lines });
+      if ("error" in res) return c.json({ error: res.error }, 404);
+      return c.json(res);
     } catch (e) {
       return c.json({ error: (e as Error).message }, 502);
     }

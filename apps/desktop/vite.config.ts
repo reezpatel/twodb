@@ -24,8 +24,23 @@ export default defineConfig({
           { src: "pwa-512.png", sizes: "512x512", type: "image/png" },
           { src: "pwa-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
+        // Web Share Target — accept anything (text, links, any file type).
+        // POSTs land in the service worker (public/share-sw.js), which stashes
+        // the payload and redirects to the /share page.
+        share_target: {
+          action: "/share-target",
+          method: "POST",
+          enctype: "multipart/form-data",
+          params: {
+            title: "title",
+            text: "text",
+            url: "url",
+            files: [{ name: "files", accept: ["*/*"] }],
+          },
+        },
       },
       workbox: {
+        importScripts: ["share-sw.js"],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,

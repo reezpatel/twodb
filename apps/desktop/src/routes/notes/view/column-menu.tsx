@@ -76,7 +76,7 @@ export function ColumnMenu<TData>(props: ColumnMenuProps<TData>) {
 
           <DropdownMenuItem onSelect={() => column.toggleVisibility()}>{column.getIsVisible() ? "Hide column" : "Show column"}</DropdownMenuItem>
 
-          {props.prop && props.view && (
+          {props.prop && props.view && !props.view.schemaLockedBy && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={rename}>Rename property</DropdownMenuItem>

@@ -109,60 +109,86 @@ function useSidebarJobs() {
   return { jobs: jobs.data ?? [], isPending: jobs.isPending };
 }
 
+/** Logs for one background job — expands inside the row. Polls while running. */
+function JobLogs({ sessionId, jobId, running }: { sessionId: string; jobId: string; running: boolean }) {
+  const logs = useQuery({
+    queryKey: ["code", "session", sessionId, "jobs", jobId, "logs"],
+    queryFn: () => api<{ output: string }>(`/api/code/sessions/${sessionId}/jobs/${jobId}/logs?lines=100`).then((r) => r.output),
+    refetchInterval: running ? 3000 : false,
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+  if (logs.isPending) return <div className="text-muted-foreground px-2 py-1.5 text-[10px]">loading logs…</div>;
+  if (logs.isError)
+    return <div className="text-destructive px-2 py-1.5 text-[10px]">{logs.error instanceof Error ? logs.error.message : "failed to load logs"}</div>;
+  return (
+    <pre className="text-muted-foreground max-h-64 overflow-auto px-2 py-1.5 font-mono text-[10px] whitespace-pre-wrap">{logs.data ?? "(no output yet)"}</pre>
+  );
+}
+
 function JobRow({ job }: { job: BackgroundJob }) {
   const { session } = useChat();
   const sessionId = session.data?.id ?? null;
+  const [logsOpen, setLogsOpen] = useState(false);
   const kill = useMutation({
     mutationFn: () => api(`/api/code/sessions/${sessionId}/jobs/${job.id}/kill`, { method: "POST" }),
   });
-  const icon =
-    job.status === "running" ? (
-      <Loader2 size={12} className="text-primary shrink-0 animate-spin" aria-hidden="true" />
-    ) : (
-      <Circle
-        size={12}
-        className={cn(
-          "shrink-0",
-          job.status === "done" && "text-success",
-          job.status === "failed" && "text-destructive",
-          (job.status === "lost" || job.status === "killed") && "text-muted-foreground",
-        )}
-        aria-hidden="true"
-      />
-    );
-  return (
-    <div className="bg-muted/40 flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left text-xs">
-      {icon}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-mono text-[11px]" title={job.command}>
-          {job.command}
-        </span>
-        <span className="text-muted-foreground block font-mono text-[10px]">
-          {job.id.slice(0, 8)} · {job.status}
-          {job.exitCode !== null && ` · exit ${job.exitCode}`}
-          {job.status === "running" && " · use job_logs for output"}
-        </span>
-      </span>
-      {job.status === "running" && (
-        <button
-          className="text-muted-foreground hover:bg-accent hover:text-foreground shrink-0 rounded p-1"
-          title="Kill job"
-          aria-label="Kill job"
-          onClick={(e) => {
-            e.stopPropagation();
-            kill.mutate();
-          }}
-        >
-          {kill.isPending ? <Loader2 size={11} className="animate-spin" aria-hidden="true" /> : <X size={11} aria-hidden="true" />}
-        </button>
+  const running = job.status === "running";
+  const icon = running ? (
+    <Loader2 size={12} className="text-primary shrink-0 animate-spin" aria-hidden="true" />
+  ) : (
+    <Circle
+      size={12}
+      className={cn(
+        "shrink-0",
+        job.status === "done" && "text-success",
+        job.status === "failed" && "text-destructive",
+        (job.status === "lost" || job.status === "killed") && "text-muted-foreground",
       )}
+      aria-hidden="true"
+    />
+  );
+  return (
+    <div className="bg-muted/40 w-full rounded-md border text-left text-xs">
+      <button
+        className="hover:bg-accent/50 flex w-full items-start gap-2 rounded-md px-2 py-1.5"
+        onClick={() => setLogsOpen((v) => !v)}
+        title={logsOpen ? "Hide logs" : "Show logs"}
+      >
+        {icon}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-mono text-[11px]" title={job.command}>
+            {job.command}
+          </span>
+          <span className="text-muted-foreground block font-mono text-[10px]">
+            {job.id.slice(0, 8)} · {job.status}
+            {job.exitCode !== null && ` · exit ${job.exitCode}`}
+          </span>
+        </span>
+        {running && (
+          <span
+            role="button"
+            className="text-muted-foreground hover:bg-accent hover:text-foreground shrink-0 rounded p-1"
+            title="Stop job"
+            aria-label="Stop job"
+            onClick={(e) => {
+              e.stopPropagation();
+              kill.mutate();
+            }}
+          >
+            {kill.isPending ? <Loader2 size={11} className="animate-spin" aria-hidden="true" /> : <X size={11} aria-hidden="true" />}
+          </span>
+        )}
+      </button>
+      {logsOpen && sessionId && <JobLogs sessionId={sessionId} jobId={job.id} running={running} />}
     </div>
   );
 }
 
 /** Child sessions (subagents + /btw) of the current session, with live running
  * state. Polls while any child runs so the sidebar shows live progress. */
-function useSidebarSubagents() {  const { session } = useChat();
+function useSidebarSubagents() {
+  const { session } = useChat();
   const sessionId = session.data?.id ?? null;
   const children = useQuery({
     queryKey: ["code", "session", sessionId, "children"],
@@ -210,59 +236,59 @@ export function Sidebar() {
 
   return (
     <div className="flex h-full flex-col">
-      <Section
-        title={`Subagents${subagents.children.length ? ` (${subagents.children.length})` : ""}`}
-        open={open.subagents}
-        onToggle={() => toggle("subagents")}
-      >
-        {subagents.isPending ? (
-          <div className="text-muted-foreground py-1 text-xs">loading…</div>
-        ) : subagents.children.length === 0 ? (
-          <div className="text-muted-foreground py-1 text-xs">none — invoke_subagent or /btw spawns one</div>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {subagents.children.map((child) => (
-              <button
-                key={child.id}
-                className="bg-muted/40 hover:bg-accent/50 flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition-colors"
-                onClick={() => openBtwSession(child.id)}
-                title="Open the session — live while it runs"
-              >
-                {child.running ? (
-                  <Loader2 size={12} className="text-primary shrink-0 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Bot size={12} className="text-muted-foreground shrink-0" aria-hidden="true" />
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{child.title}</span>
-                  <span className="text-muted-foreground block font-mono text-[10px]">
-                    d{child.depthCount} · {child.locked ? "closed" : child.running ? "running" : "idle"}
-                    {!child.interactive && " · headless"}
+      {(subagents.children.length > 0 || subagents.isPending) && (
+        <Section
+          title={`Subagents${subagents.children.length ? ` (${subagents.children.length})` : ""}`}
+          open={open.subagents}
+          onToggle={() => toggle("subagents")}
+        >
+          {subagents.isPending ? (
+            <div className="text-muted-foreground py-1 text-xs">loading…</div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {subagents.children.map((child) => (
+                <button
+                  key={child.id}
+                  className="bg-muted/40 hover:bg-accent/50 flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition-colors"
+                  onClick={() => openBtwSession(child.id)}
+                  title="Open the session — live while it runs"
+                >
+                  {child.running ? (
+                    <Loader2 size={12} className="text-primary shrink-0 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Bot size={12} className="text-muted-foreground shrink-0" aria-hidden="true" />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{child.title}</span>
+                    <span className="text-muted-foreground block font-mono text-[10px]">
+                      d{child.depthCount} · {child.locked ? "closed" : child.running ? "running" : "idle"}
+                      {!child.interactive && " · headless"}
+                    </span>
                   </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </Section>
+                </button>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
 
-      <Section
-        title={`Jobs${backgroundJobs.jobs.length ? ` (${backgroundJobs.jobs.filter((j) => j.status === "running").length} active)` : ""}`}
-        open={open.jobs}
-        onToggle={() => toggle("jobs")}
-      >
-        {backgroundJobs.isPending ? (
-          <div className="text-muted-foreground py-1 text-xs">loading…</div>
-        ) : backgroundJobs.jobs.length === 0 ? (
-          <div className="text-muted-foreground py-1 text-xs">none — run_background starts detached jobs</div>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {backgroundJobs.jobs.map((job) => (
-              <JobRow key={job.id} job={job} />
-            ))}
-          </div>
-        )}
-      </Section>
+      {(backgroundJobs.jobs.length > 0 || backgroundJobs.isPending) && (
+        <Section
+          title={`Jobs${backgroundJobs.jobs.length ? ` (${backgroundJobs.jobs.filter((j) => j.status === "running").length} active)` : ""}`}
+          open={open.jobs}
+          onToggle={() => toggle("jobs")}
+        >
+          {backgroundJobs.isPending ? (
+            <div className="text-muted-foreground py-1 text-xs">loading…</div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {backgroundJobs.jobs.map((job) => (
+                <JobRow key={job.id} job={job} />
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
 
       <Section title="Memories" open={open.memories} onToggle={() => toggle("memories")}>
         <div className="flex flex-col gap-2">
@@ -291,7 +317,11 @@ export function Sidebar() {
         ))}
       </Section>
 
-      <Section title={`Plan${planSteps.length ? ` (${planSteps.filter((s) => s.status === "done").length}/${planSteps.length})` : ""}`} open={open.plan} onToggle={() => toggle("plan")}>
+      <Section
+        title={`Plan${planSteps.length ? ` (${planSteps.filter((s) => s.status === "done").length}/${planSteps.length})` : ""}`}
+        open={open.plan}
+        onToggle={() => toggle("plan")}
+      >
         {planSteps.length === 0 ? (
           <div className="text-muted-foreground py-1 text-xs">no plan set — the agent calls update_plan for multi-step work</div>
         ) : (
@@ -308,7 +338,13 @@ export function Sidebar() {
                         : "text-muted-foreground",
                   )}
                 >
-                  {step.status === "done" ? <Check size={9} aria-hidden="true" /> : step.status === "in_progress" ? <Loader2 size={9} className="animate-spin" aria-hidden="true" /> : i + 1}
+                  {step.status === "done" ? (
+                    <Check size={9} aria-hidden="true" />
+                  ) : step.status === "in_progress" ? (
+                    <Loader2 size={9} className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    i + 1
+                  )}
                 </span>
                 <span className={cn("min-w-0 flex-1", step.status === "done" && "text-muted-foreground line-through")}>{step.description}</span>
               </li>

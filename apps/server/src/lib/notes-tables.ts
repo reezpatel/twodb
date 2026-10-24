@@ -27,6 +27,8 @@ const ident = (name: string) => sql.raw(`"${name.replace(/"/g, "")}"`);
 
 const table = (databaseId: string) => ident(notesTableName(databaseId));
 
+export { ident as sqlIdent, table as notesTable };
+
 export function defaultSchema(): NoteDatabaseSchema {
   return {
     columns: [],

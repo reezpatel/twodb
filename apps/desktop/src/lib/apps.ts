@@ -5,6 +5,7 @@ import {
   Contact,
   CodeXml,
   Folder,
+  SquareKanban,
   LayoutDashboard,
   LayoutGrid,
   Mail,
@@ -24,6 +25,7 @@ import { CodeProvider, CodeSidenav } from "../routes/code/code-provider";
 import { FilesProvider, FilesSidenav } from "../routes/files/files-provider";
 import { SettingsSidenav } from "../routes/settings/settings-sidenav";
 import { MeetingsProvider, MeetingsSidenav } from "../routes/meetings/meetings-provider";
+import { ProjectsSidenav } from "../routes/projects/projects-sidenav";
 
 export interface AppEntry {
   id: string;
@@ -44,6 +46,7 @@ export const APPS: AppEntry[] = [
   { id: "contacts", label: "Contacts", icon: Contact, Provider: ContactsProvider, Sidenav: ContactsSidenav },
   { id: "notes", label: "Notes", icon: StickyNote, Provider: NotesProvider, Sidenav: NotesSidenav },
   { id: "chat", label: "Chat", icon: MessageSquare, Provider: ChatProvider, Sidenav: ChatSidenav },
+  { id: "projects", label: "Projects", icon: SquareKanban, Sidenav: ProjectsSidenav },
   { id: "code", label: "Code", icon: CodeXml, Provider: CodeProvider, Sidenav: CodeSidenav },
   { id: "meetings", label: "Meetings", icon: Video, Provider: MeetingsProvider, Sidenav: MeetingsSidenav },
   { id: "meetings-old", label: "Meetings (mock)", icon: Clapperboard },

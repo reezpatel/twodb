@@ -12,8 +12,6 @@ import type { CodeSessionJobStatus } from "../plugins/db";
  * State is persisted in code_session_job so the panel survives refreshes and
  * server restarts; the runner owns the process and its log file. */
 
-/** How much of a finished job's log rides the completion user message. */
-const COMPLETION_TAIL_LINES = 30;
 /** How long after a runner reconnect before unobserved jobs are marked lost. */
 const LOST_GRACE_MS = 60_000;
 
@@ -53,11 +51,12 @@ export async function startBackgroundJob(opts: {
   return { jobId, logPath };
 }
 
-/** job_logs tool — tail of the job's log, straight from the runner. */
-export async function readJobLogs(runnerId: string, jobId: string, lines = 10): Promise<string> {
-  const result = await runnerManager.jobOutput(runnerId, jobId, Math.max(1, Math.min(200, lines)));
-  if (result.unknown) return `error: unknown job ${jobId} on this runner (server restart or runner restart lost it)`;
-  return result.output || "(no output yet)";
+/** job_logs tool — lines of the job's log, straight from the runner. Pass
+ * from/to (1-based, inclusive) for a range, or lines for the tail. */
+export async function readJobLogs(runnerId: string, jobId: string, opts: { lines?: number; from?: number; to?: number } = {}): Promise<{ output: string; totalLines?: number } | { error: string }> {
+  const result = await runnerManager.jobOutput(runnerId, jobId, opts);
+  if (result.unknown) return { error: `unknown job ${jobId} on this runner (server restart or runner restart lost it)` };
+  return { output: result.output || "(no output yet)", ...(result.totalLines !== undefined ? { totalLines: result.totalLines } : {}) };
 }
 
 /** kill by id, used from the panel and available to the agent. */
@@ -66,18 +65,45 @@ export async function killBackgroundJob(runnerId: string, jobId: string): Promis
   return result.unknown ? `unknown job ${jobId} on this runner` : `kill signal sent to ${jobId}`;
 }
 
-/** Exit watcher flips the DB row, pushes the panel, and delivers the tail as a
- * user message so the thread (and the next round) sees it. */
+/**
+ * Kill from the UI: after signaling, write a user message saying THE USER
+ * terminated the job, with its last output. The plain kill path would only
+ * mark it "killed" — the agent couldn't tell a user action from an arbitrary
+ * signal. Beats the exit watcher's completion message by flipping the row
+ * first (finishJob only writes while status="running").
+ */
+export async function killBackgroundJobByUser(runnerId: string, jobId: string): Promise<string> {
+  const result = await runnerManager.killJob(runnerId, jobId);
+  const row = await db.selectFrom("code_session_job").selectAll().where("id", "=", jobId).executeTakeFirst();
+  if (!row || row.status !== "running") return result.unknown ? `unknown job ${jobId} on this runner` : `kill signal sent to ${jobId}`;
+  await db.updateTable("code_session_job").set({ status: "killed", finishedAt: new Date() }).where("id", "=", jobId).execute();
+  const body = [
+    `[Background job ${jobId.slice(0, 8)} terminated by the user] $ ${row.command}`,
+    "The user stopped this job manually from the UI — treat it as intentionally cancelled, not a crash. Do not restart it unless asked.",
+    `To inspect output, call job_logs with job_id=${jobId} (from/to line range or lines tail).`,
+  ].join("\n");
+  await db
+    .insertInto("code_session_message")
+    .values({
+      id: crypto.randomUUID(),
+      sessionId: row.sessionId,
+      role: "user",
+      content: body,
+      meta: { backgroundJob: { id: jobId, status: "killed", exitCode: null }, killedByUser: true },
+      createdAt: new Date(),
+    })
+    .execute();
+  await broadcastToSession(row.sessionId, { type: "jobs", jobs: await listJobs(row.sessionId) });
+  return result.unknown ? `unknown job ${jobId} on this runner` : `kill signal sent to ${jobId}`;
+}
+
+/** Exit watcher flips the DB row, pushes the panel, and delivers the outcome
+ * as a user message so the thread (and the next round) sees it. Output is not
+ * included — the agent pulls it with job_logs when it needs it. */
 async function finishJob(jobId: string, code: number | null, signal?: string, message?: string) {
   const row = await db.selectFrom("code_session_job").selectAll().where("id", "=", jobId).executeTakeFirst();
   if (!row || row.status !== "running") return;
   const status: CodeSessionJobStatus = signal ? "killed" : message ? "failed" : code === 0 ? "done" : code === null ? "lost" : "failed";
-  let tail = "";
-  try {
-    tail = (await runnerManager.jobOutput(row.runnerId, jobId, COMPLETION_TAIL_LINES)).output;
-  } catch {
-    tail = "";
-  }
   await db
     .updateTable("code_session_job")
     .set({ status, exitCode: code, finishedAt: new Date() })
@@ -85,7 +111,7 @@ async function finishJob(jobId: string, code: number | null, signal?: string, me
     .execute();
 
   const header = `[Background job ${jobId.slice(0, 8)} ${status}${code !== null ? ` (exit ${code})` : ""}${signal ? ` (signal ${signal})` : ""}] $ ${row.command}`;
-  const body = [header, ...(message ? [`error: ${message}`] : []), ...(tail ? ["", "last output:", tail] : [])].join("\n");
+  const body = [header, ...(message ? [`error: ${message}`] : []), `To inspect output, call job_logs with job_id=${jobId} (from/to line range or lines tail).`].join("\n");
   await db
     .insertInto("code_session_message")
     .values({

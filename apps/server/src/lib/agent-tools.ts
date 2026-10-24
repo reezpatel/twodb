@@ -261,7 +261,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     name: "run_background",
     scope: ["code"],
     description:
-      "Runs a shell command in the background on the session's runner — returns a job id immediately instead of waiting. Use for long-running work (dev servers, builds, watchers, test suites). The output is delivered into the thread automatically when the job finishes (success or failure); poll it sooner with job_logs.",
+      "Runs a shell command in the background on the session's runner — returns a job id immediately instead of waiting. Use for long-running work (dev servers, builds, watchers, test suites). The output is delivered into the thread automatically when the job finishes (success or failure); poll it sooner with job_logs. The user can watch the job in the sidebar and may stop it there; a user-stopped job is delivered into the thread as 'terminated by the user' with its last output — treat that as intentional cancellation, not a crash, and don't restart it unless asked.",
     parameters: {
       type: "object",
       properties: {
@@ -274,12 +274,14 @@ export const AGENT_TOOLS: AgentTool[] = [
     name: "job_logs",
     scope: ["code"],
     description:
-      "Reads a background job's log by job id (from run_background). Returns the last N lines — default 10.",
+      "Reads a background job's log by job id (from run_background). Pass from/to (1-based line numbers, inclusive) for a range — total line count is returned so you can page — or lines for the tail (default 10, max 200). The user can see the same logs in the sidebar, so use this only when you need the output yourself.",
     parameters: {
       type: "object",
       properties: {
         job_id: { type: "string", description: "Job id returned by run_background" },
-        lines: { type: "number", description: "Last N lines to return (default 10, max 200)" },
+        from: { type: "number", description: "First line to return (1-based, inclusive). Default: start when 'to' is set, else tail." },
+        to: { type: "number", description: "Last line to return (1-based, inclusive). Default: end of log." },
+        lines: { type: "number", description: "Last N lines to return when from/to are not set (default 10, max 200)" },
       },
       required: ["job_id"],
     },
@@ -728,6 +730,9 @@ export async function executeToolCall(
     const command = str(call.arguments?.command).trim();
     const jobId = str(call.arguments?.job_id).trim();
     const lines = Math.max(1, Math.min(200, Number(call.arguments?.lines) || 10));
+    const numArg = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.max(1, Math.floor(v)) : undefined);
+    const from = numArg(call.arguments?.from);
+    const to = numArg(call.arguments?.to);
     if (call.name === "run_background" && !command) return { output: "error: command is required", code: null, failed: true };
     if (call.name === "job_logs" && !jobId) return { output: "error: job_id is required", code: null, failed: true };
     if (call.name === "background_job_status") {
@@ -753,8 +758,11 @@ export async function executeToolCall(
           failed: false,
         };
       }
-      const logs = await readJobLogs(runnerId, jobId, lines);
-      return { output: logs, code: 0, failed: false };
+      const logs = await readJobLogs(runnerId, jobId, from !== undefined || to !== undefined ? { from, to } : { lines });
+      if ("error" in logs) return { output: `error: ${logs.error}`, code: null, failed: true };
+      const header = logs.totalLines !== undefined ? `[${logs.totalLines} total lines]
+` : "";
+      return { output: header + logs.output, code: 0, failed: false };
     } catch (e) {
       return { output: `error: ${(e as Error).message}`, code: null, failed: true };
     }

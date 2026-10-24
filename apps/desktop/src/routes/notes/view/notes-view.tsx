@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { VisibilityState } from "@tanstack/react-table";
-import { KanbanSquare, List, Loader2, Plus, SlidersHorizontal, Table2 } from "lucide-react";
+import { KanbanSquare, List, Loader2, Lock, Plus, SlidersHorizontal, Table2 } from "lucide-react";
 import { useNotesView, NOTE_PROPERTY_TYPES, NOTE_VIEW_TYPES, type NoteProperty, type NoteViewType } from "./use-notes-view";
 import { TableView } from "./table-view";
 import { ListView } from "./list-view";
@@ -108,6 +108,11 @@ export function NotesView({ databaseId, openNoteId, setOpenNoteId }: { databaseI
         </DropdownMenu>
 
         <div className="ml-auto flex items-center gap-1">
+          {view.schemaLockedBy && (
+            <span className="text-muted-foreground/70 border-border flex h-7 items-center gap-1 rounded-md border px-2 text-[10px]" title={`Schema managed by ${view.schemaLockedBy}`}>
+              <Lock size={11} /> {view.schemaLockedBy}
+            </span>
+          )}
           {activeView?.type === "kanban" && columns.filter((c) => c.type === "select").length > 0 && (
             <select
               className="border-input bg-background h-7 rounded-md border px-2 text-xs"

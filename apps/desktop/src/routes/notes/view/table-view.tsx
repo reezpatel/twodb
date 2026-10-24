@@ -127,25 +127,30 @@ export function TableView({
         size: 80,
         cell: ({ row }) => <span className="text-muted-foreground text-xs">{relativeTime(row.original.updatedAt)}</span>,
       },
-      {
-        // add-column strip — plain fixed-width cell, always last
-        id: ADD_PROPERTY_COLUMN_ID,
-        enableHiding: false,
-        enableSorting: false,
-        enableResizing: false,
-        size: 44,
-        header: () => (
-          <button
-            type="button"
-            onClick={onAddProperty}
-            className="hover:bg-accent text-muted-foreground hover:text-foreground flex h-full w-full items-center justify-center text-xs"
-            title="Add property"
-          >
-            <Plus size={13} />
-          </button>
-        ),
-        cell: () => null,
-      },
+      // add-column strip — plain fixed-width cell, always last. Hidden when
+      // the schema is locked by an app/feature (e.g. shared_content).
+      ...(view.schemaLockedBy
+        ? []
+        : [
+            {
+              id: ADD_PROPERTY_COLUMN_ID,
+              enableHiding: false,
+              enableSorting: false,
+              enableResizing: false,
+              size: 44,
+              header: () => (
+                <button
+                  type="button"
+                  onClick={onAddProperty}
+                  className="hover:bg-accent text-muted-foreground hover:text-foreground flex h-full w-full items-center justify-center text-xs"
+                  title="Add property"
+                >
+                  <Plus size={13} />
+                </button>
+              ),
+              cell: () => null,
+            } satisfies ColumnDef<NoteRecord, unknown>,
+          ]),
     ],
     [columns, view, setOpenNoteId, onAddProperty],
   );

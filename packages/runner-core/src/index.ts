@@ -43,6 +43,9 @@ export interface ServerMessage {
   tmuxName?: string;
   jobId?: string;
   lines?: number;
+  /** jobOutput paging: 1-based inclusive line range (from defaults to 1, to to EOF). */
+  from?: number;
+  to?: number;
   diskPaths?: string[];
   /** AWS bridge (request/reply with requestId). */
   requestId?: string;
@@ -140,21 +143,34 @@ export class RunnerCore {
     }
   }
 
-  private tailFile(logPath: string, lines: number): string {
+  /** Read a log file by line range (1-based, inclusive) or as a tail when
+   * no range is given. Returns the slice plus the total line count so the
+   * caller can page forward. */
+  private readLogRange(logPath: string, from?: number, to?: number, tail?: number): { output: string; totalLines: number } {
     try {
       const content = fs.readFileSync(logPath, "utf8");
       const rows = content.length ? content.replace(/\n$/, "").split("\n") : [];
-      const start = Math.max(0, rows.length - lines);
-      return rows.slice(start).join("\n");
+      const total = rows.length;
+      let start: number;
+      let end: number;
+      if (from !== undefined || to !== undefined) {
+        start = Math.max(0, (from ?? 1) - 1);
+        end = Math.min(total, to ?? total);
+      } else {
+        start = Math.max(0, total - Math.max(1, tail ?? 10));
+        end = total;
+      }
+      return { output: rows.slice(start, end).join("\n"), totalLines: total };
     } catch {
-      return "";
+      return { output: "", totalLines: 0 };
     }
   }
 
-  private handleJobOutput(jobId: string, lines: number) {
+  private handleJobOutput(jobId: string, opts: { lines?: number; from?: number; to?: number }) {
     const job = this.jobs.get(jobId);
-    if (!job) return this.send({ type: "jobOutput", jobId, output: "", unknown: true });
-    this.send({ type: "jobOutput", jobId, output: this.tailFile(job.logPath, Math.max(1, lines)) });
+    if (!job) return this.send({ type: "jobOutput", jobId, output: "", totalLines: 0, unknown: true });
+    const { output, totalLines } = this.readLogRange(job.logPath, opts.from, opts.to, opts.lines);
+    this.send({ type: "jobOutput", jobId, output, totalLines });
   }
 
   /** Mark tracked jobs in the log so a restarted server can distinguish a
@@ -258,7 +274,7 @@ export class RunnerCore {
         if (msg.jobId && msg.command) this.handleSpawnJob(msg.jobId, msg.command, msg.cwd);
         break;
       case "jobOutput":
-        if (msg.jobId) this.handleJobOutput(msg.jobId, msg.lines ?? 10);
+        if (msg.jobId) this.handleJobOutput(msg.jobId, { lines: msg.lines, from: msg.from, to: msg.to });
         break;
       case "jobKill":
         if (msg.jobId) this.handleJobKill(msg.jobId);

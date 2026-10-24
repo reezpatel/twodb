@@ -25,6 +25,7 @@ import { CodeSection } from "./routes/settings/code/code";
 import { StorageSection } from "./routes/settings/storage/storage";
 import { AccountsSection } from "./routes/settings/accounts/accounts-settings";
 import { CalendarSettingsSection } from "./routes/settings/calendar/calendar-settings";
+import { SharedContentSection } from "./routes/settings/shared-content/shared-content";
 import { LogsSection } from "./routes/settings/logs/logs";
 import { FilesScene } from "./routes/files/files-scene";
 import { NotesScene } from "./routes/notes/notes-scene";
@@ -32,11 +33,14 @@ import { DatabasesScene } from "./routes/notes/databases-scene";
 import { EmailScene } from "./routes/email/email-scene";
 import { ContactsScene } from "./routes/contacts/contacts-scene";
 import { ChatScene } from "./routes/chat/chat-scene";
+import { ShareScene } from "./routes/share/share-scene";
 import { CalendarScene } from "./routes/calendar/calendar-scene";
 import { MeetingsScene } from "./routes/meetings/meetings-scene";
 import { MeetingsOldScene } from "./routes/meetings-old/meetings-old-scene";
 import { AutomationsScene } from "./routes/automations/automations-scene";
 import { OverviewScene } from "./routes/overview/overview-scene";
+import { ProjectsScene } from "./routes/projects/projects-scene";
+import { ProjectScene } from "./routes/projects/project/project-scene";
 import { ShowcaseScene } from "./routes/showcase/showcase-scene";
 
 export const router = createBrowserRouter([
@@ -85,6 +89,7 @@ export const router = createBrowserRouter([
           { path: "storage", Component: StorageSection },
           { path: "accounts", Component: AccountsSection },
           { path: "calendar", Component: CalendarSettingsSection },
+          { path: "shared-content", Component: SharedContentSection },
           { path: "email", element: <Navigate to="/apps/settings/accounts" replace /> },
           { path: "logs", Component: LogsSection },
         ],
@@ -114,11 +119,17 @@ export const router = createBrowserRouter([
       { path: "/apps/calendar", Component: CalendarScene },
       { path: "/apps/contacts", Component: ContactsScene },
       { path: "/apps/chat", Component: ChatScene },
+      { path: "/share", Component: ShareScene },
       { path: "/apps/meetings", Component: MeetingsScene },
       { path: "/apps/meetings/:recordingId", Component: MeetingsScene },
       { path: "/apps/meetings-old", Component: MeetingsOldScene },
       { path: "/apps/automations", Component: AutomationsScene },
       { path: "/apps/showcase", Component: ShowcaseScene },
+      { path: "/apps/projects", Component: ProjectsScene },
+      { path: "/apps/projects/:projectId", Component: ProjectScene },
+      { path: "/apps/projects/:projectId/:tab", Component: ProjectScene },
+      { path: "/apps/projects/:projectId/ticket/:ticketId", Component: ProjectScene },
+      { path: "/apps/projects/:projectId/:ticketId", Component: ProjectScene },
       { path: "/apps/notes", Component: NotesScene },
       { path: "/apps/notes/databases", Component: DatabasesScene },
       { path: "/apps/notes/:nodeId", Component: NotesScene },

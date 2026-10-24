@@ -183,7 +183,7 @@ class RunnerManager {
   }
 
   /** Last N lines of a job's log — works for running and finished jobs alike. */
-  async jobOutput(runnerId: string, jobId: string, lines = 10): Promise<{ output: string; unknown?: boolean }> {
+  async jobOutput(runnerId: string, jobId: string, opts: { lines?: number; from?: number; to?: number } = {}): Promise<{ output: string; totalLines?: number; unknown?: boolean }> {
     const runner = this.runners.get(runnerId);
     if (!runner) return Promise.reject(new Error("runner offline"));
     return new Promise((resolve, reject) => {
@@ -193,7 +193,7 @@ class RunnerManager {
         ...pending,
         output: { resolve, reject },
       });
-      send(runner.ws, { type: "jobOutput", jobId, lines });
+      send(runner.ws, { type: "jobOutput", jobId, lines: opts.lines, from: opts.from, to: opts.to });
     });
   }
 
@@ -212,7 +212,7 @@ class RunnerManager {
     });
   }
 
-  private handleJobMessage(msg: { type: string; jobId?: string; logPath?: string; output?: string; unknown?: boolean; code?: number; signal?: string; message?: string }) {
+  private handleJobMessage(msg: { type: string; jobId?: string; logPath?: string; output?: string; totalLines?: number; unknown?: boolean; code?: number; signal?: string; message?: string }) {
     if (!msg.jobId) return;
     const pending = this.jobPending.get(msg.jobId);
     switch (msg.type) {
@@ -226,7 +226,7 @@ class RunnerManager {
         if (pending) pending.spawn = undefined;
         break;
       case "jobOutput":
-        pending?.output?.resolve({ output: msg.output ?? "", ...(msg.unknown ? { unknown: true } : {}) });
+        pending?.output?.resolve({ output: msg.output ?? "", ...(msg.totalLines !== undefined ? { totalLines: msg.totalLines } : {}), ...(msg.unknown ? { unknown: true } : {}) });
         if (pending) pending.output = undefined;
         if (!pending?.spawn && !pending?.kill && !pending?.onExit) this.jobPending.delete(msg.jobId);
         break;
