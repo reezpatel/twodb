@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { SignInLayout } from "@/components/ui/sign-in-page";
+import { ServerSwitch } from "@/components/connect-server";
+import { isNative } from "@/lib/native";
 
 export function LoginPage() {
   const { form, error, signInWithPasskey } = useLogin();
@@ -99,15 +101,21 @@ export function LoginPage() {
         </form.Subscribe>
       </form>
 
-      <div className="my-6 flex items-center gap-3">
-        <Separator className="flex-1" />
-        <span className="text-muted-foreground text-xs uppercase">or</span>
-        <Separator className="flex-1" />
-      </div>
+      {/* passkeys are bound to the server's web domain — not usable from the bundled app */}
+      {!isNative && (
+        <>
+          <div className="my-6 flex items-center gap-3">
+            <Separator className="flex-1" />
+            <span className="text-muted-foreground text-xs uppercase">or</span>
+            <Separator className="flex-1" />
+          </div>
 
-      <Button variant="outline" className="w-full py-3" onClick={signInWithPasskey}>
-        Sign in with passkey
-      </Button>
+          <Button variant="outline" className="w-full py-3" onClick={signInWithPasskey}>
+            Sign in with passkey
+          </Button>
+        </>
+      )}
+      <ServerSwitch />
     </SignInLayout>
   );
 }

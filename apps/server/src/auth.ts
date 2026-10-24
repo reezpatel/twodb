@@ -1,5 +1,5 @@
 import { APIError, betterAuth } from "better-auth";
-import { admin, organization } from "better-auth/plugins";
+import { admin, bearer, organization } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { apiKey } from "@better-auth/api-key";
 import { createDb } from "./plugins/db";
@@ -21,7 +21,7 @@ export const auth = betterAuth({
   database: { db, type: "pg" },
   secret: env.auth.secret,
   baseURL: env.auth.url,
-  trustedOrigins: [env.auth.origin],
+  trustedOrigins: [env.auth.origin, ...env.auth.nativeOrigins],
   emailAndPassword: {
     enabled: true,
     sendResetPassword: async ({ user, url }) => {
@@ -47,6 +47,9 @@ export const auth = betterAuth({
       origin: env.auth.origin,
     }),
     apiKey(),
+    // Native apps (bundled UI on tauri:// origins) can't rely on cross-site
+    // cookies (WebKit blocks them) — they send the session token as a bearer.
+    bearer(),
   ],
 });
 

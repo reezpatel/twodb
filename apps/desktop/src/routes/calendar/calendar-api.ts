@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { wsUrl } from "@/lib/native";
 
 // ── types ────────────────────────────────────────────────────────────────────
 
@@ -254,8 +255,7 @@ export function useCalendarSocket(onReminder?: (r: ReminderEvent) => void) {
     let retry = 1000;
     let ping: ReturnType<typeof setInterval> | null = null;
     const connect = () => {
-      const proto = location.protocol === "https:" ? "wss" : "ws";
-      ws = new WebSocket(`${proto}://${location.host}/api/calendar/ws`);
+      ws = new WebSocket(wsUrl("/api/calendar/ws"));
       ws.onopen = () => {
         retry = 1000;
         ping = setInterval(() => ws?.readyState === WebSocket.OPEN && ws.send('{"type":"ping"}'), 25_000);

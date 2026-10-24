@@ -6,6 +6,7 @@ import type { ComposerCommand } from "@/components/composer/composer-commands";
 import type { AskUserAnswer, AskUserQuestion } from "./ask-user-wizard";
 import { joinSessionRoom, onWsStatus, sendToSession, getWsStatus } from "../code-room-ws";
 import { api } from "@/lib/api";
+import { apiFetch } from "@/lib/native";
 
 interface DbSkill {
   id: string;
@@ -680,7 +681,7 @@ export function useChatPanel(sessionId: string | null) {
         // api() helper forces a JSON content-type.
         const form = new FormData();
         form.append("file", file);
-        const res = await fetch(`/api/code/sessions/${sessionId}/assets`, { method: "POST", credentials: "include", body: form });
+        const res = await apiFetch(`/api/code/sessions/${sessionId}/assets`, { method: "POST", body: form });
         if (!res.ok) {
           const body = (await res.json().catch(() => null)) as { error?: string } | null;
           throw new Error(body?.error ?? `upload failed (${res.status})`);

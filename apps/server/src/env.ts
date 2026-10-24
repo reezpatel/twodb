@@ -21,6 +21,18 @@ export const env = {
     /** The URL users open in the browser; the UI, API and OAuth callbacks all live under it (in dev, Vite proxies /api). */
     url: authUrl,
     origin: new URL(authUrl).origin,
+    /** Origins of the bundled native apps (Tauri) + any extra comma-separated
+     *  TWODB_EXTRA_ORIGINS. They call the API cross-origin with bearer tokens.
+     *  tauri://localhost = macOS/iOS; http(s)://tauri.localhost = Windows/Android. */
+    nativeOrigins: [
+      "tauri://localhost",
+      "http://tauri.localhost",
+      "https://tauri.localhost",
+      ...(process.env.TWODB_EXTRA_ORIGINS ?? "")
+        .split(",")
+        .map((o) => o.trim().replace(/\/$/, ""))
+        .filter(Boolean),
+    ],
   },
   passkey: {
     rpID: process.env.PASSKEY_RP_ID ?? "localhost",

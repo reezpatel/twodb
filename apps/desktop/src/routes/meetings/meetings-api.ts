@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { assetUrl } from "@/lib/native";
 
 export type RecordingStatus = "recording" | "finalized" | "abandoned";
 
@@ -45,7 +46,7 @@ export function useRecording(id: string | null) {
 }
 
 export function trackMediaUrl(recordingId: string, trackId: string) {
-  return `/api/meetings/recordings/${recordingId}/tracks/${trackId}/media`;
+  return assetUrl(`/api/meetings/recordings/${recordingId}/tracks/${trackId}/media`);
 }
 
 const PLATFORM_LABELS: Record<string, string> = { meet: "Google Meet", zoom: "Zoom", teams: "Microsoft Teams" };

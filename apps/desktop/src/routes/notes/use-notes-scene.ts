@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
+import { apiFetch, assetUrl } from "@/lib/native";
 
 /** Notion model: sections hold pages and databases; pages nest pages and
  *  databases; database rows are pages (kept out of the sidebar). */
@@ -183,14 +184,14 @@ export function useAllDatabases() {
 export function assetPreviewUrl(uri: string | null | undefined): string | null {
   if (!uri) return null;
   const id = /^twodb:\/\/[^/]+\/([A-Za-z0-9-_.]+)$/.exec(uri)?.[1];
-  return id ? `/api/notes/assets/${id}` : null;
+  return id ? assetUrl(`/api/notes/assets/${id}`) : null;
 }
 
 /** Upload an image for a node (cover/icon/in-page). Resolves the twodb:// uri. */
 export async function uploadNodeAsset(nodeId: string, file: File): Promise<string> {
   const body = new FormData();
   body.append("file", file);
-  const res = await fetch(`/api/notes/nodes/${nodeId}/assets`, { method: "POST", body, credentials: "include" });
+  const res = await apiFetch(`/api/notes/nodes/${nodeId}/assets`, { method: "POST", body });
   if (!res.ok) {
     const err = (await res.json().catch(() => null)) as { error?: string } | null;
     const message = err?.error ?? "upload failed";

@@ -1,3 +1,5 @@
+import { wsUrl } from "@/lib/native";
+
 /**
  * One websocket per browser tab for all of apps/code (rooms protocol).
  *
@@ -34,9 +36,8 @@ let wantOpen = false;
 
 function connect() {
   if (!wantOpen || ws) return;
-  const proto = location.protocol === "https:" ? "wss" : "ws";
   statusListeners.forEach((fn) => fn("connecting"));
-  const sock = new WebSocket(`${proto}://${location.host}/api/code/ws`);
+  const sock = new WebSocket(wsUrl("/api/code/ws"));
   ws = sock;
 
   sock.onopen = () => {

@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { assetUrl } from "@/lib/native";
 
 type FileType = "pdf" | "doc" | "sheet" | "image";
 
@@ -228,7 +229,7 @@ export function FilesScene() {
                             {entry.type === "file" && (
                               <a
                                 className="text-muted-foreground hover:text-foreground inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-accent"
-                                href={`/api/storage/buckets/${bucket}/raw/${entry.path}`}
+                                href={assetUrl(`/api/storage/buckets/${bucket}/raw/${entry.path}`)}
                                 download
                                 title="Download"
                               >
@@ -333,7 +334,7 @@ export function FilesScene() {
             <div className="flex flex-col gap-2">
               {single.type === "file" && (
                 <Button variant="outline" size="sm" asChild>
-                  <a href={`/api/storage/buckets/${bucket}/raw/${single.path}`} download>
+                  <a href={assetUrl(`/api/storage/buckets/${bucket}/raw/${single.path}`)} download>
                     <Download size={13} /> Download
                   </a>
                 </Button>

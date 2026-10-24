@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DOMPurify from "dompurify";
 import type { EmailAttachment } from "../email-api";
+import { assetUrl } from "@/lib/native";
 
 const REMOTE_RE = /^(https?:)?\/\//i;
 
@@ -27,7 +28,7 @@ export function useMessageHtml(html: string, attachments: EmailAttachment[]) {
         if (!value) continue;
         if (value.toLowerCase().startsWith("cid:")) {
           const att = byCid.get(value.slice(4).toLowerCase());
-          if (att) node.setAttribute(attr, `${att.url}?inline=1`);
+          if (att) node.setAttribute(attr, assetUrl(`${att.url}?inline=1`));
         } else if (REMOTE_RE.test(value)) {
           remote += 1;
         }

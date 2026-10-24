@@ -27,6 +27,7 @@ import type { PasteRef } from "@/components/composer/paste-chip";
 import { useDirectoryFiles } from "./composer/use-directory-files";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { assetUrl } from "@/lib/native";
 
 /** Expanded skills on a user message render as chips — content stays in the
  * dialog (click), never inline. */
@@ -524,7 +525,7 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
   // twodb:// asset links become session-scoped preview URLs (image thumbnails inline).
   const resolveAssetUrl = (uri: string) => {
     const match = /^twodb:\/\/[^/]+\/([^/]+)$/.exec(uri);
-    return match?.[1] ? `/api/code/sessions/${sessionId}/assets/${match[1]}` : undefined;
+    return match?.[1] ? assetUrl(`/api/code/sessions/${sessionId}/assets/${match[1]}`) : undefined;
   };
   const {
     session,

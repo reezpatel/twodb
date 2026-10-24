@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router";
 import { authClient } from "../lib/auth-client";
+import { setAuthToken } from "../lib/native";
 
 export function useAppLayout() {
   const navigate = useNavigate();
@@ -8,6 +9,7 @@ export function useAppLayout() {
 
   const signOut = async () => {
     await authClient.signOut();
+    setAuthToken(null); // native builds: drop the bearer token
     navigate("/login");
   };
 

@@ -1,3 +1,5 @@
+import { apiUrl, authHeaders } from "./native";
+
 // Org-space selection injected into every API call — APIs opt into filtering
 // on it server-side. Set by the footer spaces popover; null = all spaces.
 let spaceIds: string[] | null = null;
@@ -8,11 +10,13 @@ export function setSpaceIds(ids: string[] | null) {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+  // apiUrl/authHeaders: absolute server URL + bearer token in native builds
+  const res = await fetch(apiUrl(path), {
     credentials: "include",
     ...init,
     headers: {
       "content-type": "application/json",
+      ...authHeaders(),
       ...(spaceIds ? { "x-space-ids": spaceIds.join(",") } : {}),
       ...init?.headers,
     },

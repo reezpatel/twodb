@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import type { ChatAttachment, ChatMessage } from "./use-chat";
 import { useChatScene } from "./chat-provider";
+import { assetUrl } from "@/lib/native";
 
 const QUICK_EMOJI = ["👍", "❤️", "😂", "🎉", "🔥", "✅"];
 
@@ -46,13 +47,13 @@ function AttachmentChip({ a }: { a: ChatAttachment }) {
   const image = (a.contentType ?? "").startsWith("image/");
   return (
     <a
-      href={`/api/chat/assets/${a.mediaId}`}
+      href={assetUrl(`/api/chat/assets/${a.mediaId}`)}
       target="_blank"
       rel="noreferrer"
       className="bg-card hover:border-primary/40 flex max-w-60 items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors"
     >
       {image ? (
-        <img src={`/api/chat/assets/${a.mediaId}`} alt={a.filename} className="size-7 rounded object-cover" />
+        <img src={assetUrl(`/api/chat/assets/${a.mediaId}`)} alt={a.filename} className="size-7 rounded object-cover" />
       ) : (
         <FileText size={14} className="text-muted-foreground shrink-0" />
       )}

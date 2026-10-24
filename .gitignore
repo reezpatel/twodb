@@ -13,3 +13,6 @@ result-*
 apps/api/vendor/
 deploy/choco/tools/*.exe
 scratch_pad/
+
+# signing keys (android keystore etc.) — backed up in Proton Pass, never committed
+.secrets/

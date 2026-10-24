@@ -57,11 +57,27 @@ app.use(
     origin: (origin) => {
       if (!origin) return env.auth.origin;
       if (origin === env.auth.origin || origin.startsWith("chrome-extension://")) return origin;
+      // bundled native apps (tauri origins + TWODB_EXTRA_ORIGINS)
+      if (env.auth.nativeOrigins.includes(origin)) return origin;
       return null;
     },
     credentials: true,
+    // native apps read the session token from this header after sign-in
+    exposeHeaders: ["set-auth-token"],
   }),
 );
+
+// Native apps authenticate with `Authorization: Bearer <token>`. URLs that
+// can't carry headers — WebSocket upgrades and <img>/<a>/<audio> asset GETs —
+// pass it as ?auth_token= instead; promote it to the header so the bearer
+// plugin handles every request the same way.
+app.use("/api/*", async (c, next) => {
+  if (c.req.method === "GET" && !c.req.header("authorization")) {
+    const token = c.req.query("auth_token");
+    if (token) c.req.raw.headers.set("authorization", `Bearer ${token}`);
+  }
+  await next();
+});
 
 app.get("/api/health", async (c) => {
   const checks: Record<string, boolean> = {};

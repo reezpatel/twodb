@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import type { CalendarItem, ReminderSpec } from "../../calendar/calendar-api";
 import { useCalendarSettingsSection, useCalendarShares } from "./use-calendar-settings";
+import { assetUrl } from "@/lib/native";
 
 const COLORS = ["#4f7cff", "#039be5", "#33b679", "#0b8043", "#f6bf26", "#f4511e", "#d50000", "#e67c73", "#8e24aa", "#7986cb", "#616161"];
 const MINUTES = [0, 5, 10, 15, 30, 60, 1440];
@@ -224,7 +225,7 @@ export function CalendarDetailDialog({ calendar, onClose }: { calendar: Calendar
           ) : null}
           <div className="flex flex-wrap gap-2 border-t pt-4">
             <Button size="sm" variant="outline" asChild>
-              <a href={`/api/calendar/calendars/${calendar.id}/export.ics`} download>
+              <a href={assetUrl(`/api/calendar/calendars/${calendar.id}/export.ics`)} download>
                 Export .ics
               </a>
             </Button>

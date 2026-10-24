@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { apiFetch, wsUrl } from "@/lib/native";
 
 export interface ChatChannel {
   id: string;
@@ -115,8 +116,7 @@ export function useChatSocket(activeChannelId: string | null) {
     let attempt = 0;
     const connect = () => {
       if (disposed) return;
-      const proto = location.protocol === "https:" ? "wss" : "ws";
-      const ws = new WebSocket(`${proto}://${location.host}/api/chat/ws`);
+      const ws = new WebSocket(wsUrl("/api/chat/ws"));
       ws.onmessage = (evt) => {
         let frame: ChatEvent;
         try {
@@ -313,7 +313,7 @@ export function useChatActions(channelId: string | null) {
   const uploadAttachment = async (file: File) => {
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`/api/chat/channels/${channelId}/assets`, { method: "POST", body: form, credentials: "include" });
+    const res = await apiFetch(`/api/chat/channels/${channelId}/assets`, { method: "POST", body: form });
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       throw new Error(body?.error ?? `upload failed (${res.status})`);

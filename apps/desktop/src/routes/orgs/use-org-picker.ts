@@ -14,6 +14,7 @@ function slugify(name: string) {
 export function useOrgPicker() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { refetch: refetchSession } = authClient.useSession();
   const [error, setError] = useState<string | null>(null);
 
   const orgs = useQuery({
@@ -33,6 +34,9 @@ export function useOrgPicker() {
     if (error) {
       setError(error.message ?? "Could not select organization");
     } else {
+      // RequireAuth reads activeOrganizationId from the cached session — wait
+      // for the refetch, or "/" bounces straight back here.
+      await refetchSession();
       navigate("/");
     }
   };

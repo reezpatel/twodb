@@ -3,6 +3,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { OLDWORLD_XTERM } from "@/lib/palette";
 import "@xterm/xterm/css/xterm.css";
+import { wsUrl } from "@/lib/native";
 
 interface TerminalMessage {
   type: string;
@@ -39,8 +40,7 @@ export function useRunnerTerminal(runnerId: string | null, opts: RunnerTerminalO
     const focusTerm = () => term.focus();
     container.addEventListener("click", focusTerm);
 
-    const proto = location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${proto}://${location.host}/api/terminal`);
+    const ws = new WebSocket(wsUrl("/api/terminal"));
 
     ws.onopen = () => {
       const open: Record<string, unknown> = { type: "open", runnerId, cols: term.cols, rows: term.rows };

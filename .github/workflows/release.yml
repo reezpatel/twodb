@@ -134,16 +134,14 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3 # zizmor: ignore[unpinned-uses]
+        with:
+          # the action's default list includes the long-removed 'tools' package
+          packages: platform-tools
 
-      - name: Install Android NDK
-        run: sdkmanager "ndk;27.0.12077973"
-
-      - name: Install Tauri system dependencies
+      - name: Install Android NDK + build-tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libwebkit2gtk-4.1-dev build-essential curl wget file \
-            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+          sdkmanager "ndk;27.0.12077973" "build-tools;35.0.0"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --filter @twodb/desktop
@@ -154,15 +152,89 @@ jobs:
       - name: Build Android APK
         run: pnpm --filter @twodb/desktop exec tauri android build --target aarch64 --apk
 
-      - name: Collect APK
+      # Release key lives in GitHub secrets (backup: Proton Pass, see
+      # scripts/android-signing.sh). Every update must use the same key.
+      - name: Sign APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          apk=$(find apps/desktop/src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | head -1)
-          cp "$apk" "twodb_${GITHUB_REF_NAME#v}_android-arm64.apk"
+          apk=$(find apps/desktop/src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -1)
+          test -n "$apk" || { echo "no release APK found"; exit 1; }
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          printf %s "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          out="twodb_${GITHUB_REF_NAME#v}_android-arm64.apk"
+          "$tools/zipalign" -f -p 4 "$apk" aligned.apk
+          "$tools/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD --out "$out" aligned.apk
+          "$tools/apksigner" verify --print-certs "$out" | head -3
+          rm -f "$RUNNER_TEMP/release.jks" aligned.apk
+          echo "APK=$out" >> "$GITHUB_ENV"
 
       - name: Upload APK to release
         uses: softprops/action-gh-release@v2 # zizmor: ignore[unpinned-uses]
         with:
-          files: twodb_${{ github.ref_name }}_android-arm64.apk
+          files: ${{ env.APK }}
+
+  # iOS — no Apple Developer account yet, so CI builds an unsigned simulator
+  # app only (proves the iOS target compiles; not installable on devices).
+  ios:
+    needs: check
+    permissions:
+      contents: write
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4 # zizmor: ignore[unpinned-uses]
+
+      - name: Set up Node
+        uses: actions/setup-node@v4 # zizmor: ignore[unpinned-uses,cache-poisoning]
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable # zizmor: ignore[unpinned-uses]
+        with:
+          targets: aarch64-apple-ios-sim
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2 # zizmor: ignore[unpinned-uses,cache-poisoning]
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter @twodb/desktop
+
+      - name: Init iOS project
+        run: pnpm --filter @twodb/desktop exec tauri ios init --ci
+
+      - name: Build simulator app (unsigned)
+        working-directory: apps/desktop/src-tauri/gen/apple
+        run: |
+          project=$(ls -d *.xcodeproj | head -1)
+          scheme=$(xcodebuild -list -project "$project" -json | python3 -c 'import json,sys; s=json.load(sys.stdin)["project"]["schemes"]; print(next((x for x in s if x.endswith("_iOS")), s[0]))')
+          echo "project=$project scheme=$scheme"
+          xcodebuild -project "$project" -scheme "$scheme" -configuration Release \
+            -sdk iphonesimulator -arch arm64 -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+          app=$(find build/Build/Products -name '*.app' -maxdepth 2 | head -1)
+          test -n "$app" || { echo "no .app produced"; exit 1; }
+          out="$GITHUB_WORKSPACE/twodb_${GITHUB_REF_NAME#v}_ios-simulator.zip"
+          ditto -c -k --keepParent "$app" "$out"
+          echo "IOS_ZIP=$out" >> "$GITHUB_ENV"
+
+      - name: Upload simulator build to release
+        uses: softprops/action-gh-release@v2 # zizmor: ignore[unpinned-uses]
+        with:
+          files: ${{ env.IOS_ZIP }}
 
   extension:
     needs: check

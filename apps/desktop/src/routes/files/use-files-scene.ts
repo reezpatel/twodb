@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
+import { apiFetch } from "@/lib/native";
 
 export interface StorageBackendInfo {
   id: string;
@@ -31,9 +32,8 @@ export interface StorageEntryInfo {
 /** Puts a file at bucket/<path>/<name> over the storage API. */
 async function uploadFile(bucketId: string, dir: string, file: File) {
   const rel = `${dir ? `${dir}/` : ""}${file.name}`;
-  const res = await fetch(`/api/storage/buckets/${bucketId}/raw/${rel}`, {
+  const res = await apiFetch(`/api/storage/buckets/${bucketId}/raw/${rel}`, {
     method: "PUT",
-    credentials: "include",
     headers: { "content-type": file.type || "application/octet-stream", origin: location.origin },
     body: await file.arrayBuffer(),
   });
@@ -90,9 +90,8 @@ export function useFilesScene() {
 
   const remove = useMutation({
     mutationFn: (entry: StorageEntryInfo) =>
-      fetch(`/api/storage/buckets/${bucket}/raw/${entry.path}`, {
+      apiFetch(`/api/storage/buckets/${bucket}/raw/${entry.path}`, {
         method: "DELETE",
-        credentials: "include",
         headers: { origin: location.origin },
       }).then(async (res) => {
         if (!res.ok) throw new Error(`delete failed (${res.status})`);

@@ -5,6 +5,8 @@ import { RouterProvider } from "react-router";
 import { registerSW } from "virtual:pwa-register";
 import { router } from "./router";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ConnectServer } from "@/components/connect-server";
+import { getServerUrl, isNative } from "@/lib/native";
 import "@fontsource-variable/outfit";
 import "@fontsource-variable/jetbrains-mono";
 import "./index.css";
@@ -19,14 +21,17 @@ window.addEventListener("beforeinstallprompt", (e) => {
   window.__pwaInstallEvent = e;
 });
 
-registerSW({ immediate: true });
+// The web build is a PWA served by the twodb server. Native builds bundle the
+// UI and update by installing a new app version — no service worker there.
+if (!isNative) registerSW({ immediate: true });
+
+// Native builds pick their server on first launch.
+const needsServer = isNative && !getServerUrl();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider delayDuration={300}>
-        <RouterProvider router={router} />
-      </TooltipProvider>
+      <TooltipProvider delayDuration={300}>{needsServer ? <ConnectServer /> : <RouterProvider router={router} />}</TooltipProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

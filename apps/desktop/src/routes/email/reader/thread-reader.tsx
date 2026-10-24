@@ -43,6 +43,7 @@ import { labelPathName } from "../labels/use-label-tree";
 import { MessageHtml, MessageText } from "./message-html";
 import { useThreadReader } from "./use-thread-reader";
 import { InviteCard } from "./invite-card";
+import { assetUrl } from "@/lib/native";
 
 export function snoozeOptions(): { label: string; at: Date }[] {
   const now = new Date();
@@ -237,7 +238,7 @@ function MessageBlock({ message, open, canWrite, onToggle, onReply, onOp, onEdit
             ) : null}
             {message.hasRaw ? (
               <DropdownMenuItem asChild>
-                <a href={`/api/email/messages/${message.id}/raw`} download>
+                <a href={assetUrl(`/api/email/messages/${message.id}/raw`)} download>
                   <Download /> Download .eml
                 </a>
               </DropdownMenuItem>
@@ -277,7 +278,7 @@ function MessageBlock({ message, open, canWrite, onToggle, onReply, onOp, onEdit
           {files.map((a) => (
             <a
               key={a.id}
-              href={a.status === "stored" ? a.url : undefined}
+              href={a.status === "stored" ? assetUrl(a.url) : undefined}
               download={a.filename}
               className={cn(
                 "bg-card hover:bg-accent/50 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium",

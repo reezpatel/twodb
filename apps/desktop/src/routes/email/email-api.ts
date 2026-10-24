@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { apiFetch, wsUrl } from "@/lib/native";
 
 export interface EmailAddress {
   name: string | null;
@@ -230,7 +231,7 @@ export function threadAction(ids: string[], action: ThreadAction, payload?: Reco
 }
 
 export async function uploadForm<T>(path: string, form: FormData): Promise<T> {
-  const res = await fetch(path, { method: "POST", body: form, credentials: "include" });
+  const res = await apiFetch(path, { method: "POST", body: form });
   const json = (await res.json().catch(() => null)) as (T & { error?: string; detail?: string }) | null;
   if (!res.ok) throw new Error(json?.detail ?? json?.error ?? `Upload failed (${res.status})`);
   return json as T;
@@ -290,8 +291,7 @@ export function useEmailSocket() {
 
     const connect = () => {
       if (disposed) return;
-      const proto = location.protocol === "https:" ? "wss" : "ws";
-      ws = new WebSocket(`${proto}://${location.host}/api/email/ws`);
+      ws = new WebSocket(wsUrl("/api/email/ws"));
       ws.onopen = () => {
         attempt = 0;
         ping = setInterval(() => ws?.readyState === WebSocket.OPEN && ws.send('{"type":"ping"}'), 25_000);
