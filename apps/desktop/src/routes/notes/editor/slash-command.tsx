@@ -6,8 +6,14 @@ import Suggestion from "@tiptap/suggestion";
 // side-effect: registers the chain-command type augmentations used below
 import "@tiptap/starter-kit";
 import "@tiptap/extension-image";
-import { Code2, GripVertical, Heading1, Heading2, Heading3, Image as ImageIcon, List, ListOrdered, Minus, Quote, Type } from "lucide-react";
+import { Code2, Database, GripVertical, Heading1, Heading2, Heading3, Image as ImageIcon, List, ListOrdered, Minus, Quote, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+/** Page-specific capabilities for slash items (e.g. creating child nodes). */
+export interface SlashContext {
+  /** Creates an inline database under the current page; resolves its id. */
+  createInlineDatabase?: () => Promise<string | null>;
+}
 
 export interface SlashItem {
   title: string;
@@ -32,8 +38,8 @@ const pickImage = () =>
     input.click();
   });
 
-function buildItems(): SlashItem[] {
-  return [
+function buildItems(ctx: SlashContext): SlashItem[] {
+  const items: SlashItem[] = [
     {
       title: "Text",
       description: "Plain paragraph",
@@ -109,6 +115,21 @@ function buildItems(): SlashItem[] {
       },
     },
   ];
+  if (ctx.createInlineDatabase) {
+    const create = ctx.createInlineDatabase;
+    items.push({
+      title: "Database",
+      description: "Inline table inside this page",
+      icon: Database,
+      keywords: ["database", "table", "inline", "db", "board", "list"],
+      command: async ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).run();
+        const databaseId = await create();
+        if (databaseId) editor.chain().focus().insertContent({ type: "databaseBlock", attrs: { databaseId } }).run();
+      },
+    });
+  }
+  return items;
 }
 
 export interface SlashMenuState {
@@ -123,7 +144,7 @@ interface SlashCallbacks {
   onKeyDown: (event: KeyboardEvent) => boolean;
 }
 
-const buildSlashExtension = () =>
+const buildSlashExtension = (ctx: { current: SlashContext }) =>
   Extension.create<{ callbacks: SlashCallbacks | null }>({
     name: "slashCommand",
 
@@ -141,7 +162,7 @@ const buildSlashExtension = () =>
           allowSpaces: true,
           items: ({ query }) => {
             const q = query.toLowerCase();
-            return buildItems().filter((item) => item.title.toLowerCase().includes(q) || item.keywords.some((k) => k.includes(q)));
+            return buildItems(ctx.current).filter((item) => item.title.toLowerCase().includes(q) || item.keywords.some((k) => k.includes(q)));
           },
           command: ({ editor, range, props }) => {
             (props as SlashItem).command({ editor, range });
@@ -177,8 +198,11 @@ const buildSlashExtension = () =>
   });
 
 /** Wires the suggestion plugin to React state and renders the popup. */
-export function useSlashCommand() {
+export function useSlashCommand(context: SlashContext = {}) {
   const [menu, setMenu] = useState<SlashMenuState | null>(null);
+  // latest context without rebuilding the extension
+  const ctxRef = useRef(context);
+  ctxRef.current = context;
   const menuRef = useRef(menu);
   menuRef.current = menu;
 
@@ -207,7 +231,7 @@ export function useSlashCommand() {
         return false;
       },
     };
-    return buildSlashExtension().configure({ callbacks });
+    return buildSlashExtension(ctxRef).configure({ callbacks });
   }, []);
 
   const popup = menu ? (

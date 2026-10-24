@@ -45,7 +45,7 @@ export function KanbanView({
               <button
                 className="text-muted-foreground/70 hover:text-foreground text-xs"
                 title="Add note"
-                onClick={() => view.createNote.mutate({ text: "", props: { [groupByProp.id]: value } })}
+                onClick={() => view.createNote.mutate({ props: { [groupByProp.id]: value } })}
               >
                 <Plus size={12} />
               </button>
@@ -58,7 +58,7 @@ export function KanbanView({
                 className="bg-card cursor-pointer rounded-md border p-2 text-xs shadow-xs hover:bg-accent/40"
                 onClick={() => setOpenNoteId(note.noteId)}
               >
-                <span className="block truncate">{note.preview || "(empty)"}</span>
+                <span className="block truncate">{note.title || "Untitled"}</span>
               </div>
             ))}
             {bucket.length === 0 && <p className="text-muted-foreground/40 px-1 py-2 text-center text-[10px]">drop here</p>}

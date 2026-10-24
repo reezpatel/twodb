@@ -63,14 +63,27 @@ export interface NoteView {
   sorts?: { property: string; direction: "asc" | "desc" }[];
 }
 
+/** A database row — itself a page node (noteId = node id). */
 export interface NoteRecord {
   noteId: string;
   title: string;
-  content: { text?: string; doc?: unknown } & Record<string, unknown>;
+  icon: string | null;
+  cover: string | null;
+  isFavorite: boolean;
+  content: { doc?: unknown } & Record<string, unknown>;
   preview: string;
   createdAt: string;
   updatedAt: string;
   props: Record<string, unknown>;
+}
+
+export interface RowPatch {
+  title?: string;
+  icon?: string | null;
+  cover?: string | null;
+  content?: unknown;
+  preview?: string;
+  props?: Record<string, unknown>;
 }
 
 interface NotesPayload {
@@ -81,48 +94,40 @@ interface NotesPayload {
 
 type ViewHook = ReturnType<typeof useNotesView>;
 
-export function useNotesView(groupId: string | null) {
+export function useNotesView(databaseId: string | null) {
   const queryClient = useQueryClient();
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
 
   const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ["notes", "group", groupId] });
+    void queryClient.invalidateQueries({ queryKey: ["notes", "database", databaseId] });
   };
 
   const payload = useQuery({
-    queryKey: ["notes", "group", groupId],
-    queryFn: () => api<NotesPayload>(`/api/notes/groups/${groupId}/notes`),
-    enabled: !!groupId,
+    queryKey: ["notes", "database", databaseId],
+    queryFn: () => api<NotesPayload>(`/api/notes/databases/${databaseId}/rows`),
+    enabled: !!databaseId,
   });
 
   const views = payload.data?.views ?? [];
   const activeView = views.find((v) => v.id === activeViewId) ?? views[0] ?? null;
 
   const createNote = useMutation({
-    mutationFn: ({ text, props }: { text?: string; props?: Record<string, unknown> }) =>
-      api<{ noteId: string }>(`/api/notes/groups/${groupId}/notes`, {
+    mutationFn: ({ title, props }: { title?: string; props?: Record<string, unknown> } = {}) =>
+      api<{ noteId: string }>(`/api/notes/databases/${databaseId}/rows`, {
         method: "POST",
-        body: JSON.stringify({ content: { text: text ?? "" }, preview: (text ?? "").slice(0, 120), ...(props ? { props } : {}) }),
+        body: JSON.stringify({ ...(title ? { title } : {}), ...(props ? { props } : {}) }),
       }),
     onSuccess: invalidate,
   });
 
   const updateNote = useMutation({
-    mutationFn: ({ noteId, title, content, preview, props }: { noteId: string; title?: string; content?: unknown; preview?: string; props?: Record<string, unknown> }) =>
-      api(`/api/notes/groups/${groupId}/notes/${noteId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          ...(title !== undefined ? { title } : {}),
-          ...(content !== undefined ? { content } : {}),
-          ...(preview !== undefined ? { preview } : {}),
-          ...(props !== undefined ? { props } : {}),
-        }),
-      }),
+    mutationFn: ({ noteId, ...patch }: RowPatch & { noteId: string }) =>
+      api(`/api/notes/databases/${databaseId}/rows/${noteId}`, { method: "PATCH", body: JSON.stringify(patch) }),
     onSuccess: invalidate,
   });
 
   const deleteNote = useMutation({
-    mutationFn: (noteId: string) => api(`/api/notes/groups/${groupId}/notes/${noteId}`, { method: "DELETE" }),
+    mutationFn: (noteId: string) => api(`/api/notes/databases/${databaseId}/rows/${noteId}`, { method: "DELETE" }),
     onSuccess: invalidate,
   });
 
@@ -132,7 +137,7 @@ export function useNotesView(groupId: string | null) {
 
   const addProperty = useMutation({
     mutationFn: ({ name, type, options }: { name: string; type: NotePropertyType; options?: string[] }) =>
-      api<NoteProperty>(`/api/notes/groups/${groupId}/properties`, {
+      api<NoteProperty>(`/api/notes/databases/${databaseId}/properties`, {
         method: "POST",
         body: JSON.stringify({
           name,
@@ -153,24 +158,24 @@ export function useNotesView(groupId: string | null) {
 
   const renameProperty = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
-      api(`/api/notes/groups/${groupId}/properties/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+      api(`/api/notes/databases/${databaseId}/properties/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }),
     onSuccess: invalidate,
   });
 
   const setPropertyType = useMutation({
     mutationFn: ({ id, type }: { id: string; type: NotePropertyType }) =>
-      api(`/api/notes/groups/${groupId}/properties/${id}`, { method: "PATCH", body: JSON.stringify({ type }) }),
+      api(`/api/notes/databases/${databaseId}/properties/${id}`, { method: "PATCH", body: JSON.stringify({ type }) }),
     onSuccess: invalidate,
   });
 
   const deleteProperty = useMutation({
-    mutationFn: (id: string) => api(`/api/notes/groups/${groupId}/properties/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => api(`/api/notes/databases/${databaseId}/properties/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
   });
 
   const setPropertyOptions = useMutation({
     mutationFn: ({ id, options }: { id: string; options: NotePropertyOption[] }) =>
-      api(`/api/notes/groups/${groupId}/properties/${id}`, {
+      api(`/api/notes/databases/${databaseId}/properties/${id}`, {
         method: "PATCH",
         body: JSON.stringify({ options }),
       }),
@@ -179,12 +184,12 @@ export function useNotesView(groupId: string | null) {
 
   const updateView = useMutation({
     mutationFn: ({ id, groupBy }: { id: string; groupBy: string | null }) =>
-      api(`/api/notes/groups/${groupId}/views/${id}`, { method: "PATCH", body: JSON.stringify({ groupBy }) }),
+      api(`/api/notes/databases/${databaseId}/views/${id}`, { method: "PATCH", body: JSON.stringify({ groupBy }) }),
     onSuccess: invalidate,
   });
 
   const addView = useMutation({
-    mutationFn: ({ type }: { type: NoteViewType }) => api<NoteView>(`/api/notes/groups/${groupId}/views`, { method: "POST", body: JSON.stringify({ type }) }),
+    mutationFn: ({ type }: { type: NoteViewType }) => api<NoteView>(`/api/notes/databases/${databaseId}/views`, { method: "POST", body: JSON.stringify({ type }) }),
     onSuccess: (view) => {
       invalidate();
       setActiveViewId(view.id);
@@ -192,7 +197,7 @@ export function useNotesView(groupId: string | null) {
   });
 
   const deleteView = useMutation({
-    mutationFn: (id: string) => api(`/api/notes/groups/${groupId}/views/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => api(`/api/notes/databases/${databaseId}/views/${id}`, { method: "DELETE" }),
     onSuccess: (_data, id) => {
       invalidate();
       if (activeViewId === id) setActiveViewId(null);
@@ -200,7 +205,7 @@ export function useNotesView(groupId: string | null) {
   });
 
   return {
-    groupId,
+    databaseId,
     payload,
     views,
     activeView,

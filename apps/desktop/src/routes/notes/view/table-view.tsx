@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ColumnDef, VisibilityState } from "@tanstack/react-table";
-import { Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { CellDisplayFor, CellEditFor } from "@/components/ui/property-cell";
 import { DataGridTable } from "@/components/ui/data-grid-table";
 import { ColumnMenu } from "./column-menu";
 import type { NoteProperty, NoteRecord, NotesViewHook } from "./use-notes-view";
 import { cn } from "@/lib/utils";
 
-const PREVIEW_COLUMN_ID = "preview";
+/** Notion "Name" column — the row page's title. */
+const NAME_COLUMN_ID = "name";
 const UPDATED_COLUMN_ID = "updated";
 const ADD_PROPERTY_COLUMN_ID = "__add_property__";
 
@@ -44,7 +45,7 @@ export function TableView({
   onColumnVisibilityChange: (updater: VisibilityState | ((prev: VisibilityState) => VisibilityState)) => void;
 }) {
   // New row — creates an empty note (same as the toolbar "Note" button).
-  const addRow = () => view.createNote.mutate({ text: "" });
+  const addRow = () => view.createNote.mutate({});
 
   const insertProperty = (side: "left" | "right", pivotId: string) => {
     void view.addProperty.mutateAsync({ name: "New property", type: "text" }).then((row) => {
@@ -79,13 +80,19 @@ export function TableView({
   const tableColumns = useMemo<ColumnDef<NoteRecord, unknown>[]>(
     () => [
       {
-        id: PREVIEW_COLUMN_ID,
-        accessorFn: (note) => note.preview ?? "",
-        header: "Preview",
+        id: NAME_COLUMN_ID,
+        accessorFn: (note) => note.title ?? "",
+        header: "Name",
         size: 256,
+        // whole cell opens the row page (side editor on desktop)
         cell: ({ row }) => (
-          <button type="button" className="text-left text-xs" onClick={() => setOpenNoteId(row.original.noteId)}>
-            <span className="block max-w-60 truncate">{row.original.preview || "(empty)"}</span>
+          <button
+            type="button"
+            className="flex h-full w-full items-center gap-1.5 text-left text-[13px] font-medium"
+            onClick={() => setOpenNoteId(row.original.noteId)}
+          >
+            <FileText size={13} className="text-muted-foreground/60 shrink-0" aria-hidden="true" />
+            <span className={cn("truncate", !row.original.title && "text-muted-foreground/60 font-normal")}>{row.original.title || "Untitled"}</span>
           </button>
         ),
       },
@@ -185,7 +192,7 @@ export function TableView({
   // mirror the grid's cellStyle so the count row stays column-aligned.
   const countRow = useMemo(() => {
     const cellFilled = (colId: string, note: NoteRecord): boolean => {
-      if (colId === PREVIEW_COLUMN_ID) return Boolean(note.preview?.trim());
+      if (colId === NAME_COLUMN_ID) return Boolean(note.title?.trim());
       if (colId === UPDATED_COLUMN_ID) return true;
       if (colId === ADD_PROPERTY_COLUMN_ID) return false;
       const prop = columns.find((c) => c.id === colId);

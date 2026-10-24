@@ -281,6 +281,16 @@
   pointer-events: none;
 }
 
+/* inline database block */
+.note-database-block {
+  border-radius: 6px;
+  user-select: none;
+}
+.note-database-block[data-selected="true"] {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+}
+
 /* resizable image node */
 .note-image {
   display: inline-block;

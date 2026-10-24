@@ -28,7 +28,7 @@ import { CalendarSettingsSection } from "./routes/settings/calendar/calendar-set
 import { LogsSection } from "./routes/settings/logs/logs";
 import { FilesScene } from "./routes/files/files-scene";
 import { NotesScene } from "./routes/notes/notes-scene";
-import { NotePageScene } from "./routes/notes/note-page";
+import { DatabasesScene } from "./routes/notes/databases-scene";
 import { EmailScene } from "./routes/email/email-scene";
 import { ContactsScene } from "./routes/contacts/contacts-scene";
 import { ChatScene } from "./routes/chat/chat-scene";
@@ -120,9 +120,9 @@ export const router = createBrowserRouter([
       { path: "/apps/automations", Component: AutomationsScene },
       { path: "/apps/showcase", Component: ShowcaseScene },
       { path: "/apps/notes", Component: NotesScene },
-      { path: "/apps/notes/:groupId", Component: NotesScene },
-      { path: "/apps/notes/:groupId/:noteId", Component: NotesScene },
-      { path: "/apps/notes/:groupId/:noteId/page", Component: NotePageScene },
+      { path: "/apps/notes/databases", Component: DatabasesScene },
+      { path: "/apps/notes/:nodeId", Component: NotesScene },
+      { path: "/apps/notes/:nodeId/:rowId", Component: NotesScene },
       { path: "/apps/files", Component: FilesScene },
       { path: "/apps/:appId", Component: AppPage },
     ],

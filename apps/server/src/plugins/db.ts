@@ -1,4 +1,4 @@
-import { type ColumnType, type Generated, Kysely, PostgresDialect } from "kysely";
+import { type ColumnType, type Generated, Kysely, PostgresDialect, type Selectable, type Updateable } from "kysely";
 import { Pool } from "pg";
 
 export interface UserTable {
@@ -530,9 +530,9 @@ export interface CodeSessionArtifactTable {
   updatedAt: Date;
 }
 
-export type NoteKind = "section" | "folder" | "notes" | "checklist" | "table" | "sheet" | "canvas";
-
-export type NoteGroupType = "notes" | "checklist" | "table" | "sheet" | "canvas";
+/** Notion-style notes: everything is a node. Database rows are `page` nodes
+ *  whose parent is a `database`. */
+export type NoteKind = "section" | "page" | "database";
 
 export type NotePropertyType =
   "text" | "number" | "select" | "multiselect" | "status" | "date" | "person" | "files & media" | "checkbox" | "url" | "phone" | "email" | "id" | "place";
@@ -566,37 +566,38 @@ export interface NoteViewDef {
   widths?: Record<string, number>;
 }
 
-export interface NoteGroupMetadata {
+/** Database schema — property definitions + saved views. */
+export interface NoteDatabaseSchema {
   columns: NotePropertyDef[];
   views: NoteViewDef[];
-  /** Page decorations — header icon/cover as twodb:// uris. */
-  icon?: string | null;
-  cover?: string | null;
-  [key: string]: unknown;
 }
 
 export interface NoteNodeTable {
   id: string;
   organizationId: string;
+  /** null only for sections. */
   parentId: string | null;
   kind: NoteKind;
-  name: string;
-  position: number;
-  isFavorite: boolean;
-  metadata: NoteGroupMetadata | null;
+  title: Generated<string>;
+  /** twodb:// uri or emoji. */
+  icon: ColumnType<string | null, string | null | undefined, string | null>;
+  cover: ColumnType<string | null, string | null | undefined, string | null>;
+  /** Pages: tiptap doc JSON. */
+  content: ColumnType<Record<string, unknown> | null, Record<string, unknown> | null | undefined, Record<string, unknown> | null>;
+  preview: Generated<string>;
+  /** Databases only. */
+  schema: ColumnType<NoteDatabaseSchema | null, NoteDatabaseSchema | null | undefined, NoteDatabaseSchema | null>;
+  /** Database embedded as a block in its parent page's content. */
+  inline: Generated<boolean>;
+  position: Generated<number>;
+  isFavorite: Generated<boolean>;
+  deletedAt: ColumnType<Date | null, Date | null | undefined, Date | null>;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface NoteItemTable {
-  id: string;
-  nodeId: string;
-  title: string;
-  content: Record<string, unknown>;
-  preview: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export type NoteNode = Selectable<NoteNodeTable>;
+export type NoteNodeUpdate = Updateable<NoteNodeTable>;
 
 export interface OrgApiKeyTable {
   id: string;
@@ -1339,7 +1340,6 @@ export interface Database {
   chat_draft: ChatDraftTable;
   chat_read_state: ChatReadStateTable;
   note_node: NoteNodeTable;
-  note_item: NoteItemTable;
   server_setting: ServerSettingTable;
   api_key: OrgApiKeyTable;
   device: DeviceTable;

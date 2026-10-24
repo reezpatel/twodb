@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { CheckCircleIcon, ListCheckIcon, ListChecks, Paperclip, SquarePen } from "lucide-react";
+import { ListCheckIcon, Paperclip, SquarePen } from "lucide-react";
 import { ToolBlock, type ToolViewProps } from "./tool-block";
 
 /**
@@ -48,7 +48,7 @@ function ReadAssetChip({ uri }: { uri: string }) {
 }
 
 /** update_plan — the plan itself lives in the sidebar; just note the change. */
-function PlanUpdatedChip({ failed }: { failed?: boolean }) {
+function PlanUpdatedChip(_props: { failed?: boolean }) {
   return (
     <div className="flex items-center gap-2  mb-2">
       <ListCheckIcon className="size-4 text-info/90" />

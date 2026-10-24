@@ -1,56 +1,75 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Editor, JSONContent } from "@tiptap/core";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
-import type { NoteRecord, NotesViewHook } from "../view/use-notes-view";
 import { ResizableImage } from "./resizable-image";
-import { useSlashCommand } from "./slash-command";
+import { DatabaseBlock } from "./database-block";
+import { useSlashCommand, type SlashContext } from "./slash-command";
 
-/** Page decoration fields kept beside {doc} in the note's content JSON. */
-export interface NoteDecorations {
+/** What the editor edits — a standalone page or a database row (also a page). */
+export interface EditablePage {
+  id: string;
+  title: string;
+  icon: string | null;
+  cover: string | null;
+  content: { doc?: unknown } | null;
+  updatedAt: string;
+  props?: Record<string, unknown>;
+}
+
+export interface PagePatch {
+  title?: string;
   icon?: string | null;
   cover?: string | null;
+  content?: unknown;
+  preview?: string;
+  props?: Record<string, unknown>;
 }
 
-/** Legacy notes stored {text}; newer ones store {doc} from the tiptap JSON. */
-function toTiptapDoc(content: NoteRecord["content"]): JSONContent | "" {
-  if (content?.doc && typeof content.doc === "object") return content.doc as JSONContent;
-  const text = typeof content?.text === "string" ? content.text : "";
-  if (!text.trim()) return "";
-  return {
-    type: "doc",
-    content: text.split(/\n{2,}/).map((paragraph) => ({
-      type: "paragraph",
-      content: paragraph ? [{ type: "text", text: paragraph.replace(/\n/g, " ") }] : [],
-    })),
+/** Where edits go: PATCH /nodes/:id for pages, the database rows endpoint for rows. */
+export interface PageSaver {
+  save: (patch: PagePatch) => Promise<unknown>;
+  saving: boolean;
+  remove?: () => void;
+}
+
+function toTiptapDoc(content: EditablePage["content"]): JSONContent | "" {
+  const doc = content?.doc;
+  return doc && typeof doc === "object" ? (doc as JSONContent) : "";
+}
+
+/** Inline database ids referenced by the doc — when this set changes the
+ *  sidebar must refresh (a removed block turns its database dangling). */
+function databaseIds(doc: JSONContent): string {
+  const ids: string[] = [];
+  const walk = (n: JSONContent) => {
+    if (n.type === "databaseBlock" && typeof n.attrs?.databaseId === "string") ids.push(n.attrs.databaseId);
+    n.content?.forEach(walk);
   };
+  walk(doc);
+  return ids.sort().join(",");
 }
 
-export function readDecorations(content: NoteRecord["content"]): NoteDecorations {
-  const icon = (content as Record<string, unknown>)?.icon;
-  const cover = (content as Record<string, unknown>)?.cover;
-  return { icon: typeof icon === "string" ? icon : null, cover: typeof cover === "string" ? cover : null };
-}
-
-/** Tiptap-backed editor for one note with debounced autosave of {doc} + preview. */
-export function useNoteEditor(note: NoteRecord, update: NotesViewHook["updateNote"]) {
-  const slash = useSlashCommand();
+/** Tiptap editor for one page with debounced autosave of {doc} + preview. */
+export function useNoteEditor(page: EditablePage, saver: PageSaver, opts: { slash?: SlashContext; onEmbedsChanged?: () => void } = {}) {
+  const slash = useSlashCommand(opts.slash);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSaved = useRef<string>("");
-  const decorations = useRef<NoteDecorations>(readDecorations(note.content));
+  const lastSaved = useRef<string>(JSON.stringify(page.content?.doc ?? null));
+  const lastEmbeds = useRef<string>(databaseIds((page.content?.doc as JSONContent) ?? { type: "doc" }));
+  const [isEmpty, setIsEmpty] = useState(true);
 
-  const persist = (editor: Editor) => {
+  const persist = async (editor: Editor) => {
     const doc = editor.getJSON();
-    const content = { doc, ...decorations.current };
-    const json = JSON.stringify(content);
+    const json = JSON.stringify(doc);
     if (json === lastSaved.current) return;
     lastSaved.current = json;
-    update.mutate({
-      noteId: note.noteId,
-      content,
-      preview: editor.getText().trim().slice(0, 120),
-    });
+    await saver.save({ content: { doc }, preview: editor.getText().trim().slice(0, 120) });
+    const embeds = databaseIds(doc);
+    if (embeds !== lastEmbeds.current) {
+      lastEmbeds.current = embeds;
+      opts.onEmbedsChanged?.();
+    }
   };
 
   const editor = useEditor({
@@ -58,40 +77,38 @@ export function useNoteEditor(note: NoteRecord, update: NotesViewHook["updateNot
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Placeholder.configure({ placeholder: "Write something… type / for blocks" }),
       ResizableImage,
+      DatabaseBlock,
       slash.extension,
     ],
-    content: toTiptapDoc(note.content),
+    content: toTiptapDoc(page.content),
     editorProps: { attributes: { class: "tiptap-prose", spellcheck: "true" } },
+    onCreate: ({ editor: current }) => setIsEmpty(current.isEmpty),
     onUpdate: ({ editor: current }) => {
+      setIsEmpty(current.isEmpty);
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => persist(current), 800);
+      saveTimer.current = setTimeout(() => void persist(current), 800);
     },
   });
 
-  // flush pending text when switching notes or leaving the editor
+  // flush pending text when switching pages or unmounting
   useEffect(() => {
-    decorations.current = readDecorations(note.content);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (editor && !editor.isDestroyed) void persist(editor);
     };
-  }, [note.noteId, note.content]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page.id, editor]);
 
-  const saveNow = () => {
+  const saveNow = async () => {
     if (!editor) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    persist(editor);
-  };
-
-  /** Persist icon/cover immediately (they live outside the tiptap doc). */
-  const setDecorations = (patch: NoteDecorations) => {
-    decorations.current = { ...decorations.current, ...patch };
-    if (editor) persist(editor);
+    await persist(editor);
   };
 
   const setProp = (propId: string, value: unknown) => {
-    saveNow();
-    update.mutate({ noteId: note.noteId, props: { [propId]: value } });
+    void saveNow();
+    void saver.save({ props: { [propId]: value } });
   };
 
-  return { editor, slashPopup: slash.popup, saveNow, setProp, setDecorations, saving: update.isPending };
+  return { editor, slashPopup: slash.popup, saveNow, setProp, isEmpty, saving: saver.saving };
 }

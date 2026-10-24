@@ -27,6 +27,7 @@ import { up as codeSessionJobs } from "./0025-code-session-jobs";
 import { up as codeSessionArchived } from "./0026-code-session-archived";
 import { up as runnerMetrics } from "./0027-runner-metrics";
 import { up as runnerAwsConfig } from "./0028-runner-aws-config";
+import { up as notesPagesDatabases } from "./0029-notes-pages-databases";
 
 // Keys sort lexicographically — prefix new migrations with the next number.
 export const migrations: Record<string, Migration> = {
@@ -58,4 +59,5 @@ export const migrations: Record<string, Migration> = {
   "0026_code_session_archived": { up: codeSessionArchived },
   "0027_runner_metrics": { up: runnerMetrics },
   "0028_runner_aws_config": { up: runnerAwsConfig },
+  "0029_notes_pages_databases": { up: notesPagesDatabases },
 };

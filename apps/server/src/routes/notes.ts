@@ -1,118 +1,119 @@
 import { Hono } from "hono";
+import { sql } from "kysely";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
-import { defaultMetadata, dropGroupTable, ensureGroupTable, LEAF_KINDS } from "../lib/notes-tables";
+import { defaultSchema, ensureDatabaseTable, insertRowProps } from "../lib/notes-tables";
+import {
+  ancestors,
+  detachedInlineSql,
+  getNode,
+  isEmptyContent,
+  isSelfOrDescendant,
+  nextPosition,
+  restore,
+  softDelete,
+  type NoteNode,
+} from "../lib/notes-nodes";
 import { readAssetBytesById, storeNoteAsset } from "../lib/assets";
 import { logger } from "../lib/logger";
-import type { NoteGroupMetadata, NoteKind, NoteNodeTable } from "../plugins/db";
+import type { NoteNodeUpdate } from "../plugins/db";
 
-const isLeafKind = (kind: string) => (LEAF_KINDS as readonly string[]).includes(kind);
-
-interface NodeRef {
-  id: string;
-  parentId: string | null;
-  kind: string;
-}
-
-/** Collects a node and all its descendants. */
-async function collectSubtreeIds(rootId: string, organizationId: string): Promise<string[]> {
-  const out = [rootId];
-  let frontier = [rootId];
-  while (frontier.length > 0) {
-    const children = await db.selectFrom("note_node").select("id").where("organizationId", "=", organizationId).where("parentId", "in", frontier).execute();
-    frontier = children.map((c) => c.id);
-    out.push(...frontier);
-  }
-  return out;
-}
-
-/** Drops physical tables for every leaf node in the subtree (excluding the root itself if not a leaf). */
-async function dropSubtreeTables(subtree: string[], organizationId: string) {
-  if (subtree.length <= 1) return;
-  const leaves = await db
-    .selectFrom("note_node")
-    .select("id")
-    .where("organizationId", "=", organizationId)
-    .where("id", "in", subtree)
-    .where("kind", "in", [...LEAF_KINDS])
-    .execute();
-  for (const leaf of leaves) await dropGroupTable(db, leaf.id);
-}
-
-/** Walks the parent chain to the owning section node id. */
-async function sectionOfNode(organizationId: string, nodeId: string): Promise<string | null> {
-  let current: string | null = nodeId;
-  for (let depth = 0; current && depth < 64; depth++) {
-    const node = await db
-      .selectFrom("note_node")
-      .select(["id", "parentId", "kind"])
-      .where("id", "=", current)
-      .where("organizationId", "=", organizationId)
-      .executeTakeFirst();
-    if (!node) return null;
-    if (node.kind === "section") return node.id;
-    current = node.parentId;
-  }
-  return null;
-}
-
-async function nextPosition(organizationId: string, parentId: string, kinds: NoteKind[]): Promise<number> {
-  const [{ max }] = await db
-    .selectFrom("note_node")
-    .select((eb) => eb.fn.max("position").as("max"))
-    .where("organizationId", "=", organizationId)
-    .where("parentId", "=", parentId)
-    .where("kind", "in", kinds)
-    .execute();
-  return (max ?? -1) + 1;
-}
-
-/** /tree response derives the legacy folder/group fields from the unified node rows. */
-function treeResponse(nodes: NoteNodeTable[]) {
-  const byId = new Map<string, NodeRef>(nodes.map((n) => [n.id, { id: n.id, parentId: n.parentId, kind: n.kind }]));
-  const sectionOfRef = (nodeId: string): string | null => {
-    let current: string | null = nodeId;
-    for (let depth = 0; current && depth < 64; depth++) {
-      const node = byId.get(current);
-      if (!node) return null;
-      if (node.kind === "section") return node.id;
-      current = node.parentId;
-    }
-    return null;
+/** Sidebar-facing shape: no content/schema payloads. */
+function treeNode(
+  n: Pick<NoteNode, "id" | "parentId" | "kind" | "title" | "icon" | "inline" | "position" | "isFavorite" | "updatedAt">,
+  extra: { isRow: boolean; dangling: boolean },
+) {
+  return {
+    id: n.id,
+    parentId: n.parentId,
+    kind: n.kind,
+    title: n.title,
+    icon: n.icon,
+    inline: n.inline,
+    position: n.position,
+    isFavorite: n.isFavorite,
+    updatedAt: n.updatedAt,
+    ...extra,
   };
+}
 
-  const sections = nodes.filter((n) => n.kind === "section");
-  const folders = nodes
-    .filter((n) => n.kind === "folder")
-    .map((n) => {
-      const parent = n.parentId ? byId.get(n.parentId) : undefined;
-      return { ...n, sectionId: sectionOfRef(n.id) ?? "", parentId: parent && parent.kind === "folder" ? parent.id : null };
-    });
-  const groups = nodes.filter((n) => isLeafKind(n.kind)).map((n) => ({ ...n, folderId: n.parentId ?? "", type: n.kind }));
-  return { sections, folders, groups };
+/** Full node payload for the page/database scene. */
+async function nodeDetail(organizationId: string, node: NoteNode) {
+  const [crumbs, children] = await Promise.all([
+    ancestors(organizationId, node),
+    db
+      .selectFrom("note_node")
+      .select((eb) => eb.fn.countAll<number>().as("count"))
+      .where("organizationId", "=", organizationId)
+      .where("parentId", "=", node.id)
+      .where("deletedAt", "is", null)
+      .executeTakeFirst(),
+  ]);
+  const parent = crumbs.at(-1) ?? null;
+  return {
+    ...node,
+    ancestors: crumbs,
+    childCount: Number(children?.count ?? 0),
+    isRow: parent?.kind === "database",
+    isEmpty: node.kind === "page" && isEmptyContent(node.content) && Number(children?.count ?? 0) === 0,
+  };
+}
+
+function str(v: unknown, max = 500): string | undefined {
+  return typeof v === "string" ? v.slice(0, max) : undefined;
 }
 
 export const notesRoutes = new Hono()
+  /** Sections, pages and databases for the sidebar. Database rows are left
+   *  out (they live in the database views) unless starred. Dangling =
+   *  database whose parent was deleted, or inline database whose block was
+   *  removed from its page. */
   .get("/tree", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
 
-    const nodes = await db
-      .selectFrom("note_node")
-      .selectAll()
-      .where("organizationId", "=", s.organizationId)
-      .orderBy("position", "asc")
-      .orderBy("createdAt", "asc")
+    const rows = await db
+      .selectFrom("note_node as n")
+      .leftJoin("note_node as p", "p.id", "n.parentId")
+      .select([
+        "n.id",
+        "n.parentId",
+        "n.kind",
+        "n.title",
+        "n.icon",
+        "n.inline",
+        "n.position",
+        "n.isFavorite",
+        "n.updatedAt",
+        "p.kind as parentKind",
+        "p.deletedAt as parentDeletedAt",
+        "p.id as parentExists",
+        detachedInlineSql("n", "p").as("detached"),
+      ])
+      .where("n.organizationId", "=", s.organizationId)
+      .where("n.deletedAt", "is", null)
+      .orderBy("n.position", "asc")
+      .orderBy("n.createdAt", "asc")
       .execute();
-    return c.json(treeResponse(nodes));
+
+    const nodes = [];
+    for (const r of rows) {
+      const isRow = r.parentKind === "database";
+      if (isRow && (!r.isFavorite || r.parentDeletedAt)) continue;
+      const orphaned = r.parentId !== null && (!r.parentExists || r.parentDeletedAt !== null);
+      const dangling = r.kind === "database" && (orphaned || Boolean(r.detached));
+      // pages under a deleted parent are unreachable (their batch was deleted with it)
+      if (r.kind !== "database" && !isRow && orphaned) continue;
+      nodes.push(treeNode(r, { isRow, dangling }));
+    }
+    return c.json({ nodes });
   })
 
   .post("/sections", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-
     const body = await c.req.json().catch(() => null);
-    const name = typeof body?.name === "string" && body.name.trim() ? body.name.trim() : "New section";
+    const title = str(body?.title, 200)?.trim() || "New section";
     const now = new Date();
     const row = await db
       .insertInto("note_node")
@@ -121,10 +122,8 @@ export const notesRoutes = new Hono()
         organizationId: s.organizationId,
         parentId: null,
         kind: "section",
-        name,
-        position: await nextPosition(s.organizationId, "", ["section"]),
-        isFavorite: false,
-        metadata: null,
+        title,
+        position: await nextPosition(s.organizationId, null),
         createdAt: now,
         updatedAt: now,
       })
@@ -133,76 +132,20 @@ export const notesRoutes = new Hono()
     return c.json(row, 201);
   })
 
-  .patch("/sections/:id", async (c) => {
+  /** Create a page (default) or database under a section/page. Under a
+   *  database the new node is a row page and gets a property row. */
+  .post("/nodes", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-
-    const section = await db
-      .selectFrom("note_node")
-      .select("id")
-      .where("id", "=", c.req.param("id"))
-      .where("kind", "=", "section")
-      .where("organizationId", "=", s.organizationId)
-      .executeTakeFirst();
-    if (!section) return c.json({ error: "section_not_found" }, 404);
-
     const body = await c.req.json().catch(() => null);
-    const name = typeof body?.name === "string" ? body.name.trim() : "";
-    if (!name) return c.json({ error: "invalid_name" }, 400);
+    const parentId = str(body?.parentId);
+    if (!parentId) return c.json({ error: "parentId_required" }, 400);
+    const parent = await getNode(s.organizationId, parentId);
+    if (!parent) return c.json({ error: "parent_not_found" }, 404);
 
-    const row = await db.updateTable("note_node").set({ name, updatedAt: new Date() }).where("id", "=", section.id).returningAll().executeTakeFirst();
-    return c.json(row);
-  })
-
-  .delete("/sections/:id", async (c) => {
-    const s = await requireOrgSession(c);
-    if (!s) return c.body(null, 401);
-
-    const section = await db
-      .selectFrom("note_node")
-      .select("id")
-      .where("id", "=", c.req.param("id"))
-      .where("kind", "=", "section")
-      .where("organizationId", "=", s.organizationId)
-      .executeTakeFirst();
-    if (!section) return c.json({ error: "section_not_found" }, 404);
-
-    const subtree = await collectSubtreeIds(section.id, s.organizationId);
-    await dropSubtreeTables(subtree, s.organizationId);
-    await db.deleteFrom("note_node").where("id", "=", section.id).execute();
-    return c.json({ ok: true });
-  })
-
-  .post("/folders", async (c) => {
-    const s = await requireOrgSession(c);
-    if (!s) return c.body(null, 401);
-
-    const body = await c.req.json().catch(() => null);
-    const sectionId = typeof body?.sectionId === "string" ? body.sectionId : "";
-    const parentId = typeof body?.parentId === "string" && body.parentId ? body.parentId : null;
-    const name = typeof body?.name === "string" && body.name.trim() ? body.name.trim() : "New folder";
-    if (!sectionId) return c.json({ error: "sectionId_required" }, 400);
-
-    const section = await db
-      .selectFrom("note_node")
-      .select("id")
-      .where("id", "=", sectionId)
-      .where("kind", "=", "section")
-      .where("organizationId", "=", s.organizationId)
-      .executeTakeFirst();
-    if (!section) return c.json({ error: "section_not_found" }, 404);
-
-    if (parentId) {
-      const parent = await db
-        .selectFrom("note_node")
-        .select("id")
-        .where("id", "=", parentId)
-        .where("kind", "=", "folder")
-        .where("organizationId", "=", s.organizationId)
-        .executeTakeFirst();
-      if (!parent) return c.json({ error: "parent_not_found" }, 404);
-      if ((await sectionOfNode(s.organizationId, parentId)) !== sectionId) return c.json({ error: "cross_section_move" }, 400);
-    }
+    const kind = body?.kind === "database" ? "database" : "page";
+    if (parent.kind === "database" && kind !== "page") return c.json({ error: "database_rows_are_pages" }, 400);
+    const inline = kind === "database" && parent.kind === "page" && body?.inline === true;
 
     const now = new Date();
     const row = await db
@@ -210,221 +153,203 @@ export const notesRoutes = new Hono()
       .values({
         id: crypto.randomUUID(),
         organizationId: s.organizationId,
-        parentId: parentId ?? sectionId,
-        kind: "folder",
-        name,
-        position: await nextPosition(s.organizationId, parentId ?? sectionId, ["folder"]),
-        isFavorite: false,
-        metadata: null,
+        parentId: parent.id,
+        kind,
+        title: str(body?.title, 200) ?? "",
+        content: kind === "page" ? { doc: { type: "doc", content: [] } } : null,
+        schema: kind === "database" ? defaultSchema() : null,
+        inline,
+        position: await nextPosition(s.organizationId, parent.id),
         createdAt: now,
         updatedAt: now,
       })
       .returningAll()
       .executeTakeFirstOrThrow();
+
+    if (kind === "database") await ensureDatabaseTable(db, row.id);
+    if (parent.kind === "database") {
+      await ensureDatabaseTable(db, parent.id);
+      await insertRowProps(db, parent.id, row.id, {});
+    }
     return c.json(row, 201);
   })
 
-  .patch("/folders/:id", async (c) => {
+  .get("/nodes/:id", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-
-    const folder = await db
-      .selectFrom("note_node")
-      .selectAll()
-      .where("id", "=", c.req.param("id"))
-      .where("kind", "=", "folder")
-      .where("organizationId", "=", s.organizationId)
-      .executeTakeFirst();
-    if (!folder) return c.json({ error: "folder_not_found" }, 404);
-
-    const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ name: string; parentId: string }> = {};
-    if (body?.name !== undefined) {
-      const name = typeof body.name === "string" ? body.name.trim() : "";
-      if (!name) return c.json({ error: "invalid_name" }, 400);
-      patch.name = name;
-    }
-    if (body?.parentId !== undefined) {
-      const parentId = typeof body.parentId === "string" && body.parentId ? body.parentId : null;
-      const sectionId = await sectionOfNode(s.organizationId, folder.id);
-      const targetParent = parentId ?? sectionId;
-      if (!targetParent) return c.json({ error: "section_not_found" }, 404);
-      if (parentId) {
-        const parent = await db
-          .selectFrom("note_node")
-          .select("id")
-          .where("id", "=", parentId)
-          .where("kind", "=", "folder")
-          .where("organizationId", "=", s.organizationId)
-          .executeTakeFirst();
-        if (!parent) return c.json({ error: "parent_not_found" }, 404);
-        if ((await sectionOfNode(s.organizationId, parentId)) !== sectionId) return c.json({ error: "cross_section_move" }, 400);
-        const subtree = await collectSubtreeIds(folder.id, s.organizationId);
-        if (subtree.includes(parentId)) return c.json({ error: "cannot_move_into_descendant" }, 400);
-      }
-      patch.parentId = targetParent;
-    }
-    if (Object.keys(patch).length === 0) return c.json({ error: "empty_update" }, 400);
-
-    const movesParent = patch.parentId !== undefined && patch.parentId !== folder.parentId;
-    const position = movesParent ? await nextPosition(s.organizationId, patch.parentId!, ["folder"]) : folder.position;
-
-    const row = await db
-      .updateTable("note_node")
-      .set({ ...patch, ...(movesParent ? { position } : {}), updatedAt: new Date() })
-      .where("id", "=", folder.id)
-      .returningAll()
-      .executeTakeFirst();
-    return c.json(row);
+    // deleted nodes stay readable (opened from the databases browser)
+    const node = await getNode(s.organizationId, c.req.param("id"), { includeDeleted: true });
+    if (!node) return c.json({ error: "node_not_found" }, 404);
+    return c.json(await nodeDetail(s.organizationId, node));
   })
 
-  .delete("/folders/:id", async (c) => {
+  .patch("/nodes/:id", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-
-    const folder = await db
-      .selectFrom("note_node")
-      .select("id")
-      .where("id", "=", c.req.param("id"))
-      .where("kind", "=", "folder")
-      .where("organizationId", "=", s.organizationId)
-      .executeTakeFirst();
-    if (!folder) return c.json({ error: "folder_not_found" }, 404);
-
-    const subtree = await collectSubtreeIds(folder.id, s.organizationId);
-    await dropSubtreeTables(subtree, s.organizationId);
-    await db.deleteFrom("note_node").where("id", "in", subtree).execute();
-    return c.json({ ok: true });
-  })
-
-  .post("/groups", async (c) => {
-    const s = await requireOrgSession(c);
-    if (!s) return c.body(null, 401);
+    const node = await getNode(s.organizationId, c.req.param("id"), { includeDeleted: true });
+    if (!node) return c.json({ error: "node_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const folderId = typeof body?.folderId === "string" ? body.folderId : "";
-    const name = typeof body?.name === "string" && body.name.trim() ? body.name.trim() : "New group";
-    const rawType = typeof body?.type === "string" ? body.type : "notes";
-    if (!folderId) return c.json({ error: "folderId_required" }, 400);
-    if (!isLeafKind(rawType)) return c.json({ error: "invalid_type" }, 400);
-
-    const folder = await db
-      .selectFrom("note_node")
-      .select("id")
-      .where("id", "=", folderId)
-      .where("kind", "=", "folder")
-      .where("organizationId", "=", s.organizationId)
-      .executeTakeFirst();
-    if (!folder) return c.json({ error: "folder_not_found" }, 404);
-
-    const now = new Date();
-    const row = await db
-      .insertInto("note_node")
-      .values({
-        id: crypto.randomUUID(),
-        organizationId: s.organizationId,
-        parentId: folderId,
-        kind: rawType as NoteKind,
-        name,
-        position: await nextPosition(s.organizationId, folderId, [...LEAF_KINDS]),
-        isFavorite: false,
-        metadata: defaultMetadata(),
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returningAll()
-      .executeTakeFirstOrThrow();
-    await ensureGroupTable(db, row.id);
-    return c.json(row, 201);
-  })
-
-  .patch("/groups/:id", async (c) => {
-    const s = await requireOrgSession(c);
-    if (!s) return c.body(null, 401);
-
-    const group = await db
-      .selectFrom("note_node")
-      .selectAll()
-      .where("id", "=", c.req.param("id"))
-      .where("organizationId", "=", s.organizationId)
-      .executeTakeFirst();
-    if (!group || !isLeafKind(group.kind)) return c.json({ error: "group_not_found" }, 404);
-
-    const body = await c.req.json().catch(() => null);
-    const patch: Partial<{ name: string; kind: NoteKind; isFavorite: boolean; parentId: string; metadata: NoteGroupMetadata }> = {};
-    if (body?.name !== undefined) {
-      const name = typeof body.name === "string" ? body.name.trim() : "";
-      if (!name) return c.json({ error: "invalid_name" }, 400);
-      patch.name = name;
-    }
-    if (body?.type !== undefined) {
-      if (typeof body.type !== "string" || !isLeafKind(body.type)) return c.json({ error: "invalid_type" }, 400);
-      patch.kind = body.type as NoteKind;
+    const patch: NoteNodeUpdate = {};
+    if (body?.title !== undefined) {
+      if (typeof body.title !== "string") return c.json({ error: "invalid_title" }, 400);
+      patch.title = body.title.slice(0, 200);
     }
     if (body?.isFavorite !== undefined) patch.isFavorite = Boolean(body.isFavorite);
-    // Page decorations (icon/cover) live in metadata; merged so unrelated
-    // keys (views/columns defaults) survive.
-    if (body?.icon !== undefined || body?.cover !== undefined) {
-      const base = (group.metadata as Record<string, unknown> | null) ?? {};
-      const next = { ...base } as NoteGroupMetadata;
-      if (body?.icon !== undefined) next.icon = typeof body.icon === "string" ? body.icon : null;
-      if (body?.cover !== undefined) next.cover = typeof body.cover === "string" ? body.cover : null;
-      patch.metadata = next;
+    if (typeof body?.position === "number" && Number.isFinite(body.position)) patch.position = body.position;
+    if (node.kind !== "section") {
+      if (body?.icon !== undefined) patch.icon = typeof body.icon === "string" ? body.icon : null;
+      if (body?.cover !== undefined) patch.cover = typeof body.cover === "string" ? body.cover : null;
+    }
+    if (node.kind === "page") {
+      if (body?.content !== undefined) {
+        if (typeof body.content !== "object" || body.content === null) return c.json({ error: "invalid_content" }, 400);
+        patch.content = body.content as Record<string, unknown>;
+      }
+      if (body?.preview !== undefined) patch.preview = String(body.preview).slice(0, 200);
     }
 
-    const movesFolder = typeof body?.folderId === "string" && body.folderId !== group.parentId;
-    if (movesFolder) {
-      const folder = await db
-        .selectFrom("note_node")
-        .select("id")
-        .where("id", "=", body.folderId)
-        .where("kind", "=", "folder")
-        .where("organizationId", "=", s.organizationId)
-        .executeTakeFirst();
-      if (!folder) return c.json({ error: "folder_not_found" }, 404);
-      patch.parentId = body.folderId;
+    // Move: pages/databases re-parent under a section or page (never into a
+    // database — rows are created there). A moved database is no longer inline.
+    if (typeof body?.parentId === "string" && body.parentId !== node.parentId) {
+      if (node.kind === "section") return c.json({ error: "sections_are_roots" }, 400);
+      const target = await getNode(s.organizationId, body.parentId);
+      if (!target || target.kind === "database") return c.json({ error: "invalid_parent" }, 400);
+      if (await isSelfOrDescendant(s.organizationId, node.id, target.id)) return c.json({ error: "cycle" }, 400);
+      patch.parentId = target.id;
+      patch.inline = false;
+      if (patch.position === undefined) patch.position = await nextPosition(s.organizationId, target.id);
     }
     if (Object.keys(patch).length === 0) return c.json({ error: "empty_update" }, 400);
 
-    const position = movesFolder ? await nextPosition(s.organizationId, body.folderId, [...LEAF_KINDS]) : group.position;
-
     const row = await db
       .updateTable("note_node")
-      .set({ ...patch, ...(movesFolder ? { position } : {}), updatedAt: new Date() })
-      .where("id", "=", group.id)
+      .set({ ...patch, updatedAt: new Date() })
+      .where("id", "=", node.id)
       .returningAll()
-      .executeTakeFirst();
+      .executeTakeFirstOrThrow();
     return c.json(row);
   })
 
-  .delete("/groups/:id", async (c) => {
+  /** page → database. One-way, and only while the page is empty (no content,
+   *  no children). Creates the database's property table. */
+  .post("/nodes/:id/convert", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
+    const node = await getNode(s.organizationId, c.req.param("id"));
+    if (!node) return c.json({ error: "node_not_found" }, 404);
+    if (node.kind !== "page") return c.json({ error: "only_pages_convert" }, 400);
 
-    const group = await db
-      .selectFrom("note_node")
-      .select(["id", "kind"])
-      .where("id", "=", c.req.param("id"))
-      .where("organizationId", "=", s.organizationId)
-      .executeTakeFirst();
-    if (!group || !isLeafKind(group.kind)) return c.json({ error: "group_not_found" }, 404);
+    const detail = await nodeDetail(s.organizationId, node);
+    if (detail.isRow) return c.json({ error: "rows_cannot_convert" }, 400);
+    if (!detail.isEmpty) return c.json({ error: "page_not_empty" }, 409);
 
-    await dropGroupTable(db, group.id);
-    await db.deleteFrom("note_node").where("id", "=", group.id).execute();
+    await ensureDatabaseTable(db, node.id);
+    const row = await db
+      .updateTable("note_node")
+      .set({ kind: "database", content: null, preview: "", schema: defaultSchema(), updatedAt: new Date() })
+      .where("id", "=", node.id)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    return c.json(row);
+  })
+
+  /** Soft delete. Pages/sections take their page subtree; databases are
+   *  never hard-deleted (and the ones under a deleted page turn dangling). */
+  .delete("/nodes/:id", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+    const node = await getNode(s.organizationId, c.req.param("id"));
+    if (!node) return c.json({ error: "node_not_found" }, 404);
+    await softDelete(s.organizationId, node);
     return c.json({ ok: true });
   })
 
-  // Group-page assets (header cover/icon) — same shape as note assets.
-  .post("/groups/:id/assets", async (c) => {
+  .post("/nodes/:id/restore", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+    const node = await getNode(s.organizationId, c.req.param("id"), { includeDeleted: true });
+    if (!node) return c.json({ error: "node_not_found" }, 404);
+    await restore(s.organizationId, node);
+    return c.json({ ok: true });
+  })
+
+  /** Every database in the org (live, dangling and deleted) for the
+   *  databases browser. */
+  .get("/databases", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+
+    const dbs = await db
+      .selectFrom("note_node as n")
+      .leftJoin("note_node as p", "p.id", "n.parentId")
+      .select([
+        "n.id",
+        "n.parentId",
+        "n.title",
+        "n.icon",
+        "n.inline",
+        "n.isFavorite",
+        "n.deletedAt",
+        "n.updatedAt",
+        "p.title as parentTitle",
+        "p.kind as parentKind",
+        "p.deletedAt as parentDeletedAt",
+        "p.id as parentExists",
+        detachedInlineSql("n", "p").as("detached"),
+        sql<number>`(SELECT count(*) FROM note_node r WHERE r."parentId" = n.id AND r."deletedAt" IS NULL)`.as("rowCount"),
+      ])
+      .where("n.organizationId", "=", s.organizationId)
+      .where("n.kind", "=", "database")
+      .orderBy("n.updatedAt", "desc")
+      .execute();
+
+    return c.json({
+      databases: dbs.map((d) => ({
+        id: d.id,
+        parentId: d.parentId,
+        title: d.title,
+        icon: d.icon,
+        inline: d.inline,
+        isFavorite: d.isFavorite,
+        deletedAt: d.deletedAt,
+        updatedAt: d.updatedAt,
+        parentTitle: d.parentTitle,
+        parentKind: d.parentKind,
+        rowCount: Number(d.rowCount),
+        dangling: !d.deletedAt && ((d.parentId !== null && (!d.parentExists || d.parentDeletedAt !== null)) || Boolean(d.detached)),
+      })),
+    });
+  })
+
+  /** Renumber an ordered list of sibling ids: position = array index. */
+  .post("/reorder", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+    const body = await c.req.json().catch(() => null);
+    const ids: unknown[] = Array.isArray(body?.ids) ? body.ids : [];
+    if (ids.length === 0 || ids.some((id) => typeof id !== "string")) return c.json({ error: "ids_required" }, 400);
+
+    const owned = await db
+      .selectFrom("note_node")
+      .select(["id", "parentId"])
+      .where("organizationId", "=", s.organizationId)
+      .where("id", "in", ids as string[])
+      .execute();
+    if (owned.length !== ids.length) return c.json({ error: "id_not_owned" }, 400);
+    if (new Set(owned.map((r) => r.parentId)).size > 1) return c.json({ error: "not_siblings" }, 400);
+
+    const now = new Date();
+    await Promise.all((ids as string[]).map((id, index) => db.updateTable("note_node").set({ position: index, updatedAt: now }).where("id", "=", id).execute()));
+    return c.json({ ok: true });
+  })
+
+  /** Header cover/icon (and in-page image) uploads → note_assets destination. */
+  .post("/nodes/:id/assets", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.json({ error: "unauthorized" }, 401);
-    const group = await db
-      .selectFrom("note_node")
-      .select(["id", "kind"])
-      .where("id", "=", c.req.param("id"))
-      .where("organizationId", "=", s.organizationId)
-      .executeTakeFirst();
-    if (!group || !isLeafKind(group.kind)) return c.json({ error: "group_not_found" }, 404);
+    const node = await getNode(s.organizationId, c.req.param("id"));
+    if (!node) return c.json({ error: "node_not_found" }, 404);
 
     const form = await c.req.parseBody().catch(() => null);
     const file = form?.["file"];
@@ -436,7 +361,7 @@ export const notesRoutes = new Hono()
     try {
       const asset = await storeNoteAsset({
         organizationId: s.organizationId,
-        filename: file.name || "group-asset",
+        filename: file.name || "note-asset",
         contentType: file.type || null,
         data: Buffer.from(await file.arrayBuffer()),
       });
@@ -444,37 +369,23 @@ export const notesRoutes = new Hono()
     } catch (e) {
       const message = (e as Error).message;
       if (message === "note_assets_not_configured") return c.json({ error: message }, 409);
-      logger.error({ err: e }, "notes: group asset upload failed");
+      logger.error({ err: e }, "notes: asset upload failed");
       return c.json({ error: message || "upload_failed" }, 500);
     }
   })
 
-  /** Renumber the given ordered id list: position = array index. */
-  .post("/reorder", async (c) => {
+  .get("/assets/:mediaId", async (c) => {
     const s = await requireOrgSession(c);
-    if (!s) return c.body(null, 401);
-
-    const body = await c.req.json().catch(() => null);
-    const kind = body?.kind;
-    const ids: unknown[] = Array.isArray(body?.ids) ? body.ids : [];
-    if (kind !== "section" && kind !== "folder" && kind !== "group") return c.json({ error: "invalid_kind" }, 400);
-    if (ids.length === 0 || ids.some((id) => typeof id !== "string")) return c.json({ error: "ids_required" }, 400);
-
-    const kindFilter: NoteKind[] = kind === "section" ? ["section"] : kind === "folder" ? ["folder"] : [...LEAF_KINDS];
-    const owned = await db
-      .selectFrom("note_node")
-      .select("id")
-      .where("organizationId", "=", s.organizationId)
-      .where("kind", "in", kindFilter)
-      .where("id", "in", ids as string[])
-      .execute();
-    const ownedSet = new Set(owned.map((r) => r.id));
-    for (const id of ids as string[]) {
-      if (!ownedSet.has(id)) return c.json({ error: "id_not_owned" }, 400);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+    try {
+      const asset = await readAssetBytesById(s.organizationId, c.req.param("mediaId") ?? "");
+      return c.body(new Uint8Array(asset.body), 200, {
+        "content-type": asset.contentType,
+        "content-disposition": `inline; filename="${asset.filename.replace(/"/g, "")}"`,
+      });
+    } catch (e) {
+      const message = (e as Error).message;
+      if (message === "asset_not_found") return c.json({ error: message }, 404);
+      return c.json({ error: message || "read_failed" }, 500);
     }
-
-    await Promise.all(
-      (ids as string[]).map((id, index) => db.updateTable("note_node").set({ position: index, updatedAt: new Date() }).where("id", "=", id).execute()),
-    );
-    return c.json({ ok: true });
   });

@@ -15,8 +15,8 @@ import { cn } from "@/lib/utils";
 
 const VIEW_ICON: Record<NoteViewType, typeof Table2> = { table: Table2, list: List, kanban: KanbanSquare };
 
-export function NotesView({ groupId, openNoteId, setOpenNoteId }: { groupId: string; openNoteId: string | null; setOpenNoteId: (id: string | null) => void }) {
-  const view = useNotesView(groupId);
+export function NotesView({ databaseId, openNoteId, setOpenNoteId }: { databaseId: string; openNoteId: string | null; setOpenNoteId: (id: string | null) => void }) {
+  const view = useNotesView(databaseId);
   const { payload } = view;
   const notes = payload.data?.notes ?? [];
   const columns = payload.data?.columns ?? [];
@@ -46,7 +46,7 @@ export function NotesView({ groupId, openNoteId, setOpenNoteId }: { groupId: str
   }, []);
 
   const columnOptions: ColumnOption[] = useMemo(
-    () => [{ id: "preview", label: "Preview" }, ...columns.map((prop) => ({ id: prop.id, label: prop.name })), { id: "updated", label: "Updated" }],
+    () => [{ id: "name", label: "Name" }, ...columns.map((prop) => ({ id: prop.id, label: prop.name })), { id: "updated", label: "Updated" }],
     [columns],
   );
 
@@ -136,7 +136,7 @@ export function NotesView({ groupId, openNoteId, setOpenNoteId }: { groupId: str
             onColumnOrderChange={setColumnOrder}
             onColumnVisibilityChange={setColumnVisibility}
           />
-          <Button size="sm" className="h-7 text-xs" onClick={() => view.createNote.mutate({ text: "" })} disabled={view.createNote.isPending}>
+          <Button size="sm" className="h-7 text-xs" onClick={() => view.createNote.mutate({})} disabled={view.createNote.isPending}>
             <Plus size={13} /> Note
           </Button>
         </div>
@@ -215,11 +215,10 @@ export function NotesView({ groupId, openNoteId, setOpenNoteId }: { groupId: str
         {activeView?.type === "kanban" && <KanbanView notes={notes} columns={columns} view={view} groupByProp={groupByProp} setOpenNoteId={setOpenNoteId} />}
       </div>
 
-      {/* floating editor for table / kanban — desktop only; mobile note clicks
-          navigate to the full page (see notes-provider setOpenNoteId). */}
-      {!isMobile && openNote && activeView?.type !== "list" && (
-        <FloatNoteEditor note={openNote} columns={columns} view={view} onClose={() => setOpenNoteId(null)} />
-      )}
+      {/* floating side editor for table / list / kanban — desktop only; mobile
+          note clicks navigate to the full page (see notes-provider
+          setOpenNoteId). */}
+      {!isMobile && openNote && <FloatNoteEditor note={openNote} columns={columns} view={view} onClose={() => setOpenNoteId(null)} />}
     </div>
   );
 }

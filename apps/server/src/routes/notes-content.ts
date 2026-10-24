@@ -1,53 +1,50 @@
 import { Hono } from "hono";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
-import { readAssetBytesById, storeNoteAsset } from "../lib/assets";
-import type { NoteGroupMetadata, NoteNodeTable, NotePropertyDef, NotePropertyOption, NotePropertyType, NoteViewDef, NoteViewType } from "../plugins/db";
+import type { NoteDatabaseSchema, NoteNode, NoteNodeUpdate, NotePropertyDef, NotePropertyOption, NotePropertyType, NoteViewDef, NoteViewType } from "../plugins/db";
 import type { NoteRow } from "../lib/notes-tables";
 import { logger } from "../lib/logger";
 import {
   PROPERTY_TYPES,
   addPropertyColumn,
   changePropertyColumnType,
-  defaultMetadata,
-  deleteNote,
+  defaultSchema,
   dropPropertyColumn,
-  ensureGroupTable,
-  LEAF_KINDS,
-  insertNote,
+  ensureDatabaseTable,
+  insertRowProps,
   listNotes,
   newPropertyId,
-  updateNote,
+  updateRowProps,
 } from "../lib/notes-tables";
+import { getNode, nextPosition, softDelete } from "../lib/notes-nodes";
 
 const VIEW_TYPES = new Set<NoteViewType>(["table", "list", "kanban"]);
 
-type GroupRow = NoteNodeTable;
-
-async function requireGroup(organizationId: string, id: string): Promise<GroupRow | null> {
-  const row = await db
-    .selectFrom("note_node")
-    .selectAll()
-    .where("id", "=", id)
-    .where("organizationId", "=", organizationId)
-    .where("kind", "in", [...LEAF_KINDS])
-    .executeTakeFirst();
-  return row ?? null;
+/** Databases stay addressable after soft delete (browser can open them). */
+async function requireDatabase(organizationId: string, id: string): Promise<NoteNode | null> {
+  const node = await getNode(organizationId, id, { includeDeleted: true });
+  return node && node.kind === "database" ? node : null;
 }
 
-/** Backfills default metadata for legacy groups and makes sure the notes table exists. */
-async function ensureInitialized(group: GroupRow): Promise<NoteGroupMetadata> {
-  let metadata = group.metadata;
-  if (!metadata || !Array.isArray(metadata.views)) {
-    metadata = defaultMetadata();
-    await db.updateTable("note_node").set({ metadata, updatedAt: new Date() }).where("id", "=", group.id).execute();
+/** Backfills a default schema and makes sure the property table exists. */
+async function ensureInitialized(database: NoteNode): Promise<NoteDatabaseSchema> {
+  let schema = database.schema;
+  if (!schema || !Array.isArray(schema.views)) {
+    schema = defaultSchema();
+    await saveSchema(database.id, schema);
   }
-  await ensureGroupTable(db, group.id);
-  return metadata;
+  await ensureDatabaseTable(db, database.id);
+  return schema;
 }
 
-async function saveMetadata(groupId: string, metadata: NoteGroupMetadata) {
-  await db.updateTable("note_node").set({ metadata, updatedAt: new Date() }).where("id", "=", groupId).execute();
+async function saveSchema(databaseId: string, schema: NoteDatabaseSchema) {
+  await db.updateTable("note_node").set({ schema, updatedAt: new Date() }).where("id", "=", databaseId).execute();
+}
+
+/** Row page under this database (live). */
+async function requireRow(organizationId: string, databaseId: string, rowId: string) {
+  const row = await getNode(organizationId, rowId);
+  return row && row.kind === "page" && row.parentId === databaseId ? row : null;
 }
 
 function parseOptions(raw: unknown): NotePropertyOption[] | undefined {
@@ -136,6 +133,9 @@ function serializeNote(row: NoteRow, columns: NotePropertyDef[]) {
   return {
     noteId: row.noteId,
     title: row.title,
+    icon: row.icon,
+    cover: row.cover,
+    isFavorite: row.isFavorite,
     content: row.content,
     preview: row.preview,
     createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
@@ -145,129 +145,104 @@ function serializeNote(row: NoteRow, columns: NotePropertyDef[]) {
 }
 
 export const notesContentRoutes = new Hono()
-  .get("/groups/:id/notes", async (c) => {
+  .get("/databases/:id/rows", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-    const group = await requireGroup(s.organizationId, c.req.param("id"));
-    if (!group) return c.json({ error: "group_not_found" }, 404);
+    const database = await requireDatabase(s.organizationId, c.req.param("id"));
+    if (!database) return c.json({ error: "database_not_found" }, 404);
 
-    const metadata = await ensureInitialized(group);
-    const rows = await listNotes(db, group.id);
+    const schema = await ensureInitialized(database);
+    const rows = await listNotes(db, database.id);
     return c.json({
-      columns: metadata.columns,
-      views: metadata.views,
-      notes: rows.map((row) => serializeNote(row, metadata.columns)),
+      columns: schema.columns,
+      views: schema.views,
+      notes: rows.map((row) => serializeNote(row, schema.columns)),
     });
   })
 
-  .post("/groups/:id/notes", async (c) => {
+  /** New row = a page node under the database + its property row. */
+  .post("/databases/:id/rows", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-    const group = await requireGroup(s.organizationId, c.req.param("id"));
-    if (!group) return c.json({ error: "group_not_found" }, 404);
+    const database = await requireDatabase(s.organizationId, c.req.param("id"));
+    if (!database) return c.json({ error: "database_not_found" }, 404);
 
-    const metadata = await ensureInitialized(group);
+    const schema = await ensureInitialized(database);
     const body = await c.req.json().catch(() => null);
-    const checked = validateProps(metadata.columns, body?.props);
+    const checked = validateProps(schema.columns, body?.props);
     if (!checked.ok) return c.json({ error: checked.error }, 400);
 
-    const title = typeof body?.title === "string" ? body.title.slice(0, 200) : "";
-    const content = body?.content ?? {};
-    const preview = typeof body?.preview === "string" ? body.preview.slice(0, 200) : "";
+    const now = new Date();
     const noteId = crypto.randomUUID();
-    await insertNote(db, group.id, noteId, title, content, preview, checked.values);
+    await db
+      .insertInto("note_node")
+      .values({
+        id: noteId,
+        organizationId: s.organizationId,
+        parentId: database.id,
+        kind: "page",
+        title: typeof body?.title === "string" ? body.title.slice(0, 200) : "",
+        content: (body?.content as Record<string, unknown>) ?? { doc: { type: "doc", content: [] } },
+        preview: typeof body?.preview === "string" ? body.preview.slice(0, 200) : "",
+        position: await nextPosition(s.organizationId, database.id),
+        createdAt: now,
+        updatedAt: now,
+      })
+      .execute();
+    await insertRowProps(db, database.id, noteId, checked.values);
     return c.json({ noteId }, 201);
   })
 
-  // Cover/icon upload — stored in the note_assets destination, referenced by
-  // twodb:// uri in the note's content JSON. Same shape as the chat upload.
-  .post("/groups/:id/notes/:noteId/assets", async (c) => {
-    const s = await requireOrgSession(c);
-    if (!s) return c.json({ error: "unauthorized" }, 401);
-    const group = await requireGroup(s.organizationId, c.req.param("id"));
-    if (!group) return c.json({ error: "group_not_found" }, 404);
-
-    const form = await c.req.parseBody().catch(() => null);
-    const file = form?.["file"];
-    if (!file || typeof file === "string") return c.json({ error: "invalid_file" }, 400);
-    if (file.size === 0) return c.json({ error: "empty_file" }, 400);
-    if (file.size > 25 * 1024 * 1024) return c.json({ error: "file_too_large" }, 413);
-    if (file.type && !file.type.startsWith("image/")) return c.json({ error: "images_only" }, 400);
-
-    try {
-      const asset = await storeNoteAsset({
-        organizationId: s.organizationId,
-        filename: file.name || "note-asset",
-        contentType: file.type || null,
-        data: Buffer.from(await file.arrayBuffer()),
-      });
-      return c.json({ ...asset, previewUrl: `/api/notes/assets/${asset.id}` }, 201);
-    } catch (e) {
-      const message = (e as Error).message;
-      if (message === "note_assets_not_configured") return c.json({ error: message }, 409);
-      logger.error({ err: e }, "notes: asset upload failed");
-      return c.json({ error: message || "upload_failed" }, 500);
-    }
-  })
-
-  .get("/assets/:mediaId", async (c) => {
-    const s = await requireOrgSession(c);
-    if (!s) return c.json({ error: "unauthorized" }, 401);
-    try {
-      const asset = await readAssetBytesById(s.organizationId, c.req.param("mediaId") ?? "");
-      return c.body(new Uint8Array(asset.body), 200, {
-        "content-type": asset.contentType,
-        "content-disposition": `inline; filename="${asset.filename.replace(/"/g, "")}"`,
-      });
-    } catch (e) {
-      const message = (e as Error).message;
-      if (message === "asset_not_found") return c.json({ error: message }, 404);
-      return c.json({ error: message || "read_failed" }, 500);
-    }
-  })
-
-  .patch("/groups/:id/notes/:noteId", async (c) => {
+  .patch("/databases/:id/rows/:rowId", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-    const group = await requireGroup(s.organizationId, c.req.param("id"));
-    if (!group) return c.json({ error: "group_not_found" }, 404);
+    const database = await requireDatabase(s.organizationId, c.req.param("id"));
+    if (!database) return c.json({ error: "database_not_found" }, 404);
+    const row = await requireRow(s.organizationId, database.id, c.req.param("rowId"));
+    if (!row) return c.json({ error: "row_not_found" }, 404);
 
-    const metadata = await ensureInitialized(group);
+    const schema = await ensureInitialized(database);
     const body = await c.req.json().catch(() => null);
-    if (!body || (body.title === undefined && body.content === undefined && body.preview === undefined && body.props === undefined)) {
-      return c.json({ error: "empty_update" }, 400);
-    }
+    if (!body) return c.json({ error: "empty_update" }, 400);
     if (body.title !== undefined && typeof body.title !== "string") return c.json({ error: "invalid_title" }, 400);
-    const checked = validateProps(metadata.columns, body.props);
+    const checked = validateProps(schema.columns, body.props);
     if (!checked.ok) return c.json({ error: checked.error }, 400);
 
-    await updateNote(db, group.id, c.req.param("noteId"), {
-      ...(body.title !== undefined ? { title: String(body.title).slice(0, 200) } : {}),
-      ...(body.content !== undefined ? { content: body.content } : {}),
-      ...(body.preview !== undefined ? { preview: String(body.preview).slice(0, 200) } : {}),
-      ...(body.props !== undefined ? { props: checked.values } : {}),
-    });
+    const patch: NoteNodeUpdate = {};
+    if (body.title !== undefined) patch.title = String(body.title).slice(0, 200);
+    if (body.content !== undefined) patch.content = body.content as Record<string, unknown>;
+    if (body.preview !== undefined) patch.preview = String(body.preview).slice(0, 200);
+    if (body.icon !== undefined) patch.icon = typeof body.icon === "string" ? body.icon : null;
+    if (body.cover !== undefined) patch.cover = typeof body.cover === "string" ? body.cover : null;
+    if (Object.keys(patch).length > 0) {
+      await db.updateTable("note_node").set({ ...patch, updatedAt: new Date() }).where("id", "=", row.id).execute();
+    }
+    if (body.props !== undefined && Object.keys(checked.values).length > 0) {
+      await insertRowProps(db, database.id, row.id, {});
+      await updateRowProps(db, database.id, row.id, checked.values);
+    }
     return c.json({ ok: true });
   })
 
-  .delete("/groups/:id/notes/:noteId", async (c) => {
+  /** Rows are pages — deleting one is a soft delete like any page. */
+  .delete("/databases/:id/rows/:rowId", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-    const group = await requireGroup(s.organizationId, c.req.param("id"));
-    if (!group) return c.json({ error: "group_not_found" }, 404);
-
-    await ensureInitialized(group);
-    await deleteNote(db, group.id, c.req.param("noteId"));
+    const database = await requireDatabase(s.organizationId, c.req.param("id"));
+    if (!database) return c.json({ error: "database_not_found" }, 404);
+    const row = await requireRow(s.organizationId, database.id, c.req.param("rowId"));
+    if (!row) return c.json({ error: "row_not_found" }, 404);
+    await softDelete(s.organizationId, row);
     return c.json({ ok: true });
   })
 
-  .post("/groups/:id/properties", async (c) => {
+  .post("/databases/:id/properties", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-    const group = await requireGroup(s.organizationId, c.req.param("id"));
-    if (!group) return c.json({ error: "group_not_found" }, 404);
+    const database = await requireDatabase(s.organizationId, c.req.param("id"));
+    if (!database) return c.json({ error: "database_not_found" }, 404);
 
-    const metadata = await ensureInitialized(group);
+    const schema = await ensureInitialized(database);
     const body = await c.req.json().catch(() => null);
     const name = typeof body?.name === "string" ? body.name.trim() : "";
     const type = body?.type;
@@ -288,24 +263,24 @@ export const notesContentRoutes = new Hono()
         ? { validation: body.validation as Record<string, unknown> }
         : {}),
     };
-    await addPropertyColumn(db, group.id, def.id, def.type);
-    await saveMetadata(group.id, { ...metadata, columns: [...metadata.columns, def] });
+    await addPropertyColumn(db, database.id, def.id, def.type);
+    await saveSchema(database.id, { ...schema, columns: [...schema.columns, def] });
     return c.json(def, 201);
   })
 
-  .patch("/groups/:id/properties/:propId", async (c) => {
+  .patch("/databases/:id/properties/:propId", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-    const group = await requireGroup(s.organizationId, c.req.param("id"));
-    if (!group) return c.json({ error: "group_not_found" }, 404);
+    const database = await requireDatabase(s.organizationId, c.req.param("id"));
+    if (!database) return c.json({ error: "database_not_found" }, 404);
 
-    const metadata = await ensureInitialized(group);
+    const schema = await ensureInitialized(database);
     const propId = c.req.param("propId");
-    const index = metadata.columns.findIndex((c2) => c2.id === propId);
+    const index = schema.columns.findIndex((c2) => c2.id === propId);
     if (index === -1) return c.json({ error: "property_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const def = { ...metadata.columns[index] };
+    const def = { ...schema.columns[index] };
     if (body?.name !== undefined) {
       const name = typeof body.name === "string" ? body.name.trim() : "";
       if (!name) return c.json({ error: "invalid_name" }, 400);
@@ -317,7 +292,7 @@ export const notesContentRoutes = new Hono()
       if (to !== def.type) {
         logger.info({ id: propId, from: def.type, to }, "notes: property type change");
         try {
-          await changePropertyColumnType(db, group.id, propId, def.type, to);
+          await changePropertyColumnType(db, database.id, propId, def.type, to);
           logger.info({ id: propId }, "notes: property type change done");
         } catch (err) {
           const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
@@ -350,65 +325,65 @@ export const notesContentRoutes = new Hono()
       def.validation = body.validation as Record<string, unknown>;
     }
 
-    const columns = [...metadata.columns];
+    const columns = [...schema.columns];
     columns[index] = def;
-    await saveMetadata(group.id, { ...metadata, columns });
+    await saveSchema(database.id, { ...schema, columns });
     return c.json(def);
   })
 
-  .delete("/groups/:id/properties/:propId", async (c) => {
+  .delete("/databases/:id/properties/:propId", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-    const group = await requireGroup(s.organizationId, c.req.param("id"));
-    if (!group) return c.json({ error: "group_not_found" }, 404);
+    const database = await requireDatabase(s.organizationId, c.req.param("id"));
+    if (!database) return c.json({ error: "database_not_found" }, 404);
 
-    const metadata = await ensureInitialized(group);
+    const schema = await ensureInitialized(database);
     const propId = c.req.param("propId");
-    if (!metadata.columns.some((c2) => c2.id === propId)) return c.json({ error: "property_not_found" }, 404);
+    if (!schema.columns.some((c2) => c2.id === propId)) return c.json({ error: "property_not_found" }, 404);
 
-    await dropPropertyColumn(db, group.id, propId);
-    const views = metadata.views.map((v) => ({
+    await dropPropertyColumn(db, database.id, propId);
+    const views = schema.views.map((v) => ({
       ...v,
       ...(v.groupBy === propId ? { groupBy: null } : {}),
       ...(v.sorts ? { sorts: v.sorts.filter((srt) => srt.property !== propId) } : {}),
     }));
-    await saveMetadata(group.id, {
-      columns: metadata.columns.filter((c2) => c2.id !== propId),
+    await saveSchema(database.id, {
+      columns: schema.columns.filter((c2) => c2.id !== propId),
       views,
     });
     return c.json({ ok: true });
   })
 
-  .post("/groups/:id/views", async (c) => {
+  .post("/databases/:id/views", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-    const group = await requireGroup(s.organizationId, c.req.param("id"));
-    if (!group) return c.json({ error: "group_not_found" }, 404);
+    const database = await requireDatabase(s.organizationId, c.req.param("id"));
+    if (!database) return c.json({ error: "database_not_found" }, 404);
 
-    const metadata = await ensureInitialized(group);
+    const schema = await ensureInitialized(database);
     const body = await c.req.json().catch(() => null);
     const type = body?.type;
     if (typeof type !== "string" || !VIEW_TYPES.has(type as NoteViewType)) return c.json({ error: "invalid_type" }, 400);
-    const name = typeof body?.name === "string" && body.name.trim() ? body.name.trim() : defaultViewName(type as NoteViewType, metadata.views);
+    const name = typeof body?.name === "string" && body.name.trim() ? body.name.trim() : defaultViewName(type as NoteViewType, schema.views);
 
     const view: NoteViewDef = { id: crypto.randomUUID(), name, type: type as NoteViewType };
-    await saveMetadata(group.id, { ...metadata, views: [...metadata.views, view] });
+    await saveSchema(database.id, { ...schema, views: [...schema.views, view] });
     return c.json(view, 201);
   })
 
-  .patch("/groups/:id/views/:viewId", async (c) => {
+  .patch("/databases/:id/views/:viewId", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-    const group = await requireGroup(s.organizationId, c.req.param("id"));
-    if (!group) return c.json({ error: "group_not_found" }, 404);
+    const database = await requireDatabase(s.organizationId, c.req.param("id"));
+    if (!database) return c.json({ error: "database_not_found" }, 404);
 
-    const metadata = await ensureInitialized(group);
+    const schema = await ensureInitialized(database);
     const viewId = c.req.param("viewId");
-    const index = metadata.views.findIndex((v) => v.id === viewId);
+    const index = schema.views.findIndex((v) => v.id === viewId);
     if (index === -1) return c.json({ error: "view_not_found" }, 404);
 
     const body = await c.req.json().catch(() => null);
-    const view = { ...metadata.views[index] };
+    const view = { ...schema.views[index] };
     if (body?.name !== undefined) {
       const name = typeof body.name === "string" ? body.name.trim() : "";
       if (!name) return c.json({ error: "invalid_name" }, 400);
@@ -417,29 +392,29 @@ export const notesContentRoutes = new Hono()
     if (body?.groupBy !== undefined) {
       if (body.groupBy === null) view.groupBy = null;
       else {
-        const prop = metadata.columns.find((c2) => c2.id === body.groupBy);
+        const prop = schema.columns.find((c2) => c2.id === body.groupBy);
         if (!prop || prop.type !== "select") return c.json({ error: "groupBy_needs_select_property" }, 400);
         view.groupBy = prop.id;
       }
     }
 
-    const views = [...metadata.views];
+    const views = [...schema.views];
     views[index] = view;
-    await saveMetadata(group.id, { ...metadata, views });
+    await saveSchema(database.id, { ...schema, views });
     return c.json(view);
   })
 
-  .delete("/groups/:id/views/:viewId", async (c) => {
+  .delete("/databases/:id/views/:viewId", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-    const group = await requireGroup(s.organizationId, c.req.param("id"));
-    if (!group) return c.json({ error: "group_not_found" }, 404);
+    const database = await requireDatabase(s.organizationId, c.req.param("id"));
+    if (!database) return c.json({ error: "database_not_found" }, 404);
 
-    const metadata = await ensureInitialized(group);
+    const schema = await ensureInitialized(database);
     const viewId = c.req.param("viewId");
-    if (!metadata.views.some((v) => v.id === viewId)) return c.json({ error: "view_not_found" }, 404);
+    if (!schema.views.some((v) => v.id === viewId)) return c.json({ error: "view_not_found" }, 404);
 
-    await saveMetadata(group.id, { ...metadata, views: metadata.views.filter((v) => v.id !== viewId) });
+    await saveSchema(database.id, { ...schema, views: schema.views.filter((v) => v.id !== viewId) });
     return c.json({ ok: true });
   });
 

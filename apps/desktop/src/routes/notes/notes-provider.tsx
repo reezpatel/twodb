@@ -1,67 +1,56 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { useNotesScene, type NoteFolder, type NoteGroup } from "./use-notes-scene";
+import { useNotesScene, type NotesHook } from "./use-notes-scene";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { Sidebar } from "./scene/sidebar";
 
 interface NotesState {
-  notes: ReturnType<typeof useNotesScene>;
+  notes: NotesHook;
   scrollRoot: React.RefObject<HTMLDivElement | null>;
-  createView: { sectionId: string; parentId: string | null; parentName: string } | null;
-  openCreate: (sectionId: string, parentId: string | null, parentName: string) => void;
-  closeCreate: () => void;
-  groupFromUrl: string | null;
-  noteFromUrl: string | null;
-  /** Mobile never opens the side editor — note clicks go to the full page. */
+  /** /apps/notes/:nodeId — the open page or database. */
+  nodeFromUrl: string | null;
+  /** /apps/notes/:databaseId/:rowId — row open in the side editor. */
+  rowFromUrl: string | null;
+  /** Mobile never opens the side editor — rows open as full pages. */
   isMobile: boolean;
-  setSelectedGroupId: (id: string | null) => void;
   setOpenNoteId: (id: string | null) => void;
 }
 
 /** Notes scene state — owned here so the shell-rendered sidenav and the
- * content share one instance. URL still drives the selected group/note. */
+ * content share one instance. The URL drives the selected node/row. */
 export const NotesContext = createContext<NotesState | null>(null);
+
+/** Static first segments that aren't node ids. */
+export const NOTES_STATIC_ROUTES = new Set(["databases"]);
 
 export function NotesProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useMediaQuery("(max-width: 1023px)");
-  // /apps/notes/:groupId/:noteId — params come from the path since this
-  // provider renders above the route element.
-  const [, , , groupId, noteId] = location.pathname.split("/");
-  const groupFromUrl = groupId ?? null;
-  const noteFromUrl = noteId ?? null;
+  // params come from the path since this provider renders above the route element
+  const [, , , first, second] = location.pathname.split("/");
+  const nodeFromUrl = first && !NOTES_STATIC_ROUTES.has(first) ? first : null;
+  const rowFromUrl = nodeFromUrl ? (second ?? null) : null;
 
-  const setSelectedGroupId = useCallback(
-    (id: string | null) => {
-      navigate(id ? `/apps/notes/${id}` : "/apps/notes", { replace: true });
-    },
-    [navigate],
-  );
+  const select = useCallback((id: string | null) => navigate(id ? `/apps/notes/${id}` : "/apps/notes"), [navigate]);
 
+  // Rows are pages: mobile opens them full-page; desktop slides in the side
+  // editor over the database.
   const setOpenNoteId = useCallback(
     (id: string | null) => {
-      if (!groupFromUrl) return;
-      // Mobile: opening a note navigates to the full page instead of the
-      // side-by-side editor (too cramped). Closing returns to the group.
-      if (id && isMobile) {
-        navigate(`/apps/notes/${groupFromUrl}/${id}/page`);
-        return;
-      }
-      navigate(id ? `/apps/notes/${groupFromUrl}/${id}` : `/apps/notes/${groupFromUrl}`, { replace: true });
+      if (!nodeFromUrl) return;
+      if (id && isMobile) return navigate(`/apps/notes/${id}`);
+      navigate(id ? `/apps/notes/${nodeFromUrl}/${id}` : `/apps/notes/${nodeFromUrl}`, { replace: true });
     },
-    [navigate, groupFromUrl, isMobile],
+    [navigate, nodeFromUrl, isMobile],
   );
 
-  const notes = useNotesScene({ selectedGroupId: groupFromUrl, onSelectGroupId: setSelectedGroupId });
+  const notes = useNotesScene({ selectedId: nodeFromUrl, onSelect: select });
   const scrollRoot = useRef<HTMLDivElement>(null);
-  const [createView, setCreateView] = useState<{ sectionId: string; parentId: string | null; parentName: string } | null>(null);
-  const openCreate = useCallback((sectionId: string, parentId: string | null, parentName: string) => setCreateView({ sectionId, parentId, parentName }), []);
-  const closeCreate = useCallback(() => setCreateView(null), []);
 
   const value = useMemo(
-    () => ({ notes, scrollRoot, createView, openCreate, closeCreate, groupFromUrl, noteFromUrl, isMobile, setSelectedGroupId, setOpenNoteId }),
-    [notes, scrollRoot, createView, openCreate, closeCreate, groupFromUrl, noteFromUrl, isMobile, setSelectedGroupId, setOpenNoteId],
+    () => ({ notes, scrollRoot, nodeFromUrl, rowFromUrl, isMobile, setOpenNoteId }),
+    [notes, scrollRoot, nodeFromUrl, rowFromUrl, isMobile, setOpenNoteId],
   );
   return <NotesContext.Provider value={value}>{children}</NotesContext.Provider>;
 }
@@ -72,12 +61,8 @@ export function useNotes() {
   return ctx;
 }
 
-/** The notes sidebar (sections tree) — rendered by the app shell
- * (desktop column / mobile drawer). */
+/** The notes sidebar — rendered by the app shell (desktop column / mobile drawer). */
 export function NotesSidenav() {
-  const { notes, scrollRoot, openCreate } = useNotes();
-
-  return <Sidebar notes={notes} scrollRoot={scrollRoot} onCreate={openCreate} />;
+  const { notes, scrollRoot } = useNotes();
+  return <Sidebar notes={notes} scrollRoot={scrollRoot} />;
 }
-
-export type { NoteFolder, NoteGroup };

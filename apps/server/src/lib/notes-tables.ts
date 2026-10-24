@@ -1,5 +1,5 @@
 import { sql, type Kysely } from "kysely";
-import type { Database, NoteGroupMetadata, NotePropertyType } from "../plugins/db";
+import type { Database, NoteDatabaseSchema, NotePropertyType } from "../plugins/db";
 
 const PROPERTY_SQL: Record<NotePropertyType, string> = {
   text: "text",
@@ -20,17 +20,14 @@ const PROPERTY_SQL: Record<NotePropertyType, string> = {
 
 export const PROPERTY_TYPES = Object.keys(PROPERTY_SQL) as NotePropertyType[];
 
-/** Physical table name for a note-group: notes_<groupId, dashes stripped>. */
-export const notesTableName = (groupId: string) => `notes_${groupId.replace(/[^a-zA-Z0-9]/g, "")}`;
-
-/** Leaf kinds — the node kinds that own a physical notes table. */
-export const LEAF_KINDS = ["notes", "checklist", "table", "sheet", "canvas"] as const;
+/** Physical property table for a database node: notes_<databaseId, dashes stripped>. */
+export const notesTableName = (databaseId: string) => `notes_${databaseId.replace(/[^a-zA-Z0-9]/g, "")}`;
 
 const ident = (name: string) => sql.raw(`"${name.replace(/"/g, "")}"`);
 
-const table = (groupId: string) => ident(notesTableName(groupId));
+const table = (databaseId: string) => ident(notesTableName(databaseId));
 
-export function defaultMetadata(): NoteGroupMetadata {
+export function defaultSchema(): NoteDatabaseSchema {
   return {
     columns: [],
     views: [
@@ -45,26 +42,22 @@ export function newPropertyId() {
   return `p_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
 }
 
-export async function ensureGroupTable(db: Kysely<Database>, groupId: string) {
+export async function ensureDatabaseTable(db: Kysely<Database>, databaseId: string) {
   await sql`
-    CREATE TABLE IF NOT EXISTS ${table(groupId)} (
-      "noteId" text PRIMARY KEY REFERENCES note_item("id") ON DELETE CASCADE,
+    CREATE TABLE IF NOT EXISTS ${table(databaseId)} (
+      "noteId" text PRIMARY KEY REFERENCES note_node("id") ON DELETE CASCADE,
       "createdAt" timestamp NOT NULL DEFAULT now(),
       "updatedAt" timestamp NOT NULL DEFAULT now()
     )
   `.execute(db);
 }
 
-export async function dropGroupTable(db: Kysely<Database>, groupId: string) {
-  await sql`DROP TABLE IF EXISTS ${table(groupId)}`.execute(db);
+export async function addPropertyColumn(db: Kysely<Database>, databaseId: string, propertyId: string, type: NotePropertyType) {
+  await sql`ALTER TABLE ${table(databaseId)} ADD COLUMN ${ident(propertyId)} ${sql.raw(PROPERTY_SQL[type])}`.execute(db);
 }
 
-export async function addPropertyColumn(db: Kysely<Database>, groupId: string, propertyId: string, type: NotePropertyType) {
-  await sql`ALTER TABLE ${table(groupId)} ADD COLUMN ${ident(propertyId)} ${sql.raw(PROPERTY_SQL[type])}`.execute(db);
-}
-
-export async function dropPropertyColumn(db: Kysely<Database>, groupId: string, propertyId: string) {
-  await sql`ALTER TABLE ${table(groupId)} DROP COLUMN IF EXISTS ${ident(propertyId)}`.execute(db);
+export async function dropPropertyColumn(db: Kysely<Database>, databaseId: string, propertyId: string) {
+  await sql`ALTER TABLE ${table(databaseId)} DROP COLUMN IF EXISTS ${ident(propertyId)}`.execute(db);
 }
 
 const NUMBER_TEXT_RE = "^[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?$";
@@ -120,46 +113,48 @@ function castExpr(col: string, from: NotePropertyType, to: NotePropertyType, act
   }
 }
 
-export async function changePropertyColumnType(db: Kysely<Database>, groupId: string, propertyId: string, from: NotePropertyType, to: NotePropertyType) {
+export async function changePropertyColumnType(db: Kysely<Database>, databaseId: string, propertyId: string, from: NotePropertyType, to: NotePropertyType) {
   // Look up the actual SQL column type so the USING expression matches the
   // real source data. This handles legacy columns where multiselect was a plain
   // `text` column rather than `text[]` (no array_to_string is available).
   const infoRows = await sql<{ data_type: string }>`
     SELECT data_type FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = ${notesTableName(groupId)}
+    WHERE table_schema = current_schema()
+      AND table_name = ${notesTableName(databaseId)}
       AND column_name = ${propertyId}
   `.execute(db);
   const actualFromSqlType = infoRows.rows[0]?.data_type ?? PROPERTY_SQL[from];
   const expr = castExpr(propertyId, from, to, actualFromSqlType);
 
-  const sqlText = `ALTER TABLE ${table(groupId)} ALTER COLUMN ${ident(propertyId)} TYPE ${sql.raw(PROPERTY_SQL[to])} USING ${sql.raw(expr)}`;
-  console.log("[changePropertyColumnType]", {
-    groupId,
-    propertyId,
-    from,
-    to,
-    actualFromSqlType,
-    propertySql: PROPERTY_SQL[to],
-    expr,
-    sqlText,
-  });
-  await sql`ALTER TABLE ${table(groupId)} ALTER COLUMN ${ident(propertyId)} TYPE ${sql.raw(PROPERTY_SQL[to])} USING ${sql.raw(expr)}`.execute(db);
+  await sql`ALTER TABLE ${table(databaseId)} ALTER COLUMN ${ident(propertyId)} TYPE ${sql.raw(PROPERTY_SQL[to])} USING ${sql.raw(expr)}`.execute(db);
 }
 
 export interface NoteRow {
   noteId: string;
   title: string;
+  icon: string | null;
+  cover: string | null;
   content: unknown;
   preview: string;
+  isFavorite: boolean;
   createdAt: Date;
   updatedAt: Date;
   props: Record<string, unknown>;
 }
 
-export async function listNotes(db: Kysely<Database>, groupId: string): Promise<NoteRow[]> {
-  const items = await db.selectFrom("note_item").selectAll().where("nodeId", "=", groupId).orderBy("createdAt", "desc").execute();
-  const dyn = await sql`SELECT * FROM ${table(groupId)}`.execute(db);
+/** Rows of a database = its live (non-deleted) child pages + their property
+ *  values from the database's notes_<id> table. Oldest first (new rows append). */
+export async function listNotes(db: Kysely<Database>, databaseId: string): Promise<NoteRow[]> {
+  const pages = await db
+    .selectFrom("note_node")
+    .selectAll()
+    .where("parentId", "=", databaseId)
+    .where("kind", "=", "page")
+    .where("deletedAt", "is", null)
+    .orderBy("position", "asc")
+    .orderBy("createdAt", "asc")
+    .execute();
+  const dyn = await sql`SELECT * FROM ${table(databaseId)}`.execute(db);
   const propsById = new Map<string, Record<string, unknown>>();
   for (const raw of dyn.rows as Record<string, unknown>[]) {
     const { noteId, createdAt, updatedAt, ...props } = raw;
@@ -167,56 +162,29 @@ export async function listNotes(db: Kysely<Database>, groupId: string): Promise<
     void updatedAt;
     propsById.set(String(noteId), props);
   }
-  return items.map((i) => ({
-    noteId: i.id,
-    title: i.title,
-    content: i.content,
-    preview: i.preview,
-    createdAt: i.createdAt,
-    updatedAt: i.updatedAt,
-    props: propsById.get(i.id) ?? {},
+  return pages.map((p) => ({
+    noteId: p.id,
+    title: p.title,
+    icon: p.icon,
+    cover: p.cover,
+    content: p.content ?? {},
+    preview: p.preview,
+    isFavorite: p.isFavorite,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+    props: propsById.get(p.id) ?? {},
   }));
 }
 
-export async function insertNote(
-  db: Kysely<Database>,
-  groupId: string,
-  noteId: string,
-  title: string,
-  content: unknown,
-  preview: string,
-  props: Record<string, unknown>,
-) {
-  const now = new Date();
-  await db
-    .insertInto("note_item")
-    .values({ id: noteId, nodeId: groupId, title, content: (content ?? {}) as Record<string, unknown>, preview, createdAt: now, updatedAt: now })
-    .execute();
+/** Inserts the property row for an existing row page. */
+export async function insertRowProps(db: Kysely<Database>, databaseId: string, noteId: string, props: Record<string, unknown>) {
   const cols = [sql.raw('"noteId"'), ...Object.keys(props).map((k) => ident(k))];
   const values = [sql`${noteId}`, ...Object.values(props).map((v) => sql`${v}`)];
-  await sql`INSERT INTO ${table(groupId)} (${sql.join(cols, sql.raw(", "))}) VALUES (${sql.join(values, sql.raw(", "))})`.execute(db);
+  await sql`INSERT INTO ${table(databaseId)} (${sql.join(cols, sql.raw(", "))}) VALUES (${sql.join(values, sql.raw(", "))}) ON CONFLICT ("noteId") DO NOTHING`.execute(db);
 }
 
-export async function updateNote(
-  db: Kysely<Database>,
-  groupId: string,
-  noteId: string,
-  patch: { title?: string; content?: unknown; preview?: string; props?: Record<string, unknown> },
-) {
-  const itemPatch: { title?: string; content?: Record<string, unknown>; preview?: string; updatedAt: Date } = { updatedAt: new Date() };
-  if (patch.title !== undefined) itemPatch.title = patch.title;
-  if (patch.content !== undefined) itemPatch.content = patch.content as Record<string, unknown>;
-  if (patch.preview !== undefined) itemPatch.preview = patch.preview;
-  await db.updateTable("note_item").set(itemPatch).where("id", "=", noteId).execute();
-
+export async function updateRowProps(db: Kysely<Database>, databaseId: string, noteId: string, props: Record<string, unknown>) {
   const sets = [sql.raw(`"updatedAt" = now()`)];
-  for (const [key, value] of Object.entries(patch.props ?? {})) {
-    sets.push(sql`${ident(key)} = ${value}`);
-  }
-  await sql`UPDATE ${table(groupId)} SET ${sql.join(sets, sql.raw(", "))} WHERE "noteId" = ${noteId}`.execute(db);
-}
-
-/** Deleting the inventory row cascades the dynamic row via FK. */
-export async function deleteNote(db: Kysely<Database>, groupId: string, noteId: string) {
-  await db.deleteFrom("note_item").where("id", "=", noteId).where("nodeId", "=", groupId).execute();
+  for (const [key, value] of Object.entries(props)) sets.push(sql`${ident(key)} = ${value}`);
+  await sql`UPDATE ${table(databaseId)} SET ${sql.join(sets, sql.raw(", "))} WHERE "noteId" = ${noteId}`.execute(db);
 }
