@@ -17,7 +17,7 @@ COPY packages/runner-core/package.json packages/runner-core/
 RUN pnpm install --frozen-lockfile --filter @twodb/runner
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN npx playwright install --with-deps chromium
+RUN pnpm --filter @twodb/runner exec playwright install --with-deps chromium
 
 COPY apps/runner apps/runner
 COPY packages/runner-core packages/runner-core

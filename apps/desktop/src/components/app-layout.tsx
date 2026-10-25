@@ -1,17 +1,36 @@
-import { useEffect, useState } from "react";
-import { Outlet, useLocation } from "react-router";
-import { Menu } from "lucide-react";
-import { NavRail } from "./nav-rail";
-import { MobileNavDrawer } from "./mobile-nav";
+import { useEffect } from "react";
+import { Outlet, useLocation, useMatch, useNavigate } from "react-router";
+import { ArrowLeftRight, LogOut } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { NotificationBell } from "./notification-bell";
-import { FooterUsage } from "./footer-usage";
-import { FooterRunnerResources } from "./footer-runner-resources";
-import { FooterSpaces } from "./footer-spaces";
-import { MobileNavContext } from "./mobile-nav-context";
+import { AppNavigation } from "./blocks/app-shell/app-navigation";
+import { AppSideNavigation } from "./blocks/app-shell/app-side-navigation";
+import { AppShell } from "./blocks/app-shell/app-shell";
+import { AppShellBody } from "./blocks/app-shell/app-shell-body";
+import { AppShellContent } from "./blocks/app-shell/app-shell-content";
+import { useAppShellContext } from "./blocks/app-shell/app-shell-context";
+import { AppShellWorkspace } from "./blocks/app-shell/app-shell-workspace";
+import { SimpleHeader } from "./blocks/app-shell/simple-header";
+import { FooterBar } from "./blocks/footer/footer-bar";
+import { FooterRunnerResources } from "./blocks/footer/footer-runner-resources";
+import { FooterSpaces } from "./blocks/footer/footer-spaces";
+import { FooterUsage } from "./blocks/footer/footer-usage";
+import { NavRail } from "./blocks/nav-rail/nav-rail";
+import { NavRailItem } from "./blocks/nav-rail/nav-rail-item";
+import { NavRailSeparator } from "./blocks/nav-rail/nav-rail-separator";
+import { NavRailSpacer } from "./blocks/nav-rail/nav-rail-spacer";
+import { NavRailUser } from "./blocks/nav-rail/nav-rail-user";
 import { SpaceProvider } from "./space-provider";
+import { urls } from "../lib/url-registry";
 import { useAppLayout } from "./use-app-layout";
-import { useMediaQuery } from "../lib/use-media-query";
-import { appShellFor, getApp } from "../lib/apps";
+import { APPS, SETTINGS_APP, appShellFor, getApp, type AppEntry } from "../lib/apps";
 
 function useActiveAppId(): string | undefined {
   const { pathname } = useLocation();
@@ -19,91 +38,82 @@ function useActiveAppId(): string | undefined {
   return match?.[1];
 }
 
+function AppRailItem({ app }: { app: AppEntry }) {
+  const navigate = useNavigate();
+  const active = useMatch(urls.app(app.id)) !== null;
+  return <NavRailItem label={app.label} icon={<app.icon />} active={active} onClick={() => navigate(urls.app(app.id))} />;
+}
+
+function CloseNavigationOnAppChange({ appId }: { appId?: string }) {
+  const { closeNavigation } = useAppShellContext();
+  useEffect(() => closeNavigation(), [appId, closeNavigation]);
+  return null;
+}
+
 export function AppLayout() {
   const { session, activeOrg, signOut, switchOrg } = useAppLayout();
-  const isMobile = useMediaQuery("(max-width: 1023px)");
-  const [navOpen, setNavOpen] = useState(false);
-  const [sideNavTarget, setSideNavTarget] = useState<HTMLElement | null>(null);
-  const [sideNavActive, setSideNavActive] = useState(false);
-
   const appId = useActiveAppId();
   const app = getApp(appId);
   const Shell = appShellFor(app);
   const Sidenav = app?.Sidenav;
 
-  useEffect(() => {
-    if (!isMobile) setNavOpen(false);
-  }, [isMobile]);
-
-  // Switching apps closes the drawer; the new app's sidenav replaces the portal content.
-  useEffect(() => {
-    setNavOpen(false);
-  }, [appId]);
-
   return (
     <SpaceProvider>
-      <MobileNavContext.Provider value={{ isMobile, closeNav: () => setNavOpen(false), sideNavTarget, setSideNavActive }}>
-        <div className="bg-background safe-top safe-bottom flex h-screen flex-col">
-        {isMobile && (
-          <header className="bg-card flex h-12 shrink-0 items-center gap-3 border-b px-3">
-            <button
-              aria-label="Open menu"
-              onClick={() => setNavOpen(true)}
-              className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring flex h-8 w-8 items-center justify-center rounded-md transition-colors outline-none focus-visible:ring-2"
-            >
-              <Menu size={18} />
-            </button>
-            <NotificationBell layout="header" />
-            <span className="truncate text-sm font-semibold">{app?.label ?? activeOrg?.name ?? "twodb"}</span>
-          </header>
-        )}
+      <AppShell variant="attached">
+        <CloseNavigationOnAppChange appId={appId} />
+        <SimpleHeader title={app?.label ?? activeOrg?.name ?? "twodb"}>
+          <NotificationBell layout="header" />
+        </SimpleHeader>
 
-        <div className="flex min-h-0 flex-1">
-          {!isMobile && (
-            <NavRail
-              userName={session?.user.name}
-              userEmail={session?.user.email}
-              userImage={session?.user.image}
-              onSwitchOrg={switchOrg}
-              onSignOut={signOut}
-            />
-          )}
-          <Shell>
-            {/* Desktop: the app's sidenav is a column beside the content.
-                Mobile: SideNav portals itself into the floating drawer, so
-                nothing renders here and the main panel stays clean. */}
-            <div className="flex h-full min-h-0 min-w-0 flex-1">
-              {Sidenav ? <Sidenav /> : null}
-              <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <AppShellBody>
+          <AppShellWorkspace>
+            <Shell>
+              <AppNavigation>
+                <NavRail>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <NavRailUser name={session?.user.name} email={session?.user.email} image={session?.user.image} />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="right" align="start" sideOffset={8} className="w-56">
+                      <DropdownMenuLabel className="flex flex-col">
+                        <span className="text-sm font-medium">{session?.user.name ?? "Account"}</span>
+                        <span className="text-muted-foreground text-xs font-normal">{session?.user.email}</span>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={switchOrg}>
+                        <ArrowLeftRight />
+                        Switch organization
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={signOut}>
+                        <LogOut />
+                        Sign out
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <NavRailSeparator />
+                  <NotificationBell layout="rail" />
+                  {APPS.map((rail) => (
+                    <AppRailItem key={rail.id} app={rail} />
+                  ))}
+                  <NavRailSpacer />
+                  <AppRailItem app={SETTINGS_APP} />
+                </NavRail>
+                <AppSideNavigation>{Sidenav ? <Sidenav /> : null}</AppSideNavigation>
+              </AppNavigation>
+
+              <AppShellContent>
                 <Outlet />
-              </main>
-            </div>
-          </Shell>
-        </div>
+              </AppShellContent>
+            </Shell>
+          </AppShellWorkspace>
+        </AppShellBody>
 
-        <footer className="bg-card text-muted-foreground flex h-6 items-center justify-between gap-4 border-t px-2 text-xs">
-          <div className="flex min-w-0 items-center gap-4">
-            <FooterSpaces />
-            <FooterUsage />
-            <FooterRunnerResources />
-          </div>
-        </footer>
-
-        {isMobile && (
-          <MobileNavDrawer
-            open={navOpen}
-            onClose={() => setNavOpen(false)}
-            hasSideNav={sideNavActive}
-            userName={session?.user.name}
-            userEmail={session?.user.email}
-            userImage={session?.user.image}
-            onSwitchOrg={switchOrg}
-            onSignOut={signOut}
-            sideNavRef={setSideNavTarget}
-          />
-        )}
-        </div>
-      </MobileNavContext.Provider>
+        <FooterBar>
+          <FooterSpaces />
+          <FooterUsage />
+          <FooterRunnerResources />
+        </FooterBar>
+      </AppShell>
     </SpaceProvider>
   );
 }

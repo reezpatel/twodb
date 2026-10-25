@@ -1,5 +1,7 @@
 import { MonitorCog } from "lucide-react";
-import { useFooterRunnerResources } from "./use-footer-runner-resources";
+import type { ReactNode } from "react";
+import { useFooterRunnerResources } from "../../use-footer-runner-resources";
+import { FooterWidget } from "./footer-widget";
 import { cn } from "@/lib/utils";
 
 /**
@@ -41,7 +43,7 @@ export function FooterRunnerResources() {
   const pinnedOf = (runnerId: string) => selected.filter((s) => s.startsWith(`${runnerId}:`)).map((s) => s.split(":")[1]);
 
   return (
-    <div className="flex min-w-0 items-center gap-2">
+    <FooterRunnerResourcesPopover runners={runners} selected={selected} toggle={toggle}>
       {live.map((r) => {
         const kinds = pinnedOf(r.id);
         const m = r.live!.metrics;
@@ -54,46 +56,55 @@ export function FooterRunnerResources() {
             )}
             {kinds.includes("gpu") &&
               m.gpus.map((g) => (
-                <Chip key={g.index} label={`gpu${g.index}`} pct={g.utilization} value={`${Math.round(g.utilization)}%${g.temperature !== null ? ` ${g.temperature}°` : ""}`} />
+                <Chip
+                  key={g.index}
+                  label={`gpu${g.index}`}
+                  pct={g.utilization}
+                  value={`${Math.round(g.utilization)}%${g.temperature !== null ? ` ${g.temperature}°` : ""}`}
+                />
               ))}
             {kinds.includes("disk") &&
               m.disks
                 .filter((d) => !d.error)
-                .map((d) => <Chip key={d.path} label={d.path === "/" ? "/" : d.path} pct={(d.used / Math.max(1, d.total)) * 100} value={`${fmtBytes(d.used)}/${fmtBytes(d.total)}`} />)}
+                .map((d) => (
+                  <Chip
+                    key={d.path}
+                    label={d.path === "/" ? "/" : d.path}
+                    pct={(d.used / Math.max(1, d.total)) * 100}
+                    value={`${fmtBytes(d.used)}/${fmtBytes(d.total)}`}
+                  />
+                ))}
           </span>
         );
       })}
-
-      <FooterRunnerResourcesPopover runners={runners} selected={selected} toggle={toggle} />
-    </div>
+    </FooterRunnerResourcesPopover>
   );
 }
 
 import { useState } from "react";
-import { Checkbox } from "./ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import type { FooterRunnerRow } from "./use-footer-runner-resources";
+import { Checkbox } from "../../ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
+import type { FooterRunnerRow } from "../../use-footer-runner-resources";
 
 function FooterRunnerResourcesPopover({
   runners,
   selected,
   toggle,
+  children,
 }: {
   runners: FooterRunnerRow[];
   selected: string[];
   toggle: (id: string) => void;
+  children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          aria-label="Runner resources"
-          className="text-muted-foreground hover:text-foreground flex h-6 items-center gap-2 rounded px-1 transition-colors outline-none"
-        >
-          <MonitorCog size={13} />
-        </button>
+        <FooterWidget aria-label="Runner resources" icon={<MonitorCog size={13} />}>
+          {children}
+        </FooterWidget>
       </PopoverTrigger>
       <PopoverContent align="start" side="top" className="w-72 p-0">
         <div className="flex items-center justify-between border-b px-3 py-2">
@@ -127,7 +138,9 @@ function FooterRunnerResourcesPopover({
                       >
                         <Checkbox checked={checked} tabIndex={-1} />
                         <span className="text-muted-foreground">{KIND_LABEL[kind]}</span>
-                        {r.live && kind === "cpu" && <span className="text-muted-foreground ml-auto tabular-nums">{Math.round(r.live.metrics.cpu.busy * 100)}%</span>}
+                        {r.live && kind === "cpu" && (
+                          <span className="text-muted-foreground ml-auto tabular-nums">{Math.round(r.live.metrics.cpu.busy * 100)}%</span>
+                        )}
                         {r.live && kind === "memory" && (
                           <span className="text-muted-foreground ml-auto tabular-nums">
                             {fmtBytes(r.live.metrics.memory.used)}/{fmtBytes(r.live.metrics.memory.total)}

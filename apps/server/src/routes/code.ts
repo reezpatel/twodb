@@ -820,12 +820,6 @@ export const codeRoutes = new Hono()
       .executeTakeFirst();
     if (!session) return c.json({ error: "session_not_found" }, 404);
 
-    // Opening the session marks it seen — clears the sidebar unread flag.
-    if (session.unseenUpdates) {
-      await db.updateTable("code_session").set({ unseenUpdates: false }).where("id", "=", session.id).execute();
-      broadcastSessionEvent(s.organizationId, { type: "session_state", id: session.id, running: isSessionRunning(session.id), needsInput: false, unseenUpdates: false });
-    }
-
     // Tail window only — the client backfills older pages via /messages (keyset).
     const messages = await fetchSessionMessageWindow(session.id, 50);
     const totalMessages = await db

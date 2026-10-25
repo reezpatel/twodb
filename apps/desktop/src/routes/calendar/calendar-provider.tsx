@@ -31,7 +31,7 @@ export function CalendarSidenav() {
 
   if (s.calendars.isLoading || s.settings.isLoading) {
     return (
-      <SideNav className="w-[240px] items-center">
+      <SideNav className="items-center">
         <Loader2 className="text-muted-foreground animate-spin" />
       </SideNav>
     );
@@ -40,7 +40,7 @@ export function CalendarSidenav() {
   const pendingTotal = (s.pendingCount.data?.awaiting ?? 0) + (s.pendingCount.data?.failed ?? 0);
 
   return (
-    <SideNav className="w-[240px]">
+    <SideNav>
       <Button onClick={() => s.openEditor({})} disabled={!s.writableCalendars.length}>
         <Plus /> Create
       </Button>

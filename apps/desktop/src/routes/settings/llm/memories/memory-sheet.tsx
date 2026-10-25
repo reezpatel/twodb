@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SpaceSelect } from "@/components/space-select";
+import { urls } from "@/lib/url-registry";
 
-export const MEMORIES_LIST_PATH = "/apps/settings/llm/memories";
+export const MEMORIES_LIST_PATH = urls.settings.llm.memories();
 
 const SCOPES: { value: MemoryScope; label: string }[] = [
   { value: "workspace", label: "Workspace" },

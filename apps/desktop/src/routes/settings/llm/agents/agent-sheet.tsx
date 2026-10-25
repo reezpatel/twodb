@@ -11,8 +11,9 @@ import { AGENT_TOOL_ALL, AGENT_TOOL_NAMES } from "@/lib/agent-tool-names";
 import { cn } from "@/lib/utils";
 import { SpaceSelect } from "@/components/space-select";
 import { useCodeDirectories } from "../../../code/directories/use-code-directories";
+import { urls } from "@/lib/url-registry";
 
-export const AGENTS_LIST_PATH = "/apps/settings/llm/agents";
+export const AGENTS_LIST_PATH = urls.settings.llm.agents();
 
 const AGENT_TYPES: AgentType[] = ["sub_agent", "persona", "collaborator", "sentinel"];
 const INHERIT = "__inherit";

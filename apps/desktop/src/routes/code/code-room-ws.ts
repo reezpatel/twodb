@@ -33,6 +33,7 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let pingTimer: ReturnType<typeof setInterval> | null = null;
 let attempt = 0;
 let wantOpen = false;
+const pendingSeen = new Set<string>();
 
 function connect() {
   if (!wantOpen || ws) return;
@@ -48,6 +49,8 @@ function connect() {
     // compaction_state / jobs sync per room, which panels use to recover.
     for (const room of rooms.keys()) sock.send(JSON.stringify({ type: "subscribe", session: room.slice("session:".length) }));
     if (resourcesRefCount > 0) sock.send(JSON.stringify({ type: "resources:subscribe" }));
+    for (const id of pendingSeen) sock.send(JSON.stringify({ type: "seen", session: id }));
+    pendingSeen.clear();
     pingTimer = setInterval(() => {
       if (sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify({ type: "ping" }));
     }, PING_INTERVAL);
@@ -129,6 +132,12 @@ export function joinSessionRoom(sessionId: string, onFrame: RoomHandler): () => 
     }
     maybeClose();
   };
+}
+
+/** Seen receipt: clears the session's unseen flag on the server. Queued until the socket is open. */
+export function markSessionSeen(sessionId: string) {
+  if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "seen", session: sessionId }));
+  else pendingSeen.add(sessionId);
 }
 
 /** Listen to org-level frames (sidebar events, runners). Returns an unsubscribe fn. */

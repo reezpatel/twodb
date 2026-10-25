@@ -76,7 +76,7 @@ export function EmailSidenav() {
   const importing = accounts.filter((a) => a.backfillState === "running");
 
   return (
-    <SideNav className="w-[230px]">
+    <SideNav>
       <SideNavHeader>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

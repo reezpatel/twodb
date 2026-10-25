@@ -8,8 +8,9 @@ import { TagInput } from "../tag-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { SpaceSelect } from "@/components/space-select";
+import { urls } from "@/lib/url-registry";
 
-export const SKILLS_LIST_PATH = "/apps/settings/llm/skills";
+export const SKILLS_LIST_PATH = urls.settings.llm.skills();
 
 const NEW_SKILL_TEMPLATE = `---
 title:

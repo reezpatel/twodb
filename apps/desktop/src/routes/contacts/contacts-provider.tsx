@@ -24,7 +24,7 @@ export function ContactsSidenav() {
   const books = s.books.data ?? [];
 
   return (
-    <SideNav className="w-[220px]">
+    <SideNav>
       <SideNavHeader title="Contacts" description="Learned from your mail and meetings — one list per account." />
       <SideNavGroup label="Accounts">
         {books

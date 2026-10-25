@@ -12,8 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { SpaceSelect } from "@/components/space-select";
+import { urls } from "@/lib/url-registry";
 
-export const MCP_LIST_PATH = "/apps/settings/llm/mcp";
+export const MCP_LIST_PATH = urls.settings.llm.mcp();
 
 const TRANSPORTS = [
   { value: "auto", label: "Auto (streamable http → sse)" },

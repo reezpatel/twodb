@@ -1,0 +1,39 @@
+.light {
+  color-scheme: light;
+  --background: oklch(0.985 0.003 301.3);
+  --foreground: oklch(0.205 0.009 301.3);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.205 0.009 301.3);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.205 0.009 301.3);
+  --primary: oklch(0.485 0.061 297.3);
+  --primary-foreground: oklch(0.985 0.003 301.3);
+  --secondary: oklch(0.94 0.008 301.3);
+  --secondary-foreground: oklch(0.275 0.01 297.6);
+  --muted: oklch(0.955 0.006 310.8);
+  --muted-foreground: oklch(0.485 0.012 300);
+  --accent: oklch(0.93 0.014 301.3);
+  --accent-foreground: oklch(0.205 0.009 301.3);
+  --destructive: oklch(0.575 0.109 2.9);
+  --destructive-foreground: oklch(0.985 0.003 301.3);
+  --success: oklch(0.575 0.048 160.1);
+  --success-foreground: oklch(0.985 0.003 301.3);
+  --warning: oklch(0.66 0.055 71.8);
+  --warning-foreground: oklch(0.205 0.009 301.3);
+  --info: oklch(0.575 0.064 274.1);
+  --border: oklch(0.88 0.009 301.3);
+  --input: oklch(0.88 0.009 301.3);
+  --ring: oklch(0.575 0.055 298.9);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.dark {
+  color-scheme: dark;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+#storybook-root {
+  min-height: 100vh;
+}

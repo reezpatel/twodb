@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CodeDirectory } from "../directories/use-code-directories";
-import { onOrgFrames } from "../code-room-ws";
+import { markSessionSeen, onOrgFrames } from "../code-room-ws";
 import { api } from "@/lib/api";
 
 export interface CodeSession {
@@ -65,7 +65,7 @@ export function groupSessionsByDirectory(sessions: CodeSession[], directories: C
 export interface SessionLiveState {
   running: boolean;
   needsInput: boolean;
-  unseenUpdates: boolean;
+  unseenUpdates?: boolean;
 }
 
 /**
@@ -74,18 +74,27 @@ export interface SessionLiveState {
  * room socket (one per tab). Overlays are keyed by session id and reset
  * whenever the list refetches.
  */
-export function useSessionEvents(enabled: boolean) {
+export function useSessionEvents(enabled: boolean, activeSessionId: string | null) {
   const queryClient = useQueryClient();
   const [live, setLive] = useState<Map<string, SessionLiveState>>(new Map());
+  const activeSessionIdRef = useRef(activeSessionId);
+  activeSessionIdRef.current = activeSessionId;
 
   useEffect(() => {
     if (!enabled) return;
     return onOrgFrames((frame) => {
       if (frame.type === "session_state") {
-        const f = frame as unknown as { id: string; running: boolean; needsInput: boolean; unseenUpdates: boolean };
+        const f = frame as unknown as { id: string; running: boolean; needsInput: boolean; unseenUpdates?: boolean };
+        // The session being viewed is never unseen — acknowledge the moment the server flags it.
+        if (f.unseenUpdates && f.id === activeSessionIdRef.current) markSessionSeen(f.id);
+        if (f.unseenUpdates !== undefined) {
+          queryClient.setQueriesData<CodeSession[]>({ queryKey: ["code", "sessions"] }, (sessions) =>
+            sessions?.map((session) => (session.id === f.id ? { ...session, unseenUpdates: f.unseenUpdates } : session)),
+          );
+        }
         setLive((prev) => {
           const next = new Map(prev);
-          next.set(f.id, { running: f.running, needsInput: f.needsInput, unseenUpdates: f.unseenUpdates });
+          next.set(f.id, { running: f.running, needsInput: f.needsInput, unseenUpdates: f.unseenUpdates ?? prev.get(f.id)?.unseenUpdates });
           return next;
         });
       } else if (frame.type === "session_deleted") {

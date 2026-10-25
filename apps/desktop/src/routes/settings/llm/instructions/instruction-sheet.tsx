@@ -6,8 +6,9 @@ import { TagInput } from "../tag-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SpaceSelect } from "@/components/space-select";
+import { urls } from "@/lib/url-registry";
 
-export const INSTRUCTIONS_LIST_PATH = "/apps/settings/llm/instructions";
+export const INSTRUCTIONS_LIST_PATH = urls.settings.llm.instructions();
 
 export function InstructionSheet() {
   const { instructionId } = useParams();

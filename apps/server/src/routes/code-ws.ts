@@ -120,7 +120,7 @@ export type SessionListEvent =
   | { type: "session_created"; session: { id: string; title: string; codeDirectoryId: string | null; updatedAt: string } }
   | { type: "session_updated"; session: { id: string; title: string; updatedAt: string } }
   | { type: "session_deleted"; id: string }
-  | { type: "session_state"; id: string; running: boolean; needsInput: boolean; unseenUpdates: boolean };
+  | { type: "session_state"; id: string; running: boolean; needsInput: boolean; unseenUpdates?: boolean };
 
 /** Fan a sidebar event out to every socket of the owning org — the org room
  * is implicit: every connected socket of the org is in it. */
@@ -373,16 +373,14 @@ export async function startSessionRun(organizationId: string, session: SessionRo
   } finally {
     activeRuns.delete(session.id);
     logger.info({ sessionId: session.id, organizationId, watched: run.sockets.size > 0 }, "session run finished");
-    // Completed while the user was elsewhere — flag it for the sidebar.
-    const watched = run.sockets.size > 0;
-    if (!watched) {
-      try {
-        await db.updateTable("code_session").set({ unseenUpdates: true }).where("id", "=", session.id).execute();
-      } catch {
-        // state flag is cosmetic — never fail the run on it
-      }
+    // Round finished — mark the session unseen. The UI hides the marker for the
+    // session being viewed and sends the seen signal (POST /sessions/:id/seen).
+    try {
+      await db.updateTable("code_session").set({ unseenUpdates: true }).where("id", "=", session.id).execute();
+    } catch {
+      // state flag is cosmetic — never fail the run on it
     }
-    pushSessionState(organizationId, session.id, { unseenUpdates: !watched });
+    pushSessionState(organizationId, session.id, { unseenUpdates: true });
     // The run just touched files — refresh the footer git line.
     void (async () => {
       if (!directory) return;
@@ -416,13 +414,18 @@ async function historyWasEmpty(sessionId: string) {
   return Number(row?.count ?? 0) <= 1;
 }
 
-/** Sidebar state for one session: run/needsInput/unseen, pushed to the org channel. */
+/** Sidebar state for one session, pushed to the org channel. `unseenUpdates` is only sent when it changes; omitted means unchanged. */
 export function pushSessionState(organizationId: string, sessionId: string, overrides?: Partial<{ needsInput: boolean; unseenUpdates: boolean }>) {
   const run = activeRuns.get(sessionId);
   const running = run !== undefined;
   const needsInput = overrides?.needsInput ?? (run?.askUser != null);
-  const unseenUpdates = overrides?.unseenUpdates ?? false;
-  broadcastSessionEvent(organizationId, { type: "session_state", id: sessionId, running, needsInput, unseenUpdates });
+  broadcastSessionEvent(organizationId, {
+    type: "session_state",
+    id: sessionId,
+    running,
+    needsInput,
+    ...(overrides?.unseenUpdates !== undefined ? { unseenUpdates: overrides.unseenUpdates } : {}),
+  });
 }
 
 /** Fan a frame out to every socket currently viewing this session (room members). */
@@ -708,6 +711,22 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
               socket?.rooms.delete(room);
               activeRuns.get(sessionId)?.sockets.delete(ws);
             }
+            return;
+          }
+
+          // Seen receipt — the client viewing a session acknowledges its unseen flag.
+          // Org-scoped, so no room subscription is required.
+          if (msg.type === "seen") {
+            const seenId = typeof msg.session === "string" ? msg.session : "";
+            if (!seenId) return;
+            const updated = await db
+              .updateTable("code_session")
+              .set({ unseenUpdates: false })
+              .where("id", "=", seenId)
+              .where("organizationId", "=", organizationId)
+              .returning("id")
+              .executeTakeFirst();
+            if (updated) pushSessionState(organizationId, updated.id, { unseenUpdates: false });
             return;
           }
 

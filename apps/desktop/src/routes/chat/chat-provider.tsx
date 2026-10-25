@@ -133,7 +133,7 @@ export function ChatSidenav() {
   };
 
   return (
-    <SideNav className="w-[230px]">
+    <SideNav>
       <div className="flex items-center justify-between px-1">
         <strong className="text-base font-semibold">Chat</strong>
         <Button variant="ghost" size="icon-xs" aria-label="Add channel" onClick={() => setCreating(true)}>

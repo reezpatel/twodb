@@ -1,10 +1,11 @@
 import { Bot, Loader2, RotateCw } from "lucide-react";
 import { useState } from "react";
-import { ProviderLogo } from "./provider-logo";
-import { useFooterUsage, type QuotaRow } from "./use-footer-usage";
-import { Button } from "./ui/button";
-import { Checkbox } from "./ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { ProviderLogo } from "../../provider-logo";
+import { useFooterUsage, type QuotaRow } from "../../use-footer-usage";
+import { Button } from "../../ui/button";
+import { Checkbox } from "../../ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
+import { FooterWidget } from "./footer-widget";
 import { cn } from "@/lib/utils";
 
 const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 0 });
@@ -58,7 +59,10 @@ function quotaTone(q: QuotaRow): string {
 function MetricChip({ q }: { q: QuotaRow }) {
   const countdown = until(q.resetAt);
   return (
-    <span className="flex items-center gap-1.5" title={`${q.connectionName} — ${TYPE_LABELS[q.quotaType] ?? q.quotaType}${countdown ? ` · resets in ${countdown}` : ""}`}>
+    <span
+      className="flex items-center gap-1.5"
+      title={`${q.connectionName} — ${TYPE_LABELS[q.quotaType] ?? q.quotaType}${countdown ? ` · resets in ${countdown}` : ""}`}
+    >
       <ProviderLogo provider={q.provider} className="size-3" />
       <span className="text-muted-foreground">{TYPE_LABELS[q.quotaType] ?? q.quotaType}</span>
       <span className={cn("tabular-nums", quotaTone(q))}>{quotaValue(q)}</span>
@@ -76,22 +80,21 @@ export function FooterUsage() {
     entry.rows.push(q);
     byConnection.set(q.connectionId, entry);
   }
-  const groups = [...byConnection.values()].map((g) => ({ ...g, rows: [...g.rows].sort((a, b) => (TYPE_ORDER[a.quotaType] ?? 99) - (TYPE_ORDER[b.quotaType] ?? 99)) }));
+  const groups = [...byConnection.values()].map((g) => ({
+    ...g,
+    rows: [...g.rows].sort((a, b) => (TYPE_ORDER[a.quotaType] ?? 99) - (TYPE_ORDER[b.quotaType] ?? 99)),
+  }));
 
   const selectedQuotas = selected.map((id) => quotas.find((q) => metricId(q) === id)).filter((q): q is QuotaRow => q !== undefined);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          aria-label="LLM usage"
-          className="text-muted-foreground hover:text-foreground flex h-6 items-center gap-2 rounded px-1 transition-colors outline-none"
-        >
-          <Bot size={13} />
+        <FooterWidget aria-label="LLM usage" icon={<Bot size={13} />}>
           {selectedQuotas.map((q) => (
             <MetricChip key={metricId(q)} q={q} />
           ))}
-        </button>
+        </FooterWidget>
       </PopoverTrigger>
       <PopoverContent align="start" side="top" className="w-80 p-0">
         <div className="flex items-center justify-between border-b px-3 py-2">

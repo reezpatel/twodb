@@ -2,7 +2,9 @@
   "name": "twodb",
   "private": true,
   "scripts": {
-    "local": "pnpm --parallel --filter @twodb/desktop --filter @twodb/server dev",
+    "local": "pnpm --workspace-root run --parallel \"/^local:.*/\"",
+    "local:app": "pnpm --parallel --filter @twodb/desktop --filter @twodb/server dev",
+    "local:storybook": "pnpm --filter @twodb/desktop storybook",
     "runner": "pnpm --filter @twodb/runner dev",
     "db:migrate": "pnpm --filter @twodb/server db:migrate",
     "dev": "turbo dev",

@@ -1,7 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { Loader2, Search, Video } from "lucide-react";
 import { SideNav, SideNavGroup, SideNavHeader } from "@/components/side-nav";
-import { useMobileNav } from "@/components/mobile-nav-context";
+import { useAppShellContext } from "@/components/blocks/app-shell/app-shell-context";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatClock, platformLabel, recordingDurationMs, recordingTitle, type Recording } from "./meetings-api";
@@ -27,7 +27,7 @@ export function MeetingsSidenav() {
   const s = useMeetings();
 
   return (
-    <SideNav className="w-[260px]">
+    <SideNav>
       <SideNavHeader title="Meetings" description="Recorded by the twodb browser extension." />
       <div className="relative px-1">
         <Search size={13} className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2" />
@@ -55,7 +55,7 @@ export function MeetingsSidenav() {
 }
 
 function RecordingItem({ recording: r, active, onSelect }: { recording: Recording; active: boolean; onSelect: () => void }) {
-  const { isMobile, closeNav } = useMobileNav();
+  const { closeNavigation } = useAppShellContext();
   const time = new Date(r.startedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   const duration = recordingDurationMs(r);
 
@@ -64,7 +64,7 @@ function RecordingItem({ recording: r, active, onSelect }: { recording: Recordin
       type="button"
       onClick={() => {
         onSelect();
-        if (isMobile) closeNav();
+        closeNavigation();
       }}
       className={cn(
         "hover:bg-accent/50 focus-visible:ring-ring flex items-start gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors outline-none focus-visible:ring-2",

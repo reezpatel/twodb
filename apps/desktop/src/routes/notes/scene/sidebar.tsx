@@ -65,7 +65,7 @@ export function Sidebar({ notes, scrollRoot }: { notes: NotesHook; scrollRoot: R
   };
 
   return (
-    <SideNav className="bg-card w-72 gap-0 overflow-hidden p-0">
+    <SideNav className="gap-0 overflow-hidden p-0">
       <div className="flex items-center justify-between border-b px-3 py-2">
         <span className="text-sm font-semibold">Notes</span>
         <Button variant="ghost" size="icon-sm" title="New section" onClick={() => notes.createSection.mutate(undefined)} disabled={notes.createSection.isPending}>

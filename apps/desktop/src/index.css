@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@source "./components/blocks";
+@source "./components/ui";
 @import "tw-animate-css";
 
 /* Safe-area padding for edge-to-edge displays (Android status/nav bars, iOS notch). */
@@ -182,6 +184,11 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 22%, transparent) transparent;
+  }
+  *:hover {
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 45%, transparent) transparent;
   }
   html {
     color-scheme: dark;

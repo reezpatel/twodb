@@ -1,66 +1,14 @@
-import { useEffect, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import type { ReactNode } from "react";
 import { NavLink } from "react-router";
 import type { LucideIcon } from "lucide-react";
-import { Resizable } from "re-resizable";
 import { cn } from "@/lib/utils";
-import { useMobileNav } from "./mobile-nav-context";
+import { useAppShellContext } from "./blocks/app-shell/app-shell-context";
 
-interface SideNavProps {
-  className?: string;
-  children: ReactNode;
-  /** Desktop width in px — when set with onWidthChange the nav is resizable (right edge). */
-  width?: number;
-  onWidthChange?: (width: number) => void;
-  minNavWidth?: number;
-  maxNavWidth?: number;
-}
-
-function SideNav({ className, children, width, onWidthChange, minNavWidth = 180, maxNavWidth = 420 }: SideNavProps) {
-  const { isMobile, sideNavTarget, setSideNavActive } = useMobileNav();
-
-  useEffect(() => {
-    if (!isMobile) return;
-    setSideNavActive(true);
-    return () => setSideNavActive(false);
-  }, [isMobile, setSideNavActive]);
-
-  if (isMobile) {
-    if (!sideNavTarget) return null;
-    return createPortal(<aside className={cn("flex flex-col gap-3", className)}>{children}</aside>, sideNavTarget);
-  }
-
-  const resizable = width !== undefined && onWidthChange !== undefined;
-
-  // Non-resizable apps keep the simple aside.
-  if (!resizable) {
-    return (
-      <aside className={cn("bg-muted/20 flex h-full min-h-0 w-[220px] shrink-0 flex-col gap-3 overflow-y-auto border-r p-4 px-3", className)}>
-        {children}
-      </aside>
-    );
-  }
-
+function SideNav({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <Resizable
-      size={{ width, height: "100%" }}
-      minWidth={minNavWidth}
-      maxWidth={maxNavWidth}
-      enable={{ right: true }}
-      handleStyles={{ right: { width: "5px", right: "-2px", height: "100%", cursor: "col-resize" } }}
-      handleComponent={{
-        right: (
-          <div
-            className="bg-border hover:bg-primary/60 absolute inset-y-0 right-0 z-10 w-1 translate-x-1/2 cursor-col-resize transition-colors"
-            title="Drag to resize"
-          />
-        ),
-      }}
-      onResizeStop={(_e, _dir, _ref, delta) => onWidthChange(width + delta.width)}
-      className="shrink-0"
-    >
-      <aside className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}>{children}</aside>
-    </Resizable>
+    <aside data-slot="side-nav" className={cn("flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto px-3 py-4", className)}>
+      {children}
+    </aside>
   );
 }
 
@@ -97,10 +45,7 @@ interface SideNavItemProps {
 }
 
 function SideNavItem({ label, icon: Icon, dotClassName, count, to, active, onSelect, className }: SideNavItemProps) {
-  const { isMobile, closeNav } = useMobileNav();
-  const closeOnMobile = () => {
-    if (isMobile) closeNav();
-  };
+  const { closeNavigation } = useAppShellContext();
   const classes = (isActive: boolean) =>
     cn(
       "hover:bg-accent/50 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors outline-none",
@@ -120,7 +65,7 @@ function SideNavItem({ label, icon: Icon, dotClassName, count, to, active, onSel
 
   if (to) {
     return (
-      <NavLink to={to} onClick={closeOnMobile} className={({ isActive }) => classes(isActive)}>
+      <NavLink to={to} onClick={closeNavigation} className={({ isActive }) => classes(isActive)}>
         {content}
       </NavLink>
     );
@@ -130,7 +75,7 @@ function SideNavItem({ label, icon: Icon, dotClassName, count, to, active, onSel
       type="button"
       onClick={() => {
         onSelect?.();
-        closeOnMobile();
+        closeNavigation();
       }}
       className={classes(active ?? false)}
     >

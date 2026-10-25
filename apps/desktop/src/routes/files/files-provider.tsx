@@ -33,7 +33,7 @@ export function FilesSidenav() {
   const [bucketLimitGb, setBucketLimitGb] = useState("");
 
   return (
-    <SideNav className="bg-card w-56 gap-2 p-3">
+    <SideNav className="gap-2 p-3">
       <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold uppercase">Storage</h3>
       <div className="mb-3 flex flex-col gap-1">
         {(buckets.data ?? []).map((b) => (
