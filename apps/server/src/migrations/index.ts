@@ -32,6 +32,7 @@ import { up as projects } from "./0030-projects";
 import { up as noteSchemaLock } from "./0031-note-schema-lock";
 import { up as sharedContentMediaColumn } from "./0032-shared-content-media-column";
 import { up as sharedContentUrlColumns } from "./0033-shared-content-url-columns";
+import { up as sharedContentStatusSelect } from "./0034-shared-content-status-select";
 
 // Keys sort lexicographically — prefix new migrations with the next number.
 export const migrations: Record<string, Migration> = {
@@ -68,4 +69,5 @@ export const migrations: Record<string, Migration> = {
   "0031_note_schema_lock": { up: noteSchemaLock },
   "0032_shared_content_media_column": { up: sharedContentMediaColumn },
   "0033_shared_content_url_columns": { up: sharedContentUrlColumns },
+  "0034_shared_content_status_select": { up: sharedContentStatusSelect },
 };

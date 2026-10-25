@@ -42,13 +42,12 @@ export function sharedContentColumns(): NotePropertyDef[] {
     {
       id: SHARED_CONTENT_PROPS.status,
       name: "Status",
-      type: "status",
+      type: "select",
       options: SHARED_CONTENT_STATUSES.map((value) => ({
         id: `o_${value}`,
         value,
         label: value[0].toUpperCase() + value.slice(1),
         color: STATUS_COLORS[value],
-        group: value === "saved" ? "Done" : value === "failed" ? "Failed" : "Active",
       })),
     },
   ];

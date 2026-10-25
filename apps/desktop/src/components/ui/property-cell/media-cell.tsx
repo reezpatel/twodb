@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { ImageOff } from "lucide-react";
 import { assetUrl } from "@/lib/native";
 import { cn } from "@/lib/utils";
-import type { CellDisplayProps } from "./types";
+import type { CellDisplayProps, CellSidebarViewProps } from "./types";
 
 const MAX_THUMBS = 4;
 
@@ -54,6 +55,42 @@ export function MediaCellDisplay({ value }: CellDisplayProps) {
         </span>
       ))}
       {extra > 0 ? <span className="text-muted-foreground text-xs tabular-nums">+{extra}</span> : null}
+    </div>
+  );
+}
+
+/** One media item in the sidebar: videos get a real player, images a larger
+ *  preview; unknown types fall back to the thumbnail. */
+function SidebarMediaItem({ id }: { id: string }) {
+  const url = mediaUrl(id);
+  const [failed, setFailed] = useState(false);
+  // A stored media id maps to one file; the resolver serves the real
+  // content-type, so <video> just won't play for images — detect by trying
+  // the image first for non-video-looking ids and vice versa. Simpler:
+  // render <video> when the id came from a video upload — we can't know here,
+  // so probe with an <img> that hides on error, backed by a <video>.
+  return (
+    <div className="bg-muted/40 relative w-full overflow-hidden rounded-lg border">
+      {!failed && (
+        <img src={url} alt="" loading="lazy" className="w-full object-contain" onError={() => setFailed(true)} />
+      )}
+      {failed && (
+        <video src={url} controls preload="metadata" className="max-h-80 w-full" />
+      )}
+    </div>
+  );
+}
+
+/** Property-sheet (sidebar) view for media: stacked full-width previews —
+ *  images rendered large, videos in a player. Read-only like the table cell. */
+export function MediaCellSidebarView({ value }: CellSidebarViewProps) {
+  const ids = mediaIdsOf(value);
+  if (ids.length === 0) return <p className="text-muted-foreground/60 py-1 text-xs">No media</p>;
+  return (
+    <div className="flex flex-col gap-2 py-1">
+      {ids.map((id) => (
+        <SidebarMediaItem key={id} id={id} />
+      ))}
     </div>
   );
 }

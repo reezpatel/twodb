@@ -273,7 +273,9 @@ export async function fetchInstagramMedia(url: string, organizationId: string): 
  *  the markdown content as the permalink anyway). */
 const MEDIA_DOWNLOAD_MAX_BYTES = 100 * 1024 * 1024;
 
-async function downloadMedias(organizationId: string, urls: string[], shortcode: string): Promise<StoredMediaDescriptor[]> {
+async function downloadMedias(organizationId: string, urls: string[], shortcode: string, kind: InstagramMediaKind): Promise<StoredMediaDescriptor[]> {
+  // Reels: the video is the content — skip thumbnails.
+  if (kind === "reel") urls = urls.filter((u) => u.includes(".mp4"));
   if (!urls.length) return [];
   const stored: StoredMediaDescriptor[] = [];
   for (let i = 0; i < urls.length; i++) {
@@ -340,7 +342,7 @@ export async function processSharedContentRow(
     const content = buildMarkdown(row.content, result.description, row.url);
     // Download the scraped media into local storage — IG CDN URLs are
     // signature-bound and expire; the row references the local copies.
-    const medias = await downloadMedias(organizationId, result.medias, shortcodeOfUrl(row.url) ?? "media");
+    const medias = await downloadMedias(organizationId, result.medias, shortcodeOfUrl(row.url) ?? "media", kind);
     await updateRowProps(db, databaseId, row.noteId, {
       [SHARED_CONTENT_PROPS.medias]: medias.map((m) => m.mediaId),
       [SHARED_CONTENT_PROPS.content]: content,

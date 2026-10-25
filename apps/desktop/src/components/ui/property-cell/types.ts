@@ -10,6 +10,16 @@ export interface CellDisplayProps {
   onCommit: (value: unknown) => void;
 }
 
+/** A cell type may define a roomier display for the note property sheet
+ *  (side view) — e.g. media renders videos in a real player there instead of
+ *  the table's thumbnail strip. Optional; the registry falls back to the
+ *  table display when a type doesn't define one. */
+export interface CellSidebarViewProps {
+  value: unknown;
+  prop: NoteProperty;
+  onCommit: (value: unknown) => void;
+}
+
 /** Common props for every cell's floating edit view. */
 export interface CellEditProps {
   value: unknown;

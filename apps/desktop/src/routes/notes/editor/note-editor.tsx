@@ -3,64 +3,15 @@ import { ImageIcon, Smile, Trash2 } from "lucide-react";
 import { EditorContent } from "@tiptap/react";
 import { Resizable } from "re-resizable";
 import type { NoteProperty } from "../view/use-notes-view";
+import { CellSidebarViewFor } from "@/components/ui/property-cell";
 import { assetPreviewUrl, uploadNodeAsset } from "../use-notes-scene";
 import { useNoteEditor, type EditablePage, type PageSaver } from "./use-note-editor";
 import type { SlashContext } from "./slash-command";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
-/** Inline editor — kept for the note-editor property sheet where floating UI isn't appropriate. */
-export function PropertyCell({ value, prop, onCommit }: { value: unknown; prop: NoteProperty; onCommit: (value: unknown) => void }) {
-  if (prop.type === "checkbox") {
-    return <Checkbox checked={Boolean(value)} onCheckedChange={(checked) => onCommit(checked)} />;
-  }
-  if (prop.type === "select") {
-    return (
-      <select
-        className="border-input bg-background focus:ring-ring/20 h-6 w-full cursor-pointer border px-1 text-xs focus:outline-none"
-        value={typeof value === "string" ? value : ""}
-        onChange={(e) => onCommit(e.target.value === "" ? null : e.target.value)}
-      >
-        <option value="">—</option>
-        {(prop.options ?? []).map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.value}
-          </option>
-        ))}
-      </select>
-    );
-  }
-  if (prop.type === "number") {
-    return (
-      <input
-        type="number"
-        className="border-input bg-background h-6 w-full rounded border px-1 text-xs focus:outline-none"
-        defaultValue={typeof value === "number" ? value : ""}
-        placeholder="—"
-        onBlur={(e) => onCommit(e.target.value === "" ? null : Number(e.target.value))}
-      />
-    );
-  }
-  if (prop.type === "date") {
-    return (
-      <input
-        type="date"
-        className="border-input bg-background h-6 w-full rounded border px-1 text-xs focus:outline-none"
-        defaultValue={typeof value === "string" ? value.slice(0, 10) : ""}
-        onChange={(e) => onCommit(e.target.value === "" ? null : new Date(e.target.value).toISOString())}
-      />
-    );
-  }
-  return (
-    <input
-      className="border-input bg-background h-6 w-full rounded border px-1 text-xs focus:outline-none"
-      defaultValue={typeof value === "string" ? value : ""}
-      placeholder="—"
-      onBlur={(e) => onCommit(e.target.value === "" ? null : e.target.value)}
-    />
-  );
-}
+/** Property-sheet cells render via CellSidebarViewFor (registry): cell types
+ *  may define a roomier sidebar view, falling back to the table display. */
 
 function relativeTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -290,13 +241,13 @@ export function NoteEditor({
           onResizeStop={(_e, _dir, _ref, delta) => persistSheetWidth(sheetWidth + delta.width)}
           className="bg-muted/20 shrink-0"
         >
-          <aside className="flex h-full min-h-0 w-full flex-col overflow-y-auto border-l">
+          <aside className="flex h-full min-h-0 w-full flex-col overflow-y-auto overflow-x-hidden border-l">
             <div className="text-muted-foreground/70 px-3 pb-1 pt-3 text-[11px] font-semibold tracking-wide uppercase">Properties</div>
             {columns.map((prop) => (
-              <div key={prop.id} className="flex items-center gap-2 px-3 py-1.5">
-                <span className="text-muted-foreground w-20 shrink-0 truncate text-xs">{prop.name}</span>
-                <div className="min-w-0 flex-1">
-                  <PropertyCell value={page.props?.[prop.id]} prop={prop} onCommit={(value) => editor.setProp(prop.id, value)} />
+              <div key={prop.id} className="min-w-0 px-3 py-1.5">
+                <div className="text-muted-foreground truncate text-xs">{prop.name}</div>
+                <div className="mt-0.5 min-w-0 max-w-full overflow-hidden">
+                  <CellSidebarViewFor value={page.props?.[prop.id]} prop={prop} onCommit={(value) => editor.setProp(prop.id, value)} />
                 </div>
               </div>
             ))}

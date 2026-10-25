@@ -1,11 +1,11 @@
-import type { CellDisplayProps, CellEditProps } from "./types";
+import type { CellDisplayProps, CellEditProps, CellSidebarViewProps } from "./types";
 import { TextCellDisplay, TextCellEdit, type TextInputType } from "./text-cell";
 import { NumberCellDisplay, NumberCellEdit } from "./number-cell";
 import { SingleSelectCellDisplay, SingleSelectCellEdit } from "./single-select-cell";
 import { MultiSelectCellDisplay, MultiSelectCellEdit } from "./multi-select-cell";
 import { DateCellDisplay, DateCellEdit } from "./date-cell";
 import { CheckboxCellDisplay } from "./checkbox-cell";
-import { MediaCellDisplay } from "./media-cell";
+import { MediaCellDisplay, MediaCellSidebarView } from "./media-cell";
 
 /** Dispatch to the right per-type display cell based on `prop.type`. */
 export function CellDisplayFor(props: CellDisplayProps) {
@@ -69,6 +69,13 @@ export function CellEditFor(props: CellEditProps) {
     default:
       return <TextCellEdit {...props} inputType="text" />;
   }
+}
+
+/** Sidebar (property-sheet) display: cell types may define a roomier view
+ *  for the side panel; others fall back to the table display. */
+export function CellSidebarViewFor(props: CellSidebarViewProps) {
+  if (props.prop.type === "media") return <MediaCellSidebarView {...props} />;
+  return <CellDisplayFor {...props} onActivate={() => {}} />;
 }
 
 export type { TextInputType };
