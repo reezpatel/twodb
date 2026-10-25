@@ -37,7 +37,7 @@ export function MobileNavDrawer({ open, onClose, hasSideNav, userName, userEmail
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex shrink-0 items-center gap-2 border-b p-3">
+        <div className="safe-top flex shrink-0 items-center gap-2 border-b p-3">
           <Blobatar name={userName ?? userEmail ?? "twodb"} src={userImage ?? undefined} blobatar={{ title: userName ?? "Account" }} />
           <div className="flex min-w-0 flex-1 flex-col">
             <strong className="truncate text-sm font-semibold">{userName ?? "Account"}</strong>
@@ -67,7 +67,7 @@ export function MobileNavDrawer({ open, onClose, hasSideNav, userName, userEmail
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col gap-0.5 border-t p-3">
+        <div className="safe-bottom flex shrink-0 flex-col gap-0.5 border-t p-3">
           <SideNavItem label="Switch organization" icon={ArrowLeftRight} onSelect={onSwitchOrg} />
           <SideNavItem to={`/apps/${SETTINGS_APP.id}`} label={SETTINGS_APP.label} icon={SETTINGS_APP.icon} />
           <SideNavItem label="Sign out" icon={LogOut} onSelect={onSignOut} />

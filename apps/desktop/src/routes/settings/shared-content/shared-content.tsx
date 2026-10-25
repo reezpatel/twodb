@@ -119,7 +119,66 @@ export function SharedContentSection() {
             Save targets
           </Button>
         </section>
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold">Instagram session</h2>
+          <p className="text-muted-foreground text-xs">
+            Optional <code className="text-foreground">sessionid</code> cookie from a logged-in instagram.com browser session. Lets the processor fetch
+            posts behind login/age gates. Instagram expires these — paste a fresh one when processing starts failing. Paste it exactly as shown in
+            DevTools (URL-encoded is fine). Stored on the server, never shown back in full.
+          </p>
+          <InstagramSessionForm
+            configured={settings.data?.instagram.sessionIdConfigured ?? false}
+            masked={settings.data?.instagram.sessionIdMasked ?? null}
+            onSaved={invalidate}
+          />
+        </section>
       </div>
+    </div>
+  );
+}
+
+/** Session-cookie editor: masked status + paste-and-save. */
+function InstagramSessionForm({ configured, masked, onSaved }: { configured: boolean; masked: string | null; onSaved: () => void }) {
+  const [value, setValue] = useState("");
+  const save = useMutation({
+    mutationFn: (sessionId: string) => api("/api/shared-content/instagram", { method: "PUT", body: JSON.stringify({ sessionId }) }),
+    onSuccess: () => {
+      setValue("");
+      onSaved();
+    },
+  });
+  return (
+    <div className="space-y-2">
+      <p className="text-xs">
+        Status:{" "}
+        {configured ? (
+          <span className="text-green-500">
+            configured <span className="text-muted-foreground">({masked})</span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">not configured</span>
+        )}
+      </p>
+      <div className="flex gap-2">
+        <Input
+          className="h-8 font-mono text-xs"
+          placeholder={configured ? "Paste new sessionid to replace" : "Paste sessionid cookie value"}
+          type="password"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <Button size="sm" className="h-8 shrink-0" disabled={!value.trim() || save.isPending} onClick={() => save.mutate(value.trim())}>
+          {save.isPending ? <Loader2 size={13} className="animate-spin" /> : null}
+          Save
+        </Button>
+        {configured && (
+          <Button size="sm" variant="outline" className="h-8 shrink-0" disabled={save.isPending} onClick={() => save.mutate("")}>
+            Clear
+          </Button>
+        )}
+      </div>
+      {save.isError && <p className="text-destructive text-xs">{save.error.message}</p>}
     </div>
   );
 }

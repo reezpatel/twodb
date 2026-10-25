@@ -82,6 +82,7 @@ export interface SharedContentSettings {
   databases: SharedContentDatabase[];
   targets: { default: string | null; instagram: string | null };
   statuses: string[];
+  instagram: { sessionIdConfigured: boolean; sessionIdMasked: string | null };
 }
 
 export function useSharedContentSettings() {

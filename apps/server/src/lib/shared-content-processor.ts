@@ -3,6 +3,7 @@ import { db } from "../auth";
 import { logger } from "./logger";
 import { SHARED_CONTENT_LOCK, SHARED_CONTENT_PROPS, type SharedContentStatus } from "./shared-content";
 import { notesTable, updateRowProps } from "./notes-tables";
+import { getPrivateSetting } from "./server-settings";
 
 /** Background processing for shared_content rows with status "pending".
  *
@@ -30,12 +31,48 @@ export function instagramMediaKind(url: string): InstagramMediaKind | null {
   }
 }
 
-/** JSON/HTML-escaped URLs come back as https:\/\/…\u0026… — normalise them. */
+/** JSON/HTML-escaped URLs come back as https:\/\/…\u0026… — normalise them.
+ *  Embed pages nest JSON inside JSON, so decode iteratively (\\\\/ → \\/ → /). */
 function unescapeUrl(s: string): string {
-  return s
-    .replace(/\\u0026/gi, "&")
-    .replace(/\\\//g, "/")
-    .replace(/&amp;/g, "&");
+  let prev = s;
+  for (let i = 0; i < 3; i++) {
+    const next = prev
+      .replace(/\\\//g, "/")
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+      .replace(/&amp;/g, "&");
+    if (next === prev) break;
+    prev = next;
+  }
+  try {
+    return decodeURIComponent(prev);
+  } catch {
+    return prev;
+  }
+}
+
+/** Decodes a JSON string fragment that may be escaped multiple times
+ *  (embed pages embed JSON inside JSON). */
+function decodeJsonString(raw: string): string {
+  let s = raw;
+  for (let i = 0; i < 3; i++) {
+    try {
+      const parsed = JSON.parse(`"${s}"`);
+      if (parsed === s) break;
+      s = parsed;
+    } catch {
+      break;
+    }
+  }
+  return s;
+}
+
+/** Matches a JSON string value with 1-2 levels of backslash escaping:
+ *  "key":"value" or \\"key\\":\\"value\\". */
+function escapedJsonValues(html: string, key: string): string[] {
+  const re = new RegExp(`\\\\{1,2}"${key}\\\\{1,2}":\\\\{1,2}"((?:[^"\\\\]|\\\\.)*?)\\\\{1,2}"`, "g");
+  const out: string[] = [];
+  for (const m of html.matchAll(re)) out.push(decodeJsonString(m[1]));
+  return out;
 }
 
 function decodeEntities(s: string): string {
@@ -57,41 +94,150 @@ function metaContent(html: string, property: string): string | null {
 export interface InstagramFetchResult {
   /** Direct CDN media URLs (video for reels, one or more images for posts). */
   medias: string[];
-  /** Post caption/description (og:description). */
+  /** Post caption/description. */
   description: string | null;
 }
 
-/** Best-effort unauthenticated scrape: og meta tags + embedded JSON media
- *  (display_url / video_url entries cover multi-image posts). */
-export async function fetchInstagramMedia(url: string): Promise<InstagramFetchResult> {
+interface StrategyResult {
+  medias: string[];
+  description: string | null;
+  author: string | null;
+}
+
+/** Instagram's link-preview crawlers still get served real pages — a normal
+ *  browser UA gets a login wall. */
+const IG_CRAWLER_UA = "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)";
+const IG_MOBILE_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+
+/** Instagram session cookie (`sessionid`), configured per org in
+ *  Settings → Shared Content (stored in the org's shared_content_targets
+ *  settings blob). Unlocks posts behind login/age gates that anonymous
+ *  strategies can't see. */
+const sessionCache = new Map<string, { value: string | null; at: number }>();
+
+async function instagramSessionId(organizationId: string): Promise<string | null> {
+  const cached = sessionCache.get(organizationId);
+  if (cached && Date.now() - cached.at < 60_000) return cached.value;
+  const settings = await getPrivateSetting<{ instagramSessionId?: string }>(`shared_content_targets:${organizationId}`).catch(() => null);
+  const raw = (settings?.instagramSessionId ?? "").trim();
+  let value: string | null = raw || null;
+  if (value) {
+    try {
+      value = decodeURIComponent(value);
+    } catch {
+      // keep as-is
+    }
+  }
+  sessionCache.set(organizationId, { value, at: Date.now() });
+  return value;
+}
+
+async function fetchHtml(url: string, opts: { userAgent?: string; cookie?: string } = {}): Promise<string> {
   const res = await fetch(url, {
     headers: {
-      "user-agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "user-agent": opts.userAgent ?? IG_CRAWLER_UA,
       accept: "text/html,application/xhtml+xml",
       "accept-language": "en-US,en;q=0.9",
+      ...(opts.cookie ? { cookie: opts.cookie } : {}),
     },
     redirect: "follow",
     signal: AbortSignal.timeout(20_000),
   });
-  if (!res.ok) throw new Error(`instagram fetch failed: HTTP ${res.status}`);
-  const html = await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.text();
+}
 
-  const description = metaContent(html, "og:description");
-  const medias: string[] = [];
-  const push = (u: string | null) => {
-    if (!u) return;
-    const clean = unescapeUrl(u);
-    if (clean.startsWith("http") && !medias.includes(clean)) medias.push(clean);
-  };
+function empty(): StrategyResult {
+  return { medias: [], description: null, author: null };
+}
 
-  push(metaContent(html, "og:video") ?? metaContent(html, "og:video:url") ?? metaContent(html, "og:video:secure_url"));
-  push(metaContent(html, "og:image"));
-  // Multi-image posts: carousel entries live in the embedded JSON blob.
-  for (const m of html.matchAll(/"display_url"\s*:\s*"((?:https?:)?[^"]+)"/g)) push(m[1]);
-  for (const m of html.matchAll(/"video_url"\s*:\s*"((?:https?:)?[^"]+)"/g)) push(m[1]);
+/** og:title looks like `owner on Instagram: "caption"` — strip the wrapper. */
+function captionFromOgTitle(title: string | null): string | null {
+  if (!title) return null;
+  const m = /on Instagram: ["“](.*)["”]$/s.exec(title);
+  return (m ? m[1] : title).trim() || null;
+}
 
-  return { medias, description };
+/** Strategy 1 (strongest): the /embed/ page carries a nested JSON blob with
+ *  the raw caption (edge_media_to_caption), video_url for reels and
+ *  display_url entries for image posts. */
+async function fromEmbed(url: string): Promise<StrategyResult> {
+  const embedUrl = url.replace(/(\/(?:reel|p)\/[A-Za-z0-9_-]+)\/?(\?.*)?$/, "$1/embed/");
+  const html = await fetchHtml(embedUrl);
+  const out = empty();
+  for (const u of escapedJsonValues(html, "video_url")) out.medias.push(unescapeUrl(u));
+  for (const u of escapedJsonValues(html, "display_url")) out.medias.push(unescapeUrl(u));
+  const i = html.indexOf("edge_media_to_caption");
+  if (i >= 0) out.description = escapedJsonValues(html.slice(i, i + 8000), "text")[0] ?? null;
+  return out;
+}
+
+/** Strategy 2: the canonical page served to link-preview crawlers has
+ *  og:video / og:image + the caption wrapped in og:title. */
+async function fromCanonical(url: string): Promise<StrategyResult> {
+  const html = await fetchHtml(url);
+  const out = empty();
+  const video = metaContent(html, "og:video") ?? metaContent(html, "og:video:url") ?? metaContent(html, "og:video:secure_url");
+  if (video) out.medias.push(video);
+  const image = metaContent(html, "og:image");
+  if (image) out.medias.push(image);
+  out.description = captionFromOgTitle(metaContent(html, "og:title")) ?? metaContent(html, "og:description");
+  return out;
+}
+
+/** Strategy 3 (last resort, no auth needed): the oEmbed API. Never yields
+ *  media, but has the caption + author even for posts that login-wall the
+ *  page. Age/private gated content returns an error JSON here. */
+async function fromOEmbed(url: string): Promise<StrategyResult> {
+  const res = await fetch(`https://www.instagram.com/api/v1/oembed/?url=${encodeURIComponent(url)}`, {
+    headers: { "user-agent": IG_CRAWLER_UA },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = (await res.json()) as { title?: string; author_name?: string; thumbnail_url?: string; message?: string };
+  const out = empty();
+  out.description = json.title ?? null;
+  out.author = json.author_name ?? null;
+  if (json.thumbnail_url) out.medias.push(json.thumbnail_url);
+  return out;
+}
+
+/** Strategy 4 (needs the org's session cookie from settings): authenticated
+ *  fetch with a mobile UA — the only way to see login/age-gated posts.
+ *  Yields og:image + caption; no video/carousel URLs. Returns empty when no
+ *  session is configured. */
+async function fromAuthenticated(url: string, organizationId: string): Promise<StrategyResult> {
+  const sessionId = await instagramSessionId(organizationId);
+  if (!sessionId) return empty();
+  const html = await fetchHtml(url, { userAgent: IG_MOBILE_UA, cookie: `sessionid=${sessionId}` });
+  const out = empty();
+  const image = metaContent(html, "og:image");
+  if (image) out.medias.push(image);
+  out.description = metaContent(html, "og:description") ?? captionFromOgTitle(metaContent(html, "og:title"));
+  return out;
+}
+
+/** Runs the strategies strongest-first and merges what each found — a
+ *  failed strategy just means the next one fills the gaps. */
+export async function fetchInstagramMedia(url: string, organizationId: string): Promise<InstagramFetchResult> {
+  const merged = empty();
+  for (const [name, strategy] of [
+    ["embed", fromEmbed],
+    ["canonical", fromCanonical],
+    ["oembed", fromOEmbed],
+    ["authenticated", fromAuthenticated],
+  ] as const) {
+    try {
+      const r = await strategy(url, organizationId);
+      for (const u of r.medias) if (u.startsWith("http") && !merged.medias.includes(u)) merged.medias.push(u);
+      merged.description ??= r.description;
+      merged.author ??= r.author;
+    } catch (err) {
+      logger.debug({ err, strategy: name, url }, "shared-content: instagram strategy failed");
+    }
+  }
+  return { medias: merged.medias, description: merged.description };
 }
 
 /** Description (and any extra share text) as markdown, original link kept. */
@@ -114,6 +260,7 @@ const col = (name: string) => sql.raw(`"${name.replace(/"/g, "")}"`);
 /** Process a single pending row. Returns false when the URL has no
  *  handler — the row is left "pending". */
 export async function processSharedContentRow(
+  organizationId: string,
   databaseId: string,
   row: { noteId: string; url: string | null; content: string | null },
 ): Promise<boolean> {
@@ -123,11 +270,14 @@ export async function processSharedContentRow(
 
   await setRowStatus(databaseId, row.noteId, "downloading");
   try {
-    const result = await fetchInstagramMedia(row.url);
-    if (!result.medias.length) throw new Error("no media found on page");
+    const result = await fetchInstagramMedia(row.url, organizationId);
+    // Nothing at all — not even a caption — means every strategy failed.
+    if (!result.medias.length && !result.description) throw new Error("no media found on page");
 
     await setRowStatus(databaseId, row.noteId, "processing");
     const content = buildMarkdown(row.content, result.description, row.url);
+    // Caption-only (e.g. gated post where media URLs weren't exposed) → saved
+    // with empty medias; the original link stays in the markdown.
     await updateRowProps(db, databaseId, row.noteId, {
       [SHARED_CONTENT_PROPS.medias]: JSON.stringify(result.medias),
       [SHARED_CONTENT_PROPS.content]: content,
@@ -158,7 +308,7 @@ export async function processPendingSharedContent(): Promise<void> {
   try {
     const databases = await db
       .selectFrom("note_node")
-      .select(["id"])
+      .select(["id", "organizationId"])
       .where("kind", "=", "database")
       .where("schemaLockedBy", "=", SHARED_CONTENT_LOCK)
       .where("deletedAt", "is", null)
@@ -176,7 +326,7 @@ export async function processPendingSharedContent(): Promise<void> {
       `.execute(db);
       for (const row of result.rows) {
         budget--;
-        await processSharedContentRow(database.id, row);
+        await processSharedContentRow(database.organizationId, database.id, row);
       }
     }
   } finally {

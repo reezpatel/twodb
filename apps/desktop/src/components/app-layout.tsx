@@ -44,7 +44,7 @@ export function AppLayout() {
       <MobileNavContext.Provider value={{ isMobile, closeNav: () => setNavOpen(false), sideNavTarget, setSideNavActive }}>
         <div className="bg-background flex h-screen flex-col">
         {isMobile && (
-          <header className="bg-card flex h-12 shrink-0 items-center gap-3 border-b px-3">
+          <header className="bg-card safe-top flex min-h-12 shrink-0 items-center gap-3 border-b px-3">
             <button
               aria-label="Open menu"
               onClick={() => setNavOpen(true)}
@@ -79,7 +79,7 @@ export function AppLayout() {
           </Shell>
         </div>
 
-        <footer className="bg-card text-muted-foreground flex h-6 items-center justify-between gap-4 border-t px-2 text-xs">
+        <footer className="bg-card text-muted-foreground safe-bottom flex min-h-6 items-center justify-between gap-4 border-t px-2 text-xs">
           <div className="flex min-w-0 items-center gap-4">
             <FooterSpaces />
             <FooterUsage />

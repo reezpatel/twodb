@@ -13,19 +13,30 @@ import {
 import { getNode } from "../lib/notes-nodes";
 import { processPendingSharedContent } from "../lib/shared-content-processor";
 
-/** Per-org shared-content settings: which locked database receives shares. */
+/** Per-org shared-content settings: which locked database receives shares,
+ *  plus per-org integration config (read by the processor from the same
+ *  settings blob). */
 interface SharedContentTargets {
   /** Fallback database for any shared link. */
   default: string | null;
   /** Instagram links go here when set (falls back to default). */
   instagram: string | null;
+  /** Instagram `sessionid` cookie for gated content — never echoed back in
+   *  full by the API. */
+  instagramSessionId?: string;
 }
 
 const targetsKey = (organizationId: string) => `shared_content_targets:${organizationId}`;
 
-async function getTargets(organizationId: string): Promise<SharedContentTargets> {
+async function getSettings(organizationId: string): Promise<SharedContentTargets> {
   const stored = await getPrivateSetting<Partial<SharedContentTargets>>(targetsKey(organizationId));
-  return { default: stored?.default ?? null, instagram: stored?.instagram ?? null };
+  return { default: stored?.default ?? null, instagram: stored?.instagram ?? null, instagramSessionId: stored?.instagramSessionId };
+}
+
+/** Targets only (drops the secret). */
+async function getTargets(organizationId: string): Promise<Pick<SharedContentTargets, "default" | "instagram">> {
+  const { default: d, instagram } = await getSettings(organizationId);
+  return { default: d, instagram };
 }
 
 async function listSharedContentDatabases(organizationId: string) {
@@ -46,13 +57,47 @@ async function requireSharedContentDatabase(organizationId: string, id: string) 
   return node;
 }
 
+/** Show just enough to confirm which cookie is configured. */
+function maskSessionId(sessionId: string): string {
+  let decoded = sessionId;
+  try {
+    decoded = decodeURIComponent(sessionId);
+  } catch {
+    // keep raw
+  }
+  const id = decoded.split(":")[0];
+  return id ? `${id}:…` : "…";
+}
+
 export const sharedContentRoutes = new Hono()
-  /** Locked shared_content databases + configured targets. */
+  /** Locked shared_content databases + configured targets + integration config. */
   .get("/", async (c) => {
     const s = await requireOrgSession(c);
     if (!s) return c.body(null, 401);
-    const [databases, targets] = await Promise.all([listSharedContentDatabases(s.organizationId), getTargets(s.organizationId)]);
-    return c.json({ databases, targets, statuses: SHARED_CONTENT_STATUSES });
+    const [databases, settings] = await Promise.all([listSharedContentDatabases(s.organizationId), getSettings(s.organizationId)]);
+    const sessionId = (settings.instagramSessionId ?? "").trim();
+    return c.json({
+      databases,
+      targets: { default: settings.default, instagram: settings.instagram },
+      statuses: SHARED_CONTENT_STATUSES,
+      instagram: { sessionIdConfigured: sessionId !== "", sessionIdMasked: sessionId ? maskSessionId(sessionId) : null },
+    });
+  })
+
+  /** Instagram session cookie (`sessionid`) for fetching gated content, per
+   *  org. Stored in the org's settings blob; never echoed back in full.
+   *  Empty string clears it. */
+  .put("/instagram", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+    const body = await c.req.json().catch(() => null);
+    if (!body || typeof body !== "object") return c.json({ error: "invalid_body" }, 400);
+    const raw = body.sessionId;
+    if (raw !== null && typeof raw !== "string") return c.json({ error: "invalid_session_id" }, 400);
+    const value = typeof raw === "string" ? raw.trim() : "";
+    const current = await getSettings(s.organizationId);
+    await setPrivateSetting(targetsKey(s.organizationId), { ...current, instagramSessionId: value });
+    return c.json({ sessionIdConfigured: value !== "", sessionIdMasked: value ? maskSessionId(value) : null });
   })
 
   /** Create a new locked shared_content database. Root-level by default —
@@ -81,7 +126,7 @@ export const sharedContentRoutes = new Hono()
     const body = await c.req.json().catch(() => null);
     if (!body || typeof body !== "object") return c.json({ error: "invalid_body" }, 400);
 
-    const current = await getTargets(s.organizationId);
+    const current = await getSettings(s.organizationId);
     const next: SharedContentTargets = { ...current };
     for (const key of ["default", "instagram"] as const) {
       if (body[key] === undefined) continue;
