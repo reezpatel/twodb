@@ -21,6 +21,7 @@ import { MemoriesSection } from "./routes/settings/llm/memories/memories";
 import { InstructionsSection } from "./routes/settings/llm/instructions/instructions";
 import { McpSection } from "./routes/settings/llm/mcp/mcp-section";
 import { RunnersSection } from "./routes/settings/runners/runners";
+import { TeamsSection } from "./routes/settings/teams/teams";
 import { CodeSection } from "./routes/settings/code/code";
 import { StorageSection } from "./routes/settings/storage/storage";
 import { AccountsSection } from "./routes/settings/accounts/accounts-settings";
@@ -38,6 +39,8 @@ import { CalendarScene } from "./routes/calendar/calendar-scene";
 import { MeetingsScene } from "./routes/meetings/meetings-scene";
 import { MeetingsOldScene } from "./routes/meetings-old/meetings-old-scene";
 import { AutomationsScene } from "./routes/automations/automations-scene";
+import { NotificationsScene } from "./routes/notifications/notifications-scene";
+import { NotificationsSettingsSection } from "./routes/settings/notifications/notifications-settings";
 import { OverviewScene } from "./routes/overview/overview-scene";
 import { ProjectsScene } from "./routes/projects/projects-scene";
 import { ProjectScene } from "./routes/projects/project/project-scene";
@@ -85,10 +88,12 @@ export const router = createBrowserRouter([
             ],
           },
           { path: "runners", Component: RunnersSection },
+          { path: "teams", Component: TeamsSection },
           { path: "code", Component: CodeSection },
           { path: "storage", Component: StorageSection },
           { path: "accounts", Component: AccountsSection },
           { path: "calendar", Component: CalendarSettingsSection },
+          { path: "notifications", Component: NotificationsSettingsSection },
           { path: "shared-content", Component: SharedContentSection },
           { path: "email", element: <Navigate to="/apps/settings/accounts" replace /> },
           { path: "logs", Component: LogsSection },
@@ -125,6 +130,7 @@ export const router = createBrowserRouter([
       { path: "/apps/meetings/:recordingId", Component: MeetingsScene },
       { path: "/apps/meetings-old", Component: MeetingsOldScene },
       { path: "/apps/automations", Component: AutomationsScene },
+      { path: "/apps/notifications", Component: NotificationsScene },
       { path: "/apps/showcase", Component: ShowcaseScene },
       { path: "/apps/projects", Component: ProjectsScene },
       { path: "/apps/projects/:projectId", Component: ProjectScene },

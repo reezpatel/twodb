@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router";
 import { Menu } from "lucide-react";
 import { NavRail } from "./nav-rail";
 import { MobileNavDrawer } from "./mobile-nav";
+import { NotificationBell } from "./notification-bell";
 import { FooterUsage } from "./footer-usage";
 import { FooterRunnerResources } from "./footer-runner-resources";
 import { FooterSpaces } from "./footer-spaces";
@@ -52,6 +53,7 @@ export function AppLayout() {
             >
               <Menu size={18} />
             </button>
+            <NotificationBell layout="header" />
             <span className="truncate text-sm font-semibold">{app?.label ?? activeOrg?.name ?? "twodb"}</span>
           </header>
         )}

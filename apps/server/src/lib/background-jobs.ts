@@ -126,6 +126,29 @@ async function finishJob(jobId: string, code: number | null, signal?: string, me
   await broadcastToSession(row.sessionId, { type: "jobs", jobs: await listJobs(row.sessionId) });
   // New transcript row — viewers refetch; the session list gets its dot.
   await broadcastToSession(row.sessionId, { type: "session_updated" });
+  // No viewer connected → persisted notification so the completion isn't missed.
+  // Sessions aren't user-owned; code sessions are org-shared, so this is an
+  // org-level notification (self-hosted is typically single-org anyway).
+  const { viewersOfSession } = await import("../routes/code-ws");
+  if (!viewersOfSession(row.sessionId)) {
+    const session = await db.selectFrom("code_session").select(["title", "organizationId"]).where("id", "=", row.sessionId).executeTakeFirst();
+    if (session) {
+      const { notify } = await import("./notifications/notify");
+      await notify({
+        organizationId: session.organizationId,
+        type: "code.job",
+        audience: { kind: "org" },
+        title: status === "done" ? "Background job finished" : `Background job ${status}`,
+        body: `$ ${row.command}${code !== null ? ` — exit ${code}` : ""}${session.title ? ` · ${session.title}` : ""}`,
+        urgency: status === "failed" || status === "lost" ? "high" : "normal",
+        icon: "code",
+        deepLink: `twodb://code/session/${row.sessionId}`,
+        groupingKey: `code.job:${row.sessionId}`,
+        dedupeKey: `code.job:${row.sessionId}:${jobId}`,
+        data: { jobId, status, exitCode: code, sessionId: row.sessionId, command: row.command },
+      }).catch(() => {});
+    }
+  }
   logger.info({ sessionId: row.sessionId, jobId, status, code }, "background job finished");
 }
 

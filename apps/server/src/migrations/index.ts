@@ -33,6 +33,8 @@ import { up as noteSchemaLock } from "./0031-note-schema-lock";
 import { up as sharedContentMediaColumn } from "./0032-shared-content-media-column";
 import { up as sharedContentUrlColumns } from "./0033-shared-content-url-columns";
 import { up as sharedContentStatusSelect } from "./0034-shared-content-status-select";
+import { up as notifications } from "./0035-notifications";
+import { up as teamsAccounts } from "./0036-teams-accounts";
 
 // Keys sort lexicographically — prefix new migrations with the next number.
 export const migrations: Record<string, Migration> = {
@@ -70,4 +72,6 @@ export const migrations: Record<string, Migration> = {
   "0032_shared_content_media_column": { up: sharedContentMediaColumn },
   "0033_shared_content_url_columns": { up: sharedContentUrlColumns },
   "0034_shared_content_status_select": { up: sharedContentStatusSelect },
+  "0035_notifications": { up: notifications },
+  "0036_teams_accounts": { up: teamsAccounts },
 };

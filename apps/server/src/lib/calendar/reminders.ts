@@ -163,20 +163,19 @@ async function fire(
     await sendReminderEmail(userId, organizationId, payload);
     return;
   }
-  await db
-    .insertInto("notification")
-    .values({
-      id: crypto.randomUUID(),
-      organizationId,
-      userId,
-      title: payload.title,
-      body: spec.minutes ? `Starts in ${spec.minutes} min` : "Starting now",
-      data: { kind: "calendar.reminder", ...payload } as never,
-      readAt: null,
-      createdAt: new Date(),
-    })
-    .execute()
-    .catch(() => {});
+  const { notify } = await import("../notifications/notify");
+  await notify({
+    organizationId,
+    type: "calendar.reminder",
+    audience: { kind: "user", userId },
+    title: payload.title,
+    body: spec.minutes ? `Starts in ${spec.minutes} min` : "Starting now",
+    urgency: "high",
+    accent: "calendar",
+    deepLink: `twodb://calendar/event/${eventId}`,
+    groupingKey: `calendar.reminder:${deliveryId}`,
+    data: { kind: "calendar.reminder", ...payload },
+  }).catch((e) => logger.warn({ err: e }, "calendar: reminder notification failed"));
   await deliver(userId, payload);
 }
 

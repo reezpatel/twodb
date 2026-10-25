@@ -35,7 +35,23 @@ async function sessionTarget(organizationId: string, sessionId: string) {
   return dir ?? null;
 }
 
-const HOP_BY_HOP = new Set(["connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade", "host", "content-length", "accept-encoding"]);
+const HOP_BY_HOP = new Set([
+  "connection",
+  "keep-alive",
+  "transfer-encoding",
+  "te",
+  "trailer",
+  "upgrade",
+  "host",
+  "content-length",
+  "accept-encoding",
+  // Conditional-request headers: a 304 from code-server would be validated
+  // against the browser's cache of OUR urls, and the body must be stripped.
+  "if-none-match",
+  "if-modified-since",
+  "if-match",
+  "if-unmodified-since",
+]);
 
 export const codeRoutes = new Hono()
   .get("/directories/:id/files", async (c) => {
@@ -1042,6 +1058,14 @@ export const codeRoutes = new Hono()
           "utf8",
         );
         delete responseHeaders["content-length"];
+      }
+      // Null-body statuses (204/304…) must not carry a body — undici throws
+      // "Invalid response status code 304" otherwise.
+      const nullBody = res.status === 204 || res.status === 304 || (res.status >= 100 && res.status < 200);
+      if (nullBody) {
+        delete responseHeaders["content-length"];
+        delete responseHeaders["content-type"];
+        return c.body(null, res.status as 304, responseHeaders);
       }
       return c.body(new Uint8Array(out), res.status as 200, responseHeaders);
     } catch (e) {

@@ -525,17 +525,22 @@ class RunnerManager {
   private handleProxyWsMessage(msg: { type: string; channelId?: string; dataBase64?: string; code?: number; reason?: string }) {
     if (!msg.channelId) return;
     const channel = this.proxyWsChannels.get(msg.channelId);
-    if (!channel) return;
+    if (!channel) {
+      logger.debug({ channelId: msg.channelId, type: msg.type }, "proxyWs: message for unknown channel");
+      return;
+    }
     try {
       if (msg.type === "proxyWsData" && msg.dataBase64) {
         channel.client.send(Buffer.from(msg.dataBase64, "base64"));
       } else if (msg.type === "proxyWsClose") {
+        logger.info({ channelId: msg.channelId, code: msg.code, reason: msg.reason }, "proxyWs: upstream closed");
         this.proxyWsChannels.delete(msg.channelId);
         channel.client.close(msg.code ?? 1000, msg.reason ?? "");
       } else if (msg.type === "proxyWsOpen") {
-        // upstream handshake done — frames flow from here on
+        logger.info({ channelId: msg.channelId }, "proxyWs: upstream handshake done");
       }
-    } catch {
+    } catch (e) {
+      logger.warn({ err: e, channelId: msg.channelId }, "proxyWs: relay failed");
       this.proxyWsChannels.delete(msg.channelId);
     }
   }

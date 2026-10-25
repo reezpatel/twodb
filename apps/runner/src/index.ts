@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import * as pty from "node-pty";
 import WebSocket from "ws";
 import { RunnerCore, collectMetrics, awsStatus, awsLogin, awsSelectProfile, type ServerMessage } from "@twodb/runner-core";
+import { TeamsManager } from "./teams/manager";
 
 const serverUrl = process.env.TWODB_SERVER_URL ?? "http://localhost:3001";
 const key = process.env.TWODB_RUNNER_KEY;
@@ -60,6 +61,8 @@ const core = new RunnerCore({
   ptySpawn: (file, args, opts) => pty.spawn(file, args as string[], opts as Parameters<typeof pty.spawn>[2]) as unknown as import("@twodb/runner-core").PtyProcess,
 });
 
+const teams = new TeamsManager((msg) => send(msg));
+
 function send(msg: unknown) {
   if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
@@ -89,6 +92,13 @@ function handle(msg: ServerMessage) {
       break;
     case "awsSelect":
       void awsSelectProfile(msg.profile ?? "").then((r) => send({ type: "awsSelectResult", requestId: msg.requestId, ...r }));
+      break;
+    case "teamsStart":
+    case "teamsStop":
+    case "teamsLiveStart":
+    case "teamsLiveStop":
+    case "teamsLiveInput":
+      void teams.handle(msg);
       break;
     default:
       core.handle(msg);

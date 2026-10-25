@@ -59,6 +59,15 @@ const localSink = {
             runnerManager.fromRunner(localId!, { type: "awsSelectResult", requestId: msg.requestId, ...r } as never),
           );
           break;
+        case "teamsStart":
+          // Teams bridge needs Chromium — standalone runners only.
+          runnerManager.fromRunner(localId!, {
+            type: "teamsStatus",
+            teamsAccountId: (msg as unknown as { teamsAccount?: { id: string } }).teamsAccount?.id,
+            status: "error",
+            error: "The embedded local runner can't host Teams browser sessions — pick a standalone runner in Settings → Teams.",
+          } as never);
+          break;
         default:
           core?.handle(msg as Parameters<RunnerCore["handle"]>[0]);
       }

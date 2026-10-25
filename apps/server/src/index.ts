@@ -35,11 +35,18 @@ import { startEmailScheduler, stopEmailScheduler } from "./lib/email/scheduler";
 import { startSharedContentScheduler, stopSharedContentScheduler } from "./lib/shared-content-processor";
 import { calendarRoutes } from "./routes/calendar";
 import { registerCalendarWs } from "./routes/calendar-ws";
+import { notificationRoutes } from "./routes/notifications";
+import { registerGatewayWs } from "./lib/ws-gateway";
+import { startNotificationSweeper, stopNotificationSweeper } from "./lib/notifications/expiry";
 import { contactRoutes } from "./routes/contacts";
 import { startCalendarScheduler, stopCalendarScheduler } from "./lib/calendar/scheduler";
 import "./lib/calendar/imip";
 import { getServerSettings } from "./lib/server-settings";
 import { runMigrations } from "./lib/migrate";
+import { runnerManager } from "./lib/runner-manager";
+import { reconcileAll, handleRunnerRosterChange } from "./lib/teams/manager";
+import { teamsRoutes } from "./routes/teams";
+import { registerTeamsWs } from "./routes/teams-ws";
 import { reconcileOrphanJobs } from "./lib/background-jobs";
 import { logger } from "./lib/logger";
 import { notesRoutes } from "./routes/notes";
@@ -108,6 +115,7 @@ app.get("/api/health", async (c) => {
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.route("/api/llm", llmRoutes);
+registerCodeWs(app, upgradeWebSocket);
 app.route("/api/code", codeRoutes);
 app.route("/api/skills", skillRoutes);
 app.route("/api/memories", memoryRoutes);
@@ -136,11 +144,18 @@ app.route("/api/email", emailRoutes);
 app.route("/api/calendar", calendarRoutes);
 app.route("/api/contacts", contactRoutes);
 app.route("/api/spaces", spaceRoutes);
+app.route("/api/notifications", notificationRoutes);
+app.route("/api/teams", teamsRoutes);
 registerRunnerWs(app, upgradeWebSocket);
-registerCodeWs(app, upgradeWebSocket);
 registerChatWs(app, upgradeWebSocket);
 registerEmailWs(app, upgradeWebSocket);
 registerCalendarWs(app, upgradeWebSocket);
+registerTeamsWs(app, upgradeWebSocket);
+registerGatewayWs(app, upgradeWebSocket);
+
+// Teams bridge: (re)start accounts when their runner connects, mark them
+// offline when it drops.
+runnerManager.onChange(handleRunnerRosterChange);
 
 // Production: serve the built desktop app (SPA) from a static dir; API routes
 // above always win because they are registered first.
@@ -166,6 +181,9 @@ if (env.skipAutoMigration) {
   } catch (err) {
     logger.warn({ err }, "background job reconcile failed (non-fatal)");
   }
+  // Teams accounts whose runner is already connected start right away; the
+  // roster-change hook covers later connects.
+  void reconcileAll().catch((err) => logger.warn({ err }, "teams reconcile failed (non-fatal)"));
 }
 
 const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
@@ -213,6 +231,7 @@ heartbeat.unref();
 startEmailScheduler();
 startSharedContentScheduler();
 startCalendarScheduler();
+startNotificationSweeper();
 
 process.on("SIGINT", async () => {
   logger.info("shutting down (SIGINT)");
@@ -220,6 +239,7 @@ process.on("SIGINT", async () => {
   stopEmailScheduler();
   stopSharedContentScheduler();
   stopCalendarScheduler();
+  stopNotificationSweeper();
   await graph.close();
   await db.destroy();
   process.exit(0);

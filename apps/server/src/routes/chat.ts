@@ -394,6 +394,31 @@ export const chatRoutes = new Hono()
     const [payload] = await hydrateMessages(s.organizationId, userId, [row]);
     broadcastChatEvent(s.organizationId, { type: "message", channelId: channel.id, message: payload });
 
+    // Mentioned humans get a notification (agents are handled by responders).
+    const mentionedUsers = mentions.filter((m) => m.type === "user" && m.id !== userId).map((m) => m.id);
+    if (mentionedUsers.length) {
+      const { notify } = await import("../lib/notifications/notify");
+      const actorRow = await db.selectFrom("user").select(["name", "image"]).where("id", "=", userId).executeTakeFirst();
+      const snippet = row.body.length > 140 ? `${row.body.slice(0, 140)}…` : row.body;
+      for (const mentioned of mentionedUsers) {
+        void notify({
+          organizationId: s.organizationId,
+          type: "chat.mention",
+          audience: { kind: "user", userId: mentioned },
+          title: `${actorRow?.name ?? "Someone"} mentioned you in #${channel.name}`,
+          body: snippet,
+          urgency: "high",
+          icon: "chat",
+          accent: "chat",
+          actor: { name: actorRow?.name ?? "Someone", image: actorRow?.image ?? null },
+          deepLink: `twodb://chat/channel/${channel.id}`,
+          groupingKey: `chat.mention:${channel.id}:${mentioned}`,
+          dedupeKey: `chat.mention:${row.id}:${mentioned}`,
+          data: { channelId: channel.id, messageId: row.id },
+        }).catch(() => {});
+      }
+    }
+
     const replyTarget = replyToId ? ((await db.selectFrom("chat_message").select(["id", "authorType", "userId", "agentId", "body", "meta", "replyToId"]).where("id", "=", replyToId).executeTakeFirst()) ?? null) : null;
     const responders = await resolveResponders(s.organizationId, channel, mentions, replyTarget as never);
     void triggerChatRuns({

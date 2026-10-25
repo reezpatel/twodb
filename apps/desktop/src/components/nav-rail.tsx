@@ -4,6 +4,7 @@ import { APPS, SETTINGS_APP, type AppEntry } from "../lib/apps";
 import { cn } from "@/lib/utils";
 import { useMobileNav } from "./mobile-nav-context";
 import { Blobatar } from "@/components/ui/blobatar";
+import { NotificationBell } from "./notification-bell";
 import "blobatar/motion.css";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -90,6 +91,7 @@ export function NavRail({ userName, userEmail, userImage, onSwitchOrg, onSignOut
           </DropdownMenu>
 
           <Separator className="my-1 w-5" />
+          <NotificationBell layout="rail" />
         </>
       )}
       {APPS.map((app) => (

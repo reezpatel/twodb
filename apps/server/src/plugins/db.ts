@@ -158,6 +158,26 @@ export interface RunnerTable {
   deletedAt: Date | null;
 }
 
+/** One Teams account (company) watched by a runner-side Chromium session. */
+export interface TeamsAccountTable {
+  id: string;
+  organizationId: string;
+  /** Owner — this account's Teams events become notifications for this user. */
+  userId: string;
+  /** Runner hosting the Chromium session for this account. */
+  runnerId: string;
+  label: string;
+  /** Login hint shown on the connect screen (UPN/email). */
+  email: string | null;
+  enabled: boolean;
+  /** idle | starting | running | auth_required | error | runner_offline */
+  status: string;
+  lastError: string | null;
+  lastEventAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /** One persisted metrics sample per runner per 10-minute window; jsonb payload mirrors the runner's RunnerMetrics minus `at`. */
 export interface RunnerMetricTable {
   id: string;
@@ -809,9 +829,54 @@ export interface NotificationTable {
   userId: string;
   title: string;
   body: string;
+  /** "core" | app id. */
+  origin: string;
+  /** dotted type, e.g. "calendar.reminder". */
+  type: string;
+  urgency: string;
+  icon: string | null;
+  accent: string | null;
+  audience: string | null;
+  actorName: string | null;
+  actorImage: string | null;
+  media: Record<string, unknown>[] | null;
+  actions: Record<string, unknown>[] | null;
+  deepLink: string | null;
+  groupingKey: string | null;
+  dedupeKey: string | null;
+  silent: boolean;
+  revision: number;
   data: Record<string, unknown> | null;
   readAt: Date | null;
   createdAt: Date;
+  updatedAt: Date | null;
+  expiresAt: Date | null;
+}
+
+export interface NotificationRecipientTable {
+  id: string;
+  notificationId: string;
+  organizationId: string;
+  userId: string;
+  seenAt: Date | null;
+  readAt: Date | null;
+  dismissedAt: Date | null;
+  createdAt: Date;
+}
+
+export interface NotificationPreferenceTable {
+  id: string;
+  organizationId: string;
+  userId: string;
+  /** "core" | app id — the coarse group. */
+  groupId: string;
+  /** dotted type id; null = group-level default row. */
+  typeId: string | null;
+  /** { inApp, toast, osPush, emailDigest } tri-state (null = inherit). */
+  channels: Record<string, unknown>;
+  urgencyFloor: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ChatChannelTable {
@@ -1481,6 +1546,7 @@ export interface Database {
   runner_access_key: RunnerAccessKeyTable;
   runner: RunnerTable;
   runner_metric: RunnerMetricTable;
+  teams_account: TeamsAccountTable;
   code_directory: CodeDirectoryTable;
   code_session: CodeSessionTable;
   code_session_message: CodeSessionMessageTable;
@@ -1534,6 +1600,8 @@ export interface Database {
   api_key: OrgApiKeyTable;
   device: DeviceTable;
   notification: NotificationTable;
+  notification_recipient: NotificationRecipientTable;
+  notification_preference: NotificationPreferenceTable;
   connected_account: ConnectedAccountTable;
   connected_account_member: ConnectedAccountMemberTable;
   connected_account_webhook: ConnectedAccountWebhookTable;

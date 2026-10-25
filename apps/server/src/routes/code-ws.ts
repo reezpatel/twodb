@@ -12,6 +12,7 @@ import { resolveAskUser, type AskUserAnswer, type AskUserQuestion } from "../lib
 import { readGitStatus } from "../lib/git-status";
 import { onMetrics, allLatestMetrics } from "../lib/runner-metrics";
 import { runnerManager } from "../lib/runner-manager";
+import { notify } from "../lib/notifications/notify";
 
 type UpgradeWebSocket = ReturnType<typeof createNodeWebSocket>["upgradeWebSocket"];
 
@@ -332,8 +333,23 @@ export async function startSessionRun(organizationId: string, session: SessionRo
     accumulate(run, frame);
     broadcast(run, frame, session.id);
     if (opts.onFrame) opts.onFrame(frame);
-    if (frame.type === "ask_user") pushSessionState(organizationId, session.id, { needsInput: true });
-    else if (frame.type === "tool_result" && run.askUser?.id === frame.id) pushSessionState(organizationId, session.id, { needsInput: false });
+    if (frame.type === "ask_user") {
+      pushSessionState(organizationId, session.id, { needsInput: true });
+      if (run.sockets.size === 0) {
+        void notify({
+          organizationId,
+          type: "core.agent",
+          audience: { kind: "org" },
+          title: `Agent needs your answer`,
+          body: frame.questions[0]?.question ?? session.title,
+          urgency: "high",
+          icon: "agent",
+          deepLink: `twodb://code/session/${session.id}`,
+          dedupeKey: `core.agent.ask:${frame.id}`,
+          data: { sessionId: session.id, callId: frame.id },
+        }).catch(() => {});
+      }
+    } else if (frame.type === "tool_result" && run.askUser?.id === frame.id) pushSessionState(organizationId, session.id, { needsInput: false });
   };
 
   try {
@@ -423,6 +439,14 @@ export function broadcastToSession(sessionId: string, frame: unknown) {
   }
 }
 
+/** Whether anyone is currently viewing a session (job-completion notices are
+ *  only persisted when nobody is watching). */
+export function viewersOfSession(sessionId: string): boolean {
+  const room = sessionRoom(sessionId);
+  for (const s of sockets) if (s.rooms.has(room)) return true;
+  return false;
+}
+
 /** Direct reply to one socket in a session's room — errors, busy, btw acks.
  * Routed through the room envelope so panels sharing a socket stay separated. */
 function replyTo(ws: WSContext, sessionId: string, frame: unknown) {
@@ -495,8 +519,7 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
 
   // Editor websocket tunnel: browser WS ↔ runner WS ↔ code-server on the
   // runner's loopback. Raw WS frames relay as base64 both ways.
-  app.get(
-    "/api/code/sessions/:id/editor-ws",
+  const editorWsTunnel = (prefix: "editor" | "editor-ws") =>
     upgradeWebSocket((c: Context) => {
       const orgReady = auth.api
         .getSession({ headers: c.req.raw.headers })
@@ -527,17 +550,21 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
           try {
             const ensured = await runnerManager.editorEnsure(dir.runnerId, dir.cwd);
             if (ensured.error || !ensured.port) return ws.close(1011, ensured.error ?? "editor unavailable");
-            // Forward the original query (code-server's ?reconnectionToken etc.)
             const url = new URL(c.req.url);
             const headers: Record<string, string> = {};
             for (const [k, v] of c.req.raw.headers.entries()) {
-              if (["host", "connection", "upgrade", "sec-websocket-key", "sec-websocket-version", "sec-websocket-protocol", "sec-websocket-extensions", "authorization"].includes(k)) continue;
+              // origin: code-server rejects sockets whose Origin isn't its own
+              // loopback origin — strip it (we enforce auth at this layer).
+              if (["host", "connection", "upgrade", "sec-websocket-key", "sec-websocket-version", "sec-websocket-protocol", "sec-websocket-extensions", "authorization", "origin"].includes(k)) continue;
               headers[k] = v;
             }
             const protocols = (c.req.header("sec-websocket-protocol") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
-            const ok = runnerManager.proxyWsOpen(dir.runnerId, channelId, ws, { port: ensured.port, path: url.search ? `/${url.search}` : "/", headers, protocols });
+            // Forward the workbench's own WS path (stable-<commit>/…) + query.
+            const wsPath = c.req.path.slice(`/api/code/sessions/${sessionId}/${prefix}`.length) || "/";
+            const ok = runnerManager.proxyWsOpen(dir.runnerId, channelId, ws, { port: ensured.port, path: wsPath + url.search, headers, protocols });
             if (!ok) return ws.close(1011, "runner offline");
             opened = true;
+            logger.info({ channelId, sessionId, port: ensured.port }, "editor-ws: tunnel requested");
           } catch (e) {
             ws.close(1011, (e as Error).message);
           }
@@ -553,8 +580,12 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
           runnerManager.proxyWsClose(channelId);
         },
       };
-    }),
-  );
+    });
+
+  app.get("/api/code/sessions/:id/editor-ws/*", editorWsTunnel("editor-ws"));
+  // The workbench builds its socket path from window.location, so after our
+  // path prefix it lands under /editor/ — serve the upgrade there too.
+  app.get("/api/code/sessions/:id/editor/*", editorWsTunnel("editor"));
 
   app.get(
     "/api/code/ws",

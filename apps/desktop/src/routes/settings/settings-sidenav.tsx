@@ -6,9 +6,11 @@ const SECTIONS = [
   { id: "llm", label: "LLM" },
   { id: "code", label: "Code" },
   { id: "runners", label: "Runners" },
+  { id: "teams", label: "Teams" },
   { id: "storage", label: "Storage" },
   { id: "accounts", label: "Accounts" },
   { id: "calendar", label: "Calendar" },
+  { id: "notifications", label: "Notifications" },
   { id: "shared-content", label: "Shared Content" },
   { id: "logs", label: "Logs" },
 ] as const;

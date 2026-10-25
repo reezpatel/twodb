@@ -1,6 +1,5 @@
 import * as http from "node:http";
-import * as net from "node:net";
-import * as crypto from "node:crypto";
+import { WebSocket } from "ws";
 
 /** Localhost HTTP/WS proxying on the runner: the server tunnels requests to
  *  a port on this machine (the per-workdir code-server) through the runner
@@ -54,86 +53,63 @@ export function handleProxyHttp(req: ProxyHttpRequest, send: (msg: unknown) => v
   upstream.end();
 }
 
-/** WS tunnel: server↔runner frames become a raw TCP socket to the local
- *  target, performing the WebSocket handshake with the headers the server
- *  forwarded (path, protocols, cookies). Frames relay both ways as base64. */
+const STRIP_HEADERS = new Set([
+  "host",
+  "connection",
+  "upgrade",
+  "sec-websocket-key",
+  "sec-websocket-version",
+  "sec-websocket-protocol",
+  "sec-websocket-extensions",
+  "origin", // code-server origin-checks against its loopback origin
+]);
+
+/** WS tunnel: a real WebSocket client to the local target, frames relayed
+ *  over the runner connection as base64. Using `ws` (already a dep) instead
+ *  of hand-rolled TCP keeps the handshake/framing correct. */
 export class ProxyWsTunnel {
-  private socket: net.Socket | null = null;
-  private handshook = false;
-  private leftover: Buffer = Buffer.alloc(0);
+  private ws: WebSocket | null = null;
+  private queue: string[] = []; // frames that arrived before the socket opened
 
   constructor(
     private channelId: string,
-    private port: number,
-    private path: string,
-    private headers: Record<string, string>,
-    private protocols: string[],
+    port: number,
+    path: string,
+    headers: Record<string, string>,
+    protocols: string[],
     private send: (msg: unknown) => void,
   ) {
-    this.connect();
+    const forwardHeaders: Record<string, string> = {};
+    for (const [k, v] of Object.entries(headers)) if (!STRIP_HEADERS.has(k.toLowerCase())) forwardHeaders[k] = v;
+
+    const ws = new WebSocket(`ws://127.0.0.1:${port}${path}`, protocols, { headers: forwardHeaders });
+    this.ws = ws;
+
+    ws.on("open", () => {
+      this.send({ type: "proxyWsOpen", channelId: this.channelId });
+      for (const frame of this.queue) ws.send(Buffer.from(frame, "base64"));
+      this.queue = [];
+    });
+    ws.on("message", (data: Buffer | string) => {
+      const buf = typeof data === "string" ? Buffer.from(data) : data;
+      this.send({ type: "proxyWsData", channelId: this.channelId, dataBase64: buf.toString("base64") });
+    });
+    ws.on("close", (code: number, reason: Buffer) => {
+      this.send({ type: "proxyWsClose", channelId: this.channelId, code, reason: reason.toString() });
+    });
+    ws.on("error", (e: Error) => {
+      this.send({ type: "proxyWsClose", channelId: this.channelId, code: 1006, reason: e.message });
+    });
   }
 
-  private connect() {
-    const socket = net.connect(this.port, "127.0.0.1");
-    this.socket = socket;
-    const key = crypto.randomBytes(16).toString("base64");
-    const lines = [
-      `GET ${this.path} HTTP/1.1`,
-      `Host: 127.0.0.1:${this.port}`,
-      "Connection: Upgrade",
-      "Upgrade: websocket",
-      `Sec-WebSocket-Key: ${key}`,
-      "Sec-WebSocket-Version: 13",
-      ...(this.protocols.length ? [`Sec-WebSocket-Protocol: ${this.protocols.join(", ")}`] : []),
-      ...Object.entries(this.headers)
-        .filter(([k]) => !["host", "connection", "upgrade", "sec-websocket-key", "sec-websocket-version", "sec-websocket-protocol"].includes(k.toLowerCase()))
-        .map(([k, v]) => `${k}: ${v}`),
-      "",
-      "",
-    ];
-    socket.write(lines.join("\r\n"));
-
-    let head = Buffer.alloc(0);
-    const onData = (chunk: Buffer) => {
-      if (!this.handshook) {
-        head = Buffer.concat([head, chunk]);
-        const end = head.indexOf("\r\n\r\n");
-        if (end === -1) return;
-        const statusLine = head.subarray(0, head.indexOf("\r\n")).toString();
-        if (!statusLine.includes("101")) {
-          this.send({ type: "proxyWsClose", channelId: this.channelId, code: 1002, reason: `upstream handshake failed: ${statusLine}` });
-          socket.destroy();
-          return;
-        }
-        this.handshook = true;
-        this.send({ type: "proxyWsOpen", channelId: this.channelId });
-        const rest = head.subarray(end + 4);
-        if (rest.length) this.relay(rest);
-        head = Buffer.alloc(0);
-        return;
-      }
-      this.relay(chunk);
-    };
-    socket.on("data", onData);
-    socket.on("error", () => this.send({ type: "proxyWsClose", channelId: this.channelId, code: 1006 }));
-    socket.on("close", () => this.send({ type: "proxyWsClose", channelId: this.channelId, code: 1000 }));
-  }
-
-  /** Raw bytes after the handshake — frames flow untouched in both
-   *  directions (the browser↔server WS already frames them). */
-  private relay(chunk: Buffer) {
-    this.leftover = Buffer.concat([this.leftover, chunk]);
-    this.send({ type: "proxyWsData", channelId: this.channelId, dataBase64: this.leftover.toString("base64") });
-    this.leftover = Buffer.alloc(0);
-  }
-
-  /** Browser → upstream bytes. */
+  /** Browser → upstream frame. */
   write(dataBase64: string) {
-    this.socket?.write(Buffer.from(dataBase64, "base64"));
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(Buffer.from(dataBase64, "base64"));
+    else this.queue.push(dataBase64);
   }
 
   close() {
-    this.socket?.destroy();
-    this.socket = null;
+    this.ws?.close();
+    this.ws = null;
   }
 }

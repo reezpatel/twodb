@@ -5,6 +5,7 @@ import { auth, db } from "../auth";
 import { runnerManager } from "../lib/runner-manager";
 import { ingestRunnerMetrics, type RunnerMetricsPayload } from "../lib/runner-metrics";
 import { logger } from "../lib/logger";
+import { notify } from "../lib/notifications/notify";
 
 type UpgradeWebSocket = ReturnType<typeof createNodeWebSocket>["upgradeWebSocket"];
 
@@ -20,6 +21,13 @@ interface WsMessage {
   tmuxName?: string;
   /** metrics stream (10s cadence). */
   metrics?: RunnerMetricsPayload;
+  /** Teams bridge (runner→server). */
+  teamsAccountId?: string;
+  status?: string;
+  error?: string;
+  event?: import("@twodb/runner-core").TeamsEvent;
+  viewId?: string;
+  dataBase64?: string;
 }
 
 function parseMessage(data: unknown): WsMessage | null {
@@ -86,6 +94,7 @@ export function registerRunnerWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) 
             ws,
           });
           logger.info({ runnerId: runner.id, organizationId: keyRow.organizationId, name, hostname }, "runner connected");
+          void notify({ organizationId: keyRow.organizationId, type: "core.runner", audience: { kind: "org" }, title: `Runner connected`, body: name ? `${name} is online` : "A runner just connected", urgency: "low", silent: true, dedupeKey: `core.runner.up:${runner.id}`, data: { runnerId: runner.id, state: "online" } }).catch(() => {});
           ws.send(JSON.stringify({ type: "welcome", runnerId: runner.id }));
           // Push the disk-path config so the first metrics sample covers it.
           if (runner.diskPaths?.length) ws.send(JSON.stringify({ type: "metricsConfig", diskPaths: runner.diskPaths }));
@@ -111,14 +120,23 @@ export function registerRunnerWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) 
             ingestRunnerMetrics(runnerId, runnerManager.orgOf(runnerId) ?? "", msg.metrics);
             return;
           }
+          if (msg.type?.startsWith("teams")) {
+            void import("../lib/teams/manager").then((m) => m.handleTeamsRunnerMessage(runnerId!, msg));
+            return;
+          }
           runnerManager.fromRunner(runnerId, msg);
         },
 
         async onClose() {
           if (!runnerId) return;
           logger.info({ runnerId }, "runner disconnected");
+          const orgId = runnerManager.orgOf(runnerId);
+          const runnerName = (await db.selectFrom("runner").select("name").where("id", "=", runnerId).executeTakeFirst())?.name ?? null;
           runnerManager.removeRunner(runnerId);
           await db.updateTable("runner").set({ lastSeenAt: new Date() }).where("id", "=", runnerId).execute();
+          if (orgId) {
+            void notify({ organizationId: orgId, type: "core.runner", audience: { kind: "org" }, title: `Runner disconnected`, body: runnerName ? `${runnerName} went offline` : "A runner went offline", urgency: "critical", dedupeKey: `core.runner.down:${runnerId}`, renotifyOnDedupe: true, data: { runnerId, state: "offline" } }).catch(() => {});
+          }
         },
       };
     }),

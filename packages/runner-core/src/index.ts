@@ -5,11 +5,13 @@ import { spawn, spawnSync } from "node:child_process";
 import { awsEnv } from "./aws";
 import { EditorManager } from "./editor";
 import { ProxyWsTunnel, handleProxyHttp } from "./proxy";
+import type { TeamsAccountConfig, TeamsLiveInput } from "./teams";
 
 export * from "./metrics";
 export * from "./aws";
 export * from "./editor";
 export * from "./proxy";
+export * from "./teams";
 
 /**
  * Runner core: everything the standalone runner process does that the main
@@ -68,6 +70,11 @@ export interface ServerMessage {
   channelId?: string;
   dataBase64?: string;
   protocols?: string[];
+  /** Teams bridge (teamsStart/teamsStop/teamsLiveStart/teamsLiveStop/teamsLiveInput). */
+  teamsAccount?: TeamsAccountConfig;
+  teamsAccountId?: string;
+  viewId?: string;
+  input?: TeamsLiveInput;
 }
 
 export interface RunnerCoreOptions {

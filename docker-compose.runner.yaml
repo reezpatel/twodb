@@ -35,6 +35,13 @@ services:
       # Local terminal port — host networking shares the host stack, so pick a
       # free port when a native runner already holds 4700.
       RUNNER_PORT: ${RUNNER_PORT:-4700}
+      # Teams bridge: where per-account Chromium profiles live (persist this!).
+      TWODB_TEAMS_PROFILE_ROOT: ${TWODB_TEAMS_PROFILE_ROOT:-/data/teams}
+    volumes:
+      - teams-profiles:/data
+
+volumes:
+  teams-profiles:
     # networks:
     #   - twodb-net
 
