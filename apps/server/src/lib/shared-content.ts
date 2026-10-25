@@ -36,7 +36,7 @@ export function sharedContentColumns(): NotePropertyDef[] {
     { id: SHARED_CONTENT_PROPS.content, name: "Content", type: "text" },
     { id: SHARED_CONTENT_PROPS.url, name: "URL", type: "url" },
     { id: SHARED_CONTENT_PROPS.tags, name: "Tags", type: "multiselect", options: [] },
-    { id: SHARED_CONTENT_PROPS.site, name: "Site", type: "text" },
+    { id: SHARED_CONTENT_PROPS.site, name: "Site", type: "url" },
     // Array of media ids (media_asset rows).
     { id: SHARED_CONTENT_PROPS.medias, name: "Medias", type: "media" },
     {
