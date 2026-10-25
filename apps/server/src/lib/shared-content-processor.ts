@@ -4,6 +4,7 @@ import { logger } from "./logger";
 import { SHARED_CONTENT_LOCK, SHARED_CONTENT_PROPS, type SharedContentStatus } from "./shared-content";
 import { notesTable, updateRowProps } from "./notes-tables";
 import { getPrivateSetting } from "./server-settings";
+import { storeNoteAsset } from "./assets";
 
 /** Background processing for shared_content rows with status "pending".
  *
@@ -15,7 +16,7 @@ import { getPrivateSetting } from "./server-settings";
 
 export type InstagramMediaKind = "reel" | "post";
 
-const IG_PATH_RE = /^\/(reel|p)\/[A-Za-z0-9_-]+/;
+const IG_PATH_RE = /^\/(reel|p)\/([A-Za-z0-9_-]+)/;
 
 /** Returns "reel" | "post" for Instagram reel/post URLs, null otherwise. */
 export function instagramMediaKind(url: string): InstagramMediaKind | null {
@@ -26,6 +27,15 @@ export function instagramMediaKind(url: string): InstagramMediaKind | null {
     const m = u.pathname.match(IG_PATH_RE);
     if (!m) return null;
     return m[1] === "reel" ? "reel" : "post";
+  } catch {
+    return null;
+  }
+}
+
+/** Shortcode ("Dee3pIrPENG") from a reel/post URL — used for media filenames. */
+function shortcodeOfUrl(url: string): string | null {
+  try {
+    return new URL(url).pathname.match(IG_PATH_RE)?.[2] ?? null;
   } catch {
     return null;
   }
@@ -96,6 +106,22 @@ export interface InstagramFetchResult {
   medias: string[];
   /** Post caption/description. */
   description: string | null;
+}
+
+/** A media item stored locally: what lands in the row's `medias` prop
+ *  (JSON.stringify'd array of these). */
+export interface StoredMediaDescriptor {
+  /** Remote CDN URL it was fetched from (expires). */
+  sourceUrl: string;
+  /** Local reference: /api/storage/resolve/<mediaId> — streams on path
+   *  backends, redirects to a presigned URL on object backends. */
+  uri: string;
+  mediaId: string;
+  backendId: string;
+  path: string;
+  filename: string;
+  contentType: string | null;
+  size: number;
 }
 
 interface StrategyResult {
@@ -240,6 +266,42 @@ export async function fetchInstagramMedia(url: string, organizationId: string): 
   return { medias: merged.medias, description: merged.description };
 }
 
+/** Downloads the scraped media URLs into the note_assets storage
+ *  destination — IG CDN URLs are signature-bound and expire, so the row
+ *  references the local copies (https resolve urls) instead. Storage
+ *  unconfigured / expired URL → that item is skipped (sourceUrl kept in
+ *  the markdown content as the permalink anyway). */
+const MEDIA_DOWNLOAD_MAX_BYTES = 100 * 1024 * 1024;
+
+async function downloadMedias(organizationId: string, urls: string[], shortcode: string): Promise<StoredMediaDescriptor[]> {
+  if (!urls.length) return [];
+  const stored: StoredMediaDescriptor[] = [];
+  for (let i = 0; i < urls.length; i++) {
+    const sourceUrl = urls[i];
+    try {
+      const res = await fetch(sourceUrl, {
+        headers: { "user-agent": IG_CRAWLER_UA },
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const contentType = res.headers.get("content-type")?.split(";")[0]?.trim() ?? null;
+      const data = Buffer.from(await res.arrayBuffer());
+      if (data.length > MEDIA_DOWNLOAD_MAX_BYTES) throw new Error(`too large (${data.length} bytes)`);
+      const extension = contentType === "video/mp4" ? "mp4" : contentType === "image/webp" ? "webp" : contentType === "image/png" ? "png" : "jpg";
+      const asset = await storeNoteAsset({
+        organizationId,
+        filename: `ig-${shortcode}-${i + 1}.${extension}`,
+        contentType,
+        data,
+      });
+      stored.push({ sourceUrl, uri: asset.uri, mediaId: asset.id, backendId: asset.backendId, path: asset.path, filename: asset.filename, contentType: asset.contentType, size: asset.size });
+    } catch (err) {
+      logger.warn({ err, sourceUrl: sourceUrl.slice(0, 120) }, "shared-content: media download failed");
+    }
+  }
+  return stored;
+}
+
 /** Description (and any extra share text) as markdown, original link kept. */
 function buildMarkdown(existing: string | null, description: string | null, url: string): string {
   const parts: string[] = [];
@@ -276,10 +338,11 @@ export async function processSharedContentRow(
 
     await setRowStatus(databaseId, row.noteId, "processing");
     const content = buildMarkdown(row.content, result.description, row.url);
-    // Caption-only (e.g. gated post where media URLs weren't exposed) → saved
-    // with empty medias; the original link stays in the markdown.
+    // Download the scraped media into local storage — IG CDN URLs are
+    // signature-bound and expire; the row references the local copies.
+    const medias = await downloadMedias(organizationId, result.medias, shortcodeOfUrl(row.url) ?? "media");
     await updateRowProps(db, databaseId, row.noteId, {
-      [SHARED_CONTENT_PROPS.medias]: JSON.stringify(result.medias),
+      [SHARED_CONTENT_PROPS.medias]: JSON.stringify(medias),
       [SHARED_CONTENT_PROPS.content]: content,
       [SHARED_CONTENT_PROPS.status]: "saved",
     });

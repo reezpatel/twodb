@@ -522,8 +522,9 @@ export function ChatConversation() {
 /** The full chat panel (message list + composer + footer) for one session —
  * used by the main route AND the /btw dialog (a second session's chat). */
 export function ChatConversationInner({ sessionId }: { sessionId: string }) {
-  // twodb:// asset links become session-scoped preview URLs (image thumbnails inline).
+  // Asset links become fetchable URLs (image thumbnails inline).
   const resolveAssetUrl = (uri: string) => {
+    if (uri.includes("/api/storage/resolve/")) return assetUrl(uri);
     const match = /^twodb:\/\/[^/]+\/([^/]+)$/.exec(uri);
     return match?.[1] ? assetUrl(`/api/code/sessions/${sessionId}/assets/${match[1]}`) : undefined;
   };

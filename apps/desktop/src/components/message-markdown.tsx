@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Paperclip } from "lucide-react";
 import { CodeSnippet } from "@/components/ui/code-snippet";
+import { assetUrl } from "@/lib/native";
 
 function nodeText(node: ReactNode): string {
   if (node == null || typeof node === "boolean") return "";
@@ -43,9 +44,10 @@ export function MessageMarkdown({
           a: ({ href, children }) => {
             // Uploaded-asset links render as chips (images inline) — the label
             // carries filename.ext so both the user and the model know the file.
-            if (href?.startsWith("twodb://")) {
+            const isAsset = href?.startsWith("twodb://") || href?.includes("/api/storage/resolve/");
+            if (href && isAsset) {
               const label = nodeText(children) || href;
-              const url = resolveAssetUrl?.(href);
+              const url = resolveAssetUrl?.(href) ?? (href.startsWith("/api/") ? assetUrl(href) : undefined);
               if (url && /\.(png|jpe?g|gif|webp|bmp)$/i.test(label)) {
                 return <img src={url} alt={label} title={label} loading="lazy" className="max-h-56 rounded-lg border" />;
               }

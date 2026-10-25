@@ -24,12 +24,60 @@ function driverPath(organizationId: string, rel: string) {
   return [organizationId, ...pathSegments(rel)].join("/");
 }
 
+/** Public https reference for a stored asset: /api/storage/resolve/<mediaId>.
+ *  The endpoint streams from path backends and 302-redirects to a presigned
+ *  URL for object backends. */
+export function assetResolveUrl(mediaId: string): string {
+  return `/api/storage/resolve/${mediaId}`;
+}
+
+/** Parses an asset uri — accepts the resolve URL (with or without origin,
+ *  with or without the legacy backend segment) and legacy twodb:// refs. */
+const RESOLVE_RE = /^(?:https?:\/\/[^/]+)?\/api\/storage\/resolve\/([A-Za-z0-9-_.]+?)(?:\.[a-z0-9]+)?$/;
+const RESOLVE_WITH_BACKEND_RE = /^(?:https?:\/\/[^/]+)?\/api\/storage\/resolve\/[A-Za-z0-9-_.]+\/([A-Za-z0-9-_.]+?)(?:\.[a-z0-9]+)?$/;
+const LEGACY_TWOODB_RE = /^twodb:\/\/(?:[A-Za-z0-9-_.]+\/)?([A-Za-z0-9-_.]+)$/;
+
+export function mediaIdFromUri(uri: string): string | null {
+  const trimmed = uri.trim();
+  return RESOLVE_WITH_BACKEND_RE.exec(trimmed)?.[1] ?? RESOLVE_RE.exec(trimmed)?.[1] ?? LEGACY_TWOODB_RE.exec(trimmed)?.[1] ?? null;
+}
+
 async function orgBucket(organizationId: string, bucketId: string): Promise<StorageBucketTable | null> {
   const row = await db.selectFrom("storage_bucket").selectAll().where("id", "=", bucketId).where("organizationId", "=", organizationId).executeTakeFirst();
   return row ?? null;
 }
 
 export const storageRoutes = new Hono()
+  /** Resolve a stored asset by media id. Path backends stream the file
+   *  inline; S3-style backends redirect (302) to a presigned URL. */
+  .get("/resolve/:mediaId", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+    const mediaId = c.req.param("mediaId").replace(/\.[a-z0-9]+$/i, "");
+    const asset = await db
+      .selectFrom("media_asset")
+      .selectAll()
+      .where("id", "=", mediaId)
+      .where("organizationId", "=", s.organizationId)
+      .executeTakeFirst();
+    if (!asset) return c.json({ error: "not_found" }, 404);
+    try {
+      const { driver } = await getStorageDriver(asset.backendId);
+      if (driver.signedUrl) {
+        return c.redirect(await driver.signedUrl(asset.path, { downloadName: asset.filename }), 302);
+      }
+      const file = await driver.get(asset.path);
+      return c.body(new Uint8Array(file.body), 200, {
+        "content-type": asset.contentType ?? file.contentType ?? "application/octet-stream",
+        "content-disposition": `inline; filename="${asset.filename.replace(/"/g, "")}"`,
+        "content-length": String(asset.size),
+        "cache-control": "private, max-age=3600",
+      });
+    } catch (e) {
+      return c.json({ error: (e as Error).message }, 404);
+    }
+  })
+
   /** Enabled backends — the pool orgs create buckets on. */
   .get("/backends", async (c) => {
     const s = await requireOrgSession(c);

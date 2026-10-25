@@ -26,6 +26,8 @@ export const SHARED_CONTENT_PROPS = {
   url: "url",
   tags: "tags",
   site: "site",
+  // JSON.stringify'd array of StoredMediaDescriptor (local uri + backendId +
+  // path, plus the original sourceUrl).
   medias: "medias",
   status: "status",
 } as const;

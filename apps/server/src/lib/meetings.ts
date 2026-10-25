@@ -245,7 +245,7 @@ export async function finalizeRecording(
 
     await db.updateTable("meeting_recording_track").set({ durationMs, trackStartedAt, mediaAssetId: mediaId }).where("id", "=", track.id).execute();
 
-    assets.push({ trackId: track.trackId, mediaAssetId: mediaId, uri: `twodb://${backendId}/${mediaId}`, path: objectPath, size: body.length });
+    assets.push({ trackId: track.trackId, mediaAssetId: mediaId, uri: `/api/storage/resolve/${mediaId}`, path: objectPath, size: body.length });
   }
 
   const metadataEndedAt = new Date();
@@ -364,7 +364,7 @@ export async function listRecordings(organizationId: string, limit = 100): Promi
         durationMs: t.durationMs,
         bytes: Number(t.receivedBytes),
         mediaAssetId: t.mediaAssetId,
-        uri: t.mediaAssetId ? `twodb://${t.mediaAssetId}` : null,
+        uri: t.mediaAssetId ? `/api/storage/resolve/${t.mediaAssetId}` : null,
       })),
   }));
 }
@@ -379,19 +379,6 @@ export async function getRecording(organizationId: string, recordingId: string):
   if (!recording) return null;
 
   const tracks = await db.selectFrom("meeting_recording_track").selectAll().where("recordingId", "=", recordingId).execute();
-  const backendByAsset = new Map<string, string>();
-  if (tracks.some((t) => t.mediaAssetId)) {
-    const assets = await db
-      .selectFrom("media_asset")
-      .select(["id", "backendId"])
-      .where(
-        "id",
-        "in",
-        tracks.filter((t) => t.mediaAssetId).map((t) => t.mediaAssetId!),
-      )
-      .execute();
-    for (const a of assets) backendByAsset.set(a.id, a.backendId);
-  }
 
   return {
     id: recording.id,
@@ -406,7 +393,7 @@ export async function getRecording(organizationId: string, recordingId: string):
       durationMs: t.durationMs,
       bytes: Number(t.receivedBytes),
       mediaAssetId: t.mediaAssetId,
-      uri: t.mediaAssetId && backendByAsset.has(t.mediaAssetId) ? `twodb://${backendByAsset.get(t.mediaAssetId)}/${t.mediaAssetId}` : null,
+      uri: t.mediaAssetId ? `/api/storage/resolve/${t.mediaAssetId}` : null,
     })),
   };
 }

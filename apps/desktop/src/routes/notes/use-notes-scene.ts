@@ -180,10 +180,11 @@ export function useAllDatabases() {
   });
 }
 
-/** twodb:// asset uri → org-scoped preview URL. */
+/** Asset uri (https resolve URL, or legacy twodb://) → fetchable URL. */
 export function assetPreviewUrl(uri: string | null | undefined): string | null {
   if (!uri) return null;
-  const id = /^twodb:\/\/[^/]+\/([A-Za-z0-9-_.]+)$/.exec(uri)?.[1];
+  if (uri.includes("/api/storage/resolve/")) return assetUrl(uri);
+  const id = /^twodb:\/\/(?:[^/]+\/)?([A-Za-z0-9-_.]+)$/.exec(uri)?.[1];
   return id ? assetUrl(`/api/notes/assets/${id}`) : null;
 }
 

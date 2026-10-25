@@ -3,11 +3,13 @@ import { getStorageDestinations } from "./server-settings";
 import { getStorageDriver } from "./storage/registry";
 import { logger } from "./logger";
 
-// Chat assets: files uploaded from the composer land in the agent_assets
-// storage destination (backend + prefix from server settings) and are
-// referenced everywhere as twodb://<backendId>/<mediaId>.
+// Assets (chat uploads, note media, shared content…) are stored in a
+// configured storage destination (backend + prefix from server settings) and
+// referenced as https resolve URLs: /api/storage/resolve/<mediaId> — path
+// backends stream the file, object backends redirect to a presigned URL.
+// (Legacy references were twodb://<backendId>/<mediaId>.)
 
-export const TWOODB_URI_RE = /^twodb:\/\/([A-Za-z0-9-_.]+)\/([A-Za-z0-9-_.]+)$/;
+import { mediaIdFromUri } from "../routes/storage";
 
 export interface StoredAsset {
   id: string;
@@ -91,7 +93,7 @@ async function storeAssetAt(destinationId: DestinationId, input: StoreAssetInput
     extension,
     contentType: input.contentType,
     size: input.data.length,
-    uri: `twodb://${backendId}/${id}`,
+    uri: `/api/storage/resolve/${backendId}/${id}`,
   };
 }
 
@@ -126,10 +128,14 @@ export async function storeNoteAsset(input: {
   return storeAssetAt("note_assets", input);
 }
 
-/** Parses a twodb:// uri into its backend + media id. */
+/** Parses an asset uri into its backend + media id. Accepts the standard
+ *  https resolve URL (with or without origin) and legacy twodb:// refs. */
 export function parseAssetUri(uri: string): { backendId: string; mediaId: string } | null {
-  const match = TWOODB_URI_RE.exec(uri.trim());
-  return match ? { backendId: match[1], mediaId: match[2] } : null;
+  const mediaId = mediaIdFromUri(uri);
+  if (!mediaId) return null;
+  // Backend comes from the media_asset row at load time — a uri without a
+  // backend segment is fine.
+  return { backendId: "", mediaId };
 }
 
 async function loadAsset(organizationId: string, uri: string) {

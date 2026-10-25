@@ -231,7 +231,7 @@ export async function triggerChatRuns(input: TriggerChatRunsInput): Promise<Trig
         const assets: { uri: string; filename: string; contentType: string }[] = [];
         const fileNotes: string[] = [];
         for (const a of input.attachments) {
-          const uri = `twodb://${connection.id}/${a.mediaId}`;
+          const uri = `/api/storage/resolve/${a.mediaId}`;
           if ((a.contentType ?? "").startsWith("image/")) assets.push({ uri, filename: a.filename, contentType: a.contentType! });
           else fileNotes.push(`[attached file: ${a.filename} — read it with read_asset ${uri}]`);
         }
