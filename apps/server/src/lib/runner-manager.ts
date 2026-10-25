@@ -92,6 +92,9 @@ class RunnerManager {
   private reqPending = new Map<string, RequestPending>();
   private proxyHttpPending = new Map<string, ProxyHttpPending>();
   private proxyWsChannels = new Map<string, ProxyWsChannel>();
+  /** Editor installs in flight per runner — so the status endpoint (and fresh
+   *  tabs) can report "installing" with progress instead of "not_installed". */
+  private editorInstalls = new Map<string, { bytes: number; startedAt: number }>();
   private changeListeners = new Set<() => void>();
 
   /** Fires whenever a runner connects or disconnects. */
@@ -401,9 +404,29 @@ class RunnerManager {
     return this.runnerRequest<{ installed: boolean; version: string | null; reason?: string }>(runnerId, { type: "editorStatus" }, 15_000);
   }
 
-  /** Downloads code-server on the runner when missing (minutes on slow links). */
-  editorInstall(runnerId: string, onProgress?: (bytes: number) => void) {
-    return this.runnerRequest<{ installed: boolean; version: string | null; reason?: string }>(runnerId, { type: "editorInstall" }, 10 * 60_000, onProgress);
+  /** Downloads code-server on the runner when missing (minutes on slow links).
+   *  Progress (downloaded bytes) is tracked per runner so the status endpoint
+   *  — and freshly-opened tabs — can show the in-flight download. */
+  editorInstall(runnerId: string) {
+    if (this.editorInstalls.has(runnerId)) {
+      // Another tab kicked the same install — just let the caller poll status.
+      return Promise.resolve({ installed: false, version: null, reason: "install_in_progress" });
+    }
+    this.editorInstalls.set(runnerId, { bytes: 0, startedAt: Date.now() });
+    return this.runnerRequest<{ installed: boolean; version: string | null; reason?: string }>(
+      runnerId,
+      { type: "editorInstall" },
+      10 * 60_000,
+      (bytes) => this.editorInstalls.set(runnerId, { bytes, startedAt: this.editorInstalls.get(runnerId)?.startedAt ?? Date.now() }),
+    ).finally(() => {
+      // Small grace so the status endpoint's ensure-probe has spun up.
+      setTimeout(() => this.editorInstalls.delete(runnerId), 5_000);
+    });
+  }
+
+  /** In-flight editor install state for a runner (null = not installing). */
+  editorInstallProgress(runnerId: string): { bytes: number; startedAt: number } | null {
+    return this.editorInstalls.get(runnerId) ?? null;
   }
 
   /** Start (or reuse) the code-server for a workdir → its localhost port. */
