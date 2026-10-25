@@ -965,7 +965,7 @@ export const codeRoutes = new Hono()
     if (!runnerManager.isOnline(target.runnerId)) return c.json({ state: "error", detail: "runner_offline" });
     try {
       const installing = runnerManager.editorInstallProgress(target.runnerId);
-      if (installing) return c.json({ state: "installing", bytes: installing.bytes });
+      if (installing) return c.json({ state: "installing", bytes: installing.bytes, total: installing.total });
       const status = await runnerManager.editorStatus(target.runnerId);
       if (!status.installed) return c.json({ state: status.reason === "windows_unsupported" ? "unsupported" : "not_installed", detail: status.reason ?? null });
       // Probe is cheap: ensuring the editor also returns its port.

@@ -54,11 +54,11 @@ async function findCodeServer(): Promise<{ bin: string; version: string } | null
   return null;
 }
 
-function download(url: string, dest: string, onProgress?: (bytes: number) => void): Promise<void> {
+function download(url: string, dest: string, onProgress?: (bytes: number, total: number | null) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const follow = (u: string, redirects: number) => {
       https
-        .get(u, (res) => {
+        .get(u, { headers: { "accept-encoding": "identity" } }, (res) => {
           if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
             res.resume();
             if (redirects > 5) return reject(new Error("too many redirects"));
@@ -69,10 +69,12 @@ function download(url: string, dest: string, onProgress?: (bytes: number) => voi
             return reject(new Error(`HTTP ${res.statusCode} downloading code-server`));
           }
           const out = fs.createWriteStream(dest);
+          // Content-length is the on-disk tarball size when we refuse gzip.
+          const total = res.headers["content-length"] ? Number(res.headers["content-length"]) : null;
           let bytes = 0;
           res.on("data", (chunk: Buffer) => {
             bytes += chunk.length;
-            onProgress?.(bytes);
+            onProgress?.(bytes, Number.isFinite(total) && (total ?? 0) > 0 ? total : null);
           });
           res.pipe(out);
           out.on("finish", () => out.close(() => resolve()));
@@ -103,7 +105,7 @@ export class EditorManager {
 
   /** Download the standalone tarball into ~/.cache/twodb/code-server — no
    *  root, no package manager. Concurrent calls share one install. */
-  async install(onProgress?: (bytes: number) => void): Promise<EditorStatus> {
+  async install(onProgress?: (bytes: number, total: number | null) => void): Promise<EditorStatus> {
     const existing = await findCodeServer();
     if (existing) return { installed: true, version: existing.version };
     const pa = platformArch();

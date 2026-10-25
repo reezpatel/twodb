@@ -309,7 +309,7 @@ export class RunnerCore {
       }
       case "editorInstall": {
         void this.editors
-          .install((bytes) => this.send({ type: "editorInstallProgress", requestId: msg.requestId, bytes }))
+          .install((bytes, total) => this.send({ type: "editorInstallProgress", requestId: msg.requestId, bytes, total: total ?? undefined }))
           .then((status) => this.send({ type: "editorStatusResult", requestId: msg.requestId, ...status }))
           .catch((e) => this.send({ type: "editorStatusResult", requestId: msg.requestId, installed: false, version: null, reason: (e as Error).message }));
         break;

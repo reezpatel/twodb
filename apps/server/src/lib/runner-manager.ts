@@ -54,7 +54,7 @@ interface AwsPending {
 interface RequestPending {
   resolve: (r: unknown) => void;
   reject: (e: Error) => void;
-  onProgress?: (bytes: number) => void;
+  onProgress?: (bytes: number, total: number | null) => void;
   timer?: ReturnType<typeof setTimeout>;
 }
 
@@ -94,7 +94,7 @@ class RunnerManager {
   private proxyWsChannels = new Map<string, ProxyWsChannel>();
   /** Editor installs in flight per runner — so the status endpoint (and fresh
    *  tabs) can report "installing" with progress instead of "not_installed". */
-  private editorInstalls = new Map<string, { bytes: number; startedAt: number }>();
+  private editorInstalls = new Map<string, { bytes: number; total: number | null; startedAt: number }>();
   private changeListeners = new Set<() => void>();
 
   /** Fires whenever a runner connects or disconnects. */
@@ -382,7 +382,7 @@ class RunnerManager {
   // --- Editor (code-server on the runner) + HTTP/WS proxying ---
 
   /** One-shot request/reply over the runner socket (requestId correlation). */
-  private runnerRequest<T>(runnerId: string, msg: Record<string, unknown>, timeoutMs = 20_000, onProgress?: (bytes: number) => void): Promise<T> {
+  private runnerRequest<T>(runnerId: string, msg: Record<string, unknown>, timeoutMs = 20_000, onProgress?: (bytes: number, total: number | null) => void): Promise<T> {
     const runner = this.runners.get(runnerId);
     if (!runner) return Promise.reject(new Error("runner offline"));
     const requestId = crypto.randomUUID();
@@ -412,12 +412,12 @@ class RunnerManager {
       // Another tab kicked the same install — just let the caller poll status.
       return Promise.resolve({ installed: false, version: null, reason: "install_in_progress" });
     }
-    this.editorInstalls.set(runnerId, { bytes: 0, startedAt: Date.now() });
+    this.editorInstalls.set(runnerId, { bytes: 0, total: null, startedAt: Date.now() });
     return this.runnerRequest<{ installed: boolean; version: string | null; reason?: string }>(
       runnerId,
       { type: "editorInstall" },
       10 * 60_000,
-      (bytes) => this.editorInstalls.set(runnerId, { bytes, startedAt: this.editorInstalls.get(runnerId)?.startedAt ?? Date.now() }),
+      (bytes, total) => this.editorInstalls.set(runnerId, { bytes, total, startedAt: this.editorInstalls.get(runnerId)?.startedAt ?? Date.now() }),
     ).finally(() => {
       // Small grace so the status endpoint's ensure-probe has spun up.
       setTimeout(() => this.editorInstalls.delete(runnerId), 5_000);
@@ -425,7 +425,7 @@ class RunnerManager {
   }
 
   /** In-flight editor install state for a runner (null = not installing). */
-  editorInstallProgress(runnerId: string): { bytes: number; startedAt: number } | null {
+  editorInstallProgress(runnerId: string): { bytes: number; total: number | null; startedAt: number } | null {
     return this.editorInstalls.get(runnerId) ?? null;
   }
 
@@ -488,12 +488,12 @@ class RunnerManager {
     this.proxyWsChannels.delete(channelId);
   }
 
-  private handleEditorMessage(msg: { type: string; requestId?: string; bytes?: number; installed?: boolean; version?: string | null; reason?: string; port?: number; error?: string }) {
+  private handleEditorMessage(msg: { type: string; requestId?: string; bytes?: number; total?: number; installed?: boolean; version?: string | null; reason?: string; port?: number; error?: string }) {
     if (!msg.requestId) return;
     const pending = this.reqPending.get(msg.requestId);
     if (!pending) return;
     if (msg.type === "editorInstallProgress") {
-      pending.onProgress?.(msg.bytes ?? 0);
+      pending.onProgress?.(msg.bytes ?? 0, typeof msg.total === "number" ? msg.total : null);
       return;
     }
     if (pending.timer) clearTimeout(pending.timer);

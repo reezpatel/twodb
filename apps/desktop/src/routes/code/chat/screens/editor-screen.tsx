@@ -10,6 +10,8 @@ interface EditorStatus {
   detail?: string | null;
   /** Bytes downloaded so far while state === "installing". */
   bytes?: number;
+  /** Total tarball bytes when the server knows it (content-length). */
+  total?: number | null;
 }
 
 /** Editor tab: a code-server instance running on the session's runner,
@@ -34,6 +36,8 @@ export function EditorScreen({ sessionId }: { sessionId: string }) {
 
   const state = status.data?.state ?? "starting";
   const downloadedMb = status.data?.bytes ? status.data.bytes / (1024 * 1024) : 0;
+  const totalMb = status.data?.total ? status.data.total / (1024 * 1024) : null;
+  const pct = totalMb && totalMb > 0 ? Math.min(100, (downloadedMb / totalMb) * 100) : null;
 
   if (state === "ready") {
     return (
@@ -75,14 +79,13 @@ export function EditorScreen({ sessionId }: { sessionId: string }) {
           <Loader2 size={18} className="text-muted-foreground animate-spin" />
           <p className="text-sm">Installing VS Code Server on the runner…</p>
           <div className="bg-muted h-1.5 w-56 overflow-hidden rounded-full">
-            {/* ~63MB tarball — indeterminate shimmer under 1MB, then a real bar. */}
             <div
               className="bg-primary h-full rounded-full transition-all duration-500"
-              style={{ width: downloadedMb > 1 ? `${Math.min(100, (downloadedMb / 63) * 100)}%` : "30%" }}
+              style={{ width: pct !== null ? `${pct}%` : "30%" }}
             />
           </div>
           <p className="text-muted-foreground text-xs tabular-nums">
-            {downloadedMb > 0.1 ? `${downloadedMb.toFixed(1)} MB of ~63 MB` : "Downloading…"} — then unpacking, this can take a minute on slow connections.
+            {downloadedMb > 0.1 ? (totalMb ? `${downloadedMb.toFixed(1)} MB of ${totalMb.toFixed(0)} MB` : `${downloadedMb.toFixed(1)} MB downloaded`) : "Downloading…"} — then unpacking, this can take a minute on slow connections.
           </p>
         </>
       )}
