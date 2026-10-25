@@ -12,6 +12,7 @@ export const NOTE_PROPERTY_TYPES = [
   "date",
   "person",
   "files & media",
+  "media",
   "checkbox",
   "url",
   "phone",
@@ -33,6 +34,7 @@ export const SELECTABLE_PROPERTY_TYPES = [
   "date",
   "checkbox",
   "url",
+  "media",
 ] as const satisfies readonly NotePropertyType[];
 
 export const NOTE_VIEW_TYPES = ["table", "list", "kanban"] as const;

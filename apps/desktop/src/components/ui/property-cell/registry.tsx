@@ -5,6 +5,7 @@ import { SingleSelectCellDisplay, SingleSelectCellEdit } from "./single-select-c
 import { MultiSelectCellDisplay, MultiSelectCellEdit } from "./multi-select-cell";
 import { DateCellDisplay, DateCellEdit } from "./date-cell";
 import { CheckboxCellDisplay } from "./checkbox-cell";
+import { MediaCellDisplay } from "./media-cell";
 
 /** Dispatch to the right per-type display cell based on `prop.type`. */
 export function CellDisplayFor(props: CellDisplayProps) {
@@ -20,6 +21,8 @@ export function CellDisplayFor(props: CellDisplayProps) {
       return <NumberCellDisplay {...props} />;
     case "date":
       return <DateCellDisplay {...props} />;
+    case "media":
+      return <MediaCellDisplay {...props} />;
     case "text":
     case "url":
     case "phone":
@@ -38,6 +41,10 @@ export function CellEditFor(props: CellEditProps) {
   switch (props.prop.type) {
     case "checkbox":
       // Checkbox edits in place via CheckboxCellDisplay's onCommit — no floating editor.
+      return null;
+    case "media":
+      // Media is display-only for now (thumbnails); editing comes with the
+      // upload/picker UX.
       return null;
     case "select":
     case "status":

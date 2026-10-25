@@ -26,8 +26,7 @@ export const SHARED_CONTENT_PROPS = {
   url: "url",
   tags: "tags",
   site: "site",
-  // JSON.stringify'd array of StoredMediaDescriptor (local uri + backendId +
-  // path, plus the original sourceUrl).
+  // Array of media ids (media_asset rows) — resolve via /api/storage/resolve/<id>.
   medias: "medias",
   status: "status",
 } as const;
@@ -38,8 +37,8 @@ export function sharedContentColumns(): NotePropertyDef[] {
     { id: SHARED_CONTENT_PROPS.url, name: "URL", type: "url" },
     { id: SHARED_CONTENT_PROPS.tags, name: "Tags", type: "multiselect", options: [] },
     { id: SHARED_CONTENT_PROPS.site, name: "Site", type: "text" },
-    // JSON.stringify'd array of media descriptors (original urls, local asset refs…).
-    { id: SHARED_CONTENT_PROPS.medias, name: "Medias", type: "text" },
+    // Array of media ids (media_asset rows).
+    { id: SHARED_CONTENT_PROPS.medias, name: "Medias", type: "media" },
     {
       id: SHARED_CONTENT_PROPS.status,
       name: "Status",
@@ -120,8 +119,8 @@ export interface SharedContentRowInput {
   tags?: string[];
   /** Explicit site override; derived from url when omitted. */
   site?: string | null;
-  /** Media descriptors — stored as a JSON.stringify'd array. */
-  medias?: unknown[];
+  /** Media ids (media_asset rows) for media already in storage. */
+  medias?: string[];
   status: SharedContentStatus;
 }
 
@@ -150,7 +149,7 @@ export async function insertSharedContentRow(organizationId: string, input: Shar
     [SHARED_CONTENT_PROPS.url]: input.url ?? null,
     [SHARED_CONTENT_PROPS.tags]: input.tags ?? [],
     [SHARED_CONTENT_PROPS.site]: input.site ?? (input.url ? siteOfUrl(input.url) : null),
-    [SHARED_CONTENT_PROPS.medias]: JSON.stringify(input.medias ?? []),
+    [SHARED_CONTENT_PROPS.medias]: input.medias ?? [],
     [SHARED_CONTENT_PROPS.status]: input.status,
   };
   await insertRowProps(db, input.databaseId, noteId, props);

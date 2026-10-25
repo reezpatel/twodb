@@ -30,6 +30,7 @@ import { up as runnerAwsConfig } from "./0028-runner-aws-config";
 import { up as notesPagesDatabases } from "./0029-notes-pages-databases";
 import { up as projects } from "./0030-projects";
 import { up as noteSchemaLock } from "./0031-note-schema-lock";
+import { up as sharedContentMediaColumn } from "./0032-shared-content-media-column";
 
 // Keys sort lexicographically — prefix new migrations with the next number.
 export const migrations: Record<string, Migration> = {
@@ -64,4 +65,5 @@ export const migrations: Record<string, Migration> = {
   "0029_notes_pages_databases": { up: notesPagesDatabases },
   "0030_projects": { up: projects },
   "0031_note_schema_lock": { up: noteSchemaLock },
+  "0032_shared_content_media_column": { up: sharedContentMediaColumn },
 };

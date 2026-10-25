@@ -10,6 +10,7 @@ const PROPERTY_SQL: Record<NotePropertyType, string> = {
   date: "timestamp",
   person: "text",
   "files & media": "text",
+  media: "text[]",
   checkbox: "boolean",
   url: "text",
   phone: "text",
@@ -67,6 +68,26 @@ const NUMBER_TEXT_RE = "^[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?$";
 function castExpr(col: string, from: NotePropertyType, to: NotePropertyType, actualFromSqlType?: string): string {
   const c = `"${col}"`;
   if (from === to) return c;
+
+  // Going TO media (text[] of media ids): multiselect converts directly when
+  // the source column is already an array; single-value types wrap in a
+  // one-element array (empty string → NULL).
+  if (to === "media") {
+    if (from === "multiselect") {
+      const isArray = actualFromSqlType === "text[]" || actualFromSqlType === "ARRAY" || actualFromSqlType?.startsWith("text[") === true;
+      if (isArray) return c;
+    }
+    return `(CASE WHEN NULLIF(${c}::text, '') IS NULL THEN NULL ELSE ARRAY[${c}::text] END)`;
+  }
+
+  // Going FROM media → anything: keep the first media id.
+  if (from === "media") {
+    if (to === "checkbox") return `(array_length(${c}, 1) > 0)`;
+    if (to === "number") return `(CASE WHEN ${c}[1] ~ '${NUMBER_TEXT_RE}' THEN (${c}[1])::double precision ELSE NULL END)`;
+    if (to === "date") return `(NULLIF(${c}[1], ''))::timestamp`;
+    if (to === "multiselect") return c;
+    return `NULLIF(${c}[1], '')`;
+  }
 
   // Going FROM multiselect → single-value type. Branch on the actual source type
   // so we work for legacy columns where multiselect was a plain `text` (no

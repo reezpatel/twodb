@@ -107,6 +107,12 @@ function validateProps(columns: NotePropertyDef[], props: unknown): { ok: true; 
         values[key] = value;
         break;
       }
+      case "media": {
+        // Array of media ids (strings).
+        if (!Array.isArray(value) || !(value as unknown[]).every((v) => typeof v === "string")) return { ok: false, error: `invalid_value:${key}` };
+        values[key] = (value as string[]).filter((v) => v.trim() !== "");
+        break;
+      }
       case "number":
         if (typeof value !== "number" || !Number.isFinite(value)) return { ok: false, error: `invalid_value:${key}` };
         values[key] = value;

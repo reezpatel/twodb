@@ -158,7 +158,14 @@ export const sharedContentRoutes = new Hono()
     if (!url && !text) return c.json({ error: "nothing_to_save" }, 400);
 
     const tags = Array.isArray(body.tags) ? (body.tags as unknown[]).filter((t): t is string => typeof t === "string" && t.trim() !== "").map((t) => t.trim()) : [];
-    const medias = Array.isArray(body.medias) ? (body.medias as unknown[]) : [];
+    // The medias prop is a `media` column: media ids only (strings). Incoming
+    // file descriptors (PWA share target sends {name,type,size}) are noted in
+    // the content instead of being stored in the column.
+    const rawMedias = Array.isArray(body.medias) ? (body.medias as unknown[]) : [];
+    const medias = rawMedias.filter((m): m is string => typeof m === "string" && m.trim() !== "");
+    const fileNotes = rawMedias
+      .map((m) => (typeof m === "object" && m !== null && typeof (m as { name?: unknown }).name === "string" ? (m as { name: string; type?: unknown }).name : null))
+      .filter((n): n is string => !!n);
     const process = body.process === true;
 
     // Resolve target database: explicit id → per-site target → default.
@@ -176,6 +183,7 @@ export const sharedContentRoutes = new Hono()
     const contentParts: string[] = [];
     if (text) contentParts.push(text);
     if (url) contentParts.push(`[${title}](${url})`);
+    if (fileNotes.length) contentParts.push(fileNotes.map((n) => `- 📎 ${n}`).join("\n"));
     const content = contentParts.join("\n\n") || null;
 
     const noteId = await insertSharedContentRow(s.organizationId, {

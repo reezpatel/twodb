@@ -9,10 +9,10 @@ import { storeNoteAsset } from "./assets";
 /** Background processing for shared_content rows with status "pending".
  *
  * Only Instagram reel (/reel/<id>) and post (/p/<id>) URLs are handled:
- * the page is fetched, media URLs are extracted into the `medias` prop
- * (JSON.stringify'd string[]) and the post description is copied into the
- * `content` prop as markdown. Everything else stays "pending" until a
- * processor for that site exists. */
+ * the page is fetched, media is downloaded into storage and the `medias`
+ * prop (a `media` column) gets the resulting media ids; the post description
+ * is copied into the `content` prop as markdown. Everything else stays
+ * "pending" until a processor for that site exists. */
 
 export type InstagramMediaKind = "reel" | "post";
 
@@ -108,8 +108,8 @@ export interface InstagramFetchResult {
   description: string | null;
 }
 
-/** A media item stored locally: what lands in the row's `medias` prop
- *  (JSON.stringify'd array of these). */
+/** A media item stored locally. Only the media id lands in the row's
+ *  `medias` prop (a `media` column) — the rest is download bookkeeping. */
 export interface StoredMediaDescriptor {
   /** Remote CDN URL it was fetched from (expires). */
   sourceUrl: string;
@@ -342,7 +342,7 @@ export async function processSharedContentRow(
     // signature-bound and expire; the row references the local copies.
     const medias = await downloadMedias(organizationId, result.medias, shortcodeOfUrl(row.url) ?? "media");
     await updateRowProps(db, databaseId, row.noteId, {
-      [SHARED_CONTENT_PROPS.medias]: JSON.stringify(medias),
+      [SHARED_CONTENT_PROPS.medias]: medias.map((m) => m.mediaId),
       [SHARED_CONTENT_PROPS.content]: content,
       [SHARED_CONTENT_PROPS.status]: "saved",
     });

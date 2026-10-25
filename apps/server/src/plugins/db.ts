@@ -705,7 +705,7 @@ export interface CodeSessionArtifactTable {
 export type NoteKind = "section" | "page" | "database";
 
 export type NotePropertyType =
-  "text" | "number" | "select" | "multiselect" | "status" | "date" | "person" | "files & media" | "checkbox" | "url" | "phone" | "email" | "id" | "place";
+  "text" | "number" | "select" | "multiselect" | "status" | "date" | "person" | "files & media" | "media" | "checkbox" | "url" | "phone" | "email" | "id" | "place";
 
 export interface NotePropertyOption {
   id: string;
