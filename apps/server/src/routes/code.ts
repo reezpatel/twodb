@@ -17,6 +17,26 @@ import { listJobs, killBackgroundJob, killBackgroundJobByUser, readJobLogs } fro
 import type { CodeSessionMode, CodeSessionType } from "../plugins/db";
 import { logger } from "../lib/logger";
 
+/** Session → its runner + workdir (via the session's code directory). */
+async function sessionTarget(organizationId: string, sessionId: string) {
+  const session = await db
+    .selectFrom("code_session")
+    .select(["id", "codeDirectoryId"])
+    .where("id", "=", sessionId)
+    .where("organizationId", "=", organizationId)
+    .executeTakeFirst();
+  if (!session?.codeDirectoryId) return null;
+  const dir = await db
+    .selectFrom("code_directory")
+    .select(["runnerId", "cwd"])
+    .where("id", "=", session.codeDirectoryId)
+    .where("organizationId", "=", organizationId)
+    .executeTakeFirst();
+  return dir ?? null;
+}
+
+const HOP_BY_HOP = new Set(["connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade", "host", "content-length", "accept-encoding"]);
+
 export const codeRoutes = new Hono()
   .get("/directories/:id/files", async (c) => {
     const s = await requireOrgSession(c);
@@ -930,6 +950,100 @@ export const codeRoutes = new Hono()
       if (message === "agent_assets_not_configured") return c.json({ error: message }, 409);
       logger.error({ err: e }, "code: asset upload failed");
       return c.json({ error: message || "upload_failed" }, 500);
+    }
+  })
+
+  // --- Code editor tab: code-server running on the session's runner, ---
+  // --- proxied over the runner connection (loopback-only on the runner). ---
+
+  /** Editor state for the tab: not_installed | installing | starting | ready | error. */
+  .get("/sessions/:id/editor/status", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+    const target = await sessionTarget(s.organizationId, c.req.param("id"));
+    if (!target) return c.json({ state: "error", detail: "no_directory" }, 404);
+    if (!runnerManager.isOnline(target.runnerId)) return c.json({ state: "error", detail: "runner_offline" });
+    try {
+      const status = await runnerManager.editorStatus(target.runnerId);
+      if (!status.installed) return c.json({ state: status.reason === "windows_unsupported" ? "unsupported" : "not_installed", detail: status.reason ?? null });
+      // Probe is cheap: ensuring the editor also returns its port.
+      const ensured = await runnerManager.editorEnsure(target.runnerId, target.cwd);
+      if (ensured.error || !ensured.port) return c.json({ state: "error", detail: ensured.error ?? "start_failed" });
+      return c.json({ state: "ready", version: status.version });
+    } catch (e) {
+      return c.json({ state: "error", detail: (e as Error).message });
+    }
+  })
+
+  /** Explicit install trigger (UI button) — downloads code-server on the runner. */
+  .post("/sessions/:id/editor/install", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.json({ error: "unauthorized" }, 401);
+    const target = await sessionTarget(s.organizationId, c.req.param("id"));
+    if (!target) return c.json({ error: "no_directory" }, 404);
+    if (!runnerManager.isOnline(target.runnerId)) return c.json({ error: "runner_offline" }, 409);
+    try {
+      const status = await runnerManager.editorInstall(target.runnerId);
+      if (!status.installed) return c.json({ state: "error", detail: status.reason ?? "install_failed" }, 500);
+      return c.json({ state: "installed", version: status.version });
+    } catch (e) {
+      return c.json({ state: "error", detail: (e as Error).message }, 500);
+    }
+  })
+
+  /** HTTP proxy: /api/code/sessions/:id/editor/<path…> → code-server on the
+   *  runner. Every request re-touches the editor so it doesn't idle-shutdown.
+   *  WS URLs in responses are rewritten to the editor-ws tunnel. */
+  .all("/sessions/:id/editor/*", async (c) => {
+    const s = await requireOrgSession(c);
+    if (!s) return c.body(null, 401);
+    const sessionId = c.req.param("id");
+    const target = await sessionTarget(s.organizationId, sessionId);
+    if (!target) return c.body("no directory", 404);
+    if (!runnerManager.isOnline(target.runnerId)) return c.body("runner offline", 502);
+
+    const ensured = await runnerManager.editorEnsure(target.runnerId, target.cwd).catch((e) => ({ error: (e as Error).message }));
+    if ("error" in ensured || !ensured.port) return c.body(`editor unavailable: ${"error" in ensured ? ensured.error : "not running"}`, 502);
+
+    const prefix = `/api/code/sessions/${sessionId}/editor`;
+    const path = c.req.path.slice(prefix.length) || "/";
+    const url = new URL(c.req.url);
+    const headers: Record<string, string> = {};
+    for (const [k, v] of c.req.raw.headers.entries()) if (!HOP_BY_HOP.has(k)) headers[k] = v;
+    const hasBody = !["GET", "HEAD"].includes(c.req.method);
+    const body = hasBody ? Buffer.from(await c.req.arrayBuffer()) : undefined;
+
+    try {
+      const res = await runnerManager.proxyHttp(target.runnerId, {
+        port: ensured.port,
+        method: c.req.method,
+        path: path + url.search,
+        headers,
+        ...(body ? { body } : {}),
+      });
+      const responseHeaders: Record<string, string> = {};
+      for (const [k, v] of Object.entries(res.headers)) {
+        if (HOP_BY_HOP.has(k) || k === "set-cookie") continue;
+        if (typeof v === "string") responseHeaders[k] = v;
+        else if (Array.isArray(v)) responseHeaders[k] = v.join(", ");
+      }
+      const contentType = responseHeaders["content-type"] ?? "";
+      let out = res.body;
+      // The workbench builds WS URLs from window.location — rewrite to the tunnel.
+      if (/^(text\/html|text\/css|application\/javascript|text\/javascript)/.test(contentType)) {
+        const wsBase = `${url.protocol === "https:" ? "wss" : "ws"}://${url.host}/api/code/sessions/${sessionId}/editor-ws`;
+        out = Buffer.from(
+          out
+            .toString("utf8")
+            .replace(/wss?:\/\/[^"'\\\s)]+/g, wsBase)
+            .replace(/(["'(])\/(stable-[a-z0-9]+|static|webview|vscode-resource|update|manifest\.json)/g, `$1${prefix}/$2`),
+          "utf8",
+        );
+        delete responseHeaders["content-length"];
+      }
+      return c.body(new Uint8Array(out), res.status as 200, responseHeaders);
+    } catch (e) {
+      return c.body(`proxy failed: ${(e as Error).message}`, 502);
     }
   })
 

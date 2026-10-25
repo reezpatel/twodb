@@ -3,9 +3,13 @@ import fs from "node:fs";
 import { dirname } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { awsEnv } from "./aws";
+import { EditorManager } from "./editor";
+import { ProxyWsTunnel, handleProxyHttp } from "./proxy";
 
 export * from "./metrics";
 export * from "./aws";
+export * from "./editor";
+export * from "./proxy";
 
 /**
  * Runner core: everything the standalone runner process does that the main
@@ -52,6 +56,18 @@ export interface ServerMessage {
   startUrl?: string;
   ssoRegion?: string;
   profile?: string;
+  /** Editor management (request/reply with requestId). */
+  workdir?: string;
+  /** HTTP proxy over the runner connection. */
+  port?: number;
+  method?: string;
+  path?: string;
+  headers?: Record<string, string>;
+  bodyBase64?: string;
+  /** WS tunnel over the runner connection. */
+  channelId?: string;
+  dataBase64?: string;
+  protocols?: string[];
 }
 
 export interface RunnerCoreOptions {
@@ -100,9 +116,15 @@ export class RunnerCore {
   // stays the source of truth for the process itself.
   private jobs = new Map<string, { child: ReturnType<typeof spawn>; logPath: string; command: string; startedAt: number }>();
 
+  /** Per-workdir code-server lifecycle + status. */
+  readonly editors: EditorManager;
+  /** Active WS tunnels (server↔runner frames → local TCP). */
+  private wsTunnels = new Map<string, ProxyWsTunnel>();
+
   constructor(opts: RunnerCoreOptions) {
     this.send = opts.send;
     this.ptySpawn = opts.ptySpawn;
+    this.editors = new EditorManager({ send: opts.send });
   }
 
   jobsDir() {
@@ -279,6 +301,53 @@ export class RunnerCore {
       case "jobKill":
         if (msg.jobId) this.handleJobKill(msg.jobId);
         break;
+      case "editorStatus": {
+        void this.editors.status().then((status) =>
+          this.send({ type: "editorStatusResult", requestId: msg.requestId, ...status }),
+        );
+        break;
+      }
+      case "editorInstall": {
+        void this.editors
+          .install((bytes) => this.send({ type: "editorInstallProgress", requestId: msg.requestId, bytes }))
+          .then((status) => this.send({ type: "editorStatusResult", requestId: msg.requestId, ...status }))
+          .catch((e) => this.send({ type: "editorStatusResult", requestId: msg.requestId, installed: false, version: null, reason: (e as Error).message }));
+        break;
+      }
+      case "editorEnsure": {
+        void this.editors
+          .ensure(msg.workdir ?? os.homedir())
+          .then(({ port }) => this.send({ type: "editorEnsureResult", requestId: msg.requestId, port }))
+          .catch((e) => this.send({ type: "editorEnsureResult", requestId: msg.requestId, error: (e as Error).message }));
+        break;
+      }
+      case "proxyHttp": {
+        if (msg.requestId && msg.port && msg.method && msg.path) {
+          handleProxyHttp(
+            { requestId: msg.requestId, port: msg.port, method: msg.method, path: msg.path, headers: msg.headers ?? {}, bodyBase64: msg.bodyBase64 },
+            this.send,
+          );
+        }
+        break;
+      }
+      case "proxyWsOpen": {
+        if (msg.channelId && msg.port && msg.path) {
+          const tunnel = new ProxyWsTunnel(msg.channelId, msg.port, msg.path, msg.headers ?? {}, msg.protocols ?? [], this.send);
+          this.wsTunnels.set(msg.channelId, tunnel);
+        }
+        break;
+      }
+      case "proxyWsData": {
+        if (msg.channelId && msg.dataBase64) this.wsTunnels.get(msg.channelId)?.write(msg.dataBase64);
+        break;
+      }
+      case "proxyWsClose": {
+        if (msg.channelId) {
+          this.wsTunnels.get(msg.channelId)?.close();
+          this.wsTunnels.delete(msg.channelId);
+        }
+        break;
+      }
     }
   }
 

@@ -50,6 +50,30 @@ interface AwsPending {
   timer?: ReturnType<typeof setTimeout>;
 }
 
+/** Pending one-shot requests keyed by requestId (editorStatus/editorInstall/editorEnsure). */
+interface RequestPending {
+  resolve: (r: unknown) => void;
+  reject: (e: Error) => void;
+  onProgress?: (bytes: number) => void;
+  timer?: ReturnType<typeof setTimeout>;
+}
+
+/** Pending proxied HTTP request keyed by requestId. */
+interface ProxyHttpPending {
+  resolve: (r: { status: number; headers: Record<string, unknown>; body: Buffer }) => void;
+  reject: (e: Error) => void;
+  status?: number;
+  headers?: Record<string, unknown>;
+  chunks: Buffer[];
+  timer?: ReturnType<typeof setTimeout>;
+}
+
+/** Browser↔runner WS tunnel (editor websockets through code-server). */
+interface ProxyWsChannel {
+  runnerId: string;
+  client: WSContext;
+}
+
 function send(ws: WSContext, msg: unknown) {
   try {
     ws.send(JSON.stringify(msg));
@@ -65,6 +89,9 @@ class RunnerManager {
   private execs = new Map<string, ExecHandlers>();
   private jobPending = new Map<string, JobPending>();
   private awsPending = new Map<string, AwsPending>();
+  private reqPending = new Map<string, RequestPending>();
+  private proxyHttpPending = new Map<string, ProxyHttpPending>();
+  private proxyWsChannels = new Map<string, ProxyWsChannel>();
   private changeListeners = new Set<() => void>();
 
   /** Fires whenever a runner connects or disconnects. */
@@ -255,6 +282,17 @@ class RunnerManager {
 
   removeRunner(runnerId: string) {
     this.runners.delete(runnerId);
+    this.closeProxyChannelsForRunner(runnerId);
+    for (const [requestId, pending] of this.reqPending) {
+      if (pending.timer) clearTimeout(pending.timer);
+      pending.reject(new Error("runner offline"));
+      this.reqPending.delete(requestId);
+    }
+    for (const [requestId, pending] of this.proxyHttpPending) {
+      if (pending.timer) clearTimeout(pending.timer);
+      pending.reject(new Error("runner offline"));
+      this.proxyHttpPending.delete(requestId);
+    }
     this.notifyChanged();
     // Pending job requests can never complete — fail them, and keep exit
     // watchers registered: jobResult may arrive after the runner reconnects
@@ -338,8 +376,161 @@ class RunnerManager {
     return this.awsRequest<{ ok: boolean; error?: string }>(runnerId, { type: "awsSelect", profile }, 15_000);
   }
 
-  private handleAwsMessage(msg: {
-    type: string;
+  // --- Editor (code-server on the runner) + HTTP/WS proxying ---
+
+  /** One-shot request/reply over the runner socket (requestId correlation). */
+  private runnerRequest<T>(runnerId: string, msg: Record<string, unknown>, timeoutMs = 20_000, onProgress?: (bytes: number) => void): Promise<T> {
+    const runner = this.runners.get(runnerId);
+    if (!runner) return Promise.reject(new Error("runner offline"));
+    const requestId = crypto.randomUUID();
+    return new Promise((resolve, reject) => {
+      this.reqPending.set(requestId, {
+        resolve: resolve as (r: unknown) => void,
+        reject,
+        ...(onProgress ? { onProgress } : {}),
+        timer: setTimeout(() => {
+          this.reqPending.delete(requestId);
+          reject(new Error("runner request timed out"));
+        }, timeoutMs),
+      });
+      send(runner.ws, { ...msg, requestId });
+    });
+  }
+
+  editorStatus(runnerId: string) {
+    return this.runnerRequest<{ installed: boolean; version: string | null; reason?: string }>(runnerId, { type: "editorStatus" }, 15_000);
+  }
+
+  /** Downloads code-server on the runner when missing (minutes on slow links). */
+  editorInstall(runnerId: string, onProgress?: (bytes: number) => void) {
+    return this.runnerRequest<{ installed: boolean; version: string | null; reason?: string }>(runnerId, { type: "editorInstall" }, 10 * 60_000, onProgress);
+  }
+
+  /** Start (or reuse) the code-server for a workdir → its localhost port. */
+  editorEnsure(runnerId: string, workdir: string) {
+    return this.runnerRequest<{ port?: number; error?: string }>(runnerId, { type: "editorEnsure", workdir }, 60_000);
+  }
+
+  /** Proxy one HTTP request to a localhost port on the runner. */
+  proxyHttp(runnerId: string, opts: { port: number; method: string; path: string; headers: Record<string, string>; body?: Buffer }): Promise<{ status: number; headers: Record<string, unknown>; body: Buffer }> {
+    const runner = this.runners.get(runnerId);
+    if (!runner) return Promise.reject(new Error("runner offline"));
+    const requestId = crypto.randomUUID();
+    return new Promise((resolve, reject) => {
+      this.proxyHttpPending.set(requestId, {
+        resolve,
+        reject,
+        chunks: [],
+        timer: setTimeout(() => {
+          this.proxyHttpPending.delete(requestId);
+          reject(new Error("proxy timeout"));
+        }, 90_000),
+      });
+      send(runner.ws, {
+        type: "proxyHttp",
+        requestId,
+        port: opts.port,
+        method: opts.method,
+        path: opts.path,
+        headers: opts.headers,
+        ...(opts.body ? { bodyBase64: opts.body.toString("base64") } : {}),
+      });
+    });
+  }
+
+  /** Open a WS tunnel through the runner to a localhost port. Frames relay as
+   *  raw base64 bytes — the browser↔server WS already frames them. */
+  proxyWsOpen(runnerId: string, channelId: string, client: WSContext, opts: { port: number; path: string; headers: Record<string, string>; protocols: string[] }): boolean {
+    const runner = this.runners.get(runnerId);
+    if (!runner) return false;
+    this.proxyWsChannels.set(channelId, { runnerId, client });
+    send(runner.ws, { type: "proxyWsOpen", channelId, port: opts.port, path: opts.path, headers: opts.headers, protocols: opts.protocols });
+    return true;
+  }
+
+  proxyWsWrite(channelId: string, data: Buffer | string) {
+    const channel = this.proxyWsChannels.get(channelId);
+    if (!channel) return;
+    const runner = this.runners.get(channel.runnerId);
+    if (!runner) return;
+    const buf = typeof data === "string" ? Buffer.from(data) : data;
+    send(runner.ws, { type: "proxyWsData", channelId, dataBase64: buf.toString("base64") });
+  }
+
+  proxyWsClose(channelId: string) {
+    const channel = this.proxyWsChannels.get(channelId);
+    if (!channel) return;
+    const runner = this.runners.get(channel.runnerId);
+    if (runner) send(runner.ws, { type: "proxyWsClose", channelId });
+    this.proxyWsChannels.delete(channelId);
+  }
+
+  private handleEditorMessage(msg: { type: string; requestId?: string; bytes?: number; installed?: boolean; version?: string | null; reason?: string; port?: number; error?: string }) {
+    if (!msg.requestId) return;
+    const pending = this.reqPending.get(msg.requestId);
+    if (!pending) return;
+    if (msg.type === "editorInstallProgress") {
+      pending.onProgress?.(msg.bytes ?? 0);
+      return;
+    }
+    if (pending.timer) clearTimeout(pending.timer);
+    this.reqPending.delete(msg.requestId);
+    if (msg.error) pending.reject(new Error(msg.error));
+    else pending.resolve(msg);
+  }
+
+  private handleProxyHttpMessage(msg: { type: string; requestId?: string; status?: number; headers?: Record<string, unknown>; dataBase64?: string }) {
+    if (!msg.requestId) return;
+    const pending = this.proxyHttpPending.get(msg.requestId);
+    if (!pending) return;
+    if (msg.type === "proxyHttpResponse") {
+      pending.status = msg.status;
+      pending.headers = msg.headers;
+      return;
+    }
+    if (msg.type === "proxyHttpChunk" && msg.dataBase64) {
+      pending.chunks.push(Buffer.from(msg.dataBase64, "base64"));
+      return;
+    }
+    if (msg.type === "proxyHttpEnd") {
+      if (pending.timer) clearTimeout(pending.timer);
+      this.proxyHttpPending.delete(msg.requestId);
+      pending.resolve({ status: pending.status ?? 502, headers: pending.headers ?? {}, body: Buffer.concat(pending.chunks) });
+    }
+  }
+
+  private handleProxyWsMessage(msg: { type: string; channelId?: string; dataBase64?: string; code?: number; reason?: string }) {
+    if (!msg.channelId) return;
+    const channel = this.proxyWsChannels.get(msg.channelId);
+    if (!channel) return;
+    try {
+      if (msg.type === "proxyWsData" && msg.dataBase64) {
+        channel.client.send(Buffer.from(msg.dataBase64, "base64"));
+      } else if (msg.type === "proxyWsClose") {
+        this.proxyWsChannels.delete(msg.channelId);
+        channel.client.close(msg.code ?? 1000, msg.reason ?? "");
+      } else if (msg.type === "proxyWsOpen") {
+        // upstream handshake done — frames flow from here on
+      }
+    } catch {
+      this.proxyWsChannels.delete(msg.channelId);
+    }
+  }
+
+  /** Drop tunnels whose runner disconnected (client sockets get closed). */
+  closeProxyChannelsForRunner(runnerId: string) {
+    for (const [channelId, channel] of this.proxyWsChannels) {
+      if (channel.runnerId !== runnerId) continue;
+      this.proxyWsChannels.delete(channelId);
+      try {
+        channel.client.close(1011, "runner disconnected");
+      } catch {
+        // already closed
+      }
+    }
+  }
+
+  private handleAwsMessage(msg: {    type: string;
     requestId?: string;
     status?: unknown;
     ok?: boolean;
@@ -403,6 +594,18 @@ class RunnerManager {
     }
     if (msg.type.startsWith("job")) {
       this.handleJobMessage(msg as Parameters<RunnerManager["handleJobMessage"]>[0]);
+      return;
+    }
+    if (msg.type.startsWith("editor")) {
+      this.handleEditorMessage(msg as { type: string; requestId?: string; bytes?: number });
+      return;
+    }
+    if (msg.type.startsWith("proxyHttp")) {
+      this.handleProxyHttpMessage(msg as { type: string; requestId?: string; status?: number; headers?: Record<string, unknown>; dataBase64?: string });
+      return;
+    }
+    if (msg.type.startsWith("proxyWs")) {
+      this.handleProxyWsMessage(msg as { type: string; channelId?: string; dataBase64?: string; code?: number; reason?: string });
       return;
     }
     if (!msg.sessionId) return;

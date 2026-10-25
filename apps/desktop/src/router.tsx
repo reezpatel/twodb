@@ -107,6 +107,7 @@ export const router = createBrowserRouter([
               // column is owned by ChatPanel. Routes exist for deep links +
               // active-tab state, so they render nothing themselves.
               { path: "terminal", element: null },
+              { path: "editor", element: null },
               { path: "checkpoints", element: null },
               { path: "changes", element: null },
               { path: "canvas", element: null },

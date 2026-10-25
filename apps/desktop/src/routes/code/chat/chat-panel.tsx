@@ -4,6 +4,7 @@ import { useChat } from "./use-chat-panel";
 import { ChatConversationInner } from "./chat-conversation";
 import { AwsChip } from "./aws-chip";
 import { TOOL_SCREENS } from "./screens/mock-screens";
+import { EditorScreen } from "./screens/editor-screen";
 import { useCode } from "../code-provider";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -28,9 +29,10 @@ export function ChatPanel() {
               key={tool.id}
               to={to}
               end={tool.id === "code"}
-              // Clicking the active panel tab closes it — back to default sections.
+              // Clicking the active panel tab closes it — back to default sections
+              // (the editor tab is main-column, not a right-bar panel).
               onClick={() => {
-                if (tool.id !== "code" && isActive) {
+                if (tool.id !== "code" && tool.id !== "editor" && isActive) {
                   navigate(`/apps/code/${sessionId}`, { replace: true });
                 }
               }}
@@ -70,8 +72,15 @@ export function ChatPanel() {
       </div>
 
       {/* The conversation always owns the main column — panel screens render in
-          the right bar instead (see CodeScene), so the chat never unmounts. */}
-      {sessionId ? <ChatConversationInner sessionId={sessionId} /> : null}
+          the right bar instead (see CodeScene), so the chat never unmounts.
+          The editor is the exception: it swaps the main column entirely. */}
+      {activePanel === "editor" && sessionId ? (
+        <div className="min-h-0 flex-1">
+          <EditorScreen sessionId={sessionId} />
+        </div>
+      ) : sessionId ? (
+        <ChatConversationInner sessionId={sessionId} />
+      ) : null}
     </div>
   );
 }

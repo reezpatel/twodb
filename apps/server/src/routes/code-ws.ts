@@ -493,6 +493,69 @@ export function registerCodeWs(app: Hono, upgradeWebSocket: UpgradeWebSocket) {
     }
   };
 
+  // Editor websocket tunnel: browser WS ↔ runner WS ↔ code-server on the
+  // runner's loopback. Raw WS frames relay as base64 both ways.
+  app.get(
+    "/api/code/sessions/:id/editor-ws",
+    upgradeWebSocket((c: Context) => {
+      const orgReady = auth.api
+        .getSession({ headers: c.req.raw.headers })
+        .then((s) => s?.session.activeOrganizationId ?? null)
+        .catch(() => null);
+      const channelId = crypto.randomUUID();
+      let opened = false;
+      return {
+        async onOpen(_evt: unknown, ws: WSContext) {
+          const organizationId = await orgReady;
+          if (!organizationId) return ws.close(4001, "unauthorized");
+          const sessionId = c.req.param("id");
+          if (!sessionId) return ws.close(4004, "no session");
+          const session = await db
+            .selectFrom("code_session")
+            .select(["codeDirectoryId"])
+            .where("id", "=", sessionId)
+            .where("organizationId", "=", organizationId)
+            .executeTakeFirst();
+          if (!session?.codeDirectoryId) return ws.close(4004, "no directory");
+          const dir = await db
+            .selectFrom("code_directory")
+            .select(["runnerId", "cwd"])
+            .where("id", "=", session.codeDirectoryId)
+            .where("organizationId", "=", organizationId)
+            .executeTakeFirst();
+          if (!dir) return ws.close(4004, "no directory");
+          try {
+            const ensured = await runnerManager.editorEnsure(dir.runnerId, dir.cwd);
+            if (ensured.error || !ensured.port) return ws.close(1011, ensured.error ?? "editor unavailable");
+            // Forward the original query (code-server's ?reconnectionToken etc.)
+            const url = new URL(c.req.url);
+            const headers: Record<string, string> = {};
+            for (const [k, v] of c.req.raw.headers.entries()) {
+              if (["host", "connection", "upgrade", "sec-websocket-key", "sec-websocket-version", "sec-websocket-protocol", "sec-websocket-extensions", "authorization"].includes(k)) continue;
+              headers[k] = v;
+            }
+            const protocols = (c.req.header("sec-websocket-protocol") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
+            const ok = runnerManager.proxyWsOpen(dir.runnerId, channelId, ws, { port: ensured.port, path: url.search ? `/${url.search}` : "/", headers, protocols });
+            if (!ok) return ws.close(1011, "runner offline");
+            opened = true;
+          } catch (e) {
+            ws.close(1011, (e as Error).message);
+          }
+        },
+        onMessage(evt: { data: unknown }, _ws: WSContext) {
+          if (!opened) return;
+          const data = evt.data;
+          if (typeof data === "string") runnerManager.proxyWsWrite(channelId, data);
+          else if (data instanceof ArrayBuffer) runnerManager.proxyWsWrite(channelId, Buffer.from(data));
+          else if (ArrayBuffer.isView(data)) runnerManager.proxyWsWrite(channelId, Buffer.from(data.buffer, data.byteOffset, data.byteLength));
+        },
+        onClose() {
+          runnerManager.proxyWsClose(channelId);
+        },
+      };
+    }),
+  );
+
   app.get(
     "/api/code/ws",
     upgradeWebSocket((c: Context) => {
