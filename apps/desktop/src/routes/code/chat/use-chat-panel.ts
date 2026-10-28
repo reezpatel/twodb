@@ -2,7 +2,7 @@ import { useCallback, createContext, useContext, useEffect, useMemo, useRef, use
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CodeMessage, CodeSession } from "../sidenav/use-session-list";
 import type { GitStatus } from "../directories/use-git-status";
-import type { ComposerCommand } from "@/components/composer/composer-commands";
+import type { ComposerCommand } from "@/components/blocks/composer/composer-commands";
 import type { AskUserAnswer, AskUserQuestion } from "./ask-user-wizard";
 import { joinSessionRoom, onWsStatus, sendToSession, getWsStatus } from "../code-room-ws";
 import { api } from "@/lib/api";

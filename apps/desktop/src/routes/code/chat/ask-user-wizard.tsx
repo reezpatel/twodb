@@ -1,8 +1,21 @@
-import { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, CircleHelp, Send, Square } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Send, Square } from "lucide-react";
+import {
+  CodeChatQuestion,
+  CodeChatQuestionAction,
+  CodeChatQuestionActions,
+  CodeChatQuestionBody,
+  CodeChatQuestionHeader,
+  CodeChatQuestionInput,
+  CodeChatQuestionNote,
+  CodeChatQuestionOption,
+  CodeChatQuestionOptions,
+  CodeChatQuestionPrompt,
+  CodeChatQuestionReview,
+  CodeChatQuestionReviewItem,
+  CodeChatQuestionReviewTitle,
+} from "@/components/blocks/code/code-chat-footer/code-chat-question";
+import { useAnswerEditor } from "@/components/blocks/composer/use-answer-editor";
 
 export interface AskUserQuestion {
   question: string;
@@ -54,6 +67,26 @@ function answerText(answer: AskUserAnswer | undefined): string {
   return Array.isArray(answer) ? answer.join(", ") : (answer ?? "");
 }
 
+interface AnswerInputProps {
+  value: string;
+  onChange: (text: string) => void;
+  onEnter: () => void;
+  files: string[] | null;
+  placeholder: string;
+  autoFocus: boolean;
+}
+
+/** Free-text answer: the chat composer's editor with @ file mentions only. Mounted per step so each question starts fresh. */
+function AnswerInput({ value, onChange, onEnter, files, placeholder, autoFocus }: AnswerInputProps) {
+  const editor = useAnswerEditor({ value, onChange, onEnter, files, placeholder });
+
+  useEffect(() => {
+    if (autoFocus) editor?.commands.focus("end");
+  }, [editor, autoFocus]);
+
+  return <CodeChatQuestionInput editor={editor} />;
+}
+
 /**
  * Pane-based question wizard replacing the composer while the agent waits on
  * ask_user: one pane per question (options + always a custom answer), then a
@@ -62,27 +95,32 @@ function answerText(answer: AskUserAnswer | undefined): string {
  */
 export function AskUserWizard({
   questions: rawQuestions,
+  files,
   onSubmit,
   onStop,
 }: {
   questions: AskUserQuestion[];
+  /** File paths for @ mentions in free-text answers — null disables them. */
+  files: string[] | null;
   onSubmit: (answers: AskUserAnswer[]) => void;
   onStop: () => void;
 }) {
   const questions = useMemo(() => normalizeAskUserQuestions(rawQuestions), [rawQuestions]);
   const [step, setStep] = useState(0);
+  // What the user typed per step — keeps typed text that happens to equal an option label in the editor.
+  const typed = useRef<Record<number, string>>({});
   const [answers, setAnswers] = useState<AskUserAnswer[]>(() => questions.map(() => ""));
   const isSummary = step >= questions.length;
   const current = questions[step] as AskUserQuestion | undefined;
 
-  const setAnswer = (value: AskUserAnswer) =>
-    setAnswers((prev) => questions.map((_, i) => (i === step ? value : (prev[i] ?? ""))));
+  const setAnswer = (value: AskUserAnswer) => setAnswers((prev) => questions.map((_, i) => (i === step ? value : (prev[i] ?? ""))));
   const currentAnswer = answers[step];
   const answered = (a: AskUserAnswer | undefined) => (Array.isArray(a) ? a.length > 0 : Boolean(a && String(a).trim()));
   const canAdvance = isSummary || answered(currentAnswer);
   const finalAnswers = questions.map((_, i) => answers[i] ?? "");
 
   const toggleOption = (option: string) => {
+    typed.current[step] = "";
     if (current?.allowMultiple) {
       const list = Array.isArray(currentAnswer) ? currentAnswer : currentAnswer ? [String(currentAnswer)] : [];
       setAnswer(list.includes(option) ? list.filter((o) => o !== option) : [...list, option]);
@@ -92,75 +130,66 @@ export function AskUserWizard({
   };
 
   const isSelected = (option: string) => (Array.isArray(currentAnswer) ? currentAnswer.includes(option) : currentAnswer === option);
-  const customText = typeof currentAnswer === "string" && currentAnswer && !current?.options?.includes(currentAnswer) ? currentAnswer : "";
+  const customText =
+    typeof currentAnswer === "string" && currentAnswer && (!current?.options?.includes(currentAnswer) || currentAnswer === typed.current[step])
+      ? currentAnswer
+      : "";
 
   return (
-    <div className="bg-card focus-within:border-ring rounded-lg border">
-      <div className="flex items-center gap-2 border-b px-3 py-2">
-        <CircleHelp size={13} className="text-primary shrink-0" aria-hidden="true" />
-        <span className="text-[11px] font-semibold tracking-wide uppercase">Agent question</span>
-        <span className="text-muted-foreground ml-auto font-mono text-[11px]">{isSummary ? "review" : `${step + 1} / ${questions.length}`}</span>
-      </div>
+    <CodeChatQuestion>
+      <CodeChatQuestionHeader progress={isSummary ? "review" : `${step + 1} / ${questions.length}`} />
 
       {!isSummary && current ? (
-        <div className="flex flex-col gap-3 px-3 py-3">
-          <p className="text-sm font-medium">{current.question}</p>
+        <CodeChatQuestionBody>
+          <CodeChatQuestionPrompt>{current.question}</CodeChatQuestionPrompt>
           {current.options && current.options.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <CodeChatQuestionOptions>
               {current.options.map((option) => (
-                <button
+                <CodeChatQuestionOption
                   key={option}
-                  type="button"
+                  label={option}
+                  selected={isSelected(option)}
+
                   onClick={() => toggleOption(option)}
-                  className={cn(
-                    "rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors",
-                    isSelected(option) ? "bg-primary/15 border-primary text-primary" : "hover:bg-accent/60",
-                  )}
-                >
-                  {option}
-                </button>
+                />
               ))}
-            </div>
+            </CodeChatQuestionOptions>
           )}
-          <Input
+          <AnswerInput
+            key={step}
             value={customText}
-            onChange={(e) => setAnswer(e.target.value)}
-            placeholder={current.allowMultiple ? "Custom answer (overrides selections)…" : "Custom answer…"}
-            className="h-8 text-xs"
-            aria-label="Custom answer"
+            onChange={(text) => {
+              typed.current[step] = text;
+              setAnswer(text);
+            }}
+            onEnter={() => canAdvance && setStep((s) => s + 1)}
+            files={files}
+            placeholder={current.allowMultiple ? "Custom answer (overrides selections)… @ for files" : "Custom answer… @ for files"}
+            autoFocus={!current.options?.length}
           />
-        </div>
+        </CodeChatQuestionBody>
       ) : questions.length === 0 ? (
-        <div className="text-muted-foreground px-3 py-3 text-sm">The agent sent a question without any readable content. Submit to continue or stop the run.</div>
+        <CodeChatQuestionBody>
+          <CodeChatQuestionNote>The agent sent a question without any readable content. Submit to continue or stop the run.</CodeChatQuestionNote>
+        </CodeChatQuestionBody>
       ) : (
-        <div className="flex flex-col gap-2 px-3 py-3">
-          <p className="text-[11px] font-semibold tracking-wide uppercase">Review your answers</p>
+        <CodeChatQuestionReview>
+          <CodeChatQuestionReviewTitle>Review your answers</CodeChatQuestionReviewTitle>
           {questions.map((q, i) => (
-            <div key={i} className="flex flex-col gap-0.5 border-t pt-2 first:border-t-0 first:pt-0">
-              <span className="text-muted-foreground text-xs">{q.question}</span>
-              <span className="text-sm font-medium">{answerText(answers[i])}</span>
-            </div>
+            <CodeChatQuestionReviewItem key={i} question={q.question} answer={answerText(answers[i])} />
           ))}
-        </div>
+        </CodeChatQuestionReview>
       )}
 
-      <div className="flex items-center gap-1 border-t px-1.5 py-1">
-        <Button variant="ghost" size="sm" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>
-          <ArrowLeft size={13} /> Back
-        </Button>
-        <Button variant="destructive" size="sm" className="ml-auto" title="Stop the run without answering" onClick={onStop}>
-          <Square size={12} /> Stop
-        </Button>
+      <CodeChatQuestionActions>
+        <CodeChatQuestionAction kind="back" label="Back" icon={<ArrowLeft />} disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))} />
+        <CodeChatQuestionAction kind="stop" label="Stop" icon={<Square className="fill-current" />} title="Stop the run without answering" onClick={onStop} />
         {isSummary ? (
-          <Button size="sm" onClick={() => onSubmit(finalAnswers)}>
-            <Send size={13} /> Submit answers
-          </Button>
+          <CodeChatQuestionAction label="Submit answers" icon={<Send />} onClick={() => onSubmit(finalAnswers)} />
         ) : (
-          <Button size="sm" disabled={!canAdvance} onClick={() => setStep((s) => s + 1)}>
-            Next <ArrowRight size={13} />
-          </Button>
+          <CodeChatQuestionAction label="Next" icon={<ArrowRight />} iconAfter disabled={!canAdvance} onClick={() => setStep((s) => s + 1)} />
         )}
-      </div>
-    </div>
+      </CodeChatQuestionActions>
+    </CodeChatQuestion>
   );
 }

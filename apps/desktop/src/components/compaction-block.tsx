@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Archive, ChevronDown } from "lucide-react";
 import { MessageMarkdown } from "@/components/message-markdown";
-import { fmtTokens } from "@/components/model-picker/stats-row";
+import { fmtTokens } from "@/lib/format-tokens";
 import { cn } from "@/lib/utils";
 
 export interface CompactionBlockMeta {

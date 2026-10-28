@@ -108,13 +108,12 @@ export const router = createBrowserRouter([
             Component: ChatPanel,
             children: [
               { index: true, element: null },
-              // Panel screens render inside the right bar (CodeScene); the main
+              // Panel screens render in the code shell's bottom panel / right bar (CodeScene); the main
               // column is owned by ChatPanel. Routes exist for deep links +
               // active-tab state, so they render nothing themselves.
               { path: "terminal", element: null },
               { path: "editor", element: null },
               { path: "checkpoints", element: null },
-              { path: "changes", element: null },
               { path: "canvas", element: null },
             ],
           },

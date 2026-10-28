@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useConnectionPicker } from "@/lib/use-connection-picker";
 import { api } from "@/lib/api";
 
-const THINKING_ORDER = ["off", "low", "medium", "high"];
+export const THINKING_ORDER = ["off", "low", "medium", "high"];
 
 export interface ModelConfigSessionLike {
   data:
@@ -91,6 +91,13 @@ export function useModelConfig(sessionId: string | null, session: ModelConfigSes
     persistConfig({ connectionId: selected?.id ?? null, model: modelId });
   };
 
+  /** Switches connection and model together — the picker lists models across connections. */
+  const selectConnectionModel = (nextConnectionId: string, modelId: string) => {
+    setConnectionId(nextConnectionId);
+    setModel(modelId);
+    persistConfig({ connectionId: nextConnectionId, model: modelId });
+  };
+
   const changeThinking = (level: string) => {
     setThinkingLevel(level);
     if (thinking) persistConfig({ thinkingLevel: level });
@@ -115,6 +122,7 @@ export function useModelConfig(sessionId: string | null, session: ModelConfigSes
     providerLabel,
     selectConnection,
     selectModel,
+    selectConnectionModel,
     changeThinking,
     showThinking: thinking,
   };

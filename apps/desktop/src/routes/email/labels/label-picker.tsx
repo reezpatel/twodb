@@ -60,7 +60,11 @@ export function LabelPicker({ labels, threads, onApply, children }: LabelPickerP
           {visible.map((l) => {
             const state = stateOf(l.id);
             return (
-              <label key={l.id} className="hover:bg-accent/50 flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm" style={{ paddingLeft: term ? 6 : 6 + l.depth * 14 }}>
+              <label
+                key={l.id}
+                className="hover:bg-accent/50 flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm"
+                style={{ paddingLeft: term ? 6 : 6 + l.depth * 14 }}
+              >
                 <Checkbox checked={state} onCheckedChange={() => (state === true ? onApply([], [l.id]) : onApply([l.id], []))} />
                 <span className="size-2 shrink-0 rounded-sm" style={{ backgroundColor: l.effectiveColor ?? "var(--color-muted-foreground)" }} />
                 <span className="truncate">{term ? labelPathName(labels, l.id) : l.name}</span>
@@ -77,7 +81,7 @@ export function LabelPicker({ labels, threads, onApply, children }: LabelPickerP
               <Plus size={13} /> Create "{search.trim()}"
             </button>
           ) : null}
-          {!visible.length && !term ? <p className="text-muted-foreground px-1.5 py-2 text-xs">No labels yet.</p> : null}
+          {!visible.length && !term ? <p className="text-muted-foreground px-1.5 py-2 text-sm">No labels yet.</p> : null}
         </div>
       </PopoverContent>
     </Popover>

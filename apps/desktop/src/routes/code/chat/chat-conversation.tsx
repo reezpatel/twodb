@@ -1,29 +1,69 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowUp, Bot, ChevronDown, Clock, Loader2, Lock, MessagesSquare, Paperclip, Send, Square, Trash2 } from "lucide-react";
+import {
+  Cpu,
+  HardDrive,
+  MemoryStick,
+  MonitorCog,
+  AlertTriangle,
+  Bot,
+  ChevronDown,
+  Loader2,
+  Lock,
+  MessagesSquare,
+  Paperclip,
+  Send,
+  Square,
+  Trash2,
+} from "lucide-react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useChat, type ToolEvent } from "./use-chat-panel";
 import type { CodeMessage } from "../sidenav/use-session-list";
 import { ToolView } from "./tools/tool-views";
-import { Badge } from "@/components/ui/badge";
 import { CompactionBlock, type CompactionBlockMeta } from "@/components/compaction-block";
 import { ClearBlock, type ClearBlockMeta } from "@/components/clear-block";
 import { AskUserWizard } from "./ask-user-wizard";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { SystemPromptBlock } from "./system-prompt-block";
 import { BtwDialog } from "./btw-dialog";
-import { CHAT_COMPOSER_COMMANDS } from "@/components/composer/composer-commands";
+import { CHAT_COMPOSER_COMMANDS } from "@/components/blocks/composer/composer-commands";
 import { MessageMarkdown } from "@/components/message-markdown";
 import { ThinkingBlock } from "@/components/thinking-block";
 import { useModelConfig } from "@/components/model-picker/use-model-config";
-import { ChatFooter } from "./footer/chat-footer";
-import { ModelDialog } from "@/components/model-picker/model-dialog";
+import { useChatModelPicker } from "./use-chat-model-picker";
+import { useChatFooterStatus, type FooterMetricKind } from "./use-chat-footer-status";
+import { useEscapeKey } from "@/lib/use-escape-key";
+import { CodeChatShell } from "@/components/blocks/code/code-chat/code-chat-shell";
+import { CodeChatFooter, CodeChatFooterNotice, CodeChatStatusBar } from "@/components/blocks/code/code-chat-footer/code-chat-footer";
+import { CodeChatUsage, CodeChatUsageContext, CodeChatUsageSpacer, CodeChatUsageStat } from "@/components/blocks/code/code-chat-footer/code-chat-usage";
+import {
+  CodeChatResourceMetric,
+  CodeChatResourceRunner,
+  CodeChatResources,
+  CodeChatResourcesEmpty,
+  CodeChatResourcesSettings,
+  CodeChatResourcesSettingsEmpty,
+  CodeChatResourcesSettingsRunner,
+  CodeChatResourcesSettingsToggle,
+} from "@/components/blocks/code/code-chat-footer/code-chat-resources";
+import { ModelPicker } from "@/components/blocks/model-picker/model-picker";
+import { ModelPickerTrigger } from "@/components/blocks/model-picker/model-picker-trigger";
+import {
+  CodeChatComposer,
+  CodeChatComposerActions,
+  CodeChatComposerInput,
+  CodeChatComposerSpacer,
+} from "@/components/blocks/code/code-chat-footer/code-chat-composer";
+import { CodeChatComposerAction } from "@/components/blocks/code/code-chat-footer/code-chat-composer-action";
+import { CodeChatComposerSend } from "@/components/blocks/code/code-chat-footer/code-chat-composer-send";
+import { CodeChatComposerStop } from "@/components/blocks/code/code-chat-footer/code-chat-composer-stop";
+import { CodeChatAttachment, CodeChatAttachments, CodeChatAttachmentUploading } from "@/components/blocks/code/code-chat-footer/code-chat-attachments";
+import { CodeChatQuestionAction, CodeChatQuestionError } from "@/components/blocks/code/code-chat-footer/code-chat-question";
+import { CodeChatQueue, CodeChatQueueActions, CodeChatQueueItem, CodeChatQueueText } from "@/components/blocks/code/code-chat-footer/code-chat-queue";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { EditorContent } from "@tiptap/react";
-import { useComposer } from "@/components/composer/use-composer";
-import type { PasteRef } from "@/components/composer/paste-chip";
+import { useComposer } from "@/components/blocks/composer/use-composer";
+import type { PasteRef } from "@/components/blocks/composer/paste-chip";
 import { useDirectoryFiles } from "./composer/use-directory-files";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -31,6 +71,13 @@ import { assetUrl } from "@/lib/native";
 
 /** Expanded skills on a user message render as chips — content stays in the
  * dialog (click), never inline. */
+const RESOURCE_ICONS: Record<FooterMetricKind, ReactNode> = {
+  cpu: <Cpu />,
+  memory: <MemoryStick />,
+  gpu: <MonitorCog />,
+  disk: <HardDrive />,
+};
+
 function SkillChipButton({ skill, onOpen }: { skill: { name: string; content: string }; onOpen: (s: { name: string; content: string }) => void }) {
   return (
     <button
@@ -513,12 +560,6 @@ interface RenderRow {
   dimmed: boolean;
 }
 
-export function ChatConversation() {
-  const { sessionId } = useParams<{ sessionId: string }>();
-  if (!sessionId) return null;
-  return <ChatConversationInner sessionId={sessionId} />;
-}
-
 /** The full chat panel (message list + composer + footer) for one session —
  * used by the main route AND the /btw dialog (a second session's chat). */
 export function ChatConversationInner({ sessionId }: { sessionId: string }) {
@@ -551,7 +592,6 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
     uploadAssets,
     removeAsset,
     stats,
-    gitStatus,
     skillCommands,
     send,
     stop,
@@ -610,7 +650,9 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   });
   const config = useModelConfig(sessionId ?? null, session);
-  const { connections, selected, effectiveModel, model, thinkingLevel, contextWindow, setConfigOpen } = config;
+  const { connections, selected, effectiveModel, model, thinkingLevel, contextWindow } = config;
+  const modelPicker = useChatModelPicker(config);
+  const footerStatus = useChatFooterStatus(stats, contextWindow);
 
   // Committed tool calls render as ONE block: the assistant message's
   // meta.toolCalls carry the request, the following role="tool" messages carry
@@ -643,6 +685,7 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
   }, [messages]);
 
   const running = streaming !== null;
+  useEscapeKey(stop, running && !askUser);
 
   const directoryId = session.data?.codeDirectoryId ?? null;
   const filesQuery = useDirectoryFiles(directoryId);
@@ -670,7 +713,7 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
   });
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <CodeChatShell>
       <ChatMessageList
         messages={messages}
         hasOlder={hasOlder}
@@ -700,176 +743,167 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
         onSkillClick={setViewSkill}
       />
 
-      <div className="mx-auto flex w-full max-w-9xl flex-col gap-2 px-6">
+      <CodeChatFooter>
+        {wsStatus === "closed" ? <CodeChatFooterNotice>Connection lost — retrying</CodeChatFooterNotice> : null}
         {askUser ? (
           <ErrorBoundary
             name="ask-user-wizard"
             resetKeys={[askUser.id]}
             fallback={({ error, reset }) => (
-              <div className="bg-card border-destructive/50 flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-xs">
-                <p className="text-destructive font-semibold">The agent's question couldn't be displayed.</p>
-                <p className="text-muted-foreground font-mono break-words">{error.message}</p>
-                <div className="flex items-center gap-1.5">
-                  <Button variant="ghost" size="sm" onClick={reset}>
-                    Retry
-                  </Button>
-                  <Button variant="destructive" size="sm" className="ml-auto" title="Stop the run without answering" onClick={stop}>
-                    <Square size={12} /> Stop
-                  </Button>
-                </div>
-              </div>
+              <CodeChatQuestionError title="The agent's question couldn't be displayed." message={error.message}>
+                <Button variant="ghost" size="sm" onClick={reset}>
+                  Retry
+                </Button>
+                <CodeChatQuestionAction
+                  kind="stop"
+                  label="Stop"
+                  icon={<Square className="fill-current" />}
+                  title="Stop the run without answering"
+                  onClick={stop}
+                />
+              </CodeChatQuestionError>
             )}
           >
             {/* keyed by tool-call id: a new question remounts with fresh step/answers state */}
-            <AskUserWizard key={askUser.id} questions={askUser.questions} onSubmit={answerAskUser} onStop={stop} />
+            <AskUserWizard key={askUser.id} questions={askUser.questions} files={filesQuery.data?.files ?? []} onSubmit={answerAskUser} onStop={stop} />
           </ErrorBoundary>
         ) : (
-          <div className="flex flex-col gap-2">
+          <>
             {steering.length > 0 && (
-              <div className="bg-card/60 flex flex-col gap-1 rounded-lg border border-dashed p-2">
+              <CodeChatQueue>
                 {steering.map((item) => (
-                  <div key={item.id} className="flex items-start gap-2 text-xs">
-                    <Badge variant="secondary" className="mt-0.5 shrink-0 gap-1 font-mono">
-                      <Clock size={10} aria-hidden="true" /> queued
-                    </Badge>
-                    <p className="min-w-0 flex-1 whitespace-pre-wrap break-words pt-0.5 font-mono">{item.content}</p>
-                    <div className="flex shrink-0 items-center gap-0.5">
-                      <Button variant="ghost" size="icon-sm" title="Send now — stops the run and dispatches" onClick={sendSteeringNow}>
-                        <Send size={12} />
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" className="hover:text-destructive" title="Delete" onClick={() => removeSteering(item.id)}>
-                        <Trash2 size={12} />
-                      </Button>
-                    </div>
-                  </div>
+                  <CodeChatQueueItem key={item.id}>
+                    <CodeChatQueueText>{item.content}</CodeChatQueueText>
+                    <CodeChatQueueActions>
+                      <CodeChatComposerAction icon={<Send />} label="Send now — stops the run and dispatches" className="size-6" onClick={sendSteeringNow} />
+                      <CodeChatComposerAction
+                        icon={<Trash2 />}
+                        label="Delete"
+                        className="hover:text-destructive size-6"
+                        onClick={() => removeSteering(item.id)}
+                      />
+                    </CodeChatQueueActions>
+                  </CodeChatQueueItem>
                 ))}
-              </div>
+              </CodeChatQueue>
             )}
-            <div className="bg-card focus-within:border-ring rounded-lg border transition-colors">
+            <CodeChatComposer busy={running}>
               {(pendingAssets.length > 0 || uploadingAssets) && (
-                <div className="flex flex-wrap gap-1.5 px-2 pt-2">
+                <CodeChatAttachments>
                   {pendingAssets.map((asset) => (
-                    <span key={asset.uri} className="bg-muted/60 flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-xs">
-                      {asset.localPreview ? (
-                        <img src={asset.localPreview} alt={asset.filename} className="size-5 rounded-sm object-cover" />
-                      ) : (
-                        <Paperclip size={11} aria-hidden="true" />
-                      )}
-                      <span className="max-w-44 truncate">{asset.filename}</span>
-                      <button className="text-muted-foreground/60 hover:text-destructive" title="Remove attachment" onClick={() => removeAsset(asset.uri)}>
-                        ×
-                      </button>
-                    </span>
+                    <CodeChatAttachment key={asset.uri} name={asset.filename} previewUrl={asset.localPreview} onRemove={() => removeAsset(asset.uri)} />
                   ))}
-                  {uploadingAssets && (
-                    <span className="text-muted-foreground flex items-center gap-1.5 px-1 py-1 text-xs">
-                      <Loader2 size={11} className="animate-spin" aria-hidden="true" /> uploading…
-                    </span>
-                  )}
-                </div>
+                  {uploadingAssets && <CodeChatAttachmentUploading />}
+                </CodeChatAttachments>
               )}
               <input
                 ref={assetInputRef}
                 type="file"
                 multiple
-                className="hidden"
+                hidden
                 onChange={(e) => {
                   if (e.target.files?.length) void uploadAssets(e.target.files);
                   e.target.value = "";
                 }}
               />
-              <div
-                onClick={(e) => {
-                  const chip = (e.target as HTMLElement).closest("[data-paste-chip]");
-                  if (!chip) return;
-                  const paste = pastes.current.get(chip.getAttribute("data-paste-id") ?? "");
-                  if (paste) setViewPaste(paste);
-                }}
-              >
-                <EditorContent editor={editor} className="min-h-12" />
-              </div>
-              <div className="flex items-center gap-1 border-t px-1.5 py-1">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  title="Attach files — stored via the Agents Assets destination"
+              <CodeChatComposerInput editor={editor} onPasteClick={(id) => setViewPaste(pastes.current.get(id) ?? null)} />
+              <CodeChatComposerActions>
+                <CodeChatComposerAction
+                  icon={<Paperclip />}
+                  label="Attach files"
+                  loading={uploadingAssets}
                   disabled={uploadingAssets}
                   onClick={() => assetInputRef.current?.click()}
-                >
-                  {uploadingAssets ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
-                </Button>
+                />
+                <CodeChatComposerSpacer />
+                {running && <CodeChatComposerStop onClick={stop} />}
                 {running ? (
-                  <>
-                    <Button size="icon-sm" variant="destructive" title="Stop" onClick={stop}>
-                      <Square size={12} />
-                    </Button>
-                    <Button
-                      size="icon-sm"
-                      className="ml-auto"
-                      title={steering.length > 0 ? "Send queued messages now" : "Queue message — sent when this round finishes"}
-                      onClick={steering.length > 0 ? sendSteeringNow : submit}
-                      disabled={!draft.trim() && steering.length === 0}
-                    >
-                      <ArrowUp size={14} />
-                    </Button>
-                  </>
+                  <CodeChatComposerSend
+                    label={steering.length > 0 ? "Send queued messages now" : "Queue message — sent when this round finishes"}
+                    disabled={!draft.trim() && steering.length === 0}
+                    onClick={steering.length > 0 ? sendSteeringNow : submit}
+                  />
                 ) : (
-                  <Button
-                    size="icon-sm"
-                    className="ml-auto"
-                    title="Send"
-                    onClick={submit}
-                    disabled={!draft.trim() || !selected || !effectiveModel || wsStatus !== "open"}
-                  >
-                    <ArrowUp size={14} />
-                  </Button>
+                  <CodeChatComposerSend label="Send" disabled={!draft.trim() || !selected || !effectiveModel || wsStatus !== "open"} onClick={submit} />
                 )}
-              </div>
-            </div>
-          </div>
+              </CodeChatComposerActions>
+            </CodeChatComposer>
+          </>
         )}
 
-        <ChatFooter
-          stats={stats}
-          contextWindow={contextWindow}
-          model={model}
-          effectiveModel={effectiveModel}
-          thinkingLevel={thinkingLevel}
-          onOpenConfig={() => setConfigOpen(true)}
-          gitStatus={gitStatus}
+        <CodeChatStatusBar>
+          <CodeChatUsage>
+            <CodeChatUsageStat title="Input tokens (incl. cached)">↑ {footerStatus.usage.input}</CodeChatUsageStat>
+            <CodeChatUsageStat title="Output tokens">↓ {footerStatus.usage.output}</CodeChatUsageStat>
+            <CodeChatUsageStat title="Cache hit — cached input / total input">⚡ {footerStatus.usage.cache}</CodeChatUsageStat>
+            <CodeChatUsageStat title="Generation speed">{footerStatus.usage.speed}</CodeChatUsageStat>
+            <CodeChatUsageContext
+              percent={footerStatus.usage.contextPercent}
+              label={footerStatus.usage.contextLabel}
+              title="Context consumed vs the model's context window"
+            />
+            <CodeChatUsageSpacer />
+            <ModelPicker {...modelPicker}>
+              <ModelPickerTrigger size="sm" />
+            </ModelPicker>
+          </CodeChatUsage>
+          <CodeChatResources>
+            {footerStatus.machines.length === 0 && <CodeChatResourcesEmpty>{footerStatus.resourcesEmptyText}</CodeChatResourcesEmpty>}
+            {footerStatus.machines.map((machine) => (
+              <CodeChatResourceRunner key={machine.id} name={machine.name}>
+                {machine.metrics.map((metric) => (
+                  <CodeChatResourceMetric key={metric.key} label={metric.label} percent={metric.percent} value={metric.value} />
+                ))}
+              </CodeChatResourceRunner>
+            ))}
+            <CodeChatResourcesSettings>
+              {footerStatus.machines.length === 0 && <CodeChatResourcesSettingsEmpty>{footerStatus.resourcesSettingsEmptyText}</CodeChatResourcesSettingsEmpty>}
+              {footerStatus.machines.map((machine) => (
+                <CodeChatResourcesSettingsRunner key={machine.id} name={machine.name}>
+                  {machine.toggles.map((toggle) => (
+                    <CodeChatResourcesSettingsToggle
+                      key={toggle.kind}
+                      on={toggle.on}
+                      onClick={() => footerStatus.toggleKind(machine.id, toggle.kind)}
+                      icon={RESOURCE_ICONS[toggle.kind]}
+                      label={toggle.label}
+                    />
+                  ))}
+                </CodeChatResourcesSettingsRunner>
+              ))}
+            </CodeChatResourcesSettings>
+          </CodeChatResources>
+        </CodeChatStatusBar>
+      </CodeChatFooter>
+
+      {btw && (
+        <BtwDialog
+          btwSessionId={btw.sessionId}
+          seed={btw.seed}
+          onClose={closeBtw}
+          onStart={(agentId, question) => void startBtw(agentId, question, directoryId)}
         />
+      )}
 
-        <ModelDialog config={config} />
+      <Dialog open={!!viewPaste} onOpenChange={(o) => !o && setViewPaste(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Paste #{viewPaste?.id} — {viewPaste?.lines} lines
+            </DialogTitle>
+          </DialogHeader>
+          <pre className="bg-muted max-h-[60vh] overflow-auto rounded-lg p-3 font-mono text-xs whitespace-pre-wrap">{viewPaste?.content}</pre>
+        </DialogContent>
+      </Dialog>
 
-        {btw && (
-          <BtwDialog
-            btwSessionId={btw.sessionId}
-            seed={btw.seed}
-            onClose={closeBtw}
-            onStart={(agentId, question) => void startBtw(agentId, question, directoryId)}
-          />
-        )}
-
-        <Dialog open={!!viewPaste} onOpenChange={(o) => !o && setViewPaste(null)}>
-          <DialogContent className="sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                Paste #{viewPaste?.id} — {viewPaste?.lines} lines
-              </DialogTitle>
-            </DialogHeader>
-            <pre className="bg-muted max-h-[60vh] overflow-auto rounded-lg p-3 font-mono text-xs whitespace-pre-wrap">{viewPaste?.content}</pre>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={!!viewSkill} onOpenChange={(o) => !o && setViewSkill(null)}>
-          <DialogContent className="sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>/{viewSkill?.name}</DialogTitle>
-            </DialogHeader>
-            <pre className="bg-muted max-h-[60vh] overflow-auto rounded-lg p-3 font-mono text-xs whitespace-pre-wrap">{viewSkill?.content}</pre>
-          </DialogContent>
-        </Dialog>
-      </div>
-    </div>
+      <Dialog open={!!viewSkill} onOpenChange={(o) => !o && setViewSkill(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>/{viewSkill?.name}</DialogTitle>
+          </DialogHeader>
+          <pre className="bg-muted max-h-[60vh] overflow-auto rounded-lg p-3 font-mono text-xs whitespace-pre-wrap">{viewSkill?.content}</pre>
+        </DialogContent>
+      </Dialog>
+    </CodeChatShell>
   );
 }

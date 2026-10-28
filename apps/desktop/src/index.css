@@ -440,7 +440,7 @@
 /* Chat composer (tiptap) — root and chip styling live in use-composer/paste-chip
    class strings; only child/pseudo selectors need real CSS. */
 .cp-composer p {
-  @apply m-0 text-xs tracking-wide;
+  @apply m-0 text-xs tracking-tight;
 }
 .cp-composer p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

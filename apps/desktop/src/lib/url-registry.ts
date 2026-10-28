@@ -6,7 +6,7 @@ const LLM_ROOT = `${SETTINGS_ROOT}/llm`;
 
 const withId = (base: string, id?: Id | null) => (id === undefined || id === null || id === "" ? base : `${base}/${id}`);
 
-export type CodePanel = "terminal" | "editor" | "checkpoints" | "changes" | "canvas";
+export type CodePanel = "terminal" | "editor" | "checkpoints" | "canvas";
 export type SettingsLlmSection = "connections" | "skills" | "agents" | "memories" | "instructions" | "mcp";
 
 export const urls = {

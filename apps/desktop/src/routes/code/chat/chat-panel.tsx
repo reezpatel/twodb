@@ -1,13 +1,28 @@
-import { NavLink, useLocation, useNavigate, useParams } from "react-router";
-import { Loader2, PanelRight } from "lucide-react";
+import { useCallback } from "react";
+import { useLocation, useNavigate, useParams } from "react-router";
+import { PanelRight } from "lucide-react";
 import { useChat } from "./use-chat-panel";
 import { ChatConversationInner } from "./chat-conversation";
 import { AwsChip } from "./aws-chip";
-import { TOOL_SCREENS } from "./screens/mock-screens";
+import { CHAT_TABS, type ChatTabId } from "./chat-tabs";
+import { useChatShortcuts } from "./use-chat-shortcuts";
 import { EditorScreen } from "./screens/editor-screen";
 import { useCode } from "../code-provider";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { CodeHeader } from "@/components/blocks/code/code-header/code-header";
+import { CodeHeaderAction, CodeHeaderActions } from "@/components/blocks/code/code-header/code-header-actions";
+import { CodeHeaderSeparator } from "@/components/blocks/code/code-header/code-header-separator";
+import { CodeHeaderStatus } from "@/components/blocks/code/code-header/code-header-status";
+import { CodeHeaderTab, CodeHeaderTabs } from "@/components/blocks/code/code-header/code-header-tabs";
+import { CodeHeaderWidgets } from "@/components/blocks/code/code-header/code-header-widgets";
+import { CodeHeaderWorking } from "@/components/blocks/code/code-header/code-header-working";
+import { formatShortcut } from "@/lib/shortcut-keys";
+import { urls } from "@/lib/url-registry";
+
+const WS_STATUS = {
+  open: { status: "live", label: "Connected" },
+  connecting: { status: "connecting", label: "Reconnecting" },
+  closed: { status: "offline", label: "Disconnected" },
+} as const;
 
 export function ChatPanel() {
   const { streaming, wsStatus, round } = useChat();
@@ -17,63 +32,55 @@ export function ChatPanel() {
   const location = useLocation();
   const running = streaming !== null;
   const activePanel = location.pathname.split("/")[4] ?? null;
+  const connection = WS_STATUS[wsStatus];
+
+  const isActive = useCallback((id: ChatTabId) => (id === "chat" ? !activePanel : activePanel === id), [activePanel]);
+
+  // Selecting the active panel again closes it — back to the default sections
+  // (the editor tab is main-column, not a panel).
+  const selectTab = useCallback(
+    (id: ChatTabId) => {
+      if (!sessionId) return;
+      if (id === "chat" || (id !== "editor" && isActive(id))) navigate(urls.code.session(sessionId), { replace: id !== "chat" });
+      else navigate(urls.code.session(sessionId, id));
+    },
+    [isActive, navigate, sessionId],
+  );
+
+  useChatShortcuts({ tabs: CHAT_TABS.map((tab) => () => selectTab(tab.id)), togglePanel: toggleRightBar });
+
+  const panelLabel = rightBarVisible ? "Hide right panel" : "Show right panel";
 
   return (
-    <div className="flex h-full min-w-0 flex-1 flex-col">
-      <div className="bg-card border-b flex items-center gap-1 border-b px-2 py-1">
-        {TOOL_SCREENS.map((tool) => {
-          const to = tool.id === "code" ? `/apps/code/${sessionId}` : `/apps/code/${sessionId}/${tool.id}`;
-          const isActive = tool.id === "code" ? !activePanel : activePanel === tool.id;
-          return (
-            <NavLink
-              key={tool.id}
-              to={to}
-              end={tool.id === "code"}
-              // Clicking the active panel tab closes it — back to default sections
-              // (the editor tab is main-column, not a right-bar panel).
-              onClick={() => {
-                if (tool.id !== "code" && tool.id !== "editor" && isActive) {
-                  navigate(`/apps/code/${sessionId}`, { replace: true });
-                }
-              }}
-              className={() =>
-                cn(
-                  "text-muted-foreground hover:text-foreground flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors",
-                  isActive && "bg-accent text-foreground font-medium",
-                )
-              }
-            >
-              <tool.icon size={13} aria-hidden="true" />
-              {tool.label}
-            </NavLink>
-          );
-        })}
-        {sessionId && <AwsChip sessionId={sessionId} />}
-        {running && (
-          <Badge variant="secondary" className="ml-auto gap-1.5">
-            <Loader2 size={11} className="animate-spin" aria-hidden="true" />
-            working{round !== null ? ` · round ${round}` : ""}
-          </Badge>
-        )}
-        <Badge variant={wsStatus === "open" ? "success" : "secondary"} className={running ? "" : "ml-auto"} title={`Chat socket: ${wsStatus}`}>
-          {wsStatus === "open" ? "live" : wsStatus}
-        </Badge>
-        <button
-          aria-label={rightBarVisible ? "Hide right panel" : "Show right panel"}
-          title={rightBarVisible ? "Hide right panel" : "Show right panel"}
-          onClick={toggleRightBar}
-          className={cn(
-            "text-muted-foreground hover:bg-accent hover:text-foreground ml-1 flex h-6 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
-            rightBarVisible && "bg-accent text-foreground",
-          )}
-        >
-          <PanelRight size={13} />
-        </button>
-      </div>
+    <>
+      <CodeHeader>
+        <CodeHeaderTabs>
+          {CHAT_TABS.map((tab, index) => (
+            <CodeHeaderTab
+              key={tab.id}
+              icon={<tab.icon />}
+              label={tab.label}
+              shortcut={formatShortcut(["mod", String(index + 1)])}
+              active={isActive(tab.id)}
+              onClick={() => selectTab(tab.id)}
+            />
+          ))}
+        </CodeHeaderTabs>
+        <CodeHeaderSeparator />
+        <CodeHeaderWidgets>{sessionId && <AwsChip sessionId={sessionId} />}</CodeHeaderWidgets>
+        <CodeHeaderActions>
+          {running && <CodeHeaderWorking label={`working${round !== null ? ` · round ${round}` : ""}`} />}
+          <CodeHeaderStatus status={connection.status} label={connection.label} />
+          <CodeHeaderAction
+            icon={<PanelRight />}
+            label={panelLabel}
+            shortcut={formatShortcut(["mod", "alt", "B"])}
+            active={rightBarVisible}
+            onClick={toggleRightBar}
+          />
+        </CodeHeaderActions>
+      </CodeHeader>
 
-      {/* The conversation always owns the main column — panel screens render in
-          the right bar instead (see CodeScene), so the chat never unmounts.
-          The editor is the exception: it swaps the main column entirely. */}
       {activePanel === "editor" && sessionId ? (
         <div className="min-h-0 flex-1">
           <EditorScreen sessionId={sessionId} />
@@ -81,6 +88,6 @@ export function ChatPanel() {
       ) : sessionId ? (
         <ChatConversationInner sessionId={sessionId} />
       ) : null}
-    </div>
+    </>
   );
 }

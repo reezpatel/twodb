@@ -7,15 +7,15 @@ import { Sidenav } from "./sidenav/sidenav";
  * sidenav and the content panels. Session id comes from the URL; this
  * provider renders above the route element so it parses the path itself. */
 
-/** Right-bar panels — the extra screens a session exposes. The route stays the
+/** Panels — the extra screens a session exposes (terminal in the bottom panel, the rest in the right bar). The route stays the
  * source of truth (`/apps/code/:sessionId/:panelId`) so panels deep-link. */
-export type CodePanelId = "terminal" | "checkpoints" | "changes" | "canvas";
+export type CodePanelId = "terminal" | "checkpoints" | "canvas";
 
 interface CodeState {
   chat: ReturnType<typeof useChatPanel>;
   selectSession: (id: string) => void;
   sessionId: string | null;
-  /** Active right-bar panel (terminal/checkpoints/…) — null = default sections. */
+  /** Active panel (terminal/checkpoints/canvas) — null = default sections. */
   panel: CodePanelId | null;
   /** Whole right bar (sections or panel) visibility toggle. */
   rightBarVisible: boolean;
@@ -31,7 +31,7 @@ export function CodeProvider({ children }: { children: ReactNode }) {
   // /apps/code/:sessionId/:panelId
   const sessionId = location.pathname.split("/")[3] ?? null;
   const rawPanel = location.pathname.split("/")[4] ?? null;
-  const panel = (["terminal", "checkpoints", "changes", "canvas"] as const).includes(rawPanel as CodePanelId) ? (rawPanel as CodePanelId) : null;
+  const panel = (["terminal", "checkpoints", "canvas"] as const).includes(rawPanel as CodePanelId) ? (rawPanel as CodePanelId) : null;
 
   const chat = useChatPanel(sessionId || null);
   const [rightBarVisible, setRightBarVisible] = useState(true);

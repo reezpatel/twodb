@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { Cloud, ExternalLink, Loader2 } from "lucide-react";
 import { useAwsWidget } from "./aws-widget";
+import { CodeHeaderWidget } from "@/components/blocks/code/code-header/code-header-widgets";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 /**
- * AWS SSO chip for the session header (before working/live). Hidden when the
+ * AWS SSO widget for the session header. Hidden when the
  * session's runner has no aws cli. States:
- *  - not authenticated → "aws" chip; click → device-code login (enter code)
- *  - authenticated → selected profile name; click → switch between profiles
+ *  - not authenticated → cloud icon; click → device-code login (enter code)
+ *  - authenticated → success-colored icon, profile in the tooltip; click → switch between profiles
  */
 
 export function AwsChip({ sessionId }: { sessionId: string }) {
@@ -28,24 +29,34 @@ export function AwsChip({ sessionId }: { sessionId: string }) {
     setError(null);
     setCode(null);
     login.mutate(undefined, {
-      onSuccess: (start) => setCode({ userCode: start.userCode, verificationUri: start.verificationUri, verificationUriComplete: start.verificationUriComplete }),
+      onSuccess: (start) =>
+        setCode({ userCode: start.userCode, verificationUri: start.verificationUri, verificationUriComplete: start.verificationUriComplete }),
       onError: (e) => setError(e.message),
     });
   };
 
   return (
-    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setCode(null); setError(null); } }}>
+    <Popover
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) {
+          setCode(null);
+          setError(null);
+        }
+      }}
+    >
       <PopoverTrigger asChild>
-        <button
-          className={cn(
-            "flex h-5 items-center gap-1 rounded-full border px-2 text-[11px] font-medium transition-colors",
-            authenticated ? "border-success/40 bg-success/10 text-foreground" : "text-muted-foreground hover:text-foreground",
-          )}
-          title={authenticated ? `AWS SSO — profile ${s.selectedProfile}${s.profiles?.length ? ` (${s.profiles.length} available)` : ""}` : "AWS SSO — click to authenticate"}
-        >
-          {loggingIn ? <Loader2 size={11} className="animate-spin" aria-hidden="true" /> : <Cloud size={11} aria-hidden="true" />}
-          {authenticated ? s.selectedProfile ?? "aws" : "aws"}
-        </button>
+        <CodeHeaderWidget
+          icon={<Cloud />}
+          label={
+            authenticated
+              ? `AWS SSO — profile ${s.selectedProfile}${s.profiles?.length ? ` (${s.profiles.length} available)` : ""}`
+              : "AWS SSO — click to authenticate"
+          }
+          active={authenticated}
+          loading={loggingIn}
+        />
       </PopoverTrigger>
       <PopoverContent align="end" side="bottom" className="w-72 p-0">
         {authenticated ? (
@@ -81,7 +92,12 @@ export function AwsChip({ sessionId }: { sessionId: string }) {
           <div className="p-3">
             <p className="mb-2 text-xs">
               Enter this code at{" "}
-              <a href={code.verificationUriComplete ?? code.verificationUri} target="_blank" rel="noreferrer" className="text-primary inline-flex items-center gap-0.5 underline">
+              <a
+                href={code.verificationUriComplete ?? code.verificationUri}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary inline-flex items-center gap-0.5 underline"
+              >
                 the AWS device page <ExternalLink size={10} aria-hidden="true" />
               </a>
             </p>
