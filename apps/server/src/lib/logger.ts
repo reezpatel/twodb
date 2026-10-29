@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import pino from "pino";
 
@@ -14,20 +15,51 @@ import pino from "pino";
  * bodies — identifiers and short excerpts only.
  */
 
-const logFile = process.env.TWODB_LOG_FILE ?? path.join(process.cwd(), "logs", "server.log");
+const preferredLogFile = process.env.TWODB_LOG_FILE ?? path.join(process.cwd(), "logs", "server.log");
+// Last resort when the preferred location isn't writable (e.g. a container user without access to /app/logs).
+const fallbackLogFile = path.join(os.tmpdir(), "twodb", "server.log");
+let logFile = preferredLogFile;
 
-// Never let logging crash the server: if the log dir isn't writable (e.g. a
-// service started with cwd=/), fall back to stdout so journald still sees it.
-function openStream(): fs.WriteStream | NodeJS.WritableStream {
+let fileError: string | null = null;
+
+/** Creates the directory and proves we can append — open errors would otherwise only surface asynchronously. */
+function canWrite(file: string): string | null {
   try {
-    fs.mkdirSync(path.dirname(logFile), { recursive: true });
-    return fs.createWriteStream(logFile, { flags: "a" });
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.closeSync(fs.openSync(file, "a"));
+    return null;
   } catch (err) {
-    process.stderr.write(`twodb: cannot open log file ${logFile} (${(err as Error).message}), logging to stdout\n`);
-    return process.stdout;
+    return (err as Error).message;
   }
 }
-const stream = openStream();
+
+// Never let logging crash the server. Try the configured file, then /tmp, and
+// always keep writing to stdout so `docker logs` / journald see everything.
+// If a file can't be used we remember why so the viewer can say so.
+function openFile(): pino.DestinationStream | null {
+  let problem = canWrite(preferredLogFile);
+  if (problem) {
+    const fallbackProblem = canWrite(fallbackLogFile);
+    process.stderr.write(
+      fallbackProblem
+        ? `twodb: cannot write log file ${preferredLogFile} (${problem}) or ${fallbackLogFile} (${fallbackProblem}), logging to stdout only\n`
+        : `twodb: cannot write log file ${preferredLogFile} (${problem}), logging to ${fallbackLogFile} instead\n`,
+    );
+    if (fallbackProblem) {
+      fileError = `${problem}; fallback ${fallbackLogFile}: ${fallbackProblem}`;
+      return null;
+    }
+    logFile = fallbackLogFile;
+    problem = null;
+  }
+  const dest = pino.destination({ dest: logFile, sync: false, append: true, mkdir: true });
+  dest.on("error", (err: Error) => {
+    fileError = err.message;
+    process.stderr.write(`twodb: log file write failed (${err.message}), logging to stdout only\n`);
+  });
+  return dest;
+}
+const fileDest = openFile();
 
 export const logger = pino(
   {
@@ -39,9 +71,24 @@ export const logger = pino(
     },
     base: undefined,
   },
-  stream,
+  fileDest ? pino.multistream([{ stream: process.stdout }, { stream: fileDest }]) : process.stdout,
 );
 
+/** The file actually being written (the /tmp fallback when the configured one isn't writable). */
 export function logFilePath(): string {
   return logFile;
+}
+
+/** Why the log file can't be written, or null when it's fine. */
+export function logFileError(): string | null {
+  return fileError;
+}
+
+/** Reopens the file — recreates it if it was deleted/rotated out from under us. */
+export function reopenLogFile(): void {
+  try {
+    (fileDest as { reopen?: () => void } | null)?.reopen?.();
+  } catch (err) {
+    fileError = (err as Error).message;
+  }
 }

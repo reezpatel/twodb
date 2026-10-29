@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { Hono } from "hono";
 import { auth } from "../auth";
-import { logFilePath } from "../lib/logger";
+import { logFileError, logFilePath, reopenLogFile } from "../lib/logger";
 
 // Server-admin only: tail the structured log file the server writes.
 
@@ -24,6 +24,9 @@ function readLines(afterLine: number, limit: number): { lines: LogLine[]; total:
     fileId = `${st.dev}:${st.ino}:${Math.round(st.birthtimeMs)}`;
     content = fs.readFileSync(file, "utf8");
   } catch {
+    // Missing file: it was removed after we opened it, so our fd points at an
+    // unlinked inode. Reopen so new events land in a fresh file.
+    reopenLogFile();
     return { lines: [], total: 0, fileId };
   }
   const all = content.split("\n");
@@ -57,5 +60,7 @@ export const logsRoutes = new Hono()
     }
     const { lines, total, fileId } = readLines(afterLine, limit);
     c.header("cache-control", "no-store");
-    return c.json({ lines, total, fileId, file: logFilePath() });
+    // fileId null = the file doesn't exist; say why instead of showing an empty log.
+    const problem = fileId === null ? (logFileError() ?? "log file does not exist yet") : null;
+    return c.json({ lines, total, fileId, file: logFilePath(), ...(problem ? { problem } : {}) });
   });

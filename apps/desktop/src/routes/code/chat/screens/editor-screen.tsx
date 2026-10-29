@@ -59,8 +59,8 @@ export function EditorScreen({ sessionId }: { sessionId: string }) {
         <>
           <p className="text-sm font-medium">VS Code Server isn't installed on this runner</p>
           <p className="text-muted-foreground max-w-sm text-xs">
-            The editor runs on the runner as a local <code>code-server</code> process — downloaded as a standalone tarball (~60MB, no admin rights
-            needed) on first use.
+            The editor runs on the runner as a local <code>code-server</code> process — downloaded as a standalone tarball (~60MB, no admin rights needed) on
+            first use.
           </p>
           <Button size="sm" onClick={install}>
             <Download size={13} /> Install on runner
@@ -71,7 +71,9 @@ export function EditorScreen({ sessionId }: { sessionId: string }) {
         <>
           <MonitorX size={22} className="text-muted-foreground/60" />
           <p className="text-sm font-medium">Editor not supported on this runner</p>
-          <p className="text-muted-foreground max-w-sm text-xs">code-server has no native Windows build — use a Linux/macOS runner, or run the runner inside WSL.</p>
+          <p className="text-muted-foreground max-w-sm text-xs">
+            code-server has no native Windows build — use a Linux/macOS runner, or run the runner inside WSL.
+          </p>
         </>
       )}
       {state === "installing" && (
@@ -79,13 +81,15 @@ export function EditorScreen({ sessionId }: { sessionId: string }) {
           <Loader2 size={18} className="text-muted-foreground animate-spin" />
           <p className="text-sm">Installing VS Code Server on the runner…</p>
           <div className="bg-muted h-1.5 w-56 overflow-hidden rounded-full">
-            <div
-              className="bg-primary h-full rounded-full transition-all duration-500"
-              style={{ width: pct !== null ? `${pct}%` : "30%" }}
-            />
+            <div className="bg-primary h-full rounded-full transition-all duration-500" style={{ width: pct !== null ? `${pct}%` : "30%" }} />
           </div>
           <p className="text-muted-foreground text-xs tabular-nums">
-            {downloadedMb > 0.1 ? (totalMb ? `${downloadedMb.toFixed(1)} MB of ${totalMb.toFixed(0)} MB` : `${downloadedMb.toFixed(1)} MB downloaded`) : "Downloading…"} — then unpacking, this can take a minute on slow connections.
+            {downloadedMb > 0.1
+              ? totalMb
+                ? `${downloadedMb.toFixed(1)} MB of ${totalMb.toFixed(0)} MB`
+                : `${downloadedMb.toFixed(1)} MB downloaded`
+              : "Downloading…"}{" "}
+            — then unpacking, this can take a minute on slow connections.
           </p>
         </>
       )}

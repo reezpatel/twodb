@@ -63,7 +63,15 @@ export interface McpServer {
   updatedAt: string;
 }
 
-export type MemoryScope = "workspace" | "project" | "session";
+/** Where a memory lives: org-wide, one code directory, one agent's own ("self"), or a single session (legacy). */
+export type MemoryScope = "organization" | "code_directory" | "agent" | "session";
+
+export const MEMORY_SCOPE_LABELS: Record<MemoryScope, string> = {
+  organization: "Organization",
+  code_directory: "Code directory",
+  agent: "Agent (self)",
+  session: "Session",
+};
 
 export interface Memory {
   id: string;
@@ -73,6 +81,10 @@ export interface Memory {
   spaceId: string | null;
   scopeId: string | null;
   scope: MemoryScope;
+  /** Owner when scope = agent (persona / collaborator / sentinel). */
+  agentId: string | null;
+  /** Listed by default; the content opens on click. Unique per level. */
+  title: string;
   content: string;
   createdAt: string;
   updatedAt: string;

@@ -1,6 +1,7 @@
 import { db } from "../auth";
 import { getCodeSettings } from "./code-settings";
 import { spaceMatches } from "./spaces";
+import { levelOf, listSessionMemories, type MemoryLevel } from "./memory";
 import { DEFAULT_SKILL_TAG, enabledRepoSources, formatSkillsForPrompt, listRepoSkills, listSessionDbSkills, type SessionSkill } from "./skills";
 import { formatMcpForPrompt, loadSessionMcpTools, type McpTool } from "./mcp";
 import { ASSISTANT_DEFAULT_PROMPT, buildSystemPrompt, CANVAS_GUIDANCE, NON_INTERACTIVE_GUIDANCE } from "./system-prompt";
@@ -15,10 +16,11 @@ export interface ResolvedInstruction {
   instruction: string;
 }
 
+/** A memory as the prompt and UI list it: title and level only — content is read on demand. */
 export interface ResolvedMemory {
   id: string;
-  scope: string;
-  content: string;
+  title: string;
+  level: MemoryLevel;
 }
 
 export interface SessionPromptResolution {
@@ -56,30 +58,10 @@ function instructionsSection(instructions: ResolvedInstruction[]): string {
 }
 
 function memoriesSection(memories: ResolvedMemory[]): string {
-  return ["Long-lived facts the user wants recalled — workspace-wide, for this project, or for this session:", ...memories.map((m) => `- ${m.content}`)].join(
-    "\n",
-  );
-}
-
-/**
- * Memories injected like skills: scope=workspace always; scope=project when its
- * directory is the session's; scope=session when bound to this session's id.
- */
-export async function listSessionMemories(organizationId: string, codeDirectoryId: string | null, sessionId: string, spaceId: string | null): Promise<ResolvedMemory[]> {
-  const rows = await db
-    .selectFrom("memory")
-    .selectAll()
-    .where("organizationId", "=", organizationId)
-    .where((eb) =>
-      eb.or([
-        eb("scope", "=", "workspace"),
-        ...(codeDirectoryId ? [eb.and([eb("scope", "=", "project"), eb("codeDirectoryId", "=", codeDirectoryId)])] : []),
-        eb.and([eb("scope", "=", "session"), eb("scopeId", "=", sessionId)]),
-      ]),
-    )
-    .orderBy("createdAt", "asc")
-    .execute();
-  return rows.filter((r) => spaceMatches(r.spaceId, spaceId)).map((r) => ({ id: r.id, scope: r.scope, content: r.content }));
+  return [
+    "Long-lived memories saved for you — organization-wide, for this directory, or your own. Only titles are listed; call read_memory with a title to get its content, and get_memories for the current list. Save durable facts with add_memory.",
+    ...memories.map((m) => `- ${m.title} (${m.level})`),
+  ].join("\n");
 }
 
 /**
@@ -107,7 +89,7 @@ export async function resolveSessionSystemPrompt(input: ResolveSessionPromptInpu
     ...(await listRepoSkills(input.runnerId, input.cwd, enabledRepoSources(settings.skillSources))),
   ];
   const instructions = await listSessionInstructions(input.organizationId, input.codeDirectoryId, input.sessionTags, input.spaceId);
-  const memories = await listSessionMemories(input.organizationId, input.codeDirectoryId, input.sessionId, input.spaceId);
+  const memories: ResolvedMemory[] = (await listSessionMemories(input.organizationId, input.sessionId)).map((m) => ({ id: m.id, title: m.title, level: levelOf(m) }));
   // MCP tools join code sessions only; the network fetch must never break
   // prompt resolution — failures become a listed note instead.
   const mcp = input.mode === "assistant" ? { tools: [] as McpTool[], failures: [] } : await loadSessionMcpTools(input.organizationId, input.codeDirectoryId, input.sessionTags, input.spaceId);

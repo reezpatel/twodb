@@ -15,8 +15,8 @@ function nodeText(node: ReactNode): string {
 
 /**
  * Shared message markdown renderer — streaming-tolerant.
- * "mono" (code chat) uses the mono font at 13px; "plain" (assistant) uses the
- * app's default font at body size.
+ * "mono" (code chat) is set at 13px; "plain" (assistant) at body size. Both use
+ * the app's default font; only inline code and code blocks are monospaced.
  */
 export function MessageMarkdown({
   text,
@@ -29,17 +29,17 @@ export function MessageMarkdown({
   resolveAssetUrl?: (uri: string) => string | undefined;
 }) {
   return (
-    <div className={variant === "mono" ? "font-mono text-[13px] leading-relaxed font-light" : "text-sm leading-relaxed font-light"}>
+    <div className={variant === "mono" ? "text-[15px] leading-relaxed font-light" : "text-base font-light leading-relaxed tracking-[0.01em]"}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-          h1: ({ children }) => <h1 className="text-foreground mt-3 mb-1 text-sm font-semibold">{children}</h1>,
-          h2: ({ children }) => <h2 className="text-foreground mt-3 mb-1 text-sm font-semibold">{children}</h2>,
-          h3: ({ children }) => <h3 className="text-foreground mt-2 mb-1 text-[13px] font-semibold">{children}</h3>,
+          p: ({ children }) => <p className="mb-4 last:mb-0 text-base">{children}</p>,
+          h1: ({ children }) => <h1 className="text-foreground mt-3 mb-1 text-[16px] font-medium">{children}</h1>,
+          h2: ({ children }) => <h2 className="text-foreground mt-3 mb-2 text-[16px] font-medium">{children}</h2>,
+          h3: ({ children }) => <h3 className="text-foreground mt-2 mb-2 text-[15px] font-medium">{children}</h3>,
           ul: ({ children }) => <ul className="mb-2 list-disc pl-4 last:mb-0">{children}</ul>,
-          ol: ({ children }) => <ol className="mb-2 ms-2 list-decimal pl-4 last:mb-0">{children}</ol>,
-          li: ({ children }) => <li className="my-0.5">{children}</li>,
+          ol: ({ children }) => <ol className="mb-4 ms-1 list-decimal pl-4 last:mb-0">{children}</ol>,
+          li: ({ children }) => <li className="my-1 text-base">{children}</li>,
           strong: ({ children }) => <strong className="font-medium">{children}</strong>,
           a: ({ href, children }) => {
             // Uploaded-asset links render as chips (images inline) — the label
@@ -63,26 +63,30 @@ export function MessageMarkdown({
               </a>
             );
           },
-          blockquote: ({ children }) => <blockquote className="text-muted-foreground mb-2 border-l-2 pl-3 last:mb-0">{children}</blockquote>,
+          blockquote: ({ children }) => (
+            <blockquote className="bg-muted/80 text-muted-foreground py-2 mb-4 mt-4 border-l-4 border-info pl-3 last:mb-0">{children}</blockquote>
+          ),
           pre: ({ children }) => {
             const first = Children.toArray(children)[0];
             const className = isValidElement<{ className?: string }>(first) ? (first.props.className as string | undefined) : undefined;
             const match = /language-(\w+)/.exec(className ?? "");
             const code = nodeText(children).replace(/\n$/, "");
+
             if (!match) {
-              return <pre className="bg-muted mb-2 overflow-x-auto rounded-lg border p-3 font-mono text-xs last:mb-0">{code}</pre>;
+              return <pre className="bg-muted mb-2 overflow-x-auto rounded-sm border p-3 font-mono text-[13px] last:mb-0">{code}</pre>;
             }
-            return <CodeSnippet code={code} language={match[1]} />;
+
+            return <CodeSnippet code={code} language={match?.[1] ?? ""} />;
           },
-          code: ({ children }) => <code className="bg-muted rounded px-1 py-0.5 text-xs whitespace-pre-wrap break-all">{children}</code>,
+          code: ({ children }) => <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs whitespace-pre-wrap break-all">{children}</code>,
           hr: () => <hr className="my-3" />,
           table: ({ children }) => (
             <div className="mb-2 overflow-x-auto last:mb-0">
-              <table className="w-full border-collapse text-xs">{children}</table>
+              <table className="w-full border-collapse">{children}</table>
             </div>
           ),
-          th: ({ children }) => <th className="border px-2 py-1 text-left font-semibold">{children}</th>,
-          td: ({ children }) => <td className="border px-2 py-1 align-top">{children}</td>,
+          th: ({ children }) => <th className="border px-3 py-1.5 text-left font-medium">{children}</th>,
+          td: ({ children }) => <td className="border px-3 py-1.5 align-top">{children}</td>,
         }}
       >
         {text}

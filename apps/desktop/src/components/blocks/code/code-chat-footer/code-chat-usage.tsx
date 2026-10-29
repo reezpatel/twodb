@@ -9,7 +9,7 @@ export function CodeChatUsage({ className, ...props }: ComponentProps<"div">) {
 }
 
 export function CodeChatUsageStat({ className, ...props }: ComponentProps<"span">) {
-  return <span data-slot="code-chat-usage-stat" className={cn("tabular-nums", className)} {...props} />;
+  return <span data-slot="code-chat-usage-stat" className={cn("tabular-nums text-xs", className)} {...props} />;
 }
 
 const RING_VIEWBOX = 32;
@@ -64,7 +64,7 @@ export function CodeChatUsageContext({ percent, label, breakdown, warnAt = 80, d
           transition={reduce ? { duration: 0 } : RING_SPRING}
         />
       </svg>
-      <span className="tabular-nums">{label}</span>
+      <span className="tabular-nums text-xs">{label}</span>
     </>
   );
 

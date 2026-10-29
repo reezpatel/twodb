@@ -10,13 +10,8 @@ export function CodeChatMessage({ variant = "assistant", label, className, child
   const user = variant === "user";
 
   return (
-    <div data-slot="code-chat-message" data-variant={variant} className={cn("flex flex-col", user ? "mt-10" : "gap-0.5", className)} {...props}>
-      <div className={cn(user && "bg-primary/15 rounded-sm px-3 py-2")}>
-        <span className={cn("block text-[11px] font-semibold tracking-wide uppercase", user ? "text-primary" : "text-muted-foreground")}>
-          {label ?? (user ? "You" : "Agent")}
-        </span>
-        {children}
-      </div>
+    <div data-slot="code-chat-message" data-variant={variant} className={cn("flex flex-col", user ? "mt-20" : "gap-0.5", className)} {...props}>
+      <div className={cn(user && "bg-primary/15 rounded-sm ms-5 md:ms-20 lg:ms-40 px-4 py-4")}>{children}</div>
     </div>
   );
 }

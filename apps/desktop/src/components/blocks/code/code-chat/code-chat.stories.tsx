@@ -4,7 +4,7 @@ import { Paperclip, Palette, Terminal } from "lucide-react";
 import { MessageMarkdown } from "@/components/message-markdown";
 import { CodeChatShell } from "./code-chat-shell";
 import { CodeChatJumpButton, CodeChatThread, CodeChatThreadFooter, CodeChatThreadHeader, CodeChatThreadRow } from "./code-chat-thread";
-import { CodeChatFooter, CodeChatFooterNotice, CodeChatStatusBar } from "../code-chat-footer/code-chat-footer";
+import { CodeChatFooter, CodeChatReconnecting, CodeChatStatusBar } from "../code-chat-footer/code-chat-footer";
 import { MockResources, MockUsage } from "../code-chat-footer/code-chat-footer.fixtures";
 import { useMockComposer } from "../../composer/composer.fixtures";
 import { CodeChatComposer, CodeChatComposerActions, CodeChatComposerInput, CodeChatComposerSpacer } from "../code-chat-footer/code-chat-composer";
@@ -30,6 +30,7 @@ import {
   CodeChatSystemPromptText,
   CodeChatSystemPromptWarning,
 } from "./code-chat-system-prompt";
+import { CodeChatDiff, CodeChatDiffContent } from "./code-chat-diff";
 import { CodeChatError } from "./code-chat-error";
 import { CodeChatSubagent } from "./code-chat-subagent";
 import { CodeChatBtw, CodeChatBtwClosed } from "./code-chat-btw";
@@ -106,7 +107,9 @@ function Tools() {
           <CodeChatToolHeader label="update_file" preview="src/lib/url-registry.ts" duration="took 1s" expandable />
           <CodeChatToolContent>
             <CodeChatToolDiff>
-              <pre className="text-muted-foreground px-3 py-2 font-mono">{DIFF}</pre>
+              <CodeChatDiff diff={DIFF}>
+                <CodeChatDiffContent />
+              </CodeChatDiff>
             </CodeChatToolDiff>
           </CodeChatToolContent>
         </CodeChatTool>
@@ -262,7 +265,7 @@ function ConversationPreview() {
           {showJump ? <CodeChatJumpButton onClick={() => setShowJump(false)} /> : null}
         </CodeChatThread>
         <CodeChatFooter>
-          <CodeChatFooterNotice>Connection lost — retrying</CodeChatFooterNotice>
+          <CodeChatReconnecting />
           <Composer />
           <StatusBar />
         </CodeChatFooter>
@@ -322,7 +325,7 @@ export const FooterWithNotice: Story = {
     <Frame>
       <div className="flex-1" />
       <CodeChatFooter>
-        <CodeChatFooterNotice>Connection lost — retrying</CodeChatFooterNotice>
+        <CodeChatReconnecting />
         <Composer />
         <StatusBar />
       </CodeChatFooter>

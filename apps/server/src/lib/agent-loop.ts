@@ -21,6 +21,7 @@ import { getProvider } from "./llm-providers";
 import { clearAskUser, waitForAskUserResponse, type AskUserQuestion } from "./ask-user";
 import { COMPACT_RESERVE_TOKENS, codeCompactionStore, estimateContextTokens, NothingToCompactError, projectHistory, runCompaction } from "./compaction";
 import { resolveSessionSystemPrompt } from "./session-prompt";
+import { executeMemoryTool, MEMORY_TOOL_NAMES, MEMORY_TOOLS } from "./memory";
 
 export const MAX_ROUNDS = 300;
 
@@ -142,7 +143,9 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
   // Subagent tools — offered to every session; each call enforces the
   // invocation permission rules (main → anything; sub_agent → sub_agent; etc).
   const subagentTools = SUBAGENT_TOOLS;
-  const tools = [...scopedTools, ...subagentTools, ...filterByAgent(mcpLoaded.tools.map((t) => t.tool))];
+  // Memory tools follow the agent's allowlist like any other tool.
+  const memoryTools = filterByAgent(MEMORY_TOOLS);
+  const tools = [...scopedTools, ...memoryTools, ...subagentTools, ...filterByAgent(mcpLoaded.tools.map((t) => t.tool))];
   if (mcpLoaded.failures.length) {
     await emit({ type: "status", text: `MCP unavailable: ${mcpLoaded.failures.map((f) => `${f.server} (${f.error.slice(0, 120)})`).join("; ")}` });
   }
@@ -264,6 +267,12 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
       const childId = str(call.arguments?.session_id).trim();
       exec = await executeCheckSubagentStatus(ctx, childId || undefined);
     } else return { output: `error: unknown subagent tool ${call.name}`, code: null, failed: true };
+    return { output: exec.output, code: exec.failed ? null : 0, failed: exec.failed };
+  };
+
+  /** Memory tools resolve against the session's memory context (sub_agents inherit their parent's). */
+  const runMemoryCall = async (call: AgentToolCall): Promise<ToolExecution> => {
+    const exec = await executeMemoryTool(organizationId, session.id, call.name, call.arguments ?? {});
     return { output: exec.output, code: exec.failed ? null : 0, failed: exec.failed };
   };
 
@@ -484,7 +493,9 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
             ? runMcpCall(call)
             : call.name === "ask_user"
               ? runAskUser(call)
-              : call.name === "list_subagents" || call.name === "invoke_subagent" || call.name === "check_subagent_status"
+              : MEMORY_TOOL_NAMES.has(call.name)
+                ? runMemoryCall(call)
+                : call.name === "list_subagents" || call.name === "invoke_subagent" || call.name === "check_subagent_status"
                 ? runSubagentCall(call)
                 : executeToolCall(
                   runnerId,

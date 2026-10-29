@@ -174,10 +174,13 @@ export function useChatPanel(sessionId: string | null) {
     setDraftState(sessionDrafts.get(sessionId) ?? "");
   }, [sessionId]);
 
-  const setDraft = useCallback((value: string) => {
-    setDraftState(value);
-    if (sessionId) sessionDrafts.set(sessionId, value);
-  }, [sessionId]);
+  const setDraft = useCallback(
+    (value: string) => {
+      setDraftState(value);
+      if (sessionId) sessionDrafts.set(sessionId, value);
+    },
+    [sessionId],
+  );
   const [streaming, setStreaming] = useState<string | null>(null);
   const [liveTools, setLiveTools] = useState<ToolEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -396,7 +399,14 @@ export function useChatPanel(sessionId: string | null) {
       setLiveTools((prev) =>
         prev.map((t) =>
           t.id === frame.id
-            ? { ...t, output: frame.output ?? t.output, done: true, completedAt: Date.now(), status: frame.status ?? undefined, ...(frame.diff ? { diff: frame.diff } : {}) }
+            ? {
+                ...t,
+                output: frame.output ?? t.output,
+                done: true,
+                completedAt: Date.now(),
+                status: frame.status ?? undefined,
+                ...(frame.diff ? { diff: frame.diff } : {}),
+              }
             : t,
         ),
       );
@@ -456,9 +466,7 @@ export function useChatPanel(sessionId: string | null) {
       void queryClient.invalidateQueries({ queryKey: ["code", "session", sessionId] });
     } else if (frame.type === "plan_updated") {
       // Live plan steps — patch the session query cache; the sidebar reads it.
-      queryClient.setQueryData<SessionDetail>(["code", "session", sessionId], (prev) =>
-        prev ? { ...prev, plan: { steps: frame.steps ?? [] } } : prev,
-      );
+      queryClient.setQueryData<SessionDetail>(["code", "session", sessionId], (prev) => (prev ? { ...prev, plan: { steps: frame.steps ?? [] } } : prev));
     } else if (frame.type === "compaction_state") {
       // Server-side compaction state — survives refresh/reconnect (the POST
       // keeps running even if the viewer goes away).
@@ -936,6 +944,20 @@ export function useChatPanel(sessionId: string | null) {
 
   const removeSteering = (id: string) => setSteering((prev) => prev.filter((s) => s.id !== id));
 
+  /** Applies a new order (ids) to the queue; unknown ids are ignored, missing ones keep their tail position. */
+  const reorderSteering = (ids: string[]) =>
+    setSteering((prev) => {
+      const byId = new Map(prev.map((s) => [s.id, s]));
+      const ordered = ids.flatMap((id) => byId.get(id) ?? []);
+      return [...ordered, ...prev.filter((s) => !ids.includes(s.id))];
+    });
+
+  const moveSteeringToTop = (id: string) =>
+    setSteering((prev) => {
+      const item = prev.find((s) => s.id === id);
+      return item ? [item, ...prev.filter((s) => s.id !== id)] : prev;
+    });
+
   /** /btw finish: summarize (sendToMain) or just close, lock the btw session,
    * and hand the result to the main thread. Server handles the LLM round +
    * main-session insert; the ws on the btw session carries it. */
@@ -984,6 +1006,8 @@ export function useChatPanel(sessionId: string | null) {
     steering,
     sendSteeringNow,
     removeSteering,
+    reorderSteering,
+    moveSteeringToTop,
     // /btw side thread
     btw,
     startBtw,

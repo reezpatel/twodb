@@ -1,18 +1,18 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BrainCog, Globe, Paperclip, Send, Trash2 } from "lucide-react";
+import { BrainCog, Globe, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEscapeKey } from "@/lib/use-escape-key";
 import { MOCK_COMMANDS, MOCK_FILES } from "../../composer/composer.fixtures";
 import { useComposer } from "../../composer/use-composer";
-import { CodeChatFooter, CodeChatFooterNotice, CodeChatStatusBar } from "./code-chat-footer";
+import { CodeChatFooter, CodeChatReconnecting, CodeChatStatusBar } from "./code-chat-footer";
 import { CodeChatComposer, CodeChatComposerActions, CodeChatComposerInput, CodeChatComposerSpacer } from "./code-chat-composer";
 import { CodeChatComposerAction } from "./code-chat-composer-action";
 import { CodeChatComposerDivider, CodeChatComposerToggle } from "./code-chat-composer-toggle";
 import { CodeChatComposerSend } from "./code-chat-composer-send";
 import { CodeChatComposerStop } from "./code-chat-composer-stop";
 import { CodeChatAttachment, CodeChatAttachments, CodeChatAttachmentUploading } from "./code-chat-attachments";
-import { CodeChatQueue, CodeChatQueueActions, CodeChatQueueItem, CodeChatQueueText } from "./code-chat-queue";
+import { CodeChatQueue } from "./code-chat-queue";
 import { MockResources, MockUsage } from "./code-chat-footer.fixtures";
 import { MockQuestionWizard } from "./code-chat-question.fixtures";
 
@@ -137,28 +137,19 @@ function FunctionalFooter() {
       </div>
 
       <CodeChatFooter>
-        {disconnected ? <CodeChatFooterNotice>Connection lost — retrying</CodeChatFooterNotice> : null}
+        {disconnected ? <CodeChatReconnecting /> : null}
         {asking ? (
           <MockQuestionWizard onSubmit={() => setAsking(false)} onStop={() => setAsking(false)} />
         ) : (
           <>
             {queue.length > 0 ? (
-              <CodeChatQueue>
-                {queue.map((item) => (
-                  <CodeChatQueueItem key={item.id}>
-                    <CodeChatQueueText>{item.text}</CodeChatQueueText>
-                    <CodeChatQueueActions>
-                      <CodeChatComposerAction icon={<Send />} label="Send now — stops the run and dispatches" className="size-6" onClick={sendQueueNow} />
-                      <CodeChatComposerAction
-                        icon={<Trash2 />}
-                        label="Delete"
-                        className="hover:text-destructive size-6"
-                        onClick={() => setQueue((current) => current.filter((queued) => queued.id !== item.id))}
-                      />
-                    </CodeChatQueueActions>
-                  </CodeChatQueueItem>
-                ))}
-              </CodeChatQueue>
+              <CodeChatQueue
+                items={queue.map((q) => ({ id: String(q.id), content: q.text }))}
+                onReorder={(next) => setQueue((current) => next.flatMap((n) => current.find((q) => String(q.id) === n.id) ?? []))}
+                onMoveToTop={(id) => setQueue((current) => [...current.filter((q) => String(q.id) === id), ...current.filter((q) => String(q.id) !== id)])}
+                onRemove={(id) => setQueue((current) => current.filter((q) => String(q.id) !== id))}
+                onSendNow={sendQueueNow}
+              />
             ) : null}
 
             <CodeChatComposer busy={running}>

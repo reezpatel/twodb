@@ -12,7 +12,7 @@ export function CodeChatClear({ className, children = "cleared", ...props }: Com
       {...props}
     >
       <span className="bg-border h-px flex-1" aria-hidden="true" />
-      <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold tracking-wide uppercase">
+      <span className="flex items-center gap-1.5 text-[13px] font-semibold tracking-wide uppercase">
         <Eraser className="size-3" aria-hidden="true" />
         {children}
       </span>

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { ListCheckIcon, Paperclip, SquarePen } from "lucide-react";
+import { CodeChatToolChip, CodeChatToolNote } from "@/components/blocks/code/code-chat/code-chat-tool";
 import { ToolBlock, type ToolViewProps } from "./tool-block";
+import { FileChangeView } from "./file-change-view";
 
 /**
  * How one tool renders in the chat. Every field is optional:
@@ -18,19 +20,9 @@ export interface ToolViewSpec {
 
 // --- Custom views -------------------------------------------------------------
 
-function ToolChip({ icon, label, detail }: { icon: ReactNode; label: string; detail: string }) {
-  return (
-    <div className="bg-muted/60 flex items-center gap-2 rounded-lg border px-2 py-1.5 font-mono text-xs">
-      {icon}
-      <span className="font-medium">{label}</span>
-      <span className="text-muted-foreground truncate">{detail}</span>
-    </div>
-  );
-}
-
 /** update_canvas — the content lives in the canvas tab; show the title only. */
 function CanvasChip({ title }: { title: string }) {
-  return <ToolChip icon={<SquarePen size={12} className="text-lavender-400 shrink-0" aria-hidden="true" />} label="update_canvas" detail={`· ${title}`} />;
+  return <CodeChatToolChip icon={<SquarePen />} label="update_canvas" detail={`· ${title}`} />;
 }
 
 /** read_asset — read <file> from <backend>; content stays collapsed. */
@@ -39,22 +31,13 @@ function ReadAssetChip({ uri }: { uri: string }) {
   const backend = match?.[1] ?? "storage";
   const mediaId = match?.[2] ?? uri;
   return (
-    <ToolChip
-      icon={<Paperclip size={12} className="text-lavender-400 shrink-0" aria-hidden="true" />}
-      label="read-asset"
-      detail={`read ${mediaId.length > 8 ? `${mediaId.slice(0, 8)}…` : mediaId} from ${backend}`}
-    />
+    <CodeChatToolChip icon={<Paperclip />} label="read-asset" detail={`read ${mediaId.length > 8 ? `${mediaId.slice(0, 8)}…` : mediaId} from ${backend}`} />
   );
 }
 
 /** update_plan — the plan itself lives in the sidebar; just note the change. */
-function PlanUpdatedChip(_props: { failed?: boolean }) {
-  return (
-    <div className="flex items-center gap-2  mb-2">
-      <ListCheckIcon className="size-4 text-info/90" />
-      <p className="text-info text-xs font-mono">Plan Updated</p>
-    </div>
-  );
+function PlanUpdatedChip() {
+  return <CodeChatToolNote icon={<ListCheckIcon />}>Plan Updated</CodeChatToolNote>;
 }
 
 /** Chip views need their args; orphan rows (no args) fall back to the generic block. */
@@ -72,7 +55,10 @@ export const TOOL_VIEWS: Record<string, ToolViewSpec> = {
   read_skill: { label: "read-skill", preview: (a) => (typeof a.name === "string" ? a.name : undefined) },
   update_canvas: { render: withArgs((a) => <CanvasChip title={String(a.title ?? "")} />) },
   read_asset: { render: withArgs((a) => <ReadAssetChip uri={String(a.uri ?? "")} />) },
-  update_plan: { render: (p) => <PlanUpdatedChip failed={p.failed} /> },
+  update_plan: { render: () => <PlanUpdatedChip /> },
+  write_file: { render: (p) => <FileChangeView {...p} /> },
+  update_file: { render: (p) => <FileChangeView {...p} /> },
+  read_file: { render: (p) => <FileChangeView {...p} /> },
 };
 
 /** Renders a tool call through its TOOL_VIEWS entry, or the generic ToolBlock. */

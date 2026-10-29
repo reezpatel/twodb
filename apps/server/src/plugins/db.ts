@@ -333,7 +333,8 @@ export interface InstructionTable {
   updatedAt: Date;
 }
 
-export type MemoryScope = "workspace" | "project" | "session";
+/** Memory levels: organization-wide, one code directory, one agent's own ("self"), or a single session (legacy). */
+export type MemoryScope = "organization" | "code_directory" | "agent" | "session";
 
 export interface MemoryTable {
   id: string;
@@ -342,8 +343,13 @@ export interface MemoryTable {
   /** Space this memory belongs to; null = all spaces. */
   spaceId: string | null;
   scopeId: string | null;
-  /** workspace | project | session */
+  /** organization | code_directory | agent | session */
   scope: MemoryScope;
+  /** Agent that owns the memory when scope = agent (persona / collaborator / sentinel). */
+  agentId: string | null;
+  /** Shown by default and used as the key by the memory tools; unique per level. */
+  title: string;
+  /** Read on demand (read_memory / click in the UI). */
   content: string;
   createdAt: Date;
   updatedAt: Date;

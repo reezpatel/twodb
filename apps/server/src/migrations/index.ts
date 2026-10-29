@@ -35,6 +35,7 @@ import { up as sharedContentUrlColumns } from "./0033-shared-content-url-columns
 import { up as sharedContentStatusSelect } from "./0034-shared-content-status-select";
 import { up as notifications } from "./0035-notifications";
 import { up as teamsAccounts } from "./0036-teams-accounts";
+import { up as memoryTitleLevels } from "./0037-memory-title-levels";
 
 // Keys sort lexicographically — prefix new migrations with the next number.
 export const migrations: Record<string, Migration> = {
@@ -74,4 +75,5 @@ export const migrations: Record<string, Migration> = {
   "0034_shared_content_status_select": { up: sharedContentStatusSelect },
   "0035_notifications": { up: notifications },
   "0036_teams_accounts": { up: teamsAccounts },
+  "0037_memory_title_levels": { up: memoryTitleLevels },
 };

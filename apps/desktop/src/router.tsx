@@ -96,7 +96,7 @@ export const router = createBrowserRouter([
           { path: "notifications", Component: NotificationsSettingsSection },
           { path: "shared-content", Component: SharedContentSection },
           { path: "email", element: <Navigate to="/apps/settings/accounts" replace /> },
-          { path: "logs", Component: LogsSection },
+          { path: "logs", Component: LogsSection, handle: { fullBleed: true } },
         ],
       },
       {

@@ -1,17 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../lib/api";
-
-export interface LogEntry {
-  /** Unique render key — line numbers repeat across rotated files. */
-  key: string;
-  line: number;
-  /** Marker row inserted when the log file was rotated/truncated. */
-  divider?: boolean;
-  time: string | null;
-  level: string | null;
-  message: string;
-  context: string | null;
-}
+import type { LogEntry, LogLevelFilter } from "@/components/blocks/settings/logs/settings-logs";
 
 interface LogLine {
   line: number;
@@ -24,6 +13,8 @@ export interface LogsResponse {
   file: string;
   /** dev:ino:birthtime of the log file — changes when it's rotated/recreated. */
   fileId?: string | null;
+  /** Set when the server has no readable log file (why). */
+  problem?: string;
 }
 
 function parseLine(l: LogLine, gen: number): LogEntry {
@@ -50,7 +41,7 @@ export function useLogs() {
   const [file, setFile] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [levelFilter, setLevelFilter] = useState<"all" | "info" | "warn" | "error">("all");
+  const [levelFilter, setLevelFilter] = useState<LogLevelFilter>("all");
   const [follow, setFollow] = useState(true);
   const lastLineRef = useRef(0);
   const fileIdRef = useRef<string | null>(null);
@@ -81,7 +72,7 @@ export function useLogs() {
           if (cancelled) return;
         }
         fileIdRef.current = res.fileId ?? fileIdRef.current ?? "";
-        setError(null);
+        setError(res.problem ? `Log file unavailable: ${res.problem}` : null);
         setTotal(res.total);
         setFile(res.file);
         const gen = genRef.current;

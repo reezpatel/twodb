@@ -15,7 +15,7 @@ export function CodeChatBtw({ agentName, closed = false, preview, ...props }: Co
 
 export function CodeChatBtwClosed({ className, children, ...props }: ComponentProps<"div">) {
   return (
-    <div data-slot="code-chat-btw-closed" className={cn("text-muted-foreground flex items-center gap-2 px-3 py-2 text-xs italic", className)} {...props}>
+    <div data-slot="code-chat-btw-closed" className={cn("text-muted-foreground flex items-center gap-2 px-3 py-2 text-sm italic", className)} {...props}>
       <Lock className="size-3" aria-hidden="true" />
       {children}
     </div>

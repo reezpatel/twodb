@@ -1,13 +1,14 @@
 import type { ComponentProps } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Orb, type OrbLook } from "@/components/ui/thinking-orbs";
 
 export function CodeChatLive({ className, children, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="code-chat-live"
       className={cn(
-        "text-muted-foreground/70 flex items-center gap-1.5 border-t border-dashed pt-3 text-[10px] font-semibold tracking-wide uppercase",
+        "text-muted-foreground/70 flex items-center gap-1.5 border-t border-dashed pt-3 text-[13px] font-semibold tracking-wide uppercase",
         className,
       )}
       {...props}
@@ -20,16 +21,20 @@ export function CodeChatLive({ className, children, ...props }: ComponentProps<"
 
 type CodeChatProgressProps = ComponentProps<"div"> & {
   size?: "sm" | "md";
+  /** Which orb to show; compacting unless told otherwise. */
+  look?: OrbLook;
 };
 
-export function CodeChatProgress({ size = "sm", className, children, ...props }: CodeChatProgressProps) {
+const COMPACTING: OrbLook = { state: "compacting" };
+
+export function CodeChatProgress({ size = "sm", look = COMPACTING, className, children, ...props }: CodeChatProgressProps) {
   return (
     <div
       data-slot="code-chat-progress"
-      className={cn("text-muted-foreground flex items-center gap-2", size === "sm" ? "text-xs" : "text-sm", className)}
+      className={cn("text-muted-foreground flex items-center gap-2", size === "sm" ? "text-sm" : "text-base", className)}
       {...props}
     >
-      <Loader2 className={cn("animate-spin", size === "sm" ? "size-3" : "size-3.5")} aria-hidden="true" />
+      <Orb {...look} size={size === "sm" ? 16 : 20} className="text-primary shrink-0" />
       {children}
     </div>
   );

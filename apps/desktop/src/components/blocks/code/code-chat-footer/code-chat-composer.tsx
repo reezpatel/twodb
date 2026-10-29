@@ -11,7 +11,7 @@ export function CodeChatComposer({ busy = false, className, ...props }: CodeChat
     <div
       data-slot="code-chat-composer"
       data-busy={busy || undefined}
-      className={cn("bg-muted/60 flex flex-col rounded-2xl border p-2 shadow-sm transition-colors", busy && "border-primary/50", className)}
+      className={cn("bg-muted/60 flex flex-col rounded-sm border p-2 shadow-sm transition-colors", busy && "border-primary/50", className)}
       {...props}
     />
   );

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Bot, Circle, Flag, Folder, GitBranch, Link, Loader2, Tag, User, X } from "lucide-react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { CodeMemories, type CodeMemory, type CodeMemoryGroup } from "@/components/blocks/code/code-sidebar/code-memories";
 import { CodeSidebarSection } from "@/components/blocks/code/code-sidebar/code-sidebar-section";
 import {
   CodeCommit,
@@ -36,11 +37,42 @@ const SESSION_ITEMS = [
   { id: "flag", label: "1 flag", icon: Flag },
 ];
 
-const MEMORIES = [
-  { id: "m1", text: "Repo uses pnpm + Kysely; migrations in apps/server/migrations.", scope: "project" },
-  { id: "m2", text: "API on :3001, desktop dev on :5173 via /api proxy.", scope: "project" },
-  { id: "m3", text: "Runners connect outbound; never expose runner ports.", scope: "global" },
-];
+interface SessionMemory {
+  id: string;
+  title: string;
+  content: string;
+  scope: "organization" | "code_directory" | "agent" | "session";
+}
+
+/** Organization → Global, code directory → Project; the agent's own and session-bound memories are Local. */
+const MEMORY_GROUPS: Record<SessionMemory["scope"], CodeMemoryGroup> = {
+  organization: "global",
+  code_directory: "project",
+  agent: "local",
+  session: "local",
+};
+
+/** The memories this session's agent sees: organization + directory + its own (a subagent's are its caller's). */
+function useSidebarMemories() {
+  const { session } = useChat();
+  const sessionId = session.data?.id ?? null;
+  const queryClient = useQueryClient();
+  const queryKey = ["code", "session", sessionId, "memories"];
+  const memories = useQuery({
+    queryKey,
+    queryFn: () => api<SessionMemory[]>(`/api/memories/applicable?sessionId=${sessionId}`),
+    enabled: !!sessionId,
+    // Agents add memories mid-run via tools; a light poll plus refocus keeps the list current.
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+  });
+  const forget = useMutation({
+    mutationFn: (id: string) => api(`/api/memories/${id}`, { method: "DELETE" }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey }),
+  });
+  const items: CodeMemory[] = (memories.data ?? []).map((m) => ({ id: m.id, title: m.title, content: m.content, group: MEMORY_GROUPS[m.scope] }));
+  return { items, isPending: memories.isPending, forget: (id: string) => forget.mutate(id) };
+}
 
 function toPlanStatus(status: string): CodePlanItemStatus {
   if (status === "done") return "completed";
@@ -199,6 +231,7 @@ export function Sidebar() {
   const git = useSidebarGit();
   const showGitTotals = git.hasDirectory && !git.isNoGit && !git.isError && !git.isPending && git.fileCount > 0;
   const gitTitle = showGitTotals ? `${git.fileCount} changed ${git.fileCount === 1 ? "file" : "files"}` : "Git Summary";
+  const memories = useSidebarMemories();
   const subagents = useSidebarSubagents();
   const backgroundJobs = useSidebarJobs();
   const { openBtwSession, session } = useChat();
@@ -261,15 +294,8 @@ export function Sidebar() {
         </CodeSidebarSection>
       )}
 
-      <CodeSidebarSection title="Memories" open={open.memories} onOpenChange={() => toggle("memories")}>
-        <div className="flex flex-col gap-2">
-          {MEMORIES.map((memory) => (
-            <div key={memory.id} className="bg-muted rounded-md p-2 text-xs">
-              <p>{memory.text}</p>
-              <span className="text-muted-foreground/70 mt-1 block font-mono text-[10px] uppercase">{memory.scope}</span>
-            </div>
-          ))}
-        </div>
+      <CodeSidebarSection title="Memories" count={memories.items.length || undefined} open={open.memories} onOpenChange={() => toggle("memories")}>
+        <CodeMemories memories={memories.items} onRemove={memories.forget} />
       </CodeSidebarSection>
 
       <CodeSidebarSection title="Workflow" open={open.workflow} onOpenChange={() => toggle("workflow")}>

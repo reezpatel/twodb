@@ -1,16 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState, type ReactNode } from "react";
-import { BrainCog, Globe, Paperclip, Send, Trash2 } from "lucide-react";
+import { BrainCog, Globe, Paperclip } from "lucide-react";
 import { MockResources, MockUsage } from "./code-chat-footer.fixtures";
 import { useMockComposer } from "../../composer/composer.fixtures";
-import { CodeChatFooter, CodeChatFooterNotice, CodeChatStatusBar } from "./code-chat-footer";
+import { CodeChatFooter, CodeChatFooterNotice, CodeChatReconnecting, CodeChatStatusBar } from "./code-chat-footer";
 import { CodeChatComposer, CodeChatComposerActions, CodeChatComposerInput, CodeChatComposerSpacer } from "./code-chat-composer";
 import { CodeChatComposerAction } from "./code-chat-composer-action";
 import { CodeChatComposerDivider, CodeChatComposerToggle } from "./code-chat-composer-toggle";
 import { CodeChatComposerSend } from "./code-chat-composer-send";
 import { CodeChatComposerStop } from "./code-chat-composer-stop";
 import { CodeChatAttachment, CodeChatAttachments, CodeChatAttachmentUploading } from "./code-chat-attachments";
-import { CodeChatQueue, CodeChatQueueActions, CodeChatQueueItem, CodeChatQueueText } from "./code-chat-queue";
+import { CodeChatQueue } from "./code-chat-queue";
 
 const meta = {
   title: "Blocks/Code/CodeChatFooter",
@@ -48,9 +48,10 @@ type ComposerPreviewProps = {
   uploading?: boolean;
   queued?: boolean;
   notice?: string;
+  reconnecting?: boolean;
 };
 
-function ComposerPreview({ resources, running = false, attachments = false, uploading = false, queued = false, notice }: ComposerPreviewProps) {
+function ComposerPreview({ resources, running = false, attachments = false, uploading = false, queued = false, notice, reconnecting = false }: ComposerPreviewProps) {
   const { editor } = useMockComposer({ placeholder: running ? "Steering — message queues until this round finishes" : undefined });
   const [search, setSearch] = useState(false);
   const [think, setThink] = useState(true);
@@ -59,16 +60,9 @@ function ComposerPreview({ resources, running = false, attachments = false, uplo
     <Frame>
       <CodeChatFooter>
         {notice ? <CodeChatFooterNotice>{notice}</CodeChatFooterNotice> : null}
+        {reconnecting ? <CodeChatReconnecting /> : null}
         {queued ? (
-          <CodeChatQueue>
-            <CodeChatQueueItem>
-              <CodeChatQueueText>also add a story for the empty state</CodeChatQueueText>
-              <CodeChatQueueActions>
-                <CodeChatComposerAction icon={<Send />} label="Send now — stops the run and dispatches" className="size-6" />
-                <CodeChatComposerAction icon={<Trash2 />} label="Delete" className="hover:text-destructive size-6" />
-              </CodeChatQueueActions>
-            </CodeChatQueueItem>
-          </CodeChatQueue>
+          <CodeChatQueue items={[{ id: "q1", content: "also add a story for the empty state" }]} onRemove={() => {}} onSendNow={() => {}} />
         ) : null}
         <CodeChatComposer busy={running}>
           {attachments || uploading ? (
@@ -120,7 +114,7 @@ export const WithQueue: Story = {
 };
 
 export const Disconnected: Story = {
-  render: () => <ComposerPreview notice="Connection lost — retrying" />,
+  render: () => <ComposerPreview reconnecting />,
 };
 
 export const MachineOffline: Story = {
