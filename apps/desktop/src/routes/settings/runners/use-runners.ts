@@ -14,17 +14,8 @@ export interface Runner {
   awsSsoRegion?: string | null;
 }
 
-export interface RunnerKey {
-  id: string;
-  name: string;
-  prefix: string;
-  createdAt: string;
-  revokedAt: string | null;
-}
-
 export function useRunners() {
   const queryClient = useQueryClient();
-  const [newKey, setNewKey] = useState<string | null>(null);
   const [terminalRunner, setTerminalRunner] = useState<Runner | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -33,34 +24,9 @@ export function useRunners() {
     queryFn: () => api<Runner[]>("/api/runners"),
   });
 
-  const keys = useQuery({
-    queryKey: ["runner-keys"],
-    queryFn: () => api<RunnerKey[]>("/api/runner-keys"),
-  });
-
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["runners"] });
-    void queryClient.invalidateQueries({ queryKey: ["runner-keys"] });
   };
-
-  const createKey = useMutation({
-    mutationFn: (name: string) =>
-      api<{ key: string }>("/api/runner-keys", {
-        method: "POST",
-        body: JSON.stringify({ name }),
-      }),
-    onSuccess: (data) => {
-      setNewKey(data.key);
-      invalidate();
-    },
-    onError: (e) => setActionError(e.message),
-  });
-
-  const revokeKey = useMutation({
-    mutationFn: (id: string) => api(`/api/runner-keys/${id}`, { method: "DELETE" }),
-    onSuccess: invalidate,
-    onError: (e) => setActionError(e.message),
-  });
 
   const deleteRunner = useMutation({
     mutationFn: (id: string) => api(`/api/runners/${id}`, { method: "DELETE" }),
@@ -70,14 +36,9 @@ export function useRunners() {
 
   return {
     runners,
-    keys,
-    newKey,
-    setNewKey,
     terminalRunner,
     setTerminalRunner,
     actionError,
-    createKey,
-    revokeKey,
     deleteRunner,
   };
 }

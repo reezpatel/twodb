@@ -38,7 +38,12 @@ export function RunnerAwsConfig({ runner }: { runner: Runner }) {
     <div className="border-muted mt-2 rounded-lg border p-3">
       <div className="mb-2 text-xs font-semibold">AWS SSO</div>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Input className="grow font-mono text-xs" placeholder="https://d-xxxxxxxxx.awsapps.com/start" value={startUrl} onChange={(e) => setStartUrl(e.target.value)} />
+        <Input
+          className="grow font-mono text-xs"
+          placeholder="https://d-xxxxxxxxx.awsapps.com/start"
+          value={startUrl}
+          onChange={(e) => setStartUrl(e.target.value)}
+        />
         <Input className="w-full font-mono text-xs sm:w-40" placeholder="us-east-1" value={region} onChange={(e) => setRegion(e.target.value)} />
         <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>
           {save.isPending ? "Saving…" : saved ? "Saved" : "Save"}

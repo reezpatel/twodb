@@ -558,6 +558,8 @@ export interface CodeSessionJobTable {
   logPath: string;
   createdAt: Date;
   finishedAt: Date | null;
+  /** Set when retired from the sidebar (/new, /compact) — the row stays. */
+  hiddenAt: ColumnType<Date | null, Date | null | undefined, Date | null | undefined>;
 }
 
 export interface LlmQuotaTable {
@@ -731,7 +733,7 @@ export interface CodeSessionArtifactTable {
 export type NoteKind = "section" | "page" | "database";
 
 export type NotePropertyType =
-  "text" | "number" | "select" | "multiselect" | "status" | "date" | "person" | "files & media" | "media" | "checkbox" | "url" | "phone" | "email" | "id" | "place";
+  "text" | "number" | "select" | "multiselect" | "status" | "date" | "person" | "files & media" | "media" | "checkbox" | "url" | "phone" | "email" | "id" | "place" | "relation";
 
 export interface NotePropertyOption {
   id: string;
@@ -748,6 +750,9 @@ export interface NotePropertyDef {
   type: NotePropertyType;
   options?: NotePropertyOption[];
   validation?: { required?: boolean } & Record<string, unknown>;
+  /** `relation` properties: the database whose rows this property points to
+   *  (may be the owning database itself). Stored as the target row's node id. */
+  relation?: { databaseId: string };
 }
 
 export type NoteViewType = "table" | "list" | "kanban";

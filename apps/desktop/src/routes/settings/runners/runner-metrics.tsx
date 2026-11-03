@@ -100,8 +100,12 @@ export function RunnerMetrics({ runner }: { runner: Runner }) {
         <div className="bg-accent/40 rounded-lg px-3 py-2 font-mono text-[11px]">
           <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1">
             <span className="font-sans text-[10px] font-semibold uppercase tracking-wide">live</span>
-            <span>cpu {Math.round(liveSample.metrics.cpu.busy * 100)}% ({liveSample.metrics.cpu.cores}c, load {liveSample.metrics.cpu.load1.toFixed(1)})</span>
-            <span>mem {fmtBytes(liveSample.metrics.memory.used)}/{fmtBytes(liveSample.metrics.memory.total)}</span>
+            <span>
+              cpu {Math.round(liveSample.metrics.cpu.busy * 100)}% ({liveSample.metrics.cpu.cores}c, load {liveSample.metrics.cpu.load1.toFixed(1)})
+            </span>
+            <span>
+              mem {fmtBytes(liveSample.metrics.memory.used)}/{fmtBytes(liveSample.metrics.memory.total)}
+            </span>
             {liveSample.metrics.gpus.map((g) => (
               <span key={g.index}>
                 gpu{g.index} {Math.round(g.utilization)}% {fmtBytes(g.memoryUsed)}/{fmtBytes(g.memoryTotal)}
@@ -135,19 +139,19 @@ export function RunnerMetrics({ runner }: { runner: Runner }) {
                 <Cpu size={12} aria-hidden="true" /> CPU
               </div>
               <AreaChart values={rows.map((r) => r.cpu.busy * 100)} max={100} label="utilization %" fmt={(v) => `${v.toFixed(0)}%`} />
-              <AreaChart values={rows.map((r) => r.cpu.load1)} max={Math.max(4, rows[rows.length - 1]?.cpu.cores ?? 4)} label="loadavg (1m)" fmt={(v) => v.toFixed(1)} />
+              <AreaChart
+                values={rows.map((r) => r.cpu.load1)}
+                max={Math.max(4, rows[rows.length - 1]?.cpu.cores ?? 4)}
+                label="loadavg (1m)"
+                fmt={(v) => v.toFixed(1)}
+              />
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 text-xs font-semibold">
                 <MemoryStick size={12} aria-hidden="true" /> Memory
               </div>
-              <AreaChart
-                values={rows.map((r) => r.memory.used)}
-                max={rows[rows.length - 1]?.memory.total ?? 1}
-                label="used"
-                fmt={(v) => fmtBytes(v)}
-              />
+              <AreaChart values={rows.map((r) => r.memory.used)} max={rows[rows.length - 1]?.memory.total ?? 1} label="used" fmt={(v) => fmtBytes(v)} />
             </div>
 
             {cols.map((g) => (
@@ -177,7 +181,12 @@ export function RunnerMetrics({ runner }: { runner: Runner }) {
                   <div className="flex items-center gap-1.5 text-xs font-semibold">
                     <HardDrive size={12} aria-hidden="true" /> Disk <span className="text-muted-foreground font-mono font-normal">{d.path}</span>
                   </div>
-                  <AreaChart values={rows.map((r) => r.disks.find((x) => x.path === d.path)?.used ?? 0)} max={d.total || 1} label="used" fmt={(v) => fmtBytes(v)} />
+                  <AreaChart
+                    values={rows.map((r) => r.disks.find((x) => x.path === d.path)?.used ?? 0)}
+                    max={d.total || 1}
+                    label="used"
+                    fmt={(v) => fmtBytes(v)}
+                  />
                 </div>
               ))}
           </div>

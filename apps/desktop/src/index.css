@@ -390,6 +390,13 @@
   color: var(--color-muted-foreground);
 }
 
+/* Soft borderless card elevation (hairline ring + gentle drop) used by the settings blocks. */
+@theme {
+  --shadow-card:
+    0 0 0 0.5px color-mix(in oklch, var(--color-foreground) 9%, transparent), 0 1px 2px color-mix(in oklch, var(--color-foreground) 5%, transparent),
+    0 4px 12px -4px color-mix(in oklch, var(--color-foreground) 6%, transparent);
+}
+
 @theme {
   --animate-ls-pulse: ls-pulse 1.6s ease-out infinite;
   --animate-ls-wave: ls-wave 0.9s ease-in-out infinite alternate;

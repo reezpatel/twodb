@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "@tanstack/react-form";
 import { api } from "@/lib/api";
 import { calendarKeys, useCalendarMeta, useCalendars, useCalendarSettings, type CalendarItem, type CalendarSettings } from "../../calendar/calendar-api";
 import { uploadForm } from "../../email/email-api";
@@ -54,15 +53,6 @@ export function useCalendarSettingsSection() {
   });
 
   return { settings, calendars, meta, saveSettings, updateCalendar, createCalendar, deleteCalendar, syncCalendar, feed, importIcs };
-}
-
-export function useGeneralForm(settings: CalendarSettings, onSave: (v: Partial<CalendarSettings>) => Promise<unknown>) {
-  return useForm({
-    defaultValues: settings,
-    onSubmit: async ({ value }) => {
-      await onSave(value);
-    },
-  });
 }
 
 export function useCalendarShares(calendar: CalendarItem | null) {

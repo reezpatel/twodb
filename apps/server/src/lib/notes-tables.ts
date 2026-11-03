@@ -17,6 +17,7 @@ const PROPERTY_SQL: Record<NotePropertyType, string> = {
   email: "text",
   id: "text",
   place: "text",
+  relation: "text",
 };
 
 export const PROPERTY_TYPES = Object.keys(PROPERTY_SQL) as NotePropertyType[];
@@ -120,6 +121,7 @@ function castExpr(col: string, from: NotePropertyType, to: NotePropertyType, act
     case "email":
     case "id":
     case "place":
+    case "relation":
       return `${c}::text`;
     case "number":
       if (from === "checkbox") return `(CASE WHEN ${c} THEN 1 WHEN NOT ${c} THEN 0 ELSE NULL END)`;
@@ -210,4 +212,15 @@ export async function updateRowProps(db: Kysely<Database>, databaseId: string, n
   const sets = [sql.raw(`"updatedAt" = now()`)];
   for (const [key, value] of Object.entries(props)) sets.push(sql`${ident(key)} = ${value}`);
   await sql`UPDATE ${table(databaseId)} SET ${sql.join(sets, sql.raw(", "))} WHERE "noteId" = ${noteId}`.execute(db);
+}
+
+export async function getRowProps(db: Kysely<Database>, databaseId: string, noteId: string): Promise<Record<string, unknown>> {
+  const res = await sql`SELECT * FROM ${table(databaseId)} WHERE "noteId" = ${noteId}`.execute(db);
+  const raw = res.rows[0] as Record<string, unknown> | undefined;
+  if (!raw) return {};
+  const { noteId: id, createdAt, updatedAt, ...props } = raw;
+  void id;
+  void createdAt;
+  void updatedAt;
+  return props;
 }

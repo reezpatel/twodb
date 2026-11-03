@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { sql } from "kysely";
 import { db } from "../auth";
 import { requireOrgSession } from "../lib/session";
-import { defaultSchema, ensureDatabaseTable, insertRowProps } from "../lib/notes-tables";
+import { defaultSchema, ensureDatabaseTable, insertRowProps, updateRowProps } from "../lib/notes-tables";
 import {
   ancestors,
   detachedInlineSql,
@@ -16,6 +16,7 @@ import {
 } from "../lib/notes-nodes";
 import { readAssetBytesById, storeNoteAsset } from "../lib/assets";
 import { logger } from "../lib/logger";
+import { actorOf, hookErrorResponse, hooksFor, lockedParentOf, readOnlyResponse, runBeforeUpdate, snapshotRow, type HookContext } from "../lib/locked-databases";
 import type { NoteNodeUpdate } from "../plugins/db";
 
 /** Sidebar-facing shape: no content/schema payloads. */
@@ -222,12 +223,39 @@ export const notesRoutes = new Hono()
     }
     if (Object.keys(patch).length === 0) return c.json({ error: "empty_update" }, 400);
 
+    const lockedDb = await lockedParentOf(s.organizationId, node);
+    const hooks = lockedDb ? hooksFor(lockedDb) : null;
+    const ctx: HookContext | null = lockedDb ? { organizationId: s.organizationId, database: lockedDb, actor: actorOf(s) } : null;
+    let prev = null;
+    let extraProps: Record<string, unknown> = {};
+    if (lockedDb && hooks && ctx) {
+      if (patch.parentId !== undefined) return c.json({ error: "row_locked", lockedBy: lockedDb.schemaLockedBy }, 403);
+      if (hooks.rowsReadOnly && (patch.title !== undefined || patch.content !== undefined || patch.preview !== undefined)) return readOnlyResponse(c, lockedDb);
+      if (patch.title !== undefined && hooks.beforeUpdate) {
+        prev = await snapshotRow(lockedDb.id, node.id);
+        if (prev) {
+          try {
+            const next = await runBeforeUpdate(ctx, prev, { title: patch.title, props: {} });
+            if (next.title !== undefined) patch.title = next.title;
+            extraProps = next.props;
+          } catch (e) {
+            return hookErrorResponse(c, e);
+          }
+        }
+      }
+    }
+
     const row = await db
       .updateTable("note_node")
       .set({ ...patch, updatedAt: new Date() })
       .where("id", "=", node.id)
       .returningAll()
       .executeTakeFirstOrThrow();
+    if (lockedDb && hooks && ctx && prev) {
+      if (Object.keys(extraProps).length > 0) await updateRowProps(db, lockedDb.id, node.id, extraProps);
+      const next = await snapshotRow(lockedDb.id, node.id);
+      if (next) await hooks.afterUpdate?.(ctx, prev, next);
+    }
     return c.json(row);
   })
 
@@ -261,6 +289,23 @@ export const notesRoutes = new Hono()
     if (!s) return c.body(null, 401);
     const node = await getNode(s.organizationId, c.req.param("id"));
     if (!node) return c.json({ error: "node_not_found" }, 404);
+    const lockedDb = await lockedParentOf(s.organizationId, node);
+    const hooks = lockedDb ? hooksFor(lockedDb) : null;
+    if (lockedDb && hooks) {
+      if (hooks.rowsReadOnly) return readOnlyResponse(c, lockedDb);
+      const ctx: HookContext = { organizationId: s.organizationId, database: lockedDb, actor: actorOf(s) };
+      const snapshot = await snapshotRow(lockedDb.id, node.id);
+      if (snapshot) {
+        try {
+          await hooks.beforeDelete?.(ctx, snapshot);
+        } catch (e) {
+          return hookErrorResponse(c, e);
+        }
+        await softDelete(s.organizationId, node);
+        await hooks.afterDelete?.(ctx, snapshot);
+        return c.json({ ok: true });
+      }
+    }
     await softDelete(s.organizationId, node);
     return c.json({ ok: true });
   })
@@ -270,7 +315,14 @@ export const notesRoutes = new Hono()
     if (!s) return c.body(null, 401);
     const node = await getNode(s.organizationId, c.req.param("id"), { includeDeleted: true });
     if (!node) return c.json({ error: "node_not_found" }, 404);
+    const lockedDb = await lockedParentOf(s.organizationId, node);
+    const hooks = lockedDb ? hooksFor(lockedDb) : null;
+    if (lockedDb && hooks?.rowsReadOnly) return readOnlyResponse(c, lockedDb);
     await restore(s.organizationId, node);
+    if (lockedDb && hooks?.afterRestore) {
+      const snapshot = await snapshotRow(lockedDb.id, node.id);
+      if (snapshot) await hooks.afterRestore({ organizationId: s.organizationId, database: lockedDb, actor: actorOf(s) }, snapshot);
+    }
     return c.json({ ok: true });
   })
 

@@ -17,6 +17,7 @@ import {
   updateRowProps,
 } from "../lib/notes-tables";
 import { getNode, nextPosition, softDelete } from "../lib/notes-nodes";
+import { actorOf, hookErrorResponse, hooksFor, readOnlyResponse, runBeforeInsert, runBeforeUpdate, snapshotRow, type HookContext } from "../lib/locked-databases";
 
 const VIEW_TYPES = new Set<NoteViewType>(["table", "list", "kanban"]);
 
@@ -91,6 +92,7 @@ function validateProps(columns: NotePropertyDef[], props: unknown): { ok: true; 
       case "id":
       case "place":
       case "person":
+      case "relation":
       case "files & media":
         if (typeof value !== "string") return { ok: false, error: `invalid_value:${key}` };
         if ((col.type === "select" || col.type === "status") && (col.options?.length ?? 0) > 0 && !col.options!.some((o) => o.value === value)) {
@@ -174,10 +176,21 @@ export const notesContentRoutes = new Hono()
     const database = await requireDatabase(s.organizationId, c.req.param("id"));
     if (!database) return c.json({ error: "database_not_found" }, 404);
 
+    const hooks = hooksFor(database);
+    if (hooks?.rowsReadOnly) return readOnlyResponse(c, database);
+
     const schema = await ensureInitialized(database);
     const body = await c.req.json().catch(() => null);
     const checked = validateProps(schema.columns, body?.props);
     if (!checked.ok) return c.json({ error: checked.error }, 400);
+
+    const ctx: HookContext = { organizationId: s.organizationId, database, actor: actorOf(s) };
+    let draft = { title: typeof body?.title === "string" ? body.title.slice(0, 200) : "", props: checked.values };
+    try {
+      draft = await runBeforeInsert(ctx, draft);
+    } catch (e) {
+      return hookErrorResponse(c, e);
+    }
 
     const now = new Date();
     const noteId = crypto.randomUUID();
@@ -188,7 +201,7 @@ export const notesContentRoutes = new Hono()
         organizationId: s.organizationId,
         parentId: database.id,
         kind: "page",
-        title: typeof body?.title === "string" ? body.title.slice(0, 200) : "",
+        title: draft.title,
         content: (body?.content as Record<string, unknown>) ?? { doc: { type: "doc", content: [] } },
         preview: typeof body?.preview === "string" ? body.preview.slice(0, 200) : "",
         position: await nextPosition(s.organizationId, database.id),
@@ -196,7 +209,8 @@ export const notesContentRoutes = new Hono()
         updatedAt: now,
       })
       .execute();
-    await insertRowProps(db, database.id, noteId, checked.values);
+    await insertRowProps(db, database.id, noteId, draft.props);
+    await hooks?.afterInsert?.(ctx, { noteId, title: draft.title, props: draft.props });
     return c.json({ noteId }, 201);
   })
 
@@ -207,6 +221,8 @@ export const notesContentRoutes = new Hono()
     if (!database) return c.json({ error: "database_not_found" }, 404);
     const row = await requireRow(s.organizationId, database.id, c.req.param("rowId"));
     if (!row) return c.json({ error: "row_not_found" }, 404);
+    const hooks = hooksFor(database);
+    if (hooks?.rowsReadOnly) return readOnlyResponse(c, database);
 
     const schema = await ensureInitialized(database);
     const body = await c.req.json().catch(() => null);
@@ -214,6 +230,18 @@ export const notesContentRoutes = new Hono()
     if (body.title !== undefined && typeof body.title !== "string") return c.json({ error: "invalid_title" }, 400);
     const checked = validateProps(schema.columns, body.props);
     if (!checked.ok) return c.json({ error: checked.error }, 400);
+
+    const ctx: HookContext = { organizationId: s.organizationId, database, actor: actorOf(s) };
+    const prev = hooks ? await snapshotRow(database.id, row.id) : null;
+    if (hooks?.beforeUpdate && prev) {
+      try {
+        const next = await runBeforeUpdate(ctx, prev, { ...(body.title !== undefined ? { title: String(body.title).slice(0, 200) } : {}), props: checked.values });
+        if (next.title !== undefined) body.title = next.title;
+        checked.values = next.props;
+      } catch (e) {
+        return hookErrorResponse(c, e);
+      }
+    }
 
     const patch: NoteNodeUpdate = {};
     if (body.title !== undefined) patch.title = String(body.title).slice(0, 200);
@@ -224,9 +252,13 @@ export const notesContentRoutes = new Hono()
     if (Object.keys(patch).length > 0) {
       await db.updateTable("note_node").set({ ...patch, updatedAt: new Date() }).where("id", "=", row.id).execute();
     }
-    if (body.props !== undefined && Object.keys(checked.values).length > 0) {
+    if (Object.keys(checked.values).length > 0) {
       await insertRowProps(db, database.id, row.id, {});
       await updateRowProps(db, database.id, row.id, checked.values);
+    }
+    if (hooks?.afterUpdate && prev) {
+      const next = await snapshotRow(database.id, row.id);
+      if (next) await hooks.afterUpdate(ctx, prev, next);
     }
     return c.json({ ok: true });
   })
@@ -239,7 +271,19 @@ export const notesContentRoutes = new Hono()
     if (!database) return c.json({ error: "database_not_found" }, 404);
     const row = await requireRow(s.organizationId, database.id, c.req.param("rowId"));
     if (!row) return c.json({ error: "row_not_found" }, 404);
+    const hooks = hooksFor(database);
+    if (hooks?.rowsReadOnly) return readOnlyResponse(c, database);
+    const ctx: HookContext = { organizationId: s.organizationId, database, actor: actorOf(s) };
+    const snapshot = hooks ? await snapshotRow(database.id, row.id) : null;
+    if (hooks?.beforeDelete && snapshot) {
+      try {
+        await hooks.beforeDelete(ctx, snapshot);
+      } catch (e) {
+        return hookErrorResponse(c, e);
+      }
+    }
     await softDelete(s.organizationId, row);
+    if (snapshot) await hooks?.afterDelete?.(ctx, snapshot);
     return c.json({ ok: true });
   })
 
@@ -255,7 +299,7 @@ export const notesContentRoutes = new Hono()
     const name = typeof body?.name === "string" ? body.name.trim() : "";
     const type = body?.type;
     if (!name) return c.json({ error: "invalid_name" }, 400);
-    if (typeof type !== "string" || !PROPERTY_TYPES.includes(type as NotePropertyType)) return c.json({ error: "invalid_type" }, 400);
+    if (typeof type !== "string" || !PROPERTY_TYPES.includes(type as NotePropertyType) || type === "relation") return c.json({ error: "invalid_type" }, 400);
 
     const options = parseOptions(body?.options);
     if ((type === "select" || type === "multiselect") && options !== undefined && new Set(options.map((o) => o.value)).size !== options.length) {
@@ -296,7 +340,7 @@ export const notesContentRoutes = new Hono()
       def.name = name;
     }
     if (body?.type !== undefined) {
-      if (typeof body.type !== "string" || !PROPERTY_TYPES.includes(body.type as NotePropertyType)) return c.json({ error: "invalid_type" }, 400);
+      if (typeof body.type !== "string" || !PROPERTY_TYPES.includes(body.type as NotePropertyType) || body.type === "relation") return c.json({ error: "invalid_type" }, 400);
       const to = body.type as NotePropertyType;
       if (to !== def.type) {
         logger.info({ id: propId, from: def.type, to }, "notes: property type change");

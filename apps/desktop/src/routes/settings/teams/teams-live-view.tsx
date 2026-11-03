@@ -84,9 +84,18 @@ export function TeamsLiveView({ account, onClose }: { account: TeamsAccount; onC
         ref={(el) => el?.focus()}
       >
         {frame ? (
-          <img ref={imgRef} src={frame} alt={`${account.label} browser screen`} className="h-full w-full cursor-crosshair object-contain" onClick={onClick} draggable={false} />
+          <img
+            ref={imgRef}
+            src={frame}
+            alt={`${account.label} browser screen`}
+            className="h-full w-full cursor-crosshair object-contain"
+            onClick={onClick}
+            draggable={false}
+          />
         ) : (
-          <div className="text-muted-foreground flex h-full items-center justify-center text-sm">{error ? "Screen unavailable." : "Connecting to the browser session…"}</div>
+          <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+            {error ? "Screen unavailable." : "Connecting to the browser session…"}
+          </div>
         )}
       </div>
       <p className="text-muted-foreground text-xs">Click the screen to interact. Keystrokes go to the browser while this panel has focus.</p>

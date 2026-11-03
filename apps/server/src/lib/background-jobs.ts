@@ -157,6 +157,7 @@ export async function listJobs(sessionId: string) {
     .selectFrom("code_session_job")
     .select(["id", "command", "status", "exitCode", "logPath", "createdAt", "finishedAt"])
     .where("sessionId", "=", sessionId)
+    .where("hiddenAt", "is", null)
     .orderBy("createdAt", "desc")
     .execute();
   return rows.map((r) => ({
@@ -185,6 +186,7 @@ export async function formatJobStatuses(sessionId: string): Promise<string> {
     .selectFrom("code_session_job")
     .selectAll()
     .where("sessionId", "=", sessionId)
+    .where("hiddenAt", "is", null)
     .orderBy("createdAt", "asc")
     .execute();
   if (rows.length === 0) return "no background jobs in this session";
@@ -217,4 +219,26 @@ export async function reconcileOrphanJobs() {
       .execute();
     logger.warn({ sessionId: row.sessionId, jobId: row.id }, "background job marked lost (server restarted while it ran)");
   }
+}
+
+/**
+ * /new and /compact start a fresh context: stop whatever is still running and
+ * hide every job from the panel. Rows are kept (logs, transcript references).
+ * Running jobs are flipped to "killed" BEFORE the signal so the exit watcher
+ * (finishJob only writes while status = running) doesn't post a message into
+ * the new context.
+ */
+export async function retireSessionJobs(sessionId: string): Promise<void> {
+  const rows = await db.selectFrom("code_session_job").select(["id", "runnerId", "status"]).where("sessionId", "=", sessionId).where("hiddenAt", "is", null).execute();
+  if (rows.length === 0) return;
+  const now = new Date();
+  // Running → killed first (see above), then hide the lot.
+  await db.updateTable("code_session_job").set({ status: "killed", finishedAt: now }).where("sessionId", "=", sessionId).where("hiddenAt", "is", null).where("status", "=", "running").execute();
+  await db.updateTable("code_session_job").set({ hiddenAt: now }).where("sessionId", "=", sessionId).where("hiddenAt", "is", null).execute();
+  await Promise.all(
+    rows
+      .filter((r) => r.status === "running")
+      .map((r) => runnerManager.killJob(r.runnerId, r.id).catch((err) => logger.warn({ err, jobId: r.id }, "retire: kill failed"))),
+  );
+  await broadcastToSession(sessionId, { type: "jobs", jobs: await listJobs(sessionId) });
 }

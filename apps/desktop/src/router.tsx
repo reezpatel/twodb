@@ -13,7 +13,6 @@ import { ChatPanel } from "./routes/code/chat/chat-panel";
 import { SettingsLayout } from "./routes/settings/settings-layout";
 import { GeneralSection } from "./routes/settings/general/general";
 import { AdministratorSection } from "./routes/settings/administrator/administrator";
-import { LlmLayout } from "./routes/settings/llm/llm";
 import { ConnectionsSection } from "./routes/settings/llm/connections/connections";
 import { SkillsSection } from "./routes/settings/llm/skills/skills";
 import { AgentsSection } from "./routes/settings/llm/agents/agents";
@@ -31,6 +30,7 @@ import { LogsSection } from "./routes/settings/logs/logs";
 import { FilesScene } from "./routes/files/files-scene";
 import { NotesScene } from "./routes/notes/notes-scene";
 import { DatabasesScene } from "./routes/notes/databases-scene";
+import { InventoryScene } from "./routes/inventory/inventory-scene";
 import { EmailScene } from "./routes/email/email-scene";
 import { ContactsScene } from "./routes/contacts/contacts-scene";
 import { ChatScene } from "./routes/chat/chat-scene";
@@ -76,7 +76,6 @@ export const router = createBrowserRouter([
           { path: "administrator", Component: AdministratorSection },
           {
             path: "llm",
-            Component: LlmLayout,
             children: [
               { index: true, element: <Navigate to="connections" replace /> },
               { path: "connections", Component: ConnectionsSection },
@@ -141,6 +140,7 @@ export const router = createBrowserRouter([
       { path: "/apps/notes/:nodeId", Component: NotesScene },
       { path: "/apps/notes/:nodeId/:rowId", Component: NotesScene },
       { path: "/apps/files", Component: FilesScene },
+      { path: "/apps/inventory", Component: InventoryScene },
       { path: "/apps/:appId", Component: AppPage },
     ],
   },

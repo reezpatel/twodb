@@ -5,6 +5,7 @@ import { resolveSpaceIds, validateSpaceId, getDirectorySpaceId } from "../lib/sp
 import { getCodeSettings, setCodeSettings, type CodeSettingsPatch } from "../lib/code-settings";
 import { parseTags, syncLlmTags } from "../lib/llm-tags";
 import { enabledRepoSources, listRepoSkills, readRepoSkill } from "../lib/skills";
+import { retireSessionWork } from "../lib/session-retire";
 import { codeCompactionStore, NothingToCompactError, runCompaction } from "../lib/compaction";
 import { fetchSessionMessageWindow, fetchSessionMessages, messageCursor } from "../lib/message-window";
 import { readAssetBytesById, storeAsset } from "../lib/assets";
@@ -1141,6 +1142,7 @@ export const codeRoutes = new Hono()
         store: codeCompactionStore(session, connection, model, s.organizationId),
       });
       // Sockets viewing this session refetch; the compaction row renders as a block.
+      await retireSessionWork(session.id);
       broadcastToSession(session.id, { type: "compaction_done", message: row });
       return c.json(row, 201);
     } catch (e) {
@@ -1234,6 +1236,7 @@ export const codeRoutes = new Hono()
       .executeTakeFirstOrThrow();
     await db.updateTable("code_session").set({ updatedAt: new Date() }).where("id", "=", session.id).execute();
 
+    await retireSessionWork(session.id);
     broadcastToSession(session.id, { type: "clear_done", message: row });
     return c.json(row, 201);
   })

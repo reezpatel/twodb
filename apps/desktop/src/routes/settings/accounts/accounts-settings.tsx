@@ -1,14 +1,14 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router";
-import { AlertTriangle, CheckCircle2, Download, Loader2, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, Loader2, ShieldAlert, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { EmailAccount } from "../../email/email-api";
-import { AccountRow } from "./account-row";
+import { SettingsAccounts } from "@/components/blocks/settings/accounts/settings-accounts";
+import { SettingsSpamRules } from "@/components/blocks/settings/accounts/settings-spam-rules";
+import { toSettingsAccount } from "./to-settings-account";
 import { AddAccountDialog } from "./add-account-dialog";
 import { EditAccountDialog } from "./edit-account-dialog";
 import { OAuthClientCard } from "./oauth-client-card";
@@ -35,14 +35,7 @@ export function AccountsSection() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">Accounts</h1>
-        <p className="text-muted-foreground text-sm">
-          Connected logins for mail and calendar. Everything is copied into twodb; each account keeps its own contacts.
-        </p>
-      </div>
-
+    <div className="flex max-w-3xl flex-col gap-4">
       {s.oauthNotice ? (
         <Alert variant={s.oauthNotice.ok ? "default" : "destructive"}>
           {s.oauthNotice.ok ? <CheckCircle2 /> : <AlertTriangle />}
@@ -71,89 +64,69 @@ export function AccountsSection() {
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div className="flex flex-col gap-1.5">
-            <CardTitle>Connected accounts</CardTitle>
-            <CardDescription>
-              Google, Microsoft, iCloud, Fastmail, Yahoo, Nextcloud or any IMAP/CalDAV server. Private by default; sharing an account shares its mail, calendars
-              and contacts.
-            </CardDescription>
-          </div>
-          <Button onClick={() => setAdding(true)} disabled={!meta}>
-            <Plus /> Add account
-          </Button>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          {s.accounts.isLoading ? <Loader2 className="text-muted-foreground animate-spin" /> : null}
-          {!s.accounts.isLoading && !accounts.length ? <p className="text-muted-foreground py-6 text-center text-sm">No accounts connected yet.</p> : null}
-          {accounts.map((a) => (
-            <AccountRow
-              key={a.id}
-              account={a}
-              testResult={testResult[a.id]}
-              onToggleCapability={(capability, on) =>
-                s.setCapabilities.mutate({
-                  account: a,
-                  capabilities: on ? [...new Set([...a.capabilities, capability])] : a.capabilities.filter((c) => c !== capability),
-                })
-              }
-              onSync={() => s.syncNow.mutate(a)}
-              onTest={() => void runTest(a)}
-              onEdit={() => setEditing(a)}
-              onShare={() => setSharing(a)}
-              onReconnect={() => a.kind !== "imap" && s.oauth.mutate({ provider: a.kind, capabilities: a.capabilities, accountId: a.id })}
-              onImport={() => {
-                setImportFor(a.id);
-                importRef.current?.click();
-              }}
-              onRemove={() => setDeleting(a)}
-              onBackfill={(op) => s.backfill.mutate({ id: a.id, op })}
-            />
-          ))}
-          {s.setCapabilities.error ? <p className="text-destructive text-xs">{s.setCapabilities.error.message}</p> : null}
-          {s.importEml.data ? (
-            <p className="text-muted-foreground text-xs">
-              <Download size={12} className="mr-1 inline" />
-              Imported {s.importEml.data.inserted} message(s).
-            </p>
-          ) : null}
-          {s.importEml.error ? <p className="text-destructive text-xs">{s.importEml.error.message}</p> : null}
-          <input
-            ref={importRef}
-            type="file"
-            accept=".eml,message/rfc822"
-            multiple
-            hidden
-            onChange={(e) => {
-              const files = [...(e.target.files ?? [])];
-              if (importFor && files.length) s.importEml.mutate({ id: importFor, files });
-              e.target.value = "";
-            }}
-          />
-        </CardContent>
-      </Card>
+      <SettingsAccounts
+        accounts={accounts.map((a) => toSettingsAccount(a, testResult[a.id]))}
+        loading={s.accounts.isLoading}
+        note="Google, Microsoft, iCloud, Fastmail, Yahoo, Nextcloud or any IMAP/CalDAV server. Private by default; sharing an account shares its mail, calendars and contacts."
+        onAdd={meta ? () => setAdding(true) : undefined}
+        onToggleCapability={(id, capability, on) => {
+          const a = accounts.find((x) => x.id === id);
+          if (a)
+            s.setCapabilities.mutate({
+              account: a,
+              capabilities: on ? [...new Set([...a.capabilities, capability])] : a.capabilities.filter((c) => c !== capability),
+            });
+        }}
+        onSync={(id) => {
+          const a = accounts.find((x) => x.id === id);
+          if (a) s.syncNow.mutate(a);
+        }}
+        onTest={(id) => {
+          const a = accounts.find((x) => x.id === id);
+          if (a) void runTest(a);
+        }}
+        onEdit={(id) => setEditing(accounts.find((x) => x.id === id) ?? null)}
+        onShare={(id) => setSharing(accounts.find((x) => x.id === id) ?? null)}
+        onReconnect={(id) => {
+          const a = accounts.find((x) => x.id === id);
+          if (!a) return;
+          // Password (IMAP) accounts re-enter credentials in the edit dialog; OAuth ones go back through the provider.
+          if (a.kind === "imap") setEditing(a);
+          else s.oauth.mutate({ provider: a.kind, capabilities: a.capabilities, accountId: a.id });
+        }}
+        onImport={(id) => {
+          setImportFor(id);
+          importRef.current?.click();
+        }}
+        onRemove={(id) => setDeleting(accounts.find((x) => x.id === id) ?? null)}
+        onTogglePause={(id, paused) => s.backfill.mutate({ id, op: paused ? "pause" : "resume" })}
+        footer={
+          <>
+            {s.setCapabilities.error ? <p className="text-destructive text-xs">{s.setCapabilities.error.message}</p> : null}
+            {s.importEml.data ? (
+              <p className="text-muted-foreground text-xs">
+                <Download size={12} className="mr-1 inline" />
+                Imported {s.importEml.data.inserted} message(s).
+              </p>
+            ) : null}
+            {s.importEml.error ? <p className="text-destructive text-xs">{s.importEml.error.message}</p> : null}
+          </>
+        }
+      />
+      <input
+        ref={importRef}
+        type="file"
+        accept=".eml,message/rfc822"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])];
+          if (importFor && files.length) s.importEml.mutate({ id: importFor, files });
+          e.target.value = "";
+        }}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Spam rules</CardTitle>
-          <CardDescription>Senders and domains you chose to always route to Spam. Applied locally to newly synced mail.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-1.5">
-          {!(s.senderRules.data ?? []).length ? (
-            <p className="text-muted-foreground text-sm">No rules yet — use "Always send to Spam" when marking mail as spam.</p>
-          ) : null}
-          {(s.senderRules.data ?? []).map((r) => (
-            <div key={r.id} className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
-              <Badge variant="outline">{r.matchType}</Badge>
-              <span className="flex-1 truncate font-mono text-xs">{r.matchType === "domain" ? `@${r.value}` : r.value}</span>
-              <Button variant="ghost" size="icon-xs" aria-label="Delete rule" onClick={() => s.removeRule.mutate(r.id)}>
-                <Trash2 />
-              </Button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <SettingsSpamRules rules={s.senderRules.data ?? []} onDelete={(id) => s.removeRule.mutate(id)} />
 
       {meta?.isAdmin ? (
         <>
