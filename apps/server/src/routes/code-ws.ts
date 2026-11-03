@@ -218,6 +218,14 @@ function sendRunState(run: ActiveRun, ws: WSContext, sessionId: string) {
   }
 }
 
+/** Aborts a live run (no-op when idle). Returns true if one was running. */
+export function abortSessionRun(sessionId: string): boolean {
+  const run = activeRuns.get(sessionId);
+  if (!run) return false;
+  run.controller.abort();
+  return true;
+}
+
 /** True while an agent loop is live on the session — compaction must not race it. */
 export function isSessionRunning(sessionId: string): boolean {
   return activeRuns.has(sessionId);

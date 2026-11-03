@@ -6,6 +6,7 @@ import { MultiSelectCellDisplay, MultiSelectCellEdit } from "./multi-select-cell
 import { DateCellDisplay, DateCellEdit } from "./date-cell";
 import { CheckboxCellDisplay } from "./checkbox-cell";
 import { MediaCellDisplay, MediaCellSidebarView } from "./media-cell";
+import { RelationCellDisplay, RelationCellEdit } from "./relation-cell";
 
 /** Dispatch to the right per-type display cell based on `prop.type`. */
 export function CellDisplayFor(props: CellDisplayProps) {
@@ -23,6 +24,8 @@ export function CellDisplayFor(props: CellDisplayProps) {
       return <DateCellDisplay {...props} />;
     case "media":
       return <MediaCellDisplay {...props} />;
+    case "relation":
+      return <RelationCellDisplay {...props} />;
     case "text":
     case "url":
     case "phone":
@@ -46,6 +49,8 @@ export function CellEditFor(props: CellEditProps) {
       // Media is display-only for now (thumbnails); editing comes with the
       // upload/picker UX.
       return null;
+    case "relation":
+      return <RelationCellEdit {...props} />;
     case "select":
     case "status":
       return <SingleSelectCellEdit {...props} />;

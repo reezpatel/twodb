@@ -183,6 +183,11 @@ export const notificationRoutes = new Hono()
   .delete("/settings", async (c) => {
     const s = await requireOrgSession(c);
     if (!s?.session) return c.json({ error: "unauthorized" }, 401);
+    // ?all=1 — drop every saved choice for this user so everything inherits the defaults again.
+    if (c.req.query("all") === "1") {
+      await db.deleteFrom("notification_preference").where("organizationId", "=", s.organizationId).where("userId", "=", s.session.user.id).execute();
+      return c.json({ ok: true });
+    }
     const groupId = c.req.query("group");
     const typeId = c.req.query("type");
     if (!groupId) return c.json({ error: "invalid_group" }, 400);

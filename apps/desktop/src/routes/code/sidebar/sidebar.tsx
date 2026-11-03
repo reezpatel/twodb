@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Bot, Circle, Flag, Folder, GitBranch, Link, Loader2, Tag, User, X } from "lucide-react";
+import { Circle, Flag, Folder, GitBranch, Link, Tag, User } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import { CodeMemories, type CodeMemory, type CodeMemoryGroup } from "@/components/blocks/code/code-sidebar/code-memories";
+import { CodeBackgroundJobs, type CodeBackgroundJob } from "@/components/blocks/code/code-sidebar/code-background-jobs";
+import { CodeSubagents, type CodeSubagent } from "@/components/blocks/code/code-sidebar/code-subagents";
 import { CodeSidebarSection } from "@/components/blocks/code/code-sidebar/code-sidebar-section";
 import {
   CodeCommit,
@@ -106,7 +107,15 @@ function useSidebarJobs() {
     // refetch is cheap and heals any missed frame.
     refetchOnWindowFocus: true,
   });
-  return { jobs: jobs.data ?? [], isPending: jobs.isPending };
+  const stop = useMutation({
+    mutationFn: (jobId: string) => api(`/api/code/sessions/${sessionId}/jobs/${jobId}/kill`, { method: "POST" }),
+  });
+  return {
+    jobs: jobs.data ?? [],
+    isPending: jobs.isPending,
+    stop: (jobId: string) => stop.mutate(jobId),
+    stoppingId: stop.isPending ? (stop.variables ?? null) : null,
+  };
 }
 
 /** Logs for one background job — expands inside the row. Polls while running. */
@@ -126,63 +135,32 @@ function JobLogs({ sessionId, jobId, running }: { sessionId: string; jobId: stri
   );
 }
 
-function JobRow({ job }: { job: BackgroundJob }) {
-  const { session } = useChat();
-  const sessionId = session.data?.id ?? null;
-  const [logsOpen, setLogsOpen] = useState(false);
-  const kill = useMutation({
-    mutationFn: () => api(`/api/code/sessions/${sessionId}/jobs/${job.id}/kill`, { method: "POST" }),
-  });
-  const running = job.status === "running";
-  const icon = running ? (
-    <Loader2 size={12} className="text-primary shrink-0 animate-spin" aria-hidden="true" />
-  ) : (
-    <Circle
-      size={12}
-      className={cn(
-        "shrink-0",
-        job.status === "done" && "text-success",
-        job.status === "failed" && "text-destructive",
-        (job.status === "lost" || job.status === "killed") && "text-muted-foreground",
-      )}
-      aria-hidden="true"
-    />
-  );
-  return (
-    <div className="bg-muted/40 w-full rounded-md border text-left text-xs">
-      <button
-        className="hover:bg-accent/50 flex w-full items-start gap-2 rounded-md px-2 py-1.5"
-        onClick={() => setLogsOpen((v) => !v)}
-        title={logsOpen ? "Hide logs" : "Show logs"}
-      >
-        {icon}
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-mono text-[11px]" title={job.command}>
-            {job.command}
-          </span>
-          <span className="text-muted-foreground block font-mono text-[10px]">
-            {job.id.slice(0, 8)} · {job.status}
-            {job.exitCode !== null && ` · exit ${job.exitCode}`}
-          </span>
-        </span>
-        {running && (
-          <span
-            role="button"
-            className="text-muted-foreground hover:bg-accent hover:text-foreground shrink-0 rounded p-1"
-            title="Stop job"
-            aria-label="Stop job"
-            onClick={(e) => {
-              e.stopPropagation();
-              kill.mutate();
-            }}
-          >
-            {kill.isPending ? <Loader2 size={11} className="animate-spin" aria-hidden="true" /> : <X size={11} aria-hidden="true" />}
-          </span>
-        )}
-      </button>
-      {logsOpen && sessionId && <JobLogs sessionId={sessionId} jobId={job.id} running={running} />}
-    </div>
-  );
+/** Subagents and jobs as block items; the logs tail is fetched only while a row is expanded. */
+function toSubagentItems(children: ReturnType<typeof useSidebarSubagents>["children"]): CodeSubagent[] {
+  return children.map((child) => ({
+    id: child.id,
+    title: child.title,
+    status: child.locked ? "closed" : child.running ? "running" : "idle",
+    detail: `depth ${child.depthCount} · ${child.locked ? "closed" : child.running ? "running" : "idle"}${child.interactive ? "" : " · headless"}`,
+  }));
+}
+
+const JOB_STATUS: Record<BackgroundJob["status"], CodeBackgroundJob["status"]> = {
+  running: "running",
+  done: "done",
+  failed: "failed",
+  killed: "stopped",
+  lost: "stopped",
+};
+
+function toJobItems(jobs: BackgroundJob[], stoppingId: string | null): CodeBackgroundJob[] {
+  return jobs.map((job) => ({
+    id: job.id,
+    command: job.command,
+    status: JOB_STATUS[job.status],
+    detail: `${job.id.slice(0, 8)} · ${job.status}${job.exitCode !== null ? ` · exit ${job.exitCode}` : ""}`,
+    stopping: stoppingId === job.id,
+  }));
 }
 
 /** Child sessions (subagents + /btw) of the current session, with live running
@@ -235,6 +213,7 @@ export function Sidebar() {
   const subagents = useSidebarSubagents();
   const backgroundJobs = useSidebarJobs();
   const { openBtwSession, session } = useChat();
+  const sessionId = session.data?.id ?? null;
   const planSteps = (session.data?.plan as { steps?: { description: string; status: string }[] } | null | undefined)?.steps ?? [];
   const planItems: CodePlanItem[] = planSteps.map((step, index) => ({ id: String(index), title: step.description, status: toPlanStatus(step.status) }));
 
@@ -249,29 +228,7 @@ export function Sidebar() {
           {subagents.isPending ? (
             <div className="text-muted-foreground py-1 text-xs">loading…</div>
           ) : (
-            <div className="flex flex-col gap-1">
-              {subagents.children.map((child) => (
-                <button
-                  key={child.id}
-                  className="bg-muted/40 hover:bg-accent/50 flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition-colors"
-                  onClick={() => openBtwSession(child.id)}
-                  title="Open the session — live while it runs"
-                >
-                  {child.running ? (
-                    <Loader2 size={12} className="text-primary shrink-0 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Bot size={12} className="text-muted-foreground shrink-0" aria-hidden="true" />
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{child.title}</span>
-                    <span className="text-muted-foreground block font-mono text-[10px]">
-                      d{child.depthCount} · {child.locked ? "closed" : child.running ? "running" : "idle"}
-                      {!child.interactive && " · headless"}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
+            <CodeSubagents subagents={toSubagentItems(subagents.children)} onSelect={openBtwSession} />
           )}
         </CodeSidebarSection>
       )}
@@ -285,11 +242,11 @@ export function Sidebar() {
           {backgroundJobs.isPending ? (
             <div className="text-muted-foreground py-1 text-xs">loading…</div>
           ) : (
-            <div className="flex flex-col gap-1">
-              {backgroundJobs.jobs.map((job) => (
-                <JobRow key={job.id} job={job} />
-              ))}
-            </div>
+            <CodeBackgroundJobs
+              jobs={toJobItems(backgroundJobs.jobs, backgroundJobs.stoppingId)}
+              onStop={backgroundJobs.stop}
+              renderLogs={(job) => (sessionId ? <JobLogs sessionId={sessionId} jobId={job.id} running={job.status === "running"} /> : null)}
+            />
           )}
         </CodeSidebarSection>
       )}

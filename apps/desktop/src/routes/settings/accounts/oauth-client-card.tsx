@@ -1,12 +1,4 @@
-import { useState } from "react";
-import { useForm } from "@tanstack/react-form";
-import { AlertTriangle, CheckCircle2, Copy, KeyRound, Loader2 } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { SettingsOAuthClient } from "@/components/blocks/settings/accounts/settings-oauth-client";
 import type { EmailMeta } from "../../email/email-api";
 import { useOAuthClientForm, type OAuthProvider } from "./use-accounts-settings";
 
@@ -50,110 +42,35 @@ export function OAuthClientCard({ provider, meta }: { provider: OAuthProvider; m
   const info = provider === "google" ? meta.gmail : meta.microsoft;
   const copy = COPY[provider];
   const { save, clear } = useOAuthClientForm(provider);
-  const [copied, setCopied] = useState(false);
-  const form = useForm({
-    defaultValues: { clientId: info.clientId, clientSecret: "", tenant: provider === "microsoft" ? meta.microsoft.tenant : "" },
-    onSubmit: async ({ value }) => {
-      await save.mutateAsync(provider === "microsoft" ? value : { clientId: value.clientId, clientSecret: value.clientSecret });
-      form.setFieldValue("clientSecret", "");
-    },
-  });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <KeyRound size={16} /> {copy.title}
-          {info.configured ? <Badge variant="success">configured</Badge> : <Badge variant="secondary">not configured</Badge>}
-        </CardTitle>
-        <CardDescription>{copy.description}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <ol className="text-muted-foreground list-decimal space-y-1 pl-5 text-xs leading-relaxed">
-          {copy.steps.map((step, i) => (
-            <li key={i}>{step}</li>
-          ))}
-        </ol>
-        {provider === "google" ? (
-          <Alert>
-            <AlertTriangle />
-            <AlertTitle>Publish the app to "In production"</AlertTitle>
-            <AlertDescription className="text-xs">
-              While the consent screen is in <em>Testing</em>, Google expires refresh tokens after 7 days and accounts need reconnecting. An unverified
-              production app shows a warning screen and is limited to 100 users — fine for self-hosting.
-            </AlertDescription>
-          </Alert>
-        ) : null}
-        <div className="flex flex-col gap-2">
-          <Label>Redirect URI</Label>
-          <div className="flex gap-2">
-            <Input readOnly value={info.redirectUri} className="font-mono text-xs" />
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Copy redirect URI"
-              onClick={() => {
-                void navigator.clipboard.writeText(info.redirectUri);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              }}
-            >
-              {copied ? <CheckCircle2 /> : <Copy />}
-            </Button>
-          </div>
-        </div>
-        <form
-          className="grid grid-cols-2 gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void form.handleSubmit();
-          }}
-        >
-          <form.Field name="clientId">
-            {(field) => (
-              <div className="flex flex-col gap-2">
-                <Label htmlFor={`${provider}-client-id`}>Client ID</Label>
-                <Input id={`${provider}-client-id`} value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} />
-              </div>
-            )}
-          </form.Field>
-          <form.Field name="clientSecret">
-            {(field) => (
-              <div className="flex flex-col gap-2">
-                <Label htmlFor={`${provider}-client-secret`}>Client secret</Label>
-                <Input
-                  id={`${provider}-client-secret`}
-                  type="password"
-                  placeholder={info.configured ? "•••••••• (unchanged)" : ""}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-              </div>
-            )}
-          </form.Field>
-          {provider === "microsoft" ? (
-            <form.Field name="tenant">
-              {(field) => (
-                <div className="col-span-2 flex flex-col gap-2">
-                  <Label htmlFor="microsoft-tenant">Tenant</Label>
-                  <Input id="microsoft-tenant" placeholder="common" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} />
-                </div>
-              )}
-            </form.Field>
-          ) : null}
-          <div className="col-span-2 flex items-center gap-2">
-            {save.error ? <span className="text-destructive text-xs">{save.error.message}</span> : null}
-            {info.configured ? (
-              <Button type="button" variant="ghost" className="ml-auto" disabled={clear.isPending} onClick={() => clear.mutate()}>
-                Remove
-              </Button>
-            ) : null}
-            <Button type="submit" className={info.configured ? undefined : "ml-auto"} disabled={save.isPending}>
-              {save.isPending ? <Loader2 className="animate-spin" /> : null} Save client
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+    <SettingsOAuthClient
+      title={copy.title}
+      description={copy.description}
+      steps={copy.steps}
+      warning={
+        provider === "google"
+          ? {
+              title: 'Publish the app to "In production"',
+              body: "While the consent screen is in Testing, Google expires refresh tokens after 7 days and accounts need reconnecting. An unverified production app shows a warning screen and is limited to 100 users — fine for self-hosting.",
+            }
+          : undefined
+      }
+      configured={info.configured}
+      redirectUri={info.redirectUri}
+      clientId={info.clientId}
+      tenant={provider === "microsoft" ? meta.microsoft.tenant : ""}
+      showTenant={provider === "microsoft"}
+      onSave={(v) =>
+        save
+          .mutateAsync(provider === "microsoft" ? v : { clientId: v.clientId, clientSecret: v.clientSecret })
+          .then(() => true)
+          .catch(() => false)
+      }
+      saving={save.isPending}
+      onRemove={() => clear.mutate()}
+      removing={clear.isPending}
+      error={save.error?.message ?? null}
+    />
   );
 }

@@ -19,6 +19,7 @@ export const NOTE_PROPERTY_TYPES = [
   "email",
   "id",
   "place",
+  "relation",
 ] as const;
 export type NotePropertyType = (typeof NOTE_PROPERTY_TYPES)[number];
 
@@ -55,6 +56,8 @@ export interface NoteProperty {
   type: NotePropertyType;
   options?: NotePropertyOption[];
   validation?: { required?: boolean } & Record<string, unknown>;
+  /** `relation` properties: the database whose rows this property points to. */
+  relation?: { databaseId: string };
 }
 
 export interface NoteView {

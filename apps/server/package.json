@@ -7,7 +7,8 @@
     "dev": "tsx watch --env-file=../../.env src/index.ts",
     "build": "tsc --noEmit",
     "start": "tsx src/index.ts",
-    "migrate": "tsx src/run-migrations.ts"
+    "migrate": "tsx src/run-migrations.ts",
+    "test": "tsx --test src/lib/*.test.ts"
   },
   "dependencies": {
     "@twodb/runner-core": "workspace:*",

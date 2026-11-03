@@ -52,6 +52,7 @@ import { logger } from "./lib/logger";
 import { notesRoutes } from "./routes/notes";
 import { notesContentRoutes } from "./routes/notes-content";
 import { sharedContentRoutes } from "./routes/shared-content";
+import { inventoryRoutes } from "./routes/inventory";
 import { spaceRoutes } from "./routes/spaces";
 
 const graph = createGraph(env.memgraph.url, env.memgraph.user, env.memgraph.password);
@@ -130,6 +131,7 @@ app.route("/api/storage-backends", storageAdminRoutes);
 app.route("/api/notes", notesRoutes);
 app.route("/api/notes", notesContentRoutes);
 app.route("/api/shared-content", sharedContentRoutes);
+app.route("/api/inventory", inventoryRoutes);
 app.route("/api/server-settings", serverSettingsRoutes);
 app.route("/api/api-keys", apiKeyRoutes);
 app.route("/api/logs", logsRoutes);

@@ -6,13 +6,11 @@ import { RunnerAwsConfig } from "./runner-aws-config";
 import { useRunners } from "./use-runners";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function RunnersSection() {
-  const { runners, keys, newKey, setNewKey, terminalRunner, setTerminalRunner, actionError, createKey, revokeKey, deleteRunner } = useRunners();
+  const { runners, terminalRunner, setTerminalRunner, actionError, deleteRunner } = useRunners();
 
-  const [keyName, setKeyName] = useState("");
   const [metricsRunner, setMetricsRunner] = useState<string | null>(null); // runner id with metrics expander open
   const [awsRunner, setAwsRunner] = useState<string | null>(null); // runner id with aws config open
 
@@ -27,58 +25,6 @@ export function RunnersSection() {
           {actionError}
         </p>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Access keys</CardTitle>
-          <CardDescription>One key can connect many runners to this organization.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {newKey && (
-            <div className="rounded-lg border border-success/40 bg-success/10 p-3 text-sm">
-              <p className="text-success">Key created — copy it now, it won't be shown again:</p>
-              <code className="bg-muted mt-2 block w-full rounded p-2 break-all select-all">{newKey}</code>
-              <Button variant="ghost" size="sm" className="mt-2" onClick={() => setNewKey(null)}>
-                Dismiss
-              </Button>
-            </div>
-          )}
-
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              createKey.mutate(keyName);
-              setKeyName("");
-            }}
-          >
-            <Input className="grow" placeholder="Key name" value={keyName} onChange={(e) => setKeyName(e.target.value)} />
-            <Button type="submit" size="sm" disabled={createKey.isPending}>
-              Create key
-            </Button>
-          </form>
-
-          {keys.data && keys.data.length > 0 && (
-            <ul className="flex flex-col gap-1">
-              {keys.data.map((k) => (
-                <li key={k.id} className="flex items-center gap-2 text-sm">
-                  <span className="font-medium">{k.name}</span>
-                  <code className="text-muted-foreground">{k.prefix}…</code>
-                  {k.revokedAt ? (
-                    <Badge variant="secondary" className="ml-auto">
-                      revoked
-                    </Badge>
-                  ) : (
-                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive ml-auto" onClick={() => revokeKey.mutate(k.id)}>
-                      Revoke
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -138,7 +84,7 @@ export function RunnersSection() {
               ))}
             </ul>
           ) : (
-            <p className="text-muted-foreground text-sm">No runners yet. Create an access key, then start a runner with it:</p>
+            <p className="text-muted-foreground text-sm">No runners yet. Create an access key in General settings, then start a runner with it:</p>
           )}
           <code className="bg-muted block rounded-md p-2 text-xs">TWODB_RUNNER_KEY=&lt;key&gt; pnpm --filter @twodb/runner dev</code>
         </CardContent>

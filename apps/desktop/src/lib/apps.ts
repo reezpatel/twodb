@@ -13,6 +13,7 @@ import {
   Settings,
   StickyNote,
   Video,
+  Warehouse,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -26,6 +27,7 @@ import { FilesProvider, FilesSidenav } from "../routes/files/files-provider";
 import { SettingsSidenav } from "../routes/settings/settings-sidenav";
 import { MeetingsProvider, MeetingsSidenav } from "../routes/meetings/meetings-provider";
 import { ProjectsSidenav } from "../routes/projects/projects-sidenav";
+import { InventoryProvider, InventorySidenav } from "../routes/inventory/inventory-provider";
 
 export interface AppEntry {
   id: string;
@@ -53,6 +55,7 @@ export const APPS: AppEntry[] = [
   { id: "automations", label: "Automations", icon: Zap },
   { id: "showcase", label: "Showcase", icon: LayoutGrid },
   { id: "files", label: "Files", icon: Folder, Provider: FilesProvider, Sidenav: FilesSidenav },
+  { id: "inventory", label: "Inventory", icon: Warehouse, Provider: InventoryProvider, Sidenav: InventorySidenav },
 ];
 
 export const SETTINGS_APP: AppEntry = {
