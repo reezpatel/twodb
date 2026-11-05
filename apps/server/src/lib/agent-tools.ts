@@ -4,7 +4,7 @@ import type { CodeSessionArtifactType } from "../plugins/db";
 import { getCodeSettings } from "./code-settings";
 import { enabledRepoSources, readRepoSkill } from "./skills";
 import { spaceMatches } from "./spaces";
-import { readAssetForModel } from "./assets";
+import { readAssetForModel, MAX_IMAGE_BASE64 } from "./assets";
 import { runnerManager } from "./runner-manager";
 import { startBackgroundJob, readJobLogs, formatJobStatuses } from "./background-jobs";
 import { broadcastToSession, broadcastSessionEvent } from "../routes/code-ws";
@@ -190,6 +190,19 @@ export const AGENT_TOOLS: AgentTool[] = [
     },
   },
   {
+    name: "read_image",
+    scope: ["code"],
+    description:
+      "Reads an image and shows it to you (as an attached image). Accepts either a file path on the runner machine (JPEG, PNG, GIF, WebP, BMP) or a twodb:// asset URI from the conversation. Use this instead of read_file for any image — read_file refuses binary files. Non-vision models get the image's metadata (type, size) only.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Image file path on the runner, or a twodb:// asset URI" },
+      },
+      required: ["path"],
+    },
+  },
+  {
     name: "write_file",
     scope: ["code"],
     description: "Creates a file or fully overwrites an existing one on the runner machine. Parent directories are created as needed.",
@@ -361,6 +374,40 @@ try {
 } catch (e) { /* diff is cosmetic — never fail the edit */ }
 `;
 
+/** read_file binary guard — git's heuristic: NUL in the first 8000 bytes ⇒ binary. Exits 0 (binary) / 1 (text). */
+const BINARY_GUARD_JS = `
+const fs = require("fs");
+const fd = fs.openSync(process.argv[1], "r");
+const buf = Buffer.alloc(8000);
+const n = fs.readSync(fd, buf, 0, 8000, 0);
+fs.closeSync(fd);
+process.exit(buf.subarray(0, n).includes(0) ? 0 : 1);
+`;
+
+/** read_image body — reads the image, sniffs the type, prints a one-line header + base64 for the server to extract. */
+const READ_IMAGE_JS = `
+const fs = require("fs");
+const path = process.argv[1];
+const st = fs.statSync(path);
+if (!st.isFile()) { console.error("error: not a file: " + path); process.exit(1); }
+const buf = fs.readFileSync(path);
+const byExt = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp", bmp: "image/bmp" };
+let contentType;
+if (buf.length >= 12 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) contentType = "image/jpeg";
+else if (buf.length >= 12 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) contentType = "image/png";
+else if (buf.length >= 12 && buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) contentType = "image/gif";
+else if (buf.length >= 12 && buf.subarray(0, 4).toString("ascii") === "RIFF" && buf.subarray(8, 12).toString("ascii") === "WEBP") contentType = "image/webp";
+else if (buf.length >= 2 && buf[0] === 0x42 && buf[1] === 0x4d) contentType = "image/bmp";
+else { const ext = path.split(".").pop().toLowerCase(); if (byExt[ext]) contentType = byExt[ext]; }
+if (!contentType) { console.error("error: unrecognized image format: " + path); process.exit(1); }
+process.stdout.write("__TWODB_IMAGE__:" + contentType + ":" + st.size + ":" + buf.length + "\n");
+process.stdout.write(buf.toString("base64"));
+process.stdout.write("\n");
+`;
+
+/** Marker prefix read_image prints on the runner; the server extracts what follows (same pattern as the diff marker). */
+export const IMAGE_MARKER = "__TWODB_IMAGE__:";
+
 /**
  * Models habitually wrap diffs in markdown fences, drop the trailing newline
  * and miscount `@@` hunk headers. git apply needs `--recount` for the last of
@@ -484,6 +531,21 @@ function extractDiffMarker(stdout: string): { stdout: string; diff?: string } {
   }
 }
 
+/** read_image marker: first line `__TWODB_IMAGE__:type:size:base64len`, second line the base64 payload. */
+function extractImageMarker(stdout: string): { stdout: string; image?: AgentImagePart & { size: number } } {
+  const lines = stdout.split("\n");
+  const headerIdx = lines.findIndex((line) => line.startsWith(IMAGE_MARKER));
+  if (headerIdx === -1) return { stdout };
+  const [contentType, size] = lines[headerIdx].slice(IMAGE_MARKER.length).split(":");
+  const payload = lines[headerIdx + 1] ?? "";
+  if (!contentType || !payload) return { stdout: lines.slice(0, headerIdx).join("\n") };
+  return {
+    // drop the marker and payload from the model-visible output
+    stdout: lines.filter((_, i) => i !== headerIdx && i !== headerIdx + 1).join("\n").trim(),
+    image: { filename: "", contentType, base64: payload, size: Number(size) || 0 },
+  };
+}
+
 /** New-file diff — every line added. Cap the body so huge writes don't bloat
  * the persisted tool row. */
 function newFileDiff(path: string, content: string): string | undefined {
@@ -519,9 +581,27 @@ function buildCommand(call: AgentToolCall): string {
       const rest = `\n…<trimmed — pass offset=${shq(String(offset + requested))} to continue, or offset=1 limit=1000000 for the whole file>`;
       return (
         `if [ ! -f ${shq(path)} ]; then echo ${shq(`error: not a file: ${path}`)} >&2; exit 1; fi; ` +
+        // Binary guard (git's heuristic): a NUL in the first 8000 bytes means
+        // this is not text — dumping it would flood the context with garbage
+        // (and NULs cannot be persisted to Postgres text columns).
+        `if command -v node >/dev/null 2>&1 && node -e ${shq(BINARY_GUARD_JS)} ${shq(path)}; then ` +
+        `echo ${shq(`error: ${path} is binary — use read_image for images or run_command (e.g. file, identify, ffprobe) for other binary formats`)} >&2; exit 1; fi; ` +
         // total line count drives the <trimmed> marker: print it only when the
         // window didn't reach EOF
         `TOTAL=$(wc -l < ${shq(path)}); ${reader}; [ "${sedEnd}" -lt "$TOTAL" ] && printf %s\\n ${shq(rest)} || true`
+      );
+    }
+
+    case "read_image": {
+      const path = str(args.path);
+      if (!path) throw new Error("path is required");
+      // The image never enters the model-visible output: the runner prints a
+      // one-line marker with base64 bytes, the server extracts it (same
+      // pattern as update_file's diff marker) and attaches it as a transient
+      // image part for vision-capable models. Nothing lands in Postgres.
+      return (
+        `if [ ! -f ${shq(path)} ]; then echo ${shq(`error: not a file: ${path}`)} >&2; exit 1; fi; ` +
+        `node -e "$(${b64Decode(READ_IMAGE_JS)})" ${shq(path)}`
       );
     }
 
@@ -813,6 +893,18 @@ export async function executeToolCall(
       failed: true,
     };
   }
+  // read_image with a twodb:// URI resolves from storage (same path as
+  // read_asset) — no runner needed; anything else is a runner file path.
+  if (call.name === "read_image" && str(call.arguments?.path).trim().startsWith("twodb://")) {
+    if (!ctx) return { output: "error: read_image requires session context", code: null, failed: true };
+    const uri = str(call.arguments?.path).trim();
+    try {
+      const asset = await readAssetForModel(ctx.organizationId, uri, ctx.supportsImages, ctx.imageToolResults);
+      return { output: asset.output, code: 0, failed: false, ...(asset.imagePart ? { imageParts: [asset.imagePart] } : {}) };
+    } catch (e) {
+      return { output: `error: ${(e as Error).message}`, code: null, failed: true };
+    }
+  }
   if (!runnerId) return { output: "error: no runner assigned to this session", code: null, failed: true };
 
   try {
@@ -828,7 +920,32 @@ export async function executeToolCall(
     const result = await runnerManager.execOnRunner(runnerId, command, onChunk, { onWaiting });
     // update_file smuggles its unified diff out as a base64 marker line —
     // keep it out of the model-visible output, hand it to the UI instead.
-    const { stdout, diff } = extractDiffMarker(result.stdout);
+    let { stdout, diff } = extractDiffMarker(result.stdout);
+    let imagePart: AgentImagePart | undefined;
+    if (call.name === "read_image" && result.code === 0) {
+      // read_image likewise smuggles the image out as base64 after a marker
+      // line; the bytes ride the wire as a transient image part and never
+      // reach the model-visible output or the persisted message.
+      const extracted = extractImageMarker(stdout);
+      stdout = extracted.stdout;
+      if (extracted.image) {
+        const base64len = extracted.image.base64.length;
+        if (ctx?.supportsImages && ctx.imageToolResults) {
+          if (base64len <= MAX_IMAGE_BASE64) imagePart = extracted.image;
+        }
+        stdout = [
+          `read image ${str(call.arguments?.path)}`,
+          `type: ${extracted.image.contentType} · size: ${extracted.image.size} bytes`,
+          ctx?.supportsImages
+            ? ctx.imageToolResults
+              ? base64len <= MAX_IMAGE_BASE64
+                ? "(image attached below)"
+                : "(image too large to inline — ask the user to attach a smaller version)"
+              : "(the image is attached to the conversation above — you can see it directly)"
+              : "(this model has no image input — you cannot view pictures; ask the user to describe it or switch to a vision-capable model)",
+        ].join("\n");
+      }
+    }
     let extraDiff: string | undefined;
     if (!diff && result.code === 0) {
       if (call.name === "write_file") extraDiff = newFileDiff(str(call.arguments?.path), str(call.arguments?.content));
@@ -845,6 +962,7 @@ export async function executeToolCall(
       code: result.code,
       failed: result.code !== 0,
       ...((diff ?? extraDiff) ? { diff: diff ?? extraDiff } : {}),
+      ...(imagePart ? { imageParts: [imagePart] } : {}),
     };
   } catch (e) {
     return { output: `error: ${(e as Error).message}`, code: null, failed: true };

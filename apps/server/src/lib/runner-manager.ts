@@ -167,12 +167,16 @@ class RunnerManager {
     if (!msg.execId) return;
     const pending = this.execs.get(msg.execId);
     if (!pending) return;
+    // NUL bytes decode fine from utf8 but Postgres text columns reject them —
+    // a binary file dumped to stdout (e.g. read_file on an image) would
+    // otherwise crash the run at the next insert. Strip at the boundary.
+    const data = (msg.data ?? "").replaceAll("\u0000", "");
     if (msg.stream === "stdout") {
-      pending.stdout += msg.data ?? "";
-      pending.onChunk?.("stdout", msg.data ?? "");
+      pending.stdout += data;
+      pending.onChunk?.("stdout", data);
     } else if (msg.stream === "stderr") {
-      pending.stderr += msg.data ?? "";
-      pending.onChunk?.("stderr", msg.data ?? "");
+      pending.stderr += data;
+      pending.onChunk?.("stderr", data);
     }
   }
 
