@@ -56,7 +56,9 @@ export function useChatModelPicker(config: ModelConfig): Omit<ModelPickerProps, 
         list.push({
           id,
           label: item.displayName ?? item.modelId,
-          provider: connection.provider,
+          provider: connection.id,
+          providerName: providerLabel(connection.provider),
+          modelId: item.modelId,
           description: [connection.name, item.contextWindow ? `${fmtTokens(item.contextWindow)} context` : null].filter(Boolean).join(" · "),
           efforts: levels.length > 0 ? levels.map(capitalize) : undefined,
           badges: [item.thinking ? "thinking" : null, item.input.includes("image") ? "vision" : null].filter((badge): badge is string => badge !== null),
@@ -66,12 +68,11 @@ export function useChatModelPicker(config: ModelConfig): Omit<ModelPickerProps, 
     return { models: list, targets: lookup };
     // modelQueries is a fresh array each render; its data identities are what change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connections, ...modelQueries.map((query) => query.data)]);
+  }, [connections, providerLabel, ...modelQueries.map((query) => query.data)]);
 
-  const providers = useMemo<ModelPickerProvider[]>(
-    () => [...new Set(connections.map((connection) => connection.provider))].map((id) => ({ id, label: providerLabel(id) })),
-    [connections, providerLabel],
-  );
+  // Group the browser by connection, not provider type — two connections to the
+  // same provider stay separate and show each connection's custom name.
+  const providers = useMemo<ModelPickerProvider[]>(() => connections.map((connection) => ({ id: connection.id, label: connection.name })), [connections]);
 
   const selectedId = selected ? pickerId(selected.id, model || effectiveModel) : null;
   const selectedModel = models.find((item) => item.id === selectedId);

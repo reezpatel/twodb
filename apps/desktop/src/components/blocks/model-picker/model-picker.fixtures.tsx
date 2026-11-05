@@ -23,8 +23,10 @@ export function buildModels(count = 1200): ModelPickerModel[] {
     const version = Math.floor(index / (CATALOG.length * provider.families.length)) + 1;
     const variant = index % 5;
     const supportsThinking = index % 4 !== 3;
+    const modelId = `${family.toLowerCase().replace(/\s+/g, "-")}-${version}.${variant}`;
     return {
-      id: `${provider.id}/${family.toLowerCase().replace(/\s+/g, "-")}-${version}.${variant}`,
+      id: `${provider.id}/${modelId}`,
+      modelId,
       label: `${family} ${version}.${variant}`,
       provider: provider.id,
       description: `${provider.label} ${family} — general coding and reasoning.`,
@@ -42,7 +44,7 @@ export const MODELS = buildModels();
 export const DEFAULT_FAVORITES = MODELS.slice(0, 6).map((model) => model.id);
 
 type ModelPickerPlaygroundProps = Partial<
-  Pick<ModelPickerProps, "models" | "side" | "disabled" | "defaultOpen" | "defaultBrowserOpen" | "defaultEditingId">
+  Pick<ModelPickerProps, "models" | "providers" | "side" | "disabled" | "defaultOpen" | "defaultBrowserOpen" | "defaultEditingId">
 > & {
   initialFavorites?: string[];
   initialSelectedId?: string | null;

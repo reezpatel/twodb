@@ -20,6 +20,7 @@ export const AGENT_TOOL_NAMES = [
   { name: "job_logs", label: "job_logs", hint: "tail a background job's log (code only)" },
   { name: "background_job_status", label: "background_job_status", hint: "list jobs + status/duration (code only)" },
   { name: "read_file", label: "read_file", hint: "read a file (code only)" },
+  { name: "read_image", label: "read_image", hint: "view an image — runner path or twodb:// URI (code only)" },
   { name: "write_file", label: "write_file", hint: "create/overwrite a file (code only)" },
   { name: "update_file", label: "update_file", hint: "targeted string replace (code only)" },
   { name: "apply_patch", label: "apply_patch", hint: "apply a unified diff (code only)" },

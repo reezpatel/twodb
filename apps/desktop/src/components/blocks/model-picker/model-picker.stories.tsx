@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState, type ReactNode } from "react";
-import { MODELS, ModelPickerPlayground } from "./model-picker.fixtures";
+import { MODELS, ModelPickerPlayground, buildModels } from "./model-picker.fixtures";
 
 const meta = {
   title: "Blocks/ModelPicker/ModelPicker",
@@ -65,6 +65,30 @@ export const CustomTrigger: Story = {
       </ModelPickerPlayground>
     </Frame>
   ),
+};
+
+/** Two connections to the same provider, each with its own custom name — the
+ * browser rail groups by connection (custom names), while each row's second
+ * line shows the original provider name + modelId (no uuids). */
+export const SameProviderConnections: Story = {
+  render: () => {
+    const dupModels = [
+      ...buildModels(6).map((model) => ({ ...model, provider: "conn-work", providerName: "Anthropic" })),
+      ...buildModels(6).map((model) => ({ ...model, provider: "conn-personal", providerName: "Anthropic" })),
+    ];
+    return (
+      <Frame>
+        <ModelPickerPlayground
+          defaultBrowserOpen
+          models={dupModels}
+          providers={[
+            { id: "conn-work", label: "Anthropic (work)" },
+            { id: "conn-personal", label: "Anthropic (personal)" },
+          ]}
+        />
+      </Frame>
+    );
+  },
 };
 
 function EventLogPreview() {

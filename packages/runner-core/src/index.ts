@@ -189,7 +189,7 @@ export class RunnerCore {
         start = Math.max(0, total - Math.max(1, tail ?? 10));
         end = total;
       }
-      return { output: rows.slice(start, end).join("\n"), totalLines: total };
+      return { output: rows.slice(start, end).join("\n").replaceAll("\u0000", ""), totalLines: total };
     } catch {
       return { output: "", totalLines: 0 };
     }

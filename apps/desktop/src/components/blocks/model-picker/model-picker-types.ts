@@ -9,10 +9,15 @@ export interface ModelPickerConfig {
 }
 
 export interface ModelPickerModel {
+  /** Stable unique key (may be a composite like `connectionId::modelId`). Never shown to users. */
   id: string;
   label: string;
-  /** Provider id, shown as `provider/label` and used to group the browser. */
+  /** Grouping id, shown as `provider/label` and used to group the browser. */
   provider: string;
+  /** Original provider catalog name (e.g. "GLM (z.ai)"), shown in the browser row's second line. Falls back to the provider group label. */
+  providerName?: string;
+  /** The provider-native model identifier, shown in the browser row — distinct from `id`. */
+  modelId?: string;
   description?: string;
   efforts?: string[];
   contexts?: string[];

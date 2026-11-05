@@ -116,7 +116,7 @@ export function ModelPicker({
   };
 
   return (
-    <ModelPickerContext.Provider value={{ selected, modifiers: selectedModifiers, disabled }}>
+    <ModelPickerContext.Provider value={{ selected, modifiers: selectedModifiers, disabled, providerLabel }}>
       <Popover open={open && !disabled} onOpenChange={closePopover}>
         <PopoverTrigger asChild>{children ?? <ModelPickerTrigger />}</PopoverTrigger>
         <ModelPickerContent side={side}>
@@ -127,7 +127,7 @@ export function ModelPicker({
                 <ModelItem
                   key={model.id}
                   label={model.label}
-                  provider={model.provider}
+                  provider={providerLabel(model.provider)}
                   modifiers={getModifiers(model, resolveConfig(model, configs))}
                   badge={favoriteSet.has(model.id) ? undefined : "one-time"}
                   selected={model.id === selectedId}
@@ -250,8 +250,8 @@ export function ModelPicker({
                 renderRow={(model) => (
                   <ModelBrowserRow
                     label={model.label}
-                    provider={filter === "all" || filter === "favorites" ? providerLabel(model.provider) : undefined}
-                    modelId={model.id}
+                    provider={model.providerName ?? providerLabel(model.provider)}
+                    modelId={model.modelId ?? model.id}
                     favorite={favoriteSet.has(model.id)}
                     selected={model.id === selectedId}
                     badges={model.badges?.map((badge) => (

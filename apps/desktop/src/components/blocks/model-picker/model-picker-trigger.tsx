@@ -11,8 +11,9 @@ type ModelPickerTriggerProps = Omit<ComponentProps<"button">, "children"> & {
 /** The default trigger. <ModelPicker> renders it when it has no children and wires it to the popover itself. */
 export function ModelPickerTrigger({ size = "default", disabled, className, type = "button", ...props }: ModelPickerTriggerProps) {
   const context = useModelPickerContext();
-  const label = context?.selected?.label ?? "Select model";
-  const provider = context?.selected?.provider;
+  const selected = context?.selected ?? null;
+  const label = selected?.label ?? "Select model";
+  const provider = selected ? (context?.providerLabel?.(selected.provider) ?? selected.provider) : undefined;
   const modifiers = context?.modifiers ?? [];
 
   return (

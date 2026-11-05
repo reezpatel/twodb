@@ -323,7 +323,9 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
         id: crypto.randomUUID(),
         sessionId: session.id,
         role,
-        content,
+        // Postgres text columns reject U+0000 — belt-and-braces with the
+        // runner-boundary strip in runner-manager.
+        content: content.replaceAll("\u0000", ""),
         meta,
         createdAt: new Date(),
       })
