@@ -85,7 +85,7 @@ function NewProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
 export function projectIcon(p: Project) {
   return (
     <span
-      className="flex size-8 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white"
+      className="flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
       style={{ backgroundColor: p.color ?? "#6366f1" }}
     >
       {p.icon ?? p.key.slice(0, 2)}
@@ -99,7 +99,7 @@ export function ProjectsScene() {
   const [creating, setCreating] = useState(false);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-8 py-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Projects</h1>
@@ -124,18 +124,16 @@ export function ProjectsScene() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.data.map((p) => (
             <Link key={p.id} to={`/apps/projects/${p.id}`}>
               <Card className="hover:bg-accent/40 h-full transition-colors">
-                <CardContent className="flex items-start gap-3 p-4">
-                  {projectIcon(p)}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{p.name}</span>
-                    <span className="text-muted-foreground block font-mono text-xs">{p.key}</span>
-                    <span className="text-muted-foreground mt-1 block text-xs">
-                      {p.ticketCount ?? 0} tickets{p.externalSource ? ` · synced from ${p.externalSource}` : ""}
-                    </span>
+                <CardContent className="flex flex-col gap-4 p-5">
+                  <span className="flex items-center gap-3">{projectIcon(p)}<span className="min-w-0 flex-1"><span className="block truncate font-medium">{p.name}</span><span className="text-muted-foreground block font-mono text-xs">{p.key}</span></span></span>
+                  {p.description && <span className="text-muted-foreground line-clamp-2 text-xs leading-relaxed">{p.description}</span>}
+                  <span className="text-muted-foreground mt-auto flex items-center gap-2 text-xs">
+                    <span>{p.ticketCount ?? 0} tickets</span>
+                    {p.externalSource && <span>· synced from {p.externalSource}</span>}
                   </span>
                 </CardContent>
               </Card>

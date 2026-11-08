@@ -10,10 +10,24 @@ import type { CodeSessionJobStatus } from "../plugins/db";
  * the transcript and picked up by the next round / auto-compaction.
  *
  * State is persisted in code_session_job so the panel survives refreshes and
- * server restarts; the runner owns the process and its log file. */
+ * server restarts; the runner owns the process and its log file.
+ *
+ * Global agent jobs (identifier + agentId set) extend this: persona,
+ * collaborator and sentinel agents register a long-lived job under a stable
+ * identifier they choose. The starting session remains the primary — the
+ * completion message still lands in its thread — but any other agent session
+ * can reach the job's lifecycle by identifier, even on another runner. */
 
 /** How long after a runner reconnect before unobserved jobs are marked lost. */
 const LOST_GRACE_MS = 60_000;
+
+/** Agent types allowed to own a global job (sub_agent is transient by design). */
+export const GLOBAL_JOB_AGENT_TYPES = new Set(["persona", "collaborator", "sentinel"]);
+
+const TERMINAL_JOB_STATUSES = new Set<CodeSessionJobStatus>(["done", "failed", "killed", "lost"]);
+
+/** Identifier shape — shell/db friendly, agent-memorable. */
+const IDENTIFIER_RE = /^[a-z0-9][a-z0-9_-]{1,62}$/;
 
 export interface StartedJob {
   jobId: string;
@@ -95,6 +109,131 @@ export async function killBackgroundJobByUser(runnerId: string, jobId: string): 
     .execute();
   await broadcastToSession(row.sessionId, { type: "jobs", jobs: await listJobs(row.sessionId) });
   return result.unknown ? `unknown job ${jobId} on this runner` : `kill signal sent to ${jobId}`;
+}
+
+// --- Global agent jobs ------------------------------------------------------
+
+export type GlobalJobResult = { output: string; failed: boolean };
+
+/** Resolve an identifier to its active (non-terminal) global job row. */
+async function findGlobalJob(organizationId: string, identifier: string) {
+  const rows = await db
+    .selectFrom("code_session_job")
+    .selectAll()
+    .where("organizationId", "=", organizationId)
+    .where("identifier", "=", identifier)
+    .orderBy("createdAt", "desc")
+    .execute();
+  return rows.find((r) => !TERMINAL_JOB_STATUSES.has(r.status)) ?? rows[0] ?? null;
+}
+
+/**
+ * global_background_job action=start — like run_background, but the job is
+ * registered under an agent-chosen identifier. Persona / collaborator /
+ * sentinel agents only (enforced by the caller). The starting session stays
+ * the primary: completion message, panel row and notification all go there.
+ */
+export async function startGlobalJob(opts: {
+  sessionId: string;
+  organizationId: string;
+  runnerId: string;
+  command: string;
+  cwd: string | null;
+  identifier: string;
+  agentId: string;
+}): Promise<GlobalJobResult> {
+  if (!IDENTIFIER_RE.test(opts.identifier)) {
+    return {
+      output: "error: identifier must be 2-63 chars of lowercase letters, digits, - or _ (start with a letter/digit)",
+      failed: true,
+    };
+  }
+  const existing = await findGlobalJob(opts.organizationId, opts.identifier);
+  if (existing && !TERMINAL_JOB_STATUSES.has(existing.status)) {
+    return { output: `error: a global job "${opts.identifier}" is already ${existing.status} (id ${existing.id}, started ${existing.createdAt.toISOString()}) — pick another identifier or kill it first`, failed: true };
+  }
+  const started = await startBackgroundJob({ ...opts });
+  // Tag the row as a global job (startBackgroundJob inserted it untagged).
+  await db.updateTable("code_session_job").set({ identifier: opts.identifier, agentId: opts.agentId }).where("id", "=", started.jobId).execute();
+  await broadcastToSession(opts.sessionId, { type: "jobs", jobs: await listJobs(opts.sessionId) });
+  return {
+    output: `global job started: ${opts.identifier}\njob id: ${started.jobId}\nstatus: running in the background on runner ${opts.runnerId}\nThe completion message lands in this session's thread. Other agents can reach it as global_background_job get/logs/kill with identifier "${opts.identifier}".`,
+    failed: false,
+  };
+}
+
+/** get by identifier — one job's lifecycle snapshot (any agent session). */
+export async function getGlobalJob(organizationId: string, identifier: string): Promise<GlobalJobResult> {
+  const row = await findGlobalJob(organizationId, identifier);
+  if (!row) return { output: `error: no global job with identifier "${identifier}"`, failed: true };
+  const end = row.finishedAt ?? new Date();
+  const duration = humanDuration(Math.max(0, end.getTime() - row.createdAt.getTime()));
+  const lines = [
+    `identifier: ${row.identifier}`,
+    `job id: ${row.id}`,
+    `status: ${row.status === "done" ? "completed" : row.status}${row.exitCode !== null ? ` (exit ${row.exitCode})` : ""}`,
+    `duration: ${duration}`,
+    `command: $ ${row.command}`,
+    `primary session: ${row.sessionId}`,
+    `runner: ${row.runnerId}`,
+    `started: ${row.createdAt.toISOString()}`,
+    ...(row.finishedAt ? [`finished: ${row.finishedAt.toISOString()}`] : []),
+    `logs: global_background_job action=logs identifier="${row.identifier}"`,
+  ];
+  return { output: lines.join("\n"), failed: false };
+}
+
+/** list — every global job in the org (optionally filtered by identifier prefix or status). */
+export async function listGlobalJobs(organizationId: string, opts: { status?: string; identifier?: string } = {}): Promise<GlobalJobResult> {
+  let query = db
+    .selectFrom("code_session_job")
+    .selectAll()
+    .where("organizationId", "=", organizationId)
+    .where("identifier", "is not", null)
+    .orderBy("createdAt", "desc");
+  if (opts.status) query = query.where("status", "=", opts.status as CodeSessionJobStatus);
+  if (opts.identifier) query = query.where("identifier", "like", `${opts.identifier}%`);
+  const rows = await query.execute();
+  if (rows.length === 0) return { output: "no global jobs registered", failed: false };
+  const lines = rows.map((r) => {
+    const end = r.finishedAt ?? new Date();
+    const duration = humanDuration(Math.max(0, end.getTime() - r.createdAt.getTime()));
+    const status = r.status === "done" ? "completed" : r.status;
+    return `- ${r.identifier} | ${status}${r.exitCode !== null ? ` | exit ${r.exitCode}` : ""} | ${duration} | ${r.id} | $ ${r.command}`;
+  });
+  return { output: `${rows.length} global job(s):\n${lines.join("\n")}`, failed: false };
+}
+
+/**
+ * Logs by identifier — reads from the job's OWN runner (the calling session's
+ * runner may be a different machine). from/to (1-based, inclusive) for a
+ * range, lines for the tail.
+ */
+export async function readGlobalJobLogs(
+  organizationId: string,
+  identifier: string,
+  opts: { lines?: number; from?: number; to?: number } = {},
+): Promise<GlobalJobResult> {
+  const row = await findGlobalJob(organizationId, identifier);
+  if (!row) return { output: `error: no global job with identifier "${identifier}"`, failed: true };
+  const result = await runnerManager.jobOutput(row.runnerId, row.id, opts);
+  if (result.unknown) return { output: `error: job ${identifier} (${row.id}) is not running on runner ${row.runnerId} (runner restart or server restart lost it)`, failed: true };
+  const header = result.totalLines !== undefined ? `[${result.totalLines} total lines]\n` : "";
+  return { output: header + (result.output || "(no output yet)"), failed: false };
+}
+
+/**
+ * Kill by identifier — signals the job's own runner and writes the
+ * completion/kill handling through the normal exit watcher. Any agent session
+ * of the org can stop a global job.
+ */
+export async function killGlobalJob(organizationId: string, identifier: string): Promise<GlobalJobResult> {
+  const row = await findGlobalJob(organizationId, identifier);
+  if (!row) return { output: `error: no global job with identifier "${identifier}"`, failed: true };
+  if (TERMINAL_JOB_STATUSES.has(row.status)) return { output: `job "${identifier}" already ${row.status} — nothing to kill`, failed: false };
+  const result = await runnerManager.killJob(row.runnerId, row.id);
+  if (result.unknown) return { output: `error: job ${identifier} (${row.id}) not found on runner ${row.runnerId}`, failed: true };
+  return { output: `kill signal sent to "${identifier}" (${row.id}) on runner ${row.runnerId} — the primary session gets the termination message`, failed: false };
 }
 
 /** Exit watcher flips the DB row, pushes the panel, and delivers the outcome
@@ -229,12 +368,29 @@ export async function reconcileOrphanJobs() {
  * the new context.
  */
 export async function retireSessionJobs(sessionId: string): Promise<void> {
-  const rows = await db.selectFrom("code_session_job").select(["id", "runnerId", "status"]).where("sessionId", "=", sessionId).where("hiddenAt", "is", null).execute();
+  // Global agent jobs outlive the session's context: /new and /compact start
+  // a fresh transcript, but the agent's registered job keeps running and
+  // stays reachable by identifier. Only plain session jobs are retired.
+  const rows = await db
+    .selectFrom("code_session_job")
+    .select(["id", "runnerId", "status", "identifier"])
+    .where("sessionId", "=", sessionId)
+    .where("hiddenAt", "is", null)
+    .where("identifier", "is", null)
+    .execute();
   if (rows.length === 0) return;
   const now = new Date();
-  // Running → killed first (see above), then hide the lot.
-  await db.updateTable("code_session_job").set({ status: "killed", finishedAt: now }).where("sessionId", "=", sessionId).where("hiddenAt", "is", null).where("status", "=", "running").execute();
-  await db.updateTable("code_session_job").set({ hiddenAt: now }).where("sessionId", "=", sessionId).where("hiddenAt", "is", null).execute();
+  // Running → killed first (see above), then hide the lot. Both updates skip
+  // global jobs (identifier set) — they survive the context reset.
+  await db
+    .updateTable("code_session_job")
+    .set({ status: "killed", finishedAt: now })
+    .where("sessionId", "=", sessionId)
+    .where("hiddenAt", "is", null)
+    .where("identifier", "is", null)
+    .where("status", "=", "running")
+    .execute();
+  await db.updateTable("code_session_job").set({ hiddenAt: now }).where("sessionId", "=", sessionId).where("hiddenAt", "is", null).where("identifier", "is", null).execute();
   await Promise.all(
     rows
       .filter((r) => r.status === "running")

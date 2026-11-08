@@ -196,7 +196,11 @@ export function useChatPanel(sessionId: string | null) {
   const [compacting, setCompacting] = useState(false);
   const [askUser, setAskUser] = useState<{ id: string; questions: AskUserQuestion[] } | null>(null);
   const [pendingAssets, setPendingAssets] = useState<PendingAsset[]>([]);
+  const pendingAssetsRef = useRef(pendingAssets);
+  pendingAssetsRef.current = pendingAssets;
   const [uploadingAssets, setUploadingAssets] = useState(false);
+  /** In-flight asset uploads — send() waits for them so paste → Enter just works. */
+  const uploadsRef = useRef<Promise<void> | null>(null);
   const [gitStatus, setGitStatus] = useState<GitLine | null>(null);
   const [stats, setStats] = useState<SessionStats>({
     inputTokens: 0,
@@ -676,39 +680,45 @@ export function useChatPanel(sessionId: string | null) {
 
   /** Sends an already-resolved message over the WS — everything the intercepts hand off to. */
   /** Uploads files to the agent_assets destination — any file, any model; the link notation works everywhere. */
-  const uploadAssets = async (files: FileList | File[]) => {
+  const uploadAssets = (files: FileList | File[]) => {
     if (!sessionId) return;
-    setUploadingAssets(true);
-    setError(null);
-    try {
-      const uploaded: PendingAsset[] = [];
-      for (const raw of Array.from(files)) {
-        const file = await shrinkImage(raw);
-        const localPreview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
-        // Raw fetch — multipart boundaries must come from the browser, and the
-        // api() helper forces a JSON content-type.
-        const form = new FormData();
-        form.append("file", file);
-        const res = await apiFetch(`/api/code/sessions/${sessionId}/assets`, { method: "POST", body: form });
-        if (!res.ok) {
-          const body = (await res.json().catch(() => null)) as { error?: string } | null;
-          throw new Error(body?.error ?? `upload failed (${res.status})`);
+    const task = (async () => {
+      setUploadingAssets(true);
+      setError(null);
+      try {
+        const uploaded: PendingAsset[] = [];
+        for (const raw of Array.from(files)) {
+          const file = await shrinkImage(raw);
+          const localPreview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+          // Raw fetch — multipart boundaries must come from the browser, and the
+          // api() helper forces a JSON content-type.
+          const form = new FormData();
+          form.append("file", file);
+          const res = await apiFetch(`/api/code/sessions/${sessionId}/assets`, { method: "POST", body: form });
+          if (!res.ok) {
+            const body = (await res.json().catch(() => null)) as { error?: string } | null;
+            throw new Error(body?.error ?? `upload failed (${res.status})`);
+          }
+          uploaded.push({ ...(await res.json()), localPreview });
         }
-        uploaded.push({ ...(await res.json()), localPreview });
+        setPendingAssets((prev) => [...prev, ...uploaded]);
+      } catch (e) {
+        const code = (e as Error).message;
+        setError(
+          code === "agent_assets_not_configured"
+            ? "No Agents Assets destination configured — set one in Settings → Storage first."
+            : code === "file_too_large"
+              ? "Files up to 25 MB are supported."
+              : code || "upload failed",
+        );
+      } finally {
+        setUploadingAssets(false);
       }
-      setPendingAssets((prev) => [...prev, ...uploaded]);
-    } catch (e) {
-      const code = (e as Error).message;
-      setError(
-        code === "agent_assets_not_configured"
-          ? "No Agents Assets destination configured — set one in Settings → Storage first."
-          : code === "file_too_large"
-            ? "Files up to 25 MB are supported."
-            : code || "upload failed",
-      );
-    } finally {
-      setUploadingAssets(false);
-    }
+    })();
+    uploadsRef.current = task;
+    void task.finally(() => {
+      if (uploadsRef.current === task) uploadsRef.current = null;
+    });
   };
 
   const removeAsset = (uri: string) => {
@@ -738,7 +748,8 @@ export function useChatPanel(sessionId: string | null) {
 
     // Attachments ride the message as markdown links — filename.ext carries the
     // file type; vision models additionally get the bytes server-side.
-    const fullContent = assets.length > 0 ? `${content}\n\n${assets.map((a) => `[${a.filename}](${a.uri})`).join("\n")}` : content;
+    const assetLinks = assets.map((a) => `[${a.filename}](${a.uri})`).join("\n");
+    const fullContent = assets.length > 0 ? [content, assetLinks].filter(Boolean).join("\n\n") : content;
 
     setError(null);
     setDraft("");
@@ -781,7 +792,18 @@ export function useChatPanel(sessionId: string | null) {
     skillsOverride?: { name: string; content: string }[],
   ): boolean => {
     const content = (contentOverride ?? draft).trim();
-    if (!content || compacting) return false;
+    if (compacting) return false;
+    // Uploads still in flight (a paste just landed) — dispatch once they settle
+    // so the attachment links ride the message. Content is captured now; the
+    // composer clears itself on the true return.
+    const inflight = uploadsRef.current;
+    if (inflight) {
+      setDraft("");
+      void inflight.then(() => send(sendConnectionId, sendModel, thinkingLevel, content, skillsOverride));
+      return true;
+    }
+    // An assets-only message is fine — dispatchSend appends the asset links.
+    if (!content && pendingAssetsRef.current.length === 0) return false;
     // Skill chips already expanded by the composer — meta.skills rides the row
     // so the transcript can render chips again.
     if (skillsOverride?.length) {
@@ -800,7 +822,7 @@ export function useChatPanel(sessionId: string | null) {
     // While a round is running, messages go to the steering queue — they're
     // dispatched when the run finishes (or immediately via "send now").
     if (streaming !== null) {
-      const assets = contentOverride === undefined ? pendingAssets : [];
+      const assets = contentOverride === undefined || contentOverride === "" ? pendingAssetsRef.current : [];
       setSteering((prev) => [...prev, { id: `steer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, content, assets }]);
       setDraft("");
       setPendingAssets([]);
@@ -854,7 +876,7 @@ export function useChatPanel(sessionId: string | null) {
         }
       }
     }
-    return dispatchSend(sendConnectionId, sendModel, thinkingLevel, content, pendingAssets);
+    return dispatchSend(sendConnectionId, sendModel, thinkingLevel, content, pendingAssetsRef.current);
   };
 
   const stop = () => {

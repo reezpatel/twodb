@@ -34,8 +34,8 @@ export function Milestones({ detail }: { detail: ProjectDetail }) {
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-4 overflow-y-auto p-6">
-      <h2 className="text-sm font-semibold">Milestones</h2>
+    <div className="mx-auto flex h-full w-full max-w-4xl flex-col gap-6 overflow-y-auto px-8 py-8">
+      <h2 className="text-lg font-semibold">Milestones</h2>
       <form
         className="flex gap-2"
         onSubmit={(e) => {
@@ -47,37 +47,42 @@ export function Milestones({ detail }: { detail: ProjectDetail }) {
           create.mutate({ name: n, ...(targetDate ? { targetDate } : {}) });
         }}
       >
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Milestone name — e.g. v1.0" className="h-8 text-sm" />
-        <Input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="h-8 w-40 text-sm" />
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Milestone name — e.g. v1.0" className="h-9 text-sm" />
+        <Input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="h-9 w-40 text-sm" />
         <Button size="sm" type="submit" disabled={!name.trim()}>
           <Plus size={13} /> Add
         </Button>
       </form>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-5">
         {detail.milestones.map((m) => {
           const stats = perMilestone.get(m.id) ?? { total: 0, done: 0 };
           const pct = stats.total > 0 ? (stats.done / stats.total) * 100 : 0;
+          const closed = m.status === "closed";
           return (
-            <Card key={m.id}>
-              <CardContent className="flex flex-col gap-1.5 p-3">
-                <div className="flex items-center gap-2">
-                  <Flag size={13} className={m.status === "closed" ? "text-success" : "text-amber-500"} />
-                  <span className="text-sm font-medium">{m.name}</span>
-                  {m.targetDate && <span className="text-muted-foreground text-[10px]">target {m.targetDate}</span>}
-                  <span className="text-muted-foreground ml-auto font-mono text-[10px]">
-                    {stats.done}/{stats.total} done
+            <Card key={m.id} className={closed ? "opacity-70" : ""}>
+              <CardContent className="flex flex-col gap-4 p-6">
+                <div className="flex items-center gap-3">
+                  <span className={`flex size-9 items-center justify-center rounded-lg border ${closed ? "text-success border-success/40" : "border-amber-500/40 text-amber-500"}`}>
+                    <Flag size={16} />
                   </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 px-2 text-[10px]"
-                    onClick={() => patch.mutate({ id: m.id, status: m.status === "open" ? "closed" : "open" })}
-                  >
-                    {m.status === "open" ? "Close" : "Reopen"}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2.5">
+                      <span className="truncate text-base font-semibold">{m.name}</span>
+                      <span className="text-muted-foreground text-[11px] capitalize">{m.status}</span>
+                    </div>
+                    {m.targetDate && <span className="text-muted-foreground mt-0.5 block text-xs">Target {m.targetDate}</span>}
+                  </div>
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => patch.mutate({ id: m.id, status: closed ? "open" : "closed" })}>
+                    {closed ? "Reopen" : "Close milestone"}
                   </Button>
                 </div>
-                <Progress value={pct} className="h-1.5" />
-                {m.description && <p className="text-muted-foreground text-xs">{m.description}</p>}
+                {m.description && <p className="text-muted-foreground text-sm leading-relaxed">{m.description}</p>}
+                <div className="flex items-center gap-4">
+                  <Progress value={pct} className="h-2 flex-1" />
+                  <span className="text-muted-foreground w-28 text-right text-xs tabular-nums">
+                    {Math.round(pct)}% · {stats.done}/{stats.total} done
+                  </span>
+                </div>
               </CardContent>
             </Card>
           );

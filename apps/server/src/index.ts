@@ -188,8 +188,8 @@ if (env.skipAutoMigration) {
   void reconcileAll().catch((err) => logger.warn({ err }, "teams reconcile failed (non-fatal)"));
 }
 
-const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
-  logger.info({ port: info.port }, "server listening");
+const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host }, (info) => {
+  logger.info({ host: env.host, port: info.port }, "server listening");
   // Embedded runner: this machine registers as a runner (no key, in-process).
   // Self-hosted deployments are typically single-org — the local runner binds
   // to the first org at boot. (Multi-org hosts can disable it via env.)
