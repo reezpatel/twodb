@@ -4,9 +4,9 @@ import { Cpu, HardDrive, MemoryStick, MonitorCog, Paperclip, Square } from "luci
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useChat, type ToolEvent } from "./use-chat-panel";
 import type { CodeMessage } from "../sidenav/use-session-list";
-import { ToolView } from "./tools/tool-views";
+import { Markdown, ThinkingState } from "@twodb/blocks";
+import { thinkingToNode, toolToNode } from "./chat-trace";
 import { ChatMessage, type MessageSkill } from "./messages/chat-message";
-import { ChatThinking } from "./messages/chat-thinking";
 import { ChatSystemPrompt } from "./messages/chat-system-prompt";
 import {
   ChatBtw,
@@ -19,7 +19,7 @@ import {
   type ErrorMeta,
   type CompactionMeta,
 } from "./messages/chat-context-rows";
-import { CodeChatLive, CodeChatProgress } from "@/components/blocks/code/code-chat/code-chat-live";
+import { CodeChatProgress } from "@/components/blocks/code/code-chat/code-chat-live";
 import { CodeChatJumpButton, CodeChatThreadHeader, CodeChatThreadRow } from "@/components/blocks/code/code-chat/code-chat-thread";
 import { CodeChatToolsOpenProvider } from "@/components/blocks/code/code-chat/code-chat-tools-open";
 import { AskUserWizard } from "./ask-user-wizard";
@@ -43,8 +43,7 @@ import {
   CodeChatResourcesSettingsRunner,
   CodeChatResourcesSettingsToggle,
 } from "@/components/blocks/code/code-chat-footer/code-chat-resources";
-import { ModelPicker } from "@/components/blocks/model-picker/model-picker";
-import { ModelPickerTrigger } from "@/components/blocks/model-picker/model-picker-trigger";
+import { ModelPicker } from "@twodb/blocks";
 import {
   CodeChatComposer,
   CodeChatComposerActions,
@@ -113,7 +112,6 @@ function ChatMessageList(props: ChatMessageListProps) {
   const {
     thinking,
     thinkingLive,
-    thinkingStartedAt,
     thinkingDurationMs,
     liveTools,
     statusText,
@@ -270,37 +268,31 @@ function ChatMessageList(props: ChatMessageListProps) {
                 {running && (
                   <>
                     <CodeChatThreadRow>
-                      <CodeChatLive>Live{round !== null ? ` · round ${round}` : ""}</CodeChatLive>
+                      <ThinkingState
+                        autoPlay={false}
+                        defaultExpanded
+                        workingLabel={thinking !== null && !streaming && liveTools.length === 0 ? "Thinking…" : `Working${round !== null ? ` · round ${round}` : ""}…`}
+                        nodes={[
+                          ...(showThinking && thinking !== null ? [thinkingToNode({ text: thinking, durationMs: thinkingDurationMs ?? undefined }, thinkingLive)] : []),
+                          ...liveTools.map((t) =>
+                            toolToNode({
+                              id: t.id,
+                              name: t.name,
+                              args: t.args,
+                              output: t.output,
+                              diff: t.diff,
+                              startedAt: t.startedAt,
+                              completedAt: t.completedAt,
+                              failed: t.status === "failed",
+                              done: t.done,
+                            }),
+                          ),
+                        ]}
+                      />
                     </CodeChatThreadRow>
-                    {liveTools.map((t) => (
-                      <CodeChatThreadRow key={t.id}>
-                        <ToolView
-                          name={t.name}
-                          args={t.args}
-                          output={t.output}
-                          diff={t.diff}
-                          running={!t.done}
-                          startedAt={t.startedAt}
-                          completedAt={t.completedAt}
-                          failed={t.status === "failed"}
-                          defaultOpen={toolOutputsOpen}
-                        />
-                      </CodeChatThreadRow>
-                    ))}
-                    {thinking !== null && (
-                      <CodeChatThreadRow>
-                        <ChatThinking
-                          text={thinking}
-                          live={thinkingLive}
-                          startedAt={thinkingStartedAt ?? undefined}
-                          durationMs={thinkingDurationMs ?? undefined}
-                          visible={showThinking}
-                        />
-                      </CodeChatThreadRow>
-                    )}
                     <CodeChatThreadRow>
                       {streaming ? (
-                        <ChatMessage role="assistant" content={streaming} resolveAssetUrl={resolveAssetUrl} />
+                        <Markdown text={streaming} />
                       ) : (
                         <CodeChatProgress look={{ state: "reasoning" }}>thinking</CodeChatProgress>
                       )}
@@ -422,14 +414,20 @@ function ChatMessageList(props: ChatMessageListProps) {
       const meta = m.meta as { name?: string; startedAt?: number; completedAt?: number; status?: string; diff?: string } | null;
       return (
         <Row dimmed={dimmed}>
-          <ToolView
-            name={meta?.name ?? "tool"}
-            output={m.content}
-            diff={meta?.diff}
-            startedAt={meta?.startedAt}
-            completedAt={meta?.completedAt}
-            failed={meta?.status === "failed"}
-            defaultOpen={toolOutputsOpen}
+          <ThinkingState
+            autoPlay={false}
+            defaultExpanded={toolOutputsOpen || undefined}
+            nodes={[
+              toolToNode({
+                id: m.id,
+                name: meta?.name ?? "tool",
+                output: m.content,
+                diff: meta?.diff,
+                startedAt: meta?.startedAt,
+                completedAt: meta?.completedAt,
+                failed: meta?.status === "failed",
+              }),
+            ]}
           />
         </Row>
       );
@@ -440,25 +438,52 @@ function ChatMessageList(props: ChatMessageListProps) {
       stopped?: boolean;
       btw?: { agentName?: string; btwSessionId?: string; sendToMain?: boolean };
     } | null;
+
+    // Assistant turns render through the blocks agent view: thinking + tool
+    // calls collapse into one ThinkingState trace, the reply is blocks Markdown.
+    const trace =
+      m.role === "user"
+        ? []
+        : [
+            ...(showThinking
+              ? (meta?.thinking ?? []).filter((t) => t.text?.trim()).map((t) => thinkingToNode(t))
+              : []),
+            ...(meta?.toolCalls ?? []).map((tc) => {
+              const timing = toolTimings.get(tc.id);
+              return toolToNode({
+                id: tc.id,
+                name: tc.name,
+                args: tc.arguments,
+                output: toolOutputs.get(tc.id),
+                diff: toolDiffs.get(tc.id),
+                startedAt: timing?.startedAt,
+                completedAt: timing?.completedAt,
+                failed: timing?.status === "failed",
+              });
+            }),
+          ];
+    const agentLabel = meta?.btw?.agentName ? `Agent ${meta.btw.agentName}` : undefined;
     return (
       <>
-        {meta?.thinking
-          ?.filter((t) => t.text?.trim())
-          .map((t, i) => (
-            <Row dimmed={dimmed} key={`thinking-${i}`}>
-              <ChatThinking text={t.text} live={false} durationMs={t.durationMs} visible={showThinking} />
-            </Row>
-          ))}
+        {trace.length > 0 && (
+          <Row dimmed={dimmed}>
+            <ThinkingState nodes={trace} autoPlay={false} defaultExpanded={toolOutputsOpen || undefined} />
+          </Row>
+        )}
         {m.content && (
           <Row dimmed={dimmed}>
-            <ChatMessage
-              role={m.role}
-              content={m.content}
-              resolveAssetUrl={resolveAssetUrl}
-              label={meta?.btw?.agentName ? `Agent ${meta.btw.agentName}` : undefined}
-              skills={m.role === "user" ? ((m.meta as { skills?: MessageSkill[] } | null)?.skills ?? undefined) : undefined}
-              onSkillClick={onSkillClick}
-            />
+            {m.role === "user" || agentLabel ? (
+              <ChatMessage
+                role={m.role}
+                content={m.content}
+                resolveAssetUrl={resolveAssetUrl}
+                label={agentLabel}
+                skills={m.role === "user" ? ((m.meta as { skills?: MessageSkill[] } | null)?.skills ?? undefined) : undefined}
+                onSkillClick={onSkillClick}
+              />
+            ) : (
+              <Markdown text={m.content} />
+            )}
           </Row>
         )}
         {meta?.stopped && (
@@ -466,23 +491,6 @@ function ChatMessageList(props: ChatMessageListProps) {
             <span className="text-muted-foreground/70 text-[13px] italic">stopped</span>
           </Row>
         )}
-        {meta?.toolCalls?.map((tc) => {
-          const timing = toolTimings.get(tc.id);
-          return (
-            <Row dimmed={dimmed} key={tc.id}>
-              <ToolView
-                name={tc.name}
-                args={tc.arguments}
-                output={toolOutputs.get(tc.id)}
-                diff={toolDiffs.get(tc.id)}
-                startedAt={timing?.startedAt}
-                completedAt={timing?.completedAt}
-                failed={timing?.status === "failed"}
-                defaultOpen={toolOutputsOpen}
-              />
-            </Row>
-          );
-        })}
       </>
     );
   }
@@ -781,9 +789,7 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
               title="Context consumed vs the model's context window"
             />
             <CodeChatUsageSpacer />
-            <ModelPicker {...modelPicker}>
-              <ModelPickerTrigger size="sm" />
-            </ModelPicker>
+            <ModelPicker providers={modelPicker.providers} value={modelPicker.value} onChange={modelPicker.onChange} />
           </CodeChatUsage>
           <CodeChatResources>
             {footerStatus.machines.length === 0 && <CodeChatResourcesEmpty>{footerStatus.resourcesEmptyText}</CodeChatResourcesEmpty>}

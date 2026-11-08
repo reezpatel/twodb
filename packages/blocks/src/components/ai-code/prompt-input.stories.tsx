@@ -13,7 +13,7 @@ import {
   usePromptInput,
   type PromptInputModel,
 } from "./prompt-input";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 const meta = {
   title: "Blocks/AICode/PromptInput",

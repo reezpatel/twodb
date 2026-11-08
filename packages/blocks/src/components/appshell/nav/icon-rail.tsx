@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../../lib/utils";
 
 /** The fixed, icon-only navigation rail — always visible, never collapses or resizes. */
 function IconRail({ className, ...props }: React.ComponentProps<"nav">) {

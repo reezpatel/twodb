@@ -1,6 +1,9 @@
 import { useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { PanelRight } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@twodb/blocks";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { CodeHeaderShortcut } from "@/components/blocks/code/code-header/code-header-shortcut";
 import { useChat } from "./use-chat-panel";
 import { ChatConversationInner } from "./chat-conversation";
 import { AwsChip } from "./aws-chip";
@@ -12,7 +15,6 @@ import { CodeHeader } from "@/components/blocks/code/code-header/code-header";
 import { CodeHeaderAction, CodeHeaderActions } from "@/components/blocks/code/code-header/code-header-actions";
 import { CodeHeaderSeparator } from "@/components/blocks/code/code-header/code-header-separator";
 import { CodeHeaderStatus } from "@/components/blocks/code/code-header/code-header-status";
-import { CodeHeaderTab, CodeHeaderTabs } from "@/components/blocks/code/code-header/code-header-tabs";
 import { CodeHeaderWidgets } from "@/components/blocks/code/code-header/code-header-widgets";
 import { CodeHeaderWorking } from "@/components/blocks/code/code-header/code-header-working";
 import { formatShortcut } from "@/lib/shortcut-keys";
@@ -35,6 +37,7 @@ export function ChatPanel() {
   const connection = WS_STATUS[wsStatus];
 
   const isActive = useCallback((id: ChatTabId) => (id === "chat" ? !activePanel : activePanel === id), [activePanel]);
+  const activeTabId = activePanel ?? "chat";
 
   // Selecting the active panel again closes it — back to the default sections
   // (the editor tab is main-column, not a panel).
@@ -54,18 +57,23 @@ export function ChatPanel() {
   return (
     <>
       <CodeHeader>
-        <CodeHeaderTabs>
-          {CHAT_TABS.map((tab, index) => (
-            <CodeHeaderTab
-              key={tab.id}
-              icon={<tab.icon />}
-              label={tab.label}
-              shortcut={formatShortcut(["mod", String(index + 1)])}
-              active={isActive(tab.id)}
-              onClick={() => selectTab(tab.id)}
-            />
-          ))}
-        </CodeHeaderTabs>
+        <Tabs value={activeTabId} onValueChange={(id) => selectTab(id as ChatTabId)} activationMode="manual">
+          <TabsList variant="line" size="sm" className="border-b-0">
+            {CHAT_TABS.map((tab, index) => (
+              <Tooltip key={tab.id} delayDuration={500}>
+                <TooltipTrigger asChild>
+                  <TabsTrigger value={tab.id} aria-label={tab.label}>
+                    <tab.icon />
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={6} className="flex items-center gap-2">
+                  {tab.label}
+                  <CodeHeaderShortcut keys={formatShortcut(["mod", String(index + 1)])} />
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </TabsList>
+        </Tabs>
         <CodeHeaderSeparator />
         <CodeHeaderWidgets>{sessionId && <AwsChip sessionId={sessionId} />}</CodeHeaderWidgets>
         <CodeHeaderActions>

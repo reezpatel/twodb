@@ -1,6 +1,6 @@
 import * as React from "react";
 import { ArrowUp, FileText, Paperclip, Square, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 import { ModelPicker } from "./model-picker";
 
 export interface PromptAttachment {

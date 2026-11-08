@@ -1,6 +1,6 @@
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import { ChevronsUpDown, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../../lib/utils";
 
 export interface WorkspaceSwitcherProps {
   workspaces: string[];

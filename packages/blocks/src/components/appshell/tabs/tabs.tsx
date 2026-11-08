@@ -1,7 +1,7 @@
 import * as React from "react";
 import { AnimatePresence, Reorder, motion } from "framer-motion";
 import { Plus, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../../lib/utils";
 import { CHIP_TONES, type ChipTone } from "../../ui/chip/chip";
 
 /** Represents a single tab. `value` is the Radix tab value; `label` is shown on the tab itself. */

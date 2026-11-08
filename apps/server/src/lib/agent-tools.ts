@@ -409,7 +409,7 @@ process.exit(buf.subarray(0, n).includes(0) ? 0 : 1);
 /** read_image body — reads the image, sniffs the type, prints a one-line header + base64 for the server to extract. */
 const READ_IMAGE_JS = `
 const fs = require("fs");
-// Runs as `node <tempfile> <image>` — argv[1] is the script, argv[2] the image.
+// Runs as \`node <tempfile> <image>\` — argv[1] is the script, argv[2] the image.
 const path = process.argv[2];
 const st = fs.statSync(path);
 if (!st.isFile()) { console.error("error: not a file: " + path); process.exit(1); }

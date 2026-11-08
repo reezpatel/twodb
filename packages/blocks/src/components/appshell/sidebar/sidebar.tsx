@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../../lib/utils";
 
 export interface SidebarProps extends Omit<React.ComponentProps<"aside">, "onResize"> {
   /** Which edge of the shell this panel docks to. Defaults to "right". */
