@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../../lib/utils";
 import { NavSection, NavItem, type NavGroupData, type NavItemData } from "./nav-item";
 import { WorkspaceSwitcher, type WorkspaceSwitcherProps } from "./workspace-switcher";
 

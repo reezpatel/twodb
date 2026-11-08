@@ -1,7 +1,9 @@
 @import "tailwindcss";
 @source "./components/blocks";
 @source "./components/ui";
+@source "../../../packages/blocks/src";
 @import "tw-animate-css";
+@import "./styles/blocks-bridge.css";
 
 /* Safe-area padding for edge-to-edge displays (Android status/nav bars, iOS notch). */
 @utility safe-top {

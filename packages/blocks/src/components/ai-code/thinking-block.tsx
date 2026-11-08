@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Brain, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 export interface ThinkingBlockProps extends React.ComponentProps<"div"> {
   /** The thinking text. If omitted and `live` is true, shows an animated placeholder. */

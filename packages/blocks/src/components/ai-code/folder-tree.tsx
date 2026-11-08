@@ -1,6 +1,6 @@
 import * as React from "react";
 import { ChevronRight, File, FileCode2, FileText, Folder } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 export type FolderNode = {
   name: string;

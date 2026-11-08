@@ -1,6 +1,6 @@
 import * as React from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../../lib/utils";
 
 export interface NavSidebarToggleProps extends Omit<React.ComponentProps<"button">, "onClick"> {
   open: boolean;

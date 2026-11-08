@@ -1,6 +1,6 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
+import { cn } from "../../../lib/utils";
 
 const statusBarVariants = cva("flex h-6 shrink-0 items-center justify-between gap-4 px-2 font-sans text-[12px] leading-none select-none", {
   variants: {

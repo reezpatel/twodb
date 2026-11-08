@@ -1,6 +1,6 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
+import { cn } from "../../../lib/utils";
 
 export const CHIP_ZONES = ["ion", "tritium", "transmute", "materials"] as const;
 export type ChipZone = (typeof CHIP_ZONES)[number];

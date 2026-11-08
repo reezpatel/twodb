@@ -1,0 +1,44 @@
+/*
+ * Bridge for @twodb/blocks ("Isometric Lab" theme).
+ *
+ * Only blocks-UNIQUE tokens are defined here (paper/stone/ink/outline/ion/…).
+ * Tokens shared with the app theme (card, popover, muted-foreground, destructive,
+ * font-sans/mono, radius, …) intentionally resolve to the app's own theme so
+ * blocks components blend in. The app is forced dark, so we use the blocks dark
+ * palette values.
+ */
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-grid: var(--paper-grid);
+  --color-stone: var(--stone);
+  --color-stone-hatch: var(--stone-hatch);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-outline: var(--outline);
+  --color-ion: var(--ion);
+  --color-ion-deep: var(--ion-deep);
+  --color-tritium: var(--tritium);
+  --color-transmute: var(--transmute);
+  --color-materials: var(--materials);
+  --color-glow: var(--glow);
+  --color-pin: var(--pin);
+}
+
+:root {
+  /* Isometric Lab — dark (neutral, no warm tint) */
+  --paper: #1a1a1a;
+  --paper-grid: #1f1f1f;
+  --stone: #1e1e1e;
+  --stone-hatch: #373737;
+  --ink: #f1ede4;
+  --ink-muted: #a9a397;
+  --outline: #353535;
+  --ion: #5d76a6;
+  --ion-deep: #9fb4e6;
+  --tritium: #4c8763;
+  --transmute: #a9677a;
+  --materials: #b47c48;
+  --glow: #e8c45a;
+  --pin: #ef6f7a;
+}

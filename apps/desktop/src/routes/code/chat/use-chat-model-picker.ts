@@ -1,42 +1,29 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
+import { Bot } from "lucide-react";
 import { api } from "@/lib/api";
 import { fmtTokens } from "@/lib/format-tokens";
 import type { LlmModel } from "@/lib/llm";
-import { THINKING_ORDER, type ModelConfig } from "@/components/model-picker/use-model-config";
-import type { ModelPickerProps } from "@/components/blocks/model-picker/model-picker";
-import type { ModelPickerModel, ModelPickerProvider } from "@/components/blocks/model-picker/model-picker-types";
-
-const FAVORITES_KEY = "twodb.favoriteModels";
+import type { ModelConfig } from "@/components/model-picker/use-model-config";
+import type { ModelProvider } from "@twodb/blocks";
 
 const pickerId = (connectionId: string, modelId: string) => `${connectionId}::${modelId}`;
-const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
-function loadFavorites(): string[] {
-  try {
-    const raw = localStorage.getItem(FAVORITES_KEY);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-/** Levels a model supports, in the same narrowing useModelConfig applies to the active model. */
-function levelsFor(model: LlmModel): string[] {
-  if (!model.thinking) return [];
-  const supported = model.thinkingLevel.length > 0 ? THINKING_ORDER.filter((level) => model.thinkingLevel.includes(level)) : THINKING_ORDER;
-  return supported.length >= 2 ? supported : THINKING_ORDER;
+export interface BlocksModelPickerProps {
+  providers: ModelProvider[];
+  /** pickerId of the active selection, or "" when nothing is selected. */
+  value: string;
+  disabled: boolean;
+  onChange: (id: string) => void;
 }
 
 /**
- * Adapts the session's connection / model / thinking selection to <ModelPicker>:
- * every enabled connection's models in one list (connection = provider), the
- * thinking level as "effort", and favorites persisted to localStorage.
+ * Adapts the session's connection / model selection to the @twodb/blocks
+ * <ModelPicker>: every enabled connection is a provider tab, its models the
+ * rows (identifier · context window · thinking badge).
  */
-export function useChatModelPicker(config: ModelConfig): Omit<ModelPickerProps, "children"> {
-  const { connections, selected, model, effectiveModel, thinkingLevel, providerLabel, selectConnectionModel, changeThinking } = config;
-  const [favorites, setFavorites] = useState<string[]>(loadFavorites);
+export function useChatModelPicker(config: ModelConfig): BlocksModelPickerProps {
+  const { connections, selected, model, effectiveModel, selectConnectionModel } = config;
 
   const modelQueries = useQueries({
     queries: connections.map((connection) => ({
@@ -45,61 +32,37 @@ export function useChatModelPicker(config: ModelConfig): Omit<ModelPickerProps, 
     })),
   });
 
-  const { models, targets } = useMemo(() => {
-    const list: ModelPickerModel[] = [];
+  const { providers, targets } = useMemo(() => {
     const lookup = new Map<string, { connectionId: string; modelId: string }>();
-    connections.forEach((connection, index) => {
-      for (const item of modelQueries[index]?.data ?? []) {
+    const list: ModelProvider[] = connections.map((connection, index) => ({
+      id: connection.id,
+      title: connection.name,
+      icon: Bot,
+      models: (modelQueries[index]?.data ?? []).map((item) => {
         const id = pickerId(connection.id, item.modelId);
-        const levels = levelsFor(item);
         lookup.set(id, { connectionId: connection.id, modelId: item.modelId });
-        list.push({
+        return {
           id,
           label: item.displayName ?? item.modelId,
-          provider: connection.id,
-          providerName: providerLabel(connection.provider),
-          modelId: item.modelId,
-          description: [connection.name, item.contextWindow ? `${fmtTokens(item.contextWindow)} context` : null].filter(Boolean).join(" · "),
-          efforts: levels.length > 0 ? levels.map(capitalize) : undefined,
-          badges: [item.thinking ? "thinking" : null, item.input.includes("image") ? "vision" : null].filter((badge): badge is string => badge !== null),
-        });
-      }
-    });
-    return { models: list, targets: lookup };
+          context: item.contextWindow ? fmtTokens(item.contextWindow) : undefined,
+          thinking: item.thinking,
+        };
+      }),
+    }));
+    return { providers: list, targets: lookup };
     // modelQueries is a fresh array each render; its data identities are what change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connections, providerLabel, ...modelQueries.map((query) => query.data)]);
+  }, [connections, ...modelQueries.map((query) => query.data)]);
 
-  // Group the browser by connection, not provider type — two connections to the
-  // same provider stay separate and show each connection's custom name.
-  const providers = useMemo<ModelPickerProvider[]>(() => connections.map((connection) => ({ id: connection.id, label: connection.name })), [connections]);
-
-  const selectedId = selected ? pickerId(selected.id, model || effectiveModel) : null;
-  const selectedModel = models.find((item) => item.id === selectedId);
-
-  const updateFavorites = useCallback((update: (current: string[]) => string[]) => {
-    setFavorites((current) => {
-      const next = update(current);
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, []);
+  const value = selected ? pickerId(selected.id, model || effectiveModel) : "";
 
   return {
-    models,
     providers,
-    selectedId,
-    configs: selectedId && selectedModel?.efforts ? { [selectedId]: { effort: capitalize(thinkingLevel) } } : undefined,
-    favorites,
+    value,
     disabled: connections.length === 0,
-    onModelPicked: (id) => {
+    onChange: (id) => {
       const target = targets.get(id);
       if (target) selectConnectionModel(target.connectionId, target.modelId);
     },
-    onConfigChanged: (_id, patch) => {
-      if (patch.effort) changeThinking(patch.effort.toLowerCase());
-    },
-    onFavoriteAdded: (id) => updateFavorites((current) => (current.includes(id) ? current : [...current, id])),
-    onFavoriteRemoved: (id) => updateFavorites((current) => current.filter((favorite) => favorite !== id)),
   };
 }

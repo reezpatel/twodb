@@ -2,7 +2,7 @@ import * as React from "react";
 import { AnimatePresence, Reorder, useDragControls, useReducedMotion } from "framer-motion";
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import { ArrowUpToLine, CornerUpRight, GripVertical, MoreHorizontal, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 import { Button } from "../ui/button/button";
 
 export interface QueuedMessage {

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Brain, Check, ChevronDown, Search } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "../ui/dialog/dialog";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs/tabs";
 
