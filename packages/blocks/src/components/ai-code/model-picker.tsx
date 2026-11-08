@@ -13,6 +13,8 @@ export interface ModelEntry {
   context?: string;
   /** Whether the model supports extended thinking. */
   thinking?: boolean;
+  /** Thinking levels this model supports (e.g. ["low","medium","high"]). Enables the effort selector when the model is selected. */
+  thinkingLevels?: string[];
 }
 
 export interface ModelProvider {
@@ -32,9 +34,12 @@ export interface ModelPickerProps {
   /** Currently selected model id. */
   value: string;
   onChange?: (id: string) => void;
+  /** Active thinking level for the selected model. */
+  thinkingLevel?: string;
+  onThinkingChange?: (level: string) => void;
 }
 
-function ModelPicker({ providers, models, value, onChange }: ModelPickerProps) {
+function ModelPicker({ providers, models, value, onChange, thinkingLevel, onThinkingChange }: ModelPickerProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const groups: ModelProvider[] = providers ?? [{ id: "all", title: "All", models: (models ?? []).map((m) => ({ id: m })) }];
@@ -49,8 +54,12 @@ function ModelPicker({ providers, models, value, onChange }: ModelPickerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // The trigger always shows the model identifier (label), never the internal
+  // value/id (which can be a connection-scoped key like "uuid::model").
   const selected = groups.flatMap((g) => g.models).find((m) => m.id === value);
-  const selectedLabel = selected?.label ?? value;
+  const selectedLabel = selected?.label ?? (groups.flatMap((g) => g.models).length ? "Select model" : "No models");
+  const effortLevels = selected?.thinkingLevels ?? (selected?.thinking ? ["low", "medium", "high"] : []);
+  const activeEffort = thinkingLevel && effortLevels.includes(thinkingLevel) ? thinkingLevel : effortLevels[Math.floor(effortLevels.length / 2)] ?? effortLevels[0];
 
   const filtered = (list: ModelEntry[]) => {
     const q = query.trim().toLowerCase();
@@ -63,15 +72,24 @@ function ModelPicker({ providers, models, value, onChange }: ModelPickerProps) {
       <button
         type="button"
         data-slot="model-picker-trigger"
+        aria-label={`Model: ${selectedLabel}`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        data-state={open ? "open" : "closed"}
         onClick={() => setOpen(true)}
         className={cn(
-          "group flex items-center gap-1.5 rounded-[6px] border border-outline bg-stone px-2.5 py-1.5 font-sans text-[12px] font-medium text-ink outline-none transition-colors",
-          "hover:bg-paper-grid focus-visible:outline-2 focus-visible:outline-ion-deep focus-visible:outline-offset-2",
+          "group flex min-w-0 items-center gap-2 rounded-lg px-1.5 py-0.5 font-sans text-xs font-medium text-muted-foreground outline-none transition-colors min-h-6",
+          "hover:bg-stone hover:text-ink data-[state=open]:bg-stone data-[state=open]:text-ink",
+          "focus-visible:outline-2 focus-visible:outline-ion-deep disabled:pointer-events-none disabled:opacity-40",
         )}
       >
-        <span className="size-1.5 shrink-0 rounded-full bg-ion-deep" />
-        <span className="max-w-[140px] truncate">{selectedLabel}</span>
-        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" strokeWidth={2} />
+        <span data-slot="model-picker-label" className="flex min-w-0 items-baseline gap-1.5 text-xs">
+          <span className="truncate text-ink">{selectedLabel}</span>
+          {effortLevels.length > 0 && activeEffort ? (
+            <span className="shrink-0 font-medium text-muted-foreground/70 capitalize tabular-nums">{activeEffort}</span>
+          ) : null}
+        </span>
+        <ChevronDown className="size-3.5 shrink-0 opacity-60 transition-transform group-data-[state=open]:rotate-180" strokeWidth={2} aria-hidden="true" />
       </button>
 
       <DialogContent showClose={false} className="gap-0 p-0" style={{ width: 560, maxWidth: "92vw" }} aria-describedby={undefined}>
@@ -89,63 +107,86 @@ function ModelPicker({ providers, models, value, onChange }: ModelPickerProps) {
           <kbd className="rounded-[4px] border border-outline bg-stone px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">ESC</kbd>
         </div>
 
-        {/* Provider tabs */}
-        <div className="border-b border-outline px-3 pt-2">
-          <Tabs value={activeProvider} onValueChange={setActiveProvider}>
-            <TabsList variant="line" size="sm" className="border-b-0">
-              {groups.map((g) => {
-                const Icon = g.icon;
+        {/* Provider tabs + model table: clipped to the dialog's rounded corners */}
+        <div className="overflow-hidden rounded-b-[10px]">
+          <div className="border-b border-outline px-3 pt-2">
+            <Tabs value={activeProvider} onValueChange={setActiveProvider}>
+              <TabsList variant="line" size="sm" className="border-b-0">
+                {groups.map((g) => {
+                  const Icon = g.icon;
+                  return (
+                    <TabsTrigger key={g.id} value={g.id}>
+                      {Icon ? <Icon strokeWidth={1.5} /> : null}
+                      {g.title}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </Tabs>
+          </div>
+
+          <div className="max-h-[320px] overflow-y-auto p-2">
+            {groups
+              .filter((g) => g.id === activeProvider)
+              .map((g) => {
+                const list = filtered(g.models);
+                if (!list.length) return <p key={g.id} className="px-3 py-6 text-center font-sans text-[13px] text-muted-foreground">No models match “{query}”.</p>;
                 return (
-                  <TabsTrigger key={g.id} value={g.id}>
-                    {Icon ? <Icon strokeWidth={1.5} /> : null}
-                    {g.title}
-                  </TabsTrigger>
+                  <div key={g.id} className="flex flex-col">
+                    {list.map((m) => {
+                      const isSel = m.id === value;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            onChange?.(m.id);
+                            setOpen(false);
+                          }}
+                          className={cn(
+                            "flex items-center gap-3 rounded-[6px] px-3 py-2 text-left outline-none transition-colors",
+                            isSel ? "bg-stone" : "hover:bg-stone/60",
+                            "focus-visible:outline-2 focus-visible:outline-ion-deep",
+                          )}
+                        >
+                          <span className="flex size-4 shrink-0 items-center justify-center">{isSel ? <Check className="size-3.5 text-ion-deep" strokeWidth={2.5} /> : null}</span>
+                          <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-ink">{m.label ?? m.id}</span>
+                          {m.context ? <span className="shrink-0 font-sans text-[11px] text-muted-foreground tabular-nums">{m.context}</span> : null}
+                          {m.thinking ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ion/40 px-2 py-0.5 font-sans text-[10px] font-medium text-ink">
+                              <Brain className="size-3" strokeWidth={1.5} />
+                              Thinking
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
                 );
               })}
-            </TabsList>
-          </Tabs>
-        </div>
+          </div>
 
-        {/* Model table */}
-        <div className="max-h-[320px] overflow-y-auto p-2">
-          {groups
-            .filter((g) => g.id === activeProvider)
-            .map((g) => {
-              const list = filtered(g.models);
-              if (!list.length) return <p key={g.id} className="px-3 py-6 text-center font-sans text-[13px] text-muted-foreground">No models match “{query}”.</p>;
-              return (
-                <div key={g.id} className="flex flex-col">
-                  {list.map((m) => {
-                    const isSel = m.id === value;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          onChange?.(m.id);
-                          setOpen(false);
-                        }}
-                        className={cn(
-                          "flex items-center gap-3 rounded-[6px] px-3 py-2 text-left outline-none transition-colors",
-                          isSel ? "bg-stone" : "hover:bg-stone/60",
-                          "focus-visible:outline-2 focus-visible:outline-ion-deep",
-                        )}
-                      >
-                        <span className="flex size-4 shrink-0 items-center justify-center">{isSel ? <Check className="size-3.5 text-ion-deep" strokeWidth={2.5} /> : null}</span>
-                        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-ink">{m.id}</span>
-                        {m.context ? <span className="shrink-0 font-sans text-[11px] text-muted-foreground tabular-nums">{m.context}</span> : null}
-                        {m.thinking ? (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ion/40 px-2 py-0.5 font-sans text-[10px] font-medium text-ink">
-                            <Brain className="size-3" strokeWidth={1.5} />
-                            Thinking
-                          </span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })}
+          {/* Effort (thinking level) — shown for the selected thinking model */}
+          {effortLevels.length > 0 && (
+            <div className="flex items-center gap-1.5 border-t border-outline px-3 py-2">
+              <Brain className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+              <span className="mr-1 font-sans text-[11px] font-medium text-muted-foreground">Effort</span>
+              {effortLevels.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => onThinkingChange?.(level)}
+                  className={cn(
+                    "rounded-[5px] px-2 py-1 font-sans text-[11px] font-medium capitalize outline-none transition-colors",
+                    level === activeEffort ? "bg-stone text-ink" : "text-muted-foreground hover:text-ink",
+                    "focus-visible:outline-2 focus-visible:outline-ion-deep",
+                  )}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

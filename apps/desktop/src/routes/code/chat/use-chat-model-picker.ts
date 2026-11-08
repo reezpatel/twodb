@@ -4,26 +4,35 @@ import { Bot } from "lucide-react";
 import { api } from "@/lib/api";
 import { fmtTokens } from "@/lib/format-tokens";
 import type { LlmModel } from "@/lib/llm";
-import type { ModelConfig } from "@/components/model-picker/use-model-config";
+import { THINKING_ORDER, type ModelConfig } from "@/components/model-picker/use-model-config";
 import type { ModelProvider } from "@twodb/blocks";
 
 const pickerId = (connectionId: string, modelId: string) => `${connectionId}::${modelId}`;
+
+/** Thinking levels a model supports, narrowed to the wire vocabulary. */
+function levelsFor(model: LlmModel): string[] {
+  if (!model.thinking) return [];
+  const supported = model.thinkingLevel.length > 0 ? THINKING_ORDER.filter((level) => model.thinkingLevel.includes(level)) : THINKING_ORDER;
+  return supported.length >= 2 ? supported : THINKING_ORDER;
+}
 
 export interface BlocksModelPickerProps {
   providers: ModelProvider[];
   /** pickerId of the active selection, or "" when nothing is selected. */
   value: string;
   disabled: boolean;
+  thinkingLevel: string;
   onChange: (id: string) => void;
+  onThinkingChange: (level: string) => void;
 }
 
 /**
- * Adapts the session's connection / model selection to the @twodb/blocks
- * <ModelPicker>: every enabled connection is a provider tab, its models the
- * rows (identifier · context window · thinking badge).
+ * Adapts the session's connection / model / thinking selection to the @twodb/blocks
+ * <ModelPicker>: every enabled connection is a provider tab, its models the rows
+ * (identifier · context window · thinking badge), plus the thinking-level effort.
  */
 export function useChatModelPicker(config: ModelConfig): BlocksModelPickerProps {
-  const { connections, selected, model, effectiveModel, selectConnectionModel } = config;
+  const { connections, selected, model, effectiveModel, thinkingLevel, selectConnectionModel, changeThinking } = config;
 
   const modelQueries = useQueries({
     queries: connections.map((connection) => ({
@@ -41,11 +50,13 @@ export function useChatModelPicker(config: ModelConfig): BlocksModelPickerProps 
       models: (modelQueries[index]?.data ?? []).map((item) => {
         const id = pickerId(connection.id, item.modelId);
         lookup.set(id, { connectionId: connection.id, modelId: item.modelId });
+        const levels = levelsFor(item);
         return {
           id,
           label: item.displayName ?? item.modelId,
           context: item.contextWindow ? fmtTokens(item.contextWindow) : undefined,
           thinking: item.thinking,
+          thinkingLevels: levels.length > 0 ? levels : undefined,
         };
       }),
     }));
@@ -54,15 +65,20 @@ export function useChatModelPicker(config: ModelConfig): BlocksModelPickerProps 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connections, ...modelQueries.map((query) => query.data)]);
 
-  const value = selected ? pickerId(selected.id, model || effectiveModel) : "";
+  // `selected`/`effectiveModel` default to the first connection/model when the
+  // session hasn't pinned one yet — reflect that default in the picker.
+  const activeModelId = model || effectiveModel;
+  const value = selected && activeModelId ? pickerId(selected.id, activeModelId) : "";
 
   return {
     providers,
     value,
     disabled: connections.length === 0,
+    thinkingLevel,
     onChange: (id) => {
       const target = targets.get(id);
       if (target) selectConnectionModel(target.connectionId, target.modelId);
     },
+    onThinkingChange: changeThinking,
   };
 }
