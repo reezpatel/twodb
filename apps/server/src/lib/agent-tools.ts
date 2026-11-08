@@ -6,7 +6,7 @@ import { enabledRepoSources, readRepoSkill } from "./skills";
 import { spaceMatches } from "./spaces";
 import { readAssetForModel, MAX_IMAGE_BASE64 } from "./assets";
 import { runnerManager } from "./runner-manager";
-import { startBackgroundJob, readJobLogs, formatJobStatuses } from "./background-jobs";
+import { startBackgroundJob, readJobLogs, formatJobStatuses, GLOBAL_JOB_AGENT_TYPES, startGlobalJob, getGlobalJob, listGlobalJobs, readGlobalJobLogs, killGlobalJob } from "./background-jobs";
 import { broadcastToSession, broadcastSessionEvent } from "../routes/code-ws";
 
 export type ToolOutputSink = (stream: "stdout" | "stderr", data: string) => void;
@@ -310,6 +310,28 @@ export const AGENT_TOOLS: AgentTool[] = [
     },
   },
   {
+    name: "global_background_job",
+    scope: ["code"],
+    description:
+      'Agent-scoped background jobs shared across sessions. Only persona, collaborator and sentinel agents can use it. action=start registers a detached job on this session\'s runner under an identifier YOU choose; its completion message lands in this session\'s thread like a normal background job. Other agent sessions (any runner) can then reach it: action=get reads its lifecycle, action=list lists all global jobs (optionally by status or identifier prefix), action=logs reads its output, action=kill stops it — all by identifier. Global jobs survive /new and /compact.',
+    parameters: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["start", "get", "list", "logs", "kill"], description: "What to do" },
+        identifier: {
+          type: "string",
+          description: 'Agent-chosen job name, e.g. "dev-server" or "nightly-build" (2-63 chars, [a-z0-9_-]). Required for every action except list.',
+        },
+        command: { type: "string", description: "action=start only: shell command to run detached" },
+        status: { type: "string", description: "action=list only: filter by running | done | failed | killed | lost" },
+        from: { type: "number", description: "action=logs only: first line (1-based, inclusive)" },
+        to: { type: "number", description: "action=logs only: last line (1-based, inclusive)" },
+        lines: { type: "number", description: "action=logs only: last N lines (default 10, max 200) when from/to omitted" },
+      },
+      required: ["action"],
+    },
+  },
+  {
     name: "web_fetch",
     scope: ["code"],
     description: "Fetches a URL and returns readable text. Placeholder — not wired up yet.",
@@ -387,7 +409,8 @@ process.exit(buf.subarray(0, n).includes(0) ? 0 : 1);
 /** read_image body — reads the image, sniffs the type, prints a one-line header + base64 for the server to extract. */
 const READ_IMAGE_JS = `
 const fs = require("fs");
-const path = process.argv[1];
+// Runs as `node <tempfile> <image>` — argv[1] is the script, argv[2] the image.
+const path = process.argv[2];
 const st = fs.statSync(path);
 if (!st.isFile()) { console.error("error: not a file: " + path); process.exit(1); }
 const buf = fs.readFileSync(path);
@@ -557,6 +580,14 @@ function newFileDiff(path: string, content: string): string | undefined {
   return `--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${Math.max(1, lines.length)} @@\n${body.join("\n")}${tail}\n`;
 }
 
+/** Runs an embedded JS body on the runner via a temp file instead of
+ * `node -e "$(printf … | base64 -d)"` — decoding through command substitution
+ * + double-quoted shell expansion mangles backslashes on some transports, and
+ * node then parses a corrupted script ("Expected ',', got 'string literal").
+ * Always cleans up; exits with node's code. */
+const runJsFile = (js: string, extraArgs = "") =>
+  `TWODB_JS=$(mktemp "\${TMPDIR:-/tmp}/twodb-js-XXXXXX.js") && ${b64Decode(js)} > "$TWODB_JS" && node "$TWODB_JS"${extraArgs}; CODE=$?; rm -f "$TWODB_JS"; exit $CODE`;
+
 /** Translates a tool call into the bash script executed on the runner. Throws on invalid arguments. */
 function buildCommand(call: AgentToolCall): string {
   const args = call.arguments ?? {};
@@ -601,7 +632,7 @@ function buildCommand(call: AgentToolCall): string {
       // image part for vision-capable models. Nothing lands in Postgres.
       return (
         `if [ ! -f ${shq(path)} ]; then echo ${shq(`error: not a file: ${path}`)} >&2; exit 1; fi; ` +
-        `node -e "$(${b64Decode(READ_IMAGE_JS)})" ${shq(path)}`
+        runJsFile(READ_IMAGE_JS, ` ${shq(path)}`)
       );
     }
 
@@ -616,8 +647,8 @@ function buildCommand(call: AgentToolCall): string {
       const path = str(args.path);
       if (!path) throw new Error("path is required");
       return (
-        `U_FILE=${shq(b64(path))} U_OLD=${shq(b64(str(args.old_string)))} U_NEW=${shq(b64(str(args.new_string)))} ` +
-        `node -e "$(${b64Decode(UPDATE_FILE_JS)})"`
+        `export U_FILE=${shq(b64(path))} U_OLD=${shq(b64(str(args.old_string)))} U_NEW=${shq(b64(str(args.new_string)))}; ` +
+        runJsFile(UPDATE_FILE_JS)
       );
     }
 
@@ -689,6 +720,9 @@ export interface ToolContext {
   supportsImages: boolean;
   /** Only the Anthropic wire renders images inside tool results; elsewhere the upload-time attachment carries them. */
   imageToolResults: boolean;
+  /** Bound agent on the session, when any — gates global agent jobs. */
+  agentId?: string | null;
+  agentType?: string | null;
 }
 
 const CANVAS_TYPES = new Set(["markdown", "html", "code", "text"]);
@@ -843,6 +877,61 @@ export async function executeToolCall(
       const header = logs.totalLines !== undefined ? `[${logs.totalLines} total lines]
 ` : "";
       return { output: header + logs.output, code: 0, failed: false };
+    } catch (e) {
+      return { output: `error: ${(e as Error).message}`, code: null, failed: true };
+    }
+  }
+  if (call.name === "global_background_job") {
+    if (!ctx) return { output: "error: global_background_job requires session context", code: null, failed: true };
+    // Persona / collaborator / sentinel agents only — the bound agent of the session.
+    if (!ctx.agentId || !ctx.agentType || !GLOBAL_JOB_AGENT_TYPES.has(ctx.agentType)) {
+      return {
+        output: `error: global_background_job is only available to persona, collaborator or sentinel agents (this session is ${ctx.agentType ? `a ${ctx.agentType} agent` : "not bound to an agent"})`,
+        code: null,
+        failed: true,
+      };
+    }
+    const action = str(call.arguments?.action).trim();
+    const identifier = str(call.arguments?.identifier).trim();
+    const command = str(call.arguments?.command).trim();
+    const status = str(call.arguments?.status).trim();
+    const lines = Math.max(1, Math.min(200, Number(call.arguments?.lines) || 10));
+    const numArg = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.max(1, Math.floor(v)) : undefined);
+    const from = numArg(call.arguments?.from);
+    const to = numArg(call.arguments?.to);
+    if (!["start", "get", "list", "logs", "kill"].includes(action)) return { output: "error: action must be start, get, list, logs or kill", code: null, failed: true };
+    if (action !== "list" && !identifier) return { output: "error: identifier is required for this action", code: null, failed: true };
+    if (action === "start" && !command) return { output: "error: command is required for action=start", code: null, failed: true };
+    try {
+      // start runs on THIS session's runner; the other actions resolve the
+      // job's own runner so cross-runner access works.
+      if (action === "start") {
+        if (!runnerId) return { output: "error: no runner assigned to this session", code: null, failed: true };
+        const result = await startGlobalJob({
+          sessionId: ctx.sessionId,
+          organizationId: ctx.organizationId,
+          runnerId,
+          command,
+          cwd,
+          identifier,
+          agentId: ctx.agentId,
+        });
+        return { output: result.output, code: result.failed ? null : 0, failed: result.failed };
+      }
+      if (action === "get") {
+        const result = await getGlobalJob(ctx.organizationId, identifier);
+        return { output: result.output, code: result.failed ? null : 0, failed: result.failed };
+      }
+      if (action === "list") {
+        const result = await listGlobalJobs(ctx.organizationId, { status: status || undefined, identifier: identifier || undefined });
+        return { output: result.output, code: 0, failed: false };
+      }
+      if (action === "logs") {
+        const result = await readGlobalJobLogs(ctx.organizationId, identifier, from !== undefined || to !== undefined ? { from, to } : { lines });
+        return { output: result.output, code: result.failed ? null : 0, failed: result.failed };
+      }
+      const result = await killGlobalJob(ctx.organizationId, identifier);
+      return { output: result.output, code: result.failed ? null : 0, failed: result.failed };
     } catch (e) {
       return { output: `error: ${(e as Error).message}`, code: null, failed: true };
     }

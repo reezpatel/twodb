@@ -2,6 +2,8 @@ const authUrl = (process.env.BETTER_AUTH_URL ?? "http://localhost:5173").replace
 
 export const env = {
   port: Number(process.env.TWODB_PORT ?? 3001),
+  /** Bind address — 0.0.0.0 by default so the server is reachable on the LAN (self-hosted setups); override with TWODB_HOST. */
+  host: process.env.TWODB_HOST ?? "0.0.0.0",
   databaseUrl: process.env.TWODB_DATABASE_URL ?? "postgres://twodb:twodb@localhost:5432/twodb",
   memgraph: {
     url: process.env.MEMGRAPH_URL ?? "bolt://localhost:7687",

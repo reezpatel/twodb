@@ -560,6 +560,10 @@ export interface CodeSessionJobTable {
   finishedAt: Date | null;
   /** Set when retired from the sidebar (/new, /compact) — the row stays. */
   hiddenAt: ColumnType<Date | null, Date | null | undefined, Date | null | undefined>;
+  /** Global agent job: agent-chosen identifier other agents address it by. */
+  identifier: string | null;
+  /** Global agent job: the agent (persona/collaborator/sentinel) that owns it. */
+  agentId: string | null;
 }
 
 export interface LlmQuotaTable {

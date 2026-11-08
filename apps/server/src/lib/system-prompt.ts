@@ -17,6 +17,7 @@ export const DEFAULT_SYSTEM_PROMPT = `You are an expert coding assistant operati
 - run_background: Run a shell command detached on the runner — returns a job id immediately; output is delivered into the thread when it finishes
 - job_logs: Read a background job's log by job id (last N lines, default 10)
 - background_job_status: List background jobs with status, exit code and duration
+- global_background_job: Agent-scoped background jobs shared across sessions (persona/collaborator/sentinel only) — start a detached job under an identifier you choose, then any agent can get/list/logs/kill it by that identifier; the completion message still lands in the starting session's thread
 
 In addition to the tools above, you may have access to other custom tools depending on the project.
 

@@ -106,6 +106,102 @@ export interface ProviderRetryInfo {
   message: string;
 }
 
+// --- tool_use/tool_result pairing repair ------------------------------------
+// Providers hard-400 on malformed tool pairing: Anthropic wants every
+// tool_use answered by a tool_result in the *immediately following* message
+// and rejects results naming an unknown call; the openai wires have the same
+// rule in their own shape. Persisted history can reach that state anyway:
+// rows share a millisecond-resolution createdAt and ties read back in
+// arbitrary order (a result lands *before* its call), a crash/restart lands
+// between the assistant row and its tool rows, a clear boundary slices a tool
+// group in half. repairToolPairing normalizes the outgoing context so the
+// wire is always valid — real results are moved next to their call, missing
+// ones get an explanatory placeholder, orphans drop out.
+
+export interface ToolPairingReport {
+  /** tool_use ids with no result anywhere — placeholders synthesized. */
+  missing: { id: string; name: string }[];
+  /** results that existed but not directly after their call — moved. */
+  moved: { id: string; name: string }[];
+  /** results whose call is gone (clear slice, id corruption) — dropped from the wire. */
+  orphans: { id: string; name: string }[];
+}
+
+export function isToolPairingClean(report: ToolPairingReport): boolean {
+  return report.missing.length === 0 && report.moved.length === 0 && report.orphans.length === 0;
+}
+
+/** Placeholder result for a call whose real output was never recorded. Doubles
+ * as the model-visible notice: the model learns the output is unknown instead
+ * of silently assuming success. */
+export function toolResultPlaceholder(name: string): string {
+  return (
+    `[twodb auto-repair] the result of this ${name} call was never recorded — the run was interrupted between the tool call and its ` +
+    `result (stop, crash or restart), or history rows read back out of order. This placeholder keeps the conversation valid for the ` +
+    `provider; do NOT assume the call succeeded — re-run it if you need its output.`
+  );
+}
+
+/**
+ * Returns a copy of `messages` with valid tool pairing (original order kept
+ * otherwise) plus a report of what changed. Idempotent: a clean history comes
+ * back untouched with an empty report.
+ */
+export function repairToolPairing(messages: AgentMessage[]): { messages: AgentMessage[]; report: ToolPairingReport } {
+  const report: ToolPairingReport = { missing: [], moved: [], orphans: [] };
+  const hasCalls = messages.some((m) => m.role === "assistant" && (m.meta?.toolCalls?.length ?? 0) > 0);
+  const hasResults = messages.some((m) => m.role === "tool");
+  if (!hasCalls && !hasResults) return { messages, report };
+
+  // Real tool results by call id; consumed as their assistant turn claims them.
+  const pool = new Map<string, AgentMessage[]>();
+  for (const m of messages) {
+    if (m.role !== "tool") continue;
+    const id = m.meta?.toolCallId;
+    if (!id) {
+      report.orphans.push({ id: "", name: m.meta?.name ?? "tool" });
+      continue;
+    }
+    const queue = pool.get(id) ?? [];
+    queue.push(m);
+    pool.set(id, queue);
+  }
+
+  const consumed = new Set<AgentMessage>();
+  const out: AgentMessage[] = [];
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    if (m.role === "tool") continue; // results emit only via their call
+    out.push(m);
+    const calls = m.role === "assistant" ? (m.meta?.toolCalls ?? []) : [];
+    if (calls.length === 0) continue;
+    // Results already sitting in the contiguous tool block right after this
+    // turn are valid where they are (any order within the block is accepted).
+    const wellPlaced = new Set<string>();
+    for (let j = i + 1; j < messages.length && messages[j].role === "tool"; j++) {
+      const id = messages[j].meta?.toolCallId;
+      if (id && !consumed.has(messages[j])) wellPlaced.add(id);
+    }
+    for (const call of calls) {
+      const real = pool.get(call.id)?.find((c) => !consumed.has(c));
+      if (real) {
+        consumed.add(real);
+        if (!wellPlaced.has(call.id)) report.moved.push({ id: call.id, name: call.name });
+        out.push(real);
+      } else {
+        report.missing.push({ id: call.id, name: call.name });
+        out.push({ role: "tool", content: toolResultPlaceholder(call.name), meta: { toolCallId: call.id, name: call.name } });
+      }
+    }
+  }
+  for (const m of messages) {
+    if (m.role !== "tool" || consumed.has(m)) continue;
+    const id = m.meta?.toolCallId;
+    if (id) report.orphans.push({ id, name: m.meta?.name ?? "tool" });
+  }
+  return { messages: out, report };
+}
+
 // --- Provider fetch with retry ----------------------------------------------
 // Network failures (ETIMEDOUT, ECONNRESET, DNS…) and transient HTTP statuses
 // (408/425/429/5xx) are retried with exponential backoff + jitter. Only the
@@ -772,6 +868,17 @@ export async function runAgentRound(
   onDelta: DeltaSink = () => {},
   events: RoundEvents = {},
 ): Promise<AgentRoundResult> {
+  // Last line of defense: never send a tool_use/tool_result mismatch to a
+  // provider — it is a hard 400. Callers that already repaired (the agent
+  // loop, projectHistory) see a no-op here.
+  const repaired = repairToolPairing(messages);
+  if (!isToolPairingClean(repaired.report)) {
+    logger.warn(
+      { provider: connection.provider, model, missing: repaired.report.missing, moved: repaired.report.moved, orphans: repaired.report.orphans },
+      "tool_use/tool_result mismatch repaired before provider call",
+    );
+    messages = repaired.messages;
+  }
   const provider = getProvider(connection.provider);
   if (provider?.api === "anthropic") {
     return anthropicRound(connection, model, messages, tools, onDelta, events);

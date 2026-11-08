@@ -3,6 +3,8 @@ import type { Selectable } from "kysely";
 import type { CodeSessionTable, LlmConnectionTable } from "../plugins/db";
 import {
   runAgentRound,
+  repairToolPairing,
+  isToolPairingClean,
   type AgentImagePart,
   type AgentImageRef,
   type AgentMessage,
@@ -22,6 +24,7 @@ import { clearAskUser, waitForAskUserResponse, type AskUserQuestion } from "./as
 import { COMPACT_RESERVE_TOKENS, codeCompactionStore, estimateContextTokens, NothingToCompactError, projectHistory, runCompaction } from "./compaction";
 import { resolveSessionSystemPrompt } from "./session-prompt";
 import { executeMemoryTool, MEMORY_TOOL_NAMES, MEMORY_TOOLS } from "./memory";
+import { GLOBAL_JOB_AGENT_TYPES } from "./background-jobs";
 
 export const MAX_ROUNDS = 300;
 
@@ -133,7 +136,10 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
   const agentToolNames = boundAgent?.tools;
   const filterByAgent = <T extends { name: string }>(list: T[]): T[] =>
     !agentToolNames || agentToolNames.includes("all") ? list : list.filter((t) => agentToolNames.includes(t.name));
-  const scopedTools = filterByAgent(scopedBase);
+  // Global agent jobs are persona/collaborator/sentinel only — drop the tool
+  // entirely for main sessions and sub_agent children so it never shows up.
+  const scopedBase2 = boundAgent && GLOBAL_JOB_AGENT_TYPES.has(boundAgent.type) ? scopedBase : scopedBase.filter((t) => t.name !== "global_background_job");
+  const scopedTools = filterByAgent(scopedBase2);
   // The session's space drives resource matching: skills/instructions/
   // memories/MCP/spaced connections of the same space join the run, null-space
   // resources match everywhere, and unspaced directories see only null-space.
@@ -316,6 +322,16 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
     return { output: JSON.stringify({ answers: resolution.answers ?? [] }, null, 2), code: 0, failed: false };
   };
 
+  // createdAt carries ms precision and history loads order by it alone —
+  // same-ms inserts (assistant row + its tool rows) would read back in
+  // arbitrary order and break tool pairing. Keep every row of a run strictly
+  // increasing so insert order survives the round trip.
+  let lastInsertMs = 0;
+  const nextCreatedAt = () => {
+    const now = Date.now();
+    lastInsertMs = now <= lastInsertMs ? lastInsertMs + 1 : now;
+    return new Date(lastInsertMs);
+  };
   const insertMessage = (role: string, content: string, meta: Record<string, unknown> | null) =>
     db
       .insertInto("code_session_message")
@@ -327,9 +343,35 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
         // runner-boundary strip in runner-manager.
         content: content.replaceAll("\u0000", ""),
         meta,
-        createdAt: new Date(),
+        createdAt: nextCreatedAt(),
       })
       .execute();
+
+  /**
+   * Last-chance validation before a round hits the provider: repair any
+   * tool_use/tool_result mismatch in the outgoing context, warn the user in
+   * the thread (persisted UI-only row, debug details in meta) and tell the
+   * model what was repaired so it doesn't trust a placeholder's silence.
+   */
+  const repairContextForProvider = async (round: number): Promise<void> => {
+    const { messages: repaired, report } = repairToolPairing(messages);
+    if (isToolPairingClean(report)) return;
+    logger.warn({ sessionId: session.id, round, ...report }, "tool pairing repaired before provider call");
+    const parts: string[] = [];
+    if (report.missing.length) parts.push(`${report.missing.length} tool call(s) had no recorded result (${report.missing.map((c) => c.name).join(", ")}) — placeholder results inserted`);
+    if (report.moved.length) parts.push(`${report.moved.length} tool result(s) were stored out of order (${report.moved.map((c) => c.name).join(", ")}) — realigned with their calls`);
+    if (report.orphans.length) parts.push(`${report.orphans.length} orphaned tool result(s) (${report.orphans.map((c) => c.name).join(", ")}) — dropped from context`);
+    const text = parts.join("; ");
+    messages.length = 0;
+    messages.push(...repaired);
+    await insertMessage("error", `Context auto-repaired: ${text}.`, { round, warning: true, final: true, repair: report });
+    await emit({ type: "run_error", message: `Context auto-repaired: ${text}.`, final: true });
+    messages.push({
+      role: "user",
+      content: `[twodb system notice — context repair] Before this round, the conversation had broken tool pairing and was auto-repaired: ${text}. Placeholder results mean the tool's real output was never recorded — do not assume those calls succeeded; re-run them if you need their output.`,
+      meta: null,
+    });
+  };
 
   const logUsage = async (usage: RoundUsage) => {
     const base = {
@@ -388,6 +430,7 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
         break;
       }
       await maybeCompact();
+      await repairContextForProvider(round);
       if (signal?.aborted) {
         stopped = true;
         break;
@@ -509,7 +552,7 @@ export async function runAgentLoop(input: AgentLoopInput, emit: FrameSink): Prom
                   () => {
                     void emit({ type: "status", text: "runner is offline — waiting for it to come back (up to 60 min)…" });
                   },
-                  { organizationId, sessionId: session.id, codeDirectoryId: session.codeDirectoryId, spaceId: sessionSpaceId, supportsImages, imageToolResults },
+                  { organizationId, sessionId: session.id, codeDirectoryId: session.codeDirectoryId, spaceId: sessionSpaceId, supportsImages, imageToolResults, agentId: session.agentId ?? null, agentType: boundAgent?.type ?? null },
                 ),
           signal,
         );

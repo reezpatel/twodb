@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { ChevronDown, CloudDownload, Flag, FolderKanban, Folder, ListTodo, Plus, Settings2, SquareKanban, Zap } from "lucide-react";
+import { ChevronDown, CloudDownload, Flag, LayoutDashboard, FolderKanban, Folder, ListTodo, Plus, Settings2, SquareKanban, Zap } from "lucide-react";
 import { useProjects, useSubprojects, type Project } from "./use-projects";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,7 @@ export function ProjectsSidenav() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-3 py-2">
+      <div className="flex items-center justify-between px-4 py-3">
         <span className="text-sm font-semibold">Projects</span>
         <div className="flex gap-1">
           <Button variant="ghost" size="icon-sm" title="New project" onClick={() => setCreating(true)}>
@@ -37,10 +37,10 @@ export function ProjectsSidenav() {
         </div>
       </div>
       <Separator />
-      <div className="flex-1 overflow-y-auto p-1.5">
+      <div className="flex-1 space-y-1 overflow-y-auto p-2.5">
         <button
           className={cn(
-            "hover:bg-accent/50 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
+            "hover:bg-accent/50 flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm",
             location.pathname === "/apps/projects" && "bg-accent",
           )}
           onClick={() => navigate("/apps/projects")}
@@ -85,10 +85,10 @@ function ProjectTree({
 }) {
   const subprojects = useSubprojects(expanded ? project.id : undefined);
   const activeSub = /[?&]sub=([^&]+)/.exec(search)?.[1];
-  const itemCls = (active: boolean) => cn("hover:bg-accent/50 flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs", active && "bg-accent");
+  const itemCls = (active: boolean) => cn("hover:bg-accent/50 flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs", active && "bg-accent");
   return (
     <div>
-      <div className={cn("hover:bg-accent/50 flex w-full items-center gap-1.5 rounded-md px-1.5 py-1.5 text-left text-sm", expanded && "bg-accent/60")}>
+      <div className={cn("hover:bg-accent/50 flex w-full items-center gap-1.5 rounded-md px-2 py-2 text-left text-sm", expanded && "bg-accent/60")}>
         <button className="flex min-w-0 flex-1 items-center gap-2" onClick={() => onOpen()}>
           <span
             className="flex size-5 shrink-0 items-center justify-center rounded text-[9px] font-bold text-white"
@@ -108,7 +108,10 @@ function ProjectTree({
         </button>
       </div>
       {expanded && (
-        <div className="border-border/60 ml-4 border-l pl-1.5">
+        <div className="border-border/60 mt-1 mb-2 ml-5 space-y-0.5 border-l pl-2.5">
+          <button className={itemCls(!activeTab || activeTab === "overview")} onClick={() => onOpen("overview")}>
+            <LayoutDashboard size={12} className="text-muted-foreground" /> Overview
+          </button>
           <button className={itemCls(activeTab === "sprints")} onClick={() => onOpen("sprints")}>
             <Zap size={11} className="text-muted-foreground" /> Sprints
           </button>
@@ -119,11 +122,11 @@ function ProjectTree({
             <Settings2 size={11} className="text-muted-foreground" /> Settings
           </button>
           {subprojects.data?.map((sub) => (
-            <div key={sub.id} className="mt-0.5">
-              <div className="text-muted-foreground flex items-center gap-1.5 px-2 pt-1 text-[10px] font-semibold tracking-wide uppercase">
+            <div key={sub.id} className="mt-2">
+              <div className="text-muted-foreground flex items-center gap-1.5 px-2.5 pt-1 pb-0.5 text-[10px] font-semibold tracking-wide uppercase">
                 <Folder size={10} /> {sub.name}
               </div>
-              <button className={itemCls(activeSub === sub.id && (activeTab === "board" || !activeTab))} onClick={() => onOpenSub(sub.id, "board")}>
+              <button className={itemCls(activeSub === sub.id && activeTab === "board")} onClick={() => onOpenSub(sub.id, "board")}>
                 <SquareKanban size={11} className="text-muted-foreground" /> Board
               </button>
               <button className={itemCls(activeSub === sub.id && activeTab === "backlog")} onClick={() => onOpenSub(sub.id, "backlog")}>

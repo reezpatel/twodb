@@ -647,6 +647,10 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
             .then((r) => r.content)
             .catch(() => null)
         : Promise.resolve(null),
+    // Pasted images/files upload as attachments (chips above the composer).
+    onPasteFiles: (files) => uploadAssets(files),
+    // Pasted an image and typed nothing? Send is still valid — links carry it.
+    allowEmptySubmit: () => pendingAssets.length > 0,
     onDraft: setDraft,
     onSend: (content, skills) => send(selected?.id, model || effectiveModel, thinkingLevel, content, skills),
   });
@@ -750,11 +754,15 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
                 {running ? (
                   <CodeChatComposerSend
                     label={steering.length > 0 ? "Send queued messages now" : "Queue message — sent when this round finishes"}
-                    disabled={!draft.trim() && steering.length === 0}
+                    disabled={!draft.trim() && pendingAssets.length === 0 && steering.length === 0}
                     onClick={steering.length > 0 ? sendSteeringNow : submit}
                   />
                 ) : (
-                  <CodeChatComposerSend label="Send" disabled={!draft.trim() || !selected || !effectiveModel || wsStatus !== "open"} onClick={submit} />
+                  <CodeChatComposerSend
+                    label="Send"
+                    disabled={(!draft.trim() && pendingAssets.length === 0) || !selected || !effectiveModel || wsStatus !== "open"}
+                    onClick={submit}
+                  />
                 )}
               </CodeChatComposerActions>
             </CodeChatComposer>

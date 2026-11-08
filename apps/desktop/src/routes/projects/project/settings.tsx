@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 export function ProjectSettings({ detail }: { detail: ProjectDetail }) {
   const synced = detail.project.externalSource !== null;
   return (
-    <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-4 overflow-y-auto p-6">
+    <div className="mx-auto flex h-full w-full max-w-4xl flex-col gap-6 overflow-y-auto px-8 py-8">
       {synced && (
         <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
           <Lock size={11} /> Synced from {detail.project.externalSource} — statuses and labels are managed remotely.

@@ -30,12 +30,16 @@ interface ComposerOptions {
   loadSkillContent?: (label: string) => Promise<string | null>;
   /** Opens the skill-content dialog when a skill chip is clicked (composer + transcript share it). */
   onSkillClick?: (skill: { name: string; content: string }) => void;
+  /** Pasted files (screenshots, copied images) become attachments instead of editor content — the caller uploads them. */
+  onPasteFiles?: (files: File[]) => void;
+  /** Lets Enter/send fire with an empty editor (e.g. attachments pending upload). */
+  allowEmptySubmit?: () => boolean;
   onDraft: (text: string) => void;
   /** Returns true when the message was dispatched — the composer clears itself. */
   onSend: (content: string, skills: { name: string; content: string }[]) => boolean;
 }
 
-export function useComposer({ files, disabled, placeholder, commands, pasteChips = true, onSkillClick, loadSkillContent, onDraft, onSend }: ComposerOptions) {
+export function useComposer({ files, disabled, placeholder, commands, pasteChips = true, onSkillClick, loadSkillContent, onPasteFiles, allowEmptySubmit, onDraft, onSend }: ComposerOptions) {
   const commandsRef = useRef(commands ?? undefined);
   commandsRef.current = commands ?? undefined;
   const filesRef = useRef(files);
@@ -55,6 +59,10 @@ export function useComposer({ files, disabled, placeholder, commands, pasteChips
   skillClickRef.current = onSkillClick;
   const loadSkillRef = useRef(loadSkillContent);
   loadSkillRef.current = loadSkillContent;
+  const pasteFilesRef = useRef(onPasteFiles);
+  pasteFilesRef.current = onPasteFiles;
+  const allowEmptyRef = useRef(allowEmptySubmit);
+  allowEmptyRef.current = allowEmptySubmit;
 
   // Chips render as labels; the wire gets the full content expanded back in.
   const expandPastes = (text: string) =>
@@ -80,7 +88,7 @@ export function useComposer({ files, disabled, placeholder, commands, pasteChips
     const editor = editorRef.current;
     if (!editor) return;
     const raw = editor.getText().trim();
-    if (!raw) return;
+    if (!raw && !allowEmptyRef.current?.()) return;
     const { text, skills } = expandSkills(expandPastes(raw));
     if (skills.some((s) => !s.content)) return; // repo skill still loading
     if (sendRef.current(text, skills)) editor.commands.clearContent(true);
@@ -221,6 +229,13 @@ export function useComposer({ files, disabled, placeholder, commands, pasteChips
         spellcheck: "true",
       },
       handlePaste: (_view, event) => {
+        // Files (screenshots, copied images) become attachments, not editor content.
+        const files = event.clipboardData?.files;
+        if (files && files.length > 0 && pasteFilesRef.current) {
+          event.preventDefault();
+          pasteFilesRef.current(Array.from(files));
+          return true;
+        }
         if (!pasteChips) return false;
         const text = event.clipboardData?.getData("text/plain") ?? "";
         const lines = text ? text.split("\n").length : 0;

@@ -1,7 +1,7 @@
 import type { Selectable } from "kysely";
 import { db } from "../auth";
 import type { CodeSessionTable, LlmConnectionTable } from "../plugins/db";
-import { runAgentRound, type AgentMessage } from "./agent";
+import { runAgentRound, repairToolPairing, type AgentMessage } from "./agent";
 
 // Context compaction for code sessions, ported from pi's model. No provider
 // exposes a native compact endpoint (pi, Claude Code and Codex all summarize),
@@ -210,23 +210,10 @@ export function projectHistory(rows: MessageRow[]): AgentMessage[] {
     .filter((item) => !["ask_user", "btw", "btw_done", "subagent", "error"].includes(item.row?.role ?? ""))
     .map((item) => item.message);
   // A crash or restart between tool_use and tool_result leaves history that
-  // providers reject — synthesize a placeholder result for every dangling call.
-  const answered = new Set<string>();
-  for (const m of projected) {
-    if (m.role === "tool" && m.meta?.toolCallId) answered.add(m.meta.toolCallId);
-  }
-  const repaired: AgentMessage[] = [];
-  for (const m of projected) {
-    repaired.push(m);
-    if (m.role === "assistant") {
-      for (const tc of m.meta?.toolCalls ?? []) {
-        if (!answered.has(tc.id)) {
-          repaired.push({ role: "tool", content: "interrupted — no result recorded", meta: { toolCallId: tc.id, name: tc.name } });
-        }
-      }
-    }
-  }
-  return repaired;
+  // providers reject, and same-ms createdAt ties can read tool rows back ahead
+  // of their call — normalize the pairing (synthesize missing results, move
+  // strays next to their call, drop orphans).
+  return repairToolPairing(projected).messages;
 }
 
 // --- token estimation + cut point --------------------------------------------

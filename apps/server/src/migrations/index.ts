@@ -37,6 +37,7 @@ import { up as notifications } from "./0035-notifications";
 import { up as teamsAccounts } from "./0036-teams-accounts";
 import { up as memoryTitleLevels } from "./0037-memory-title-levels";
 import { up as jobHidden } from "./0038-job-hidden";
+import { up as globalAgentJobs } from "./0039-global-agent-jobs";
 
 // Keys sort lexicographically — prefix new migrations with the next number.
 export const migrations: Record<string, Migration> = {
@@ -78,4 +79,5 @@ export const migrations: Record<string, Migration> = {
   "0036_teams_accounts": { up: teamsAccounts },
   "0037_memory_title_levels": { up: memoryTitleLevels },
   "0038_job_hidden": { up: jobHidden },
+  "0039_global_agent_jobs": { up: globalAgentJobs },
 };

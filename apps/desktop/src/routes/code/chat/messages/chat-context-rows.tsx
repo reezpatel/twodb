@@ -33,6 +33,8 @@ export interface ErrorMeta {
   delayMs?: number;
   status?: number;
   final?: boolean;
+  /** Context auto-repair notice — not a failure, shown as a warning. */
+  warning?: boolean;
 }
 
 /** A persisted compaction: everything above was summarized away and the summary is replayed as context from here on. */
@@ -63,11 +65,13 @@ export function ChatClear({ meta }: { meta: ClearMeta | null }) {
 /** Provider failure / retry attempt — UI-only, never sent to the model. */
 export function ChatError({ meta, content, createdAt }: { meta: ErrorMeta | null; content: string; createdAt: string | number | Date }) {
   const retrying = !meta?.final && meta?.attempt != null;
-  const title = retrying
-    ? `Request failed — retry ${meta!.attempt}/${meta!.maxRetries ?? "?"}${meta?.delayMs != null ? ` in ${Math.max(1, Math.round(meta.delayMs / 1000))}s` : ""}`
-    : "Agent run failed";
+  const title = meta?.warning
+    ? "Context repaired"
+    : retrying
+      ? `Request failed — retry ${meta!.attempt}/${meta!.maxRetries ?? "?"}${meta?.delayMs != null ? ` in ${Math.max(1, Math.round(meta.delayMs / 1000))}s` : ""}`
+      : "Agent run failed";
   return (
-    <CodeChatError tone={retrying ? "retrying" : "failed"} title={title} time={new Date(createdAt).toLocaleTimeString()}>
+    <CodeChatError tone={meta?.warning ? "warning" : retrying ? "retrying" : "failed"} title={title} time={new Date(createdAt).toLocaleTimeString()}>
       {content}
     </CodeChatError>
   );

@@ -4,7 +4,7 @@
   "scripts": {
     "local": "pnpm --workspace-root run --parallel \"/^local:.*/\"",
     "local:app": "pnpm --parallel --filter @twodb/desktop --filter @twodb/server dev",
-    "local:storybook": "pnpm --filter @twodb/desktop storybook",
+    "local:blocks": "pnpm --filter @twodb/blocks storybook",
     "runner": "pnpm --filter @twodb/runner dev",
     "db:migrate": "pnpm --filter @twodb/server db:migrate",
     "dev": "turbo dev",
