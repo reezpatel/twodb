@@ -789,7 +789,7 @@ export function ChatConversationInner({ sessionId }: { sessionId: string }) {
               title="Context consumed vs the model's context window"
             />
             <CodeChatUsageSpacer />
-            <ModelPicker providers={modelPicker.providers} value={modelPicker.value} onChange={modelPicker.onChange} />
+            <ModelPicker providers={modelPicker.providers} value={modelPicker.value} onChange={modelPicker.onChange} thinkingLevel={modelPicker.thinkingLevel} onThinkingChange={modelPicker.onThinkingChange} />
           </CodeChatUsage>
           <CodeChatResources>
             {footerStatus.machines.length === 0 && <CodeChatResourcesEmpty>{footerStatus.resourcesEmptyText}</CodeChatResourcesEmpty>}
