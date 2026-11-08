@@ -10,10 +10,12 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json apps/server/
 COPY apps/desktop/package.json apps/desktop/
 COPY packages/runner-core/package.json packages/runner-core/
-RUN pnpm install --frozen-lockfile --filter @twodb/server --filter @twodb/desktop
+COPY packages/blocks/package.json packages/blocks/
+RUN pnpm install --frozen-lockfile --filter @twodb/server --filter @twodb/desktop --filter @twodb/blocks
 COPY apps/server apps/server
 COPY apps/desktop apps/desktop
 COPY packages/runner-core packages/runner-core
+COPY packages/blocks packages/blocks
 RUN pnpm --filter @twodb/desktop build
 RUN pnpm --filter @twodb/server deploy --prod --legacy /out
 

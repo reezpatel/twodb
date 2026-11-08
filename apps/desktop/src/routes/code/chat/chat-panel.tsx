@@ -57,7 +57,7 @@ export function ChatPanel() {
   return (
     <>
       <CodeHeader>
-        <Tabs value={activeTabId} onValueChange={(id) => selectTab(id as ChatTabId)} activationMode="manual">
+        <Tabs value={activeTabId} onValueChange={(id: string) => selectTab(id as ChatTabId)} activationMode="manual">
           <TabsList variant="line" size="sm" className="border-b-0">
             {CHAT_TABS.map((tab, index) => (
               <Tooltip key={tab.id} delayDuration={500}>
