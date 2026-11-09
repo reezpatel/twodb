@@ -68,11 +68,13 @@ const installApp = defineEndpoint({
   path: "/orchestrator/apps/:slug/install",
   auth: "session",
   description:
-    "Full one-click install: provisions the app's Postgres schema, builds its Docker image, issues a unique " +
-    "registration token, and starts the container. The container self-registers once it boots — poll " +
-    "getAppStatus until installStatus is \"running\" and registrationStatus is \"active\".",
-  request: z.object({ slug: z.string() }),
-  response: z.object({ ok: z.literal(true) }),
+    "Full one-click install: provisions the app's Postgres schema, resolves its Docker image (pulls " +
+    "`$TWODB_APP_IMAGE_REGISTRY/app-<slug>:<version ?? latest>` when a registry is configured, otherwise " +
+    "builds locally from the workspace at its package.json version), issues a unique registration token, " +
+    "and starts the container. Async — poll getAppStatus until installStatus is \"running\" and " +
+    "registrationStatus is \"active\".",
+  request: z.object({ slug: z.string(), version: z.string().optional() }),
+  response: z.object({ ok: z.literal(true), status: z.literal("installing") }),
 });
 
 const issueToken = defineEndpoint({
@@ -137,9 +139,11 @@ const upgradeApp = defineEndpoint({
   path: "/orchestrator/apps/:slug/upgrade",
   auth: "session",
   description:
-    "Rebuilds the app's image and recreates its container against the same Postgres schema, with a freshly " +
-    "issued registration token.",
-  request: z.object({ slug: z.string() }),
+    "Re-resolves the app's image (to `version` if given, otherwise the registry's `latest` or the local " +
+    "workspace's current package.json version) and recreates its container against the same Postgres " +
+    "schema, with a freshly issued registration token. Async — poll getAppStatus.",
+  request: z.object({ slug: z.string(), version: z.string().optional() }),
+  response: z.object({ ok: z.literal(true), status: z.literal("installing") }),
 });
 
 const removeApp = defineEndpoint({
@@ -166,6 +170,8 @@ const getAppStatus = defineEndpoint({
     installStatus: z.string(),
     registrationStatus: z.string(),
     containerStatus: z.string(),
+    version: z.string().nullable(),
+    imageTag: z.string().nullable(),
     lastSeenAt: z.string().nullable(),
   }),
 });

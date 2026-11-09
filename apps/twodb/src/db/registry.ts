@@ -88,6 +88,11 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
         .execute();
     },
 
+    /** Records the version of the image actually installed (workspace package.json version for local builds, tag version for registry pulls). */
+    async setVersion(slug: string, version: string) {
+      await db.updateTable("registered_app").set({ version }).where("slug", "=", slug).execute();
+    },
+
     async setInstallStatus(slug: string, status: InstallStatus) {
       await db.updateTable("registered_app").set({ install_status: status }).where("slug", "=", slug).execute();
     },

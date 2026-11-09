@@ -39,9 +39,35 @@ There is **no shared registration secret**. Apps don't self-install — TwoDB
 A stolen token only ever impersonates the one slug it was issued for, and
 every install/upgrade rotates it.
 
-Lifecycle endpoints: `start`, `stop`, `restart`, `upgrade` (rebuilds the
+Lifecycle endpoints: `start`, `stop`, `restart`, `upgrade` (re-resolves the
 image, rotates the token, keeps the same DB schema), `DELETE` (removes the
 container + registry row; deliberately does NOT drop the Postgres schema).
+
+## Versions & image sources
+
+Every app releases **independently** — no lockstep versions, skipping one
+app's release is fine:
+
+```bash
+git tag tworoute/v0.2.0 && git push origin tworoute/v0.2.0
+```
+
+CI (`.github/workflows/release-app.yml`) builds just that app and publishes
+`ghcr.io/<owner>/app-tworoute:0.2.0` (+ `:latest`). Main-branch pushes only
+smoke-build every app's image (`.github/workflows/docker-image.yaml`) — they
+publish nothing.
+
+Where an install gets its image depends on `TWODB_APP_IMAGE_REGISTRY`:
+- **Unset** (monorepo dev default) → built locally from the workspace
+  checkout via `deploy/docker/app.Dockerfile`, tagged
+  `twodb/<slug>:<package.json version>` (package.json is the version source
+  of truth).
+- **Set** (e.g. `ghcr.io/youruser`) → pulled from
+  `<registry>/app-<slug>:<version ?? latest>` — the images CI released.
+
+Both `install` and `upgrade` accept an optional `{ "version": "X.Y.Z" }`
+body. The installed version + image ref are recorded and visible via
+`GET /orchestrator/apps/:slug/status`.
 
 ## Local dev without Docker
 
@@ -104,6 +130,8 @@ See `ENDPOINTS.md` / `MESSAGES.md` (generated — run `pnpm gen:docs`) for
 the exact header/payload contracts.
 
 ## Known stubs / not hardened yet
+- Registry pulls assume the images are public or the host's docker daemon is
+  already logged in — there's no `TWODB_REGISTRY_TOKEN` handling yet.
 - Encrypted Postgres credentials are AES-256-GCM keyed off `AUTH_SECRET` —
   fine for self-hosted/dev, replace with a real secrets manager before any
   serious multi-tenant deployment.

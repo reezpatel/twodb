@@ -49,6 +49,10 @@ export async function buildImage(opts: BuildImageOptions): Promise<void> {
   ]);
 }
 
+export async function pullImage(ref: string): Promise<void> {
+  await docker(["pull", ref]);
+}
+
 export interface RunContainerOptions {
   name: string;
   image: string;

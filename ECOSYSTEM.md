@@ -39,6 +39,14 @@ auth-guarded routes).
 - Docker orchestration is host-local (shells out to the `docker` CLI against
   a static in-repo catalog) — no multi-host fleet management, and the admin
   webapp doesn't expose the install/lifecycle buttons yet (API only).
+- App releases are per-app git tags (`<slug>/vX.Y.Z` → CI publishes
+  `ghcr.io/<owner>/app-<slug>`; see `.github/workflows/release-app.yml`) —
+  independent versioning, skipping an app is fine. Installs use those
+  published images only when `TWODB_APP_IMAGE_REGISTRY` is set; otherwise
+  they build locally from the workspace. Old monolith release pipelines
+  (twodb-server/runner images, desktop/android/ios builds, brew/choco
+  publishes) are retired.
+
 - TwoRoute's connection credentials are stored in plaintext — mirror
   TwoDB's `encryptSecret`/`decryptSecret` helper before real deployment.
 - No usage/quota tracking, no OAuth-subscription-based LLM providers.

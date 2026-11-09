@@ -9,7 +9,7 @@ The control plane: Docker-based app installation/lifecycle management, Postgres 
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-09T15:32:22.270Z_
+_Generated: 2026-11-09T18:34:22.346Z_
 
 ## Endpoints
 
@@ -164,7 +164,7 @@ Lists every app available to install (the static catalog — see src/orchestrato
 
 ### `POST /orchestrator/apps/:slug/install` — installApp
 
-Full one-click install: provisions the app's Postgres schema, builds its Docker image, issues a unique registration token, and starts the container. The container self-registers once it boots — poll getAppStatus until installStatus is "running" and registrationStatus is "active".
+Full one-click install: provisions the app's Postgres schema, resolves its Docker image (pulls `$TWODB_APP_IMAGE_REGISTRY/app-<slug>:<version ?? latest>` when a registry is configured, otherwise builds locally from the workspace at its package.json version), issues a unique registration token, and starts the container. Async — poll getAppStatus until installStatus is "running" and registrationStatus is "active".
 
 - **Auth**: `session`
 
@@ -175,6 +175,9 @@ Full one-click install: provisions the app's Postgres schema, builds its Docker 
   "type": "object",
   "properties": {
     "slug": {
+      "type": "string"
+    },
+    "version": {
       "type": "string"
     }
   },
@@ -194,10 +197,15 @@ Full one-click install: provisions the app's Postgres schema, builds its Docker 
     "ok": {
       "type": "boolean",
       "const": true
+    },
+    "status": {
+      "type": "string",
+      "const": "installing"
     }
   },
   "required": [
-    "ok"
+    "ok",
+    "status"
   ],
   "additionalProperties": false
 }
@@ -366,7 +374,7 @@ Restarts an app's container in place (same image, same DB).
 
 ### `POST /orchestrator/apps/:slug/upgrade` — upgradeApp
 
-Rebuilds the app's image and recreates its container against the same Postgres schema, with a freshly issued registration token.
+Re-resolves the app's image (to `version` if given, otherwise the registry's `latest` or the local workspace's current package.json version) and recreates its container against the same Postgres schema, with a freshly issued registration token. Async — poll getAppStatus.
 
 - **Auth**: `session`
 
@@ -378,10 +386,36 @@ Rebuilds the app's image and recreates its container against the same Postgres s
   "properties": {
     "slug": {
       "type": "string"
+    },
+    "version": {
+      "type": "string"
     }
   },
   "required": [
     "slug"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    },
+    "status": {
+      "type": "string",
+      "const": "installing"
+    }
+  },
+  "required": [
+    "ok",
+    "status"
   ],
   "additionalProperties": false
 }
@@ -451,6 +485,18 @@ Combined install/registration/container status for one app — poll this after i
     "containerStatus": {
       "type": "string"
     },
+    "version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "imageTag": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "lastSeenAt": {
       "type": [
         "string",
@@ -463,6 +509,8 @@ Combined install/registration/container status for one app — poll this after i
     "installStatus",
     "registrationStatus",
     "containerStatus",
+    "version",
+    "imageTag",
     "lastSeenAt"
   ],
   "additionalProperties": false

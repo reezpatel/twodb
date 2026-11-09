@@ -107,8 +107,9 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     const ctx = await resolveContext(new Headers(req.headers as any));
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
+    const version = (req.body as { version?: string } | null)?.version;
     try {
-      runLifecycle(slug, () => installApp(slug, { registry, config }));
+      runLifecycle(slug, () => installApp(slug, { registry, config }, version));
       return { ok: true, status: "installing" };
     } catch (err) {
       return reply.code(500).send({ error: String(err) });
@@ -171,8 +172,9 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     const ctx = await resolveContext(new Headers(req.headers as any));
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
+    const version = (req.body as { version?: string } | null)?.version;
     try {
-      runLifecycle(slug, () => upgradeApp(slug, { registry, config }));
+      runLifecycle(slug, () => upgradeApp(slug, { registry, config }, version));
       return { ok: true, status: "installing" };
     } catch (err) {
       return reply.code(500).send({ error: String(err) });
@@ -198,6 +200,8 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
       installStatus: row?.install_status ?? "not_installed",
       registrationStatus: row?.status ?? "unknown",
       containerStatus,
+      version: row?.version ?? null,
+      imageTag: row?.image_tag ?? null,
       lastSeenAt: row?.last_seen_at ?? null,
     };
   });

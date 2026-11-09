@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import * as fs from "node:fs";
 import type { RegistryRepo } from "../db/registry.js";
 import type { TwoDbConfig } from "../config.js";
 import { getCatalogEntry, type CatalogEntry } from "./catalog.js";
@@ -13,8 +14,23 @@ function containerName(slug: string): string {
   return `twodb-app-${slug}`;
 }
 
-function imageTag(entry: CatalogEntry, version: string): string {
+/** The version stamped on a locally-built image, read from the app's own package.json — the workspace is the source of truth. */
+function workspaceVersion(entry: CatalogEntry): string {
+  const pkgPath = path.join(REPO_ROOT, "apps", entry.slug, "package.json");
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
+function localImageRef(entry: CatalogEntry, version: string): string {
   return `twodb/${entry.slug}:${version}`;
+}
+
+function registryImageRef(config: TwoDbConfig, entry: CatalogEntry, version: string): string {
+  return `${config.TWODB_APP_IMAGE_REGISTRY}/app-${entry.slug}:${version}`;
 }
 
 export interface InstallOptions {
@@ -38,7 +54,7 @@ export async function issueRegistrationToken(slug: string, opts: InstallOptions)
     {
       slug: entry.slug,
       name: entry.slug,
-      version: "0.1.0",
+      version: workspaceVersion(entry),
       shape: "backend",
       basePath: `/apps/${entry.slug}`,
       hostId: "docker",
@@ -138,31 +154,58 @@ async function pullRegister(
 }
 
 /**
- * Full, one-click install: issues a token, provisions the DB, builds the
- * image, and starts the container. The container calls
- * `POST /registry/register` itself once it boots — this function does not
- * wait for that; `install_status` goes "installing" -> (app self-reports)
- * -> "running" asynchronously. Poll `GET /orchestrator/apps/:slug/status`.
+ * Resolves the image ref to install, honoring TWODB_APP_IMAGE_REGISTRY:
+ * - registry configured -> pull `registry/app-<slug>:<version ?? "latest">`
+ *   (images released by CI from `<slug>/vX.Y.Z` tags — see
+ *   .github/workflows/release-app.yml);
+ * - not configured (the monorepo dev default) -> build locally from the
+ *   workspace checkout and tag `twodb/<slug>:<package.json version>`.
+ * Returns the ref actually used and the version it was stamped with.
  */
-export async function installApp(slug: string, opts: InstallOptions): Promise<void> {
+async function resolveImage(
+  entry: CatalogEntry,
+  opts: InstallOptions,
+  requestedVersion?: string,
+): Promise<{ ref: string; version: string }> {
+  if (opts.config.TWODB_APP_IMAGE_REGISTRY) {
+    const version = requestedVersion ?? "latest";
+    const ref = registryImageRef(opts.config, entry, version);
+    await docker.pullImage(ref);
+    return { ref, version };
+  }
+
+  const version = requestedVersion ?? workspaceVersion(entry);
+  const ref = localImageRef(entry, version);
+  await docker.buildImage({ repoRoot: REPO_ROOT, dockerfile: DOCKERFILE, pkgName: entry.pkgName, tag: ref });
+  return { ref, version };
+}
+
+/**
+ * Full, one-click install: issues a token, provisions the DB, resolves the
+ * image (registry pull or local build), and starts the container. TwoDB
+ * then pull-registers the app via its token-guarded /internal/manifest
+ * endpoint — `install_status` goes "installing" -> "running" once the app
+ * actually answers. Poll `GET /orchestrator/apps/:slug/status`.
+ */
+export async function installApp(slug: string, opts: InstallOptions, requestedVersion?: string): Promise<void> {
   const entry = getCatalogEntry(slug);
   if (!entry) throw new Error(`"${slug}" is not in the app catalog`);
 
   const { registrationToken } = await issueRegistrationToken(slug, opts);
   const { containerConnectionString } = await provisionDatabase(slug, opts);
 
-  const tag = imageTag(entry, "0.1.0");
-  await docker.buildImage({ repoRoot: REPO_ROOT, dockerfile: DOCKERFILE, pkgName: entry.pkgName, tag });
+  const { ref, version } = await resolveImage(entry, opts, requestedVersion);
 
   const name = containerName(entry.slug);
   await docker.runContainer({
     name,
-    image: tag,
+    image: ref,
     env: buildContainerEnv(entry, opts.config, registrationToken, containerConnectionString),
     hostPort: entry.hostPort,
     containerPort: entry.containerPort,
   });
-  await opts.registry.setContainerInfo(entry.slug, { imageTag: tag, containerName: name, hostPort: entry.hostPort });
+  await opts.registry.setContainerInfo(entry.slug, { imageTag: ref, containerName: name, hostPort: entry.hostPort });
+  await opts.registry.setVersion(entry.slug, version);
 
   await pullRegister(entry, registrationToken, opts);
 }
@@ -189,13 +232,14 @@ export async function restartApp(slug: string, opts: InstallOptions): Promise<vo
 }
 
 /**
- * Rebuilds the image and recreates the container against the same DB
- * schema. A fresh registration token is issued (the old one's plaintext was
- * never retrievable — only its hash was stored) and baked into the new
- * container's env, so the app re-registers itself as part of boot, same as
- * a fresh install.
+ * Re-resolves the image (new version if given, otherwise the registry's
+ * `latest` or the local workspace's current package.json version) and
+ * recreates the container against the same DB schema. A fresh registration
+ * token is issued (the old one's plaintext was never retrievable — only
+ * its hash was stored) and baked into the new container's env, so the app
+ * re-registers itself as part of boot, same as a fresh install.
  */
-export async function upgradeApp(slug: string, opts: InstallOptions): Promise<void> {
+export async function upgradeApp(slug: string, opts: InstallOptions, targetVersion?: string): Promise<void> {
   const entry = getCatalogEntry(slug);
   if (!entry) throw new Error(`"${slug}" is not in the app catalog`);
   const row = await opts.registry.getApp(slug);
@@ -204,19 +248,19 @@ export async function upgradeApp(slug: string, opts: InstallOptions): Promise<vo
   const dbUrl = decryptSecret(row.pg_connection_string_encrypted, opts.config.AUTH_SECRET);
   const { registrationToken } = await issueRegistrationToken(slug, opts);
 
-  const tag = imageTag(entry, row.version);
-  await docker.buildImage({ repoRoot: REPO_ROOT, dockerfile: DOCKERFILE, pkgName: entry.pkgName, tag });
+  const { ref, version } = await resolveImage(entry, opts, targetVersion);
 
   const name = containerName(entry.slug);
   await docker.removeContainer(name);
   await docker.runContainer({
     name,
-    image: tag,
+    image: ref,
     env: buildContainerEnv(entry, opts.config, registrationToken, dbUrl),
     hostPort: entry.hostPort,
     containerPort: entry.containerPort,
   });
-  await opts.registry.setContainerInfo(entry.slug, { imageTag: tag, containerName: name, hostPort: entry.hostPort });
+  await opts.registry.setContainerInfo(entry.slug, { imageTag: ref, containerName: name, hostPort: entry.hostPort });
+  await opts.registry.setVersion(entry.slug, version);
 
   await pullRegister(entry, registrationToken, opts);
 }

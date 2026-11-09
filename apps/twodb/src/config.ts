@@ -16,6 +16,14 @@ export const configSchema = z.object({
   PASSKEY_ORIGIN: z.string().url().default("http://localhost:5173"),
   /** What TwoDB injects as `TWODB_GATEWAY_URL` into installed-app containers — "localhost" from TwoDB's own perspective is not reachable from inside a container when TwoDB itself runs on the host. */
   TWODB_GATEWAY_URL_FOR_CONTAINERS: z.string().url().default("http://host.docker.internal:4000"),
+  /**
+   * If set (e.g. `ghcr.io/youruser`), installs/upgrade pull app images
+   * (`<registry>/app-<slug>:<version>`) instead of building them locally
+   * from the workspace checkout. These are the images CI releases from
+   * `<slug>/vX.Y.Z` tags (see .github/workflows/release-app.yml). Leave
+   * unset for the monorepo dev default.
+   */
+  TWODB_APP_IMAGE_REGISTRY: z.string().optional(),
   TWODB_HOST_ID: z.string().default("local"),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
