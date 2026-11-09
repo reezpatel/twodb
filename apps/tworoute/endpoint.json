@@ -10,7 +10,7 @@
     "core-platform"
   ],
   "basePath": "/apps/tworoute",
-  "generatedAt": "2026-11-09T12:16:41.000Z",
+  "generatedAt": "2026-11-09T15:32:50.938Z",
   "endpoints": [
     {
       "name": "listConnections",
@@ -160,6 +160,32 @@
         "required": [
           "model",
           "messages"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "internalManifest",
+      "method": "GET",
+      "path": "/internal/manifest",
+      "auth": "public",
+      "description": "Pull-registration endpoint TwoDB's orchestrator polls on this app's published port after starting its container. Guarded by the per-app registration token via the `x-registration-token` header (shared contract in core-platform/src/manifest/serve.ts) — not callable through the Gateway.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "httpUrl": {
+            "type": "string"
+          },
+          "manifest": {}
+        },
+        "required": [
+          "slug",
+          "httpUrl",
+          "manifest"
         ],
         "additionalProperties": false
       }

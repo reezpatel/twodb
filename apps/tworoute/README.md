@@ -4,13 +4,32 @@ Multi-provider LLM gateway. Space-scoped provider connections
 (`llm_connection` table, own Postgres schema `tworoute`) plus a streaming
 OpenAI-compatible `/completions` endpoint.
 
+## Running it
+
+**As a container (the normal path)** — installed and lifecycle-managed by
+TwoDB's orchestrator; no manual env setup at all:
+
 ```bash
-pnpm --filter @twodb/app-tworoute dev
+curl -X POST -H "x-api-key: $KEY" $GW/orchestrator/apps/tworoute/install
+curl -H "x-api-key: $KEY" $GW/orchestrator/apps/tworoute/status   # poll until "running"/"active"
 ```
 
-Requires its own `DATABASE_URL` (the connection string TwoDB's
-`POST /registry/apps/tworoute/provision` returns) and `TWODB_PROVISION_TOKEN`
-(== TwoDB's `AUTH_SECRET`, for self-registration).
+**Local dev (no Docker)** — get a per-app token + DB from TwoDB first:
+
+```bash
+curl -X POST -H "x-api-key: $KEY" $GW/orchestrator/apps/tworoute/provision-db   # → DATABASE_URL
+curl -X POST -H "x-api-key: $KEY" $GW/orchestrator/apps/tworoute/issue-token    # → TWODB_PROVISION_TOKEN
+
+DATABASE_URL=... TWODB_PROVISION_TOKEN=... pnpm --filter @twodb/app-tworoute dev
+```
+
+There is no shared registration secret anymore: the token is unique to this
+app, issued by TwoDB at install time, and only its hash is stored server-
+side. In dev mode the app push-registers itself on boot
+(`registerWithGateway`); as a container TwoDB pull-registers it by polling
+`GET /internal/manifest` (see `core-platform/src/manifest/serve.ts` for why
+both paths exist — container→host traffic is firewalled on stock Linux
+Docker).
 
 ## Endpoints (see generated `ENDPOINTS.md`)
 - `POST /connections` — register a provider connection, scoped to a Space.

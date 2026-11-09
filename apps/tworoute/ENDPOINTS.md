@@ -9,7 +9,7 @@ Multi-provider LLM gateway: Space-scoped provider connections plus a streaming O
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform
 
-_Generated: 2026-11-09T12:16:41.002Z_
+_Generated: 2026-11-09T15:32:50.940Z_
 
 ## Endpoints
 
@@ -173,6 +173,35 @@ OpenAI-compatible chat completions endpoint. Pick a connection via `connectionId
   "required": [
     "model",
     "messages"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /internal/manifest` — internalManifest
+
+Pull-registration endpoint TwoDB's orchestrator polls on this app's published port after starting its container. Guarded by the per-app registration token via the `x-registration-token` header (shared contract in core-platform/src/manifest/serve.ts) — not callable through the Gateway.
+
+- **Auth**: `public`
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "slug": {
+      "type": "string"
+    },
+    "httpUrl": {
+      "type": "string"
+    },
+    "manifest": {}
+  },
+  "required": [
+    "slug",
+    "httpUrl",
+    "manifest"
   ],
   "additionalProperties": false
 }

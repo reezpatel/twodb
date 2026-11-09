@@ -12,7 +12,10 @@ export interface ProvisionResult {
   role: string;
   /** Plaintext — return this to the caller exactly once; only the encrypted form is persisted. */
   password: string;
+  /** Connection string using the admin URL's own host (for TwoDB's own use / operator visibility). */
   connectionString: string;
+  /** Connection string with the host rewritten to `containerDbHost` — this is what gets injected into the app's container, since "localhost" from the admin's perspective is not reachable from inside a Docker container. */
+  containerConnectionString: string;
 }
 
 function identSafe(slug: string): string {
@@ -21,7 +24,13 @@ function identSafe(slug: string): string {
   return cleaned;
 }
 
-export async function provisionAppDatabase(adminConnectionString: string, slug: string): Promise<ProvisionResult> {
+export { identSafe };
+
+export async function provisionAppDatabase(
+  adminConnectionString: string,
+  slug: string,
+  containerDbHost: string,
+): Promise<ProvisionResult> {
   const name = identSafe(slug);
   const schema = name;
   const role = `app_${name}`;
@@ -55,7 +64,16 @@ export async function provisionAppDatabase(adminConnectionString: string, slug: 
   connUrl.password = password;
   connUrl.pathname = adminUrl.pathname; // same database, different schema via role search_path
 
-  return { schema, role, password, connectionString: connUrl.toString() };
+  const containerUrl = new URL(connUrl.toString());
+  containerUrl.hostname = containerDbHost;
+
+  return {
+    schema,
+    role,
+    password,
+    connectionString: connUrl.toString(),
+    containerConnectionString: containerUrl.toString(),
+  };
 }
 
 /** AES-256-GCM, keyed off TwoDB's own AUTH_SECRET. Good enough for self-hosted dev-grade storage; swap for a real secrets manager before any multi-tenant/prod deployment. */

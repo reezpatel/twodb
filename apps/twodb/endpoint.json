@@ -3,7 +3,7 @@
   "slug": "twodb",
   "version": "0.1.0",
   "shape": "backend+webapp",
-  "description": "The control plane: app registry/self-registration, Postgres schema provisioning, identity (TwoAuth), and the Gateway every other app's traffic flows through.",
+  "description": "The control plane: Docker-based app installation/lifecycle management, Postgres schema provisioning, identity (TwoAuth), and the Gateway every other app's traffic flows through.",
   "capabilities": [],
   "coreDeps": [
     "core-data",
@@ -11,14 +11,14 @@
     "core-async"
   ],
   "basePath": "/",
-  "generatedAt": "2026-11-09T12:16:36.534Z",
+  "generatedAt": "2026-11-09T15:32:22.268Z",
   "endpoints": [
     {
       "name": "registerApp",
       "method": "POST",
       "path": "/registry/register",
       "auth": "public",
-      "description": "Self-registration endpoint every app calls on boot (shared-secret guarded via x-provision-token, not session/API-key auth — this is how an app first introduces itself before it has any workspace context).",
+      "description": "An installed app calls this once it boots, presenting the unique per-app registration token TwoDB generated for it at install time (not session/API-key auth — the app has no workspace context yet). There is no shared secret: a token only ever authenticates the one slug it was issued for.",
       "request": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -26,20 +26,7 @@
           "slug": {
             "type": "string"
           },
-          "name": {
-            "type": "string"
-          },
-          "version": {
-            "type": "string"
-          },
-          "shape": {
-            "type": "string",
-            "enum": [
-              "backend",
-              "backend+webapp"
-            ]
-          },
-          "basePath": {
+          "registrationToken": {
             "type": "string"
           },
           "httpUrl": {
@@ -48,25 +35,12 @@
           "socketPath": {
             "type": "string"
           },
-          "hostId": {
-            "type": "string"
-          },
-          "capabilities": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
           "manifest": {}
         },
         "required": [
           "slug",
-          "name",
-          "version",
-          "shape",
-          "basePath",
+          "registrationToken",
           "httpUrl",
-          "capabilities",
           "manifest"
         ],
         "additionalProperties": false
@@ -91,7 +65,7 @@
       "method": "GET",
       "path": "/registry/apps",
       "auth": "session-or-apiKey",
-      "description": "Lists every app currently registered with TwoDB.",
+      "description": "Lists every app TwoDB knows about (installed, running, stopped, or not-yet-registered).",
       "response": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "array",
@@ -109,13 +83,17 @@
             },
             "status": {
               "type": "string"
+            },
+            "installStatus": {
+              "type": "string"
             }
           },
           "required": [
             "slug",
             "name",
             "basePath",
-            "status"
+            "status",
+            "installStatus"
           ],
           "additionalProperties": false
         }
@@ -142,11 +120,105 @@
       }
     },
     {
-      "name": "provisionApp",
+      "name": "listCatalog",
+      "method": "GET",
+      "path": "/orchestrator/catalog",
+      "auth": "session-or-apiKey",
+      "description": "Lists every app available to install (the static catalog — see src/orchestrator/catalog.ts).",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "slug": {
+              "type": "string"
+            },
+            "hostPort": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "slug",
+            "hostPort"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "installApp",
       "method": "POST",
-      "path": "/registry/apps/:slug/provision",
+      "path": "/orchestrator/apps/:slug/install",
       "auth": "session",
-      "description": "Creates (or rotates) a Postgres role+schema for the named app. Returns the connection string exactly once.",
+      "description": "Full one-click install: provisions the app's Postgres schema, builds its Docker image, issues a unique registration token, and starts the container. The container self-registers once it boots — poll getAppStatus until installStatus is \"running\" and registrationStatus is \"active\".",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "issueRegistrationToken",
+      "method": "POST",
+      "path": "/orchestrator/apps/:slug/issue-token",
+      "auth": "session",
+      "description": "Issues a registration token without touching Docker — for running an app directly via `pnpm dev` instead of as a container. Returns the plaintext token exactly once.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "registrationToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "registrationToken"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "provisionDatabase",
+      "method": "POST",
+      "path": "/orchestrator/apps/:slug/provision-db",
+      "auth": "session",
+      "description": "Creates (or rotates) a Postgres role+schema for the named app, independent of Docker. Returns both connection-string forms exactly once — plain for a local-dev `.env`, container-reachable for Docker.",
       "request": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -172,12 +244,168 @@
           },
           "connectionString": {
             "type": "string"
+          },
+          "containerConnectionString": {
+            "type": "string"
           }
         },
         "required": [
           "schema",
           "role",
-          "connectionString"
+          "connectionString",
+          "containerConnectionString"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "startApp",
+      "method": "POST",
+      "path": "/orchestrator/apps/:slug/start",
+      "auth": "session",
+      "description": "Starts a previously-installed app's stopped container.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "stopApp",
+      "method": "POST",
+      "path": "/orchestrator/apps/:slug/stop",
+      "auth": "session",
+      "description": "Stops a running app's container without removing it.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "restartApp",
+      "method": "POST",
+      "path": "/orchestrator/apps/:slug/restart",
+      "auth": "session",
+      "description": "Restarts an app's container in place (same image, same DB).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "upgradeApp",
+      "method": "POST",
+      "path": "/orchestrator/apps/:slug/upgrade",
+      "auth": "session",
+      "description": "Rebuilds the app's image and recreates its container against the same Postgres schema, with a freshly issued registration token.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "removeApp",
+      "method": "DELETE",
+      "path": "/orchestrator/apps/:slug",
+      "auth": "session",
+      "description": "Removes the app's container and its registry row. Does NOT drop its Postgres schema — that's a deliberately separate, more dangerous operation left for a future endpoint.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getAppStatus",
+      "method": "GET",
+      "path": "/orchestrator/apps/:slug/status",
+      "auth": "session-or-apiKey",
+      "description": "Combined install/registration/container status for one app — poll this after install/upgrade/restart.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "installStatus": {
+            "type": "string"
+          },
+          "registrationStatus": {
+            "type": "string"
+          },
+          "containerStatus": {
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "slug",
+          "installStatus",
+          "registrationStatus",
+          "containerStatus",
+          "lastSeenAt"
         ],
         "additionalProperties": false
       }

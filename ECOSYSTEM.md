@@ -31,16 +31,14 @@ auth-guarded routes).
 | `core/core-platform` | implemented: manifest schema + Zod→endpoint.json + ENDPOINTS.md generator, auth (better-auth: passkey + Google + generic OIDC for PocketID + API keys + zero-setup migration), org/workspace/space model, Gateway-internal transport dialer, telemetry |
 | `core/core-async` | implemented: Postgres-backed queue + LISTEN/NOTIFY broadcast, generic engine + Zod typed-schema-registry + MESSAGES.md generator |
 | `core/core-runtime` | implemented: `twodb-cli` (loads any app's endpoint.json → live CLI), `shell` (tabs/panes runtime + pane-state contract, partials/hooks convention) |
-| `apps/twodb` | **implemented** — control plane: zero-setup SQLite bootstrap (incl. better-auth tables), app registry/self-registration, Postgres schema+role provisioning, Gateway (HTTP routing + streaming proxy + federated search fan-out), admin webapp (passkey login, registry UI) |
+| `apps/twodb` | **implemented** — control plane: zero-setup SQLite bootstrap (incl. better-auth tables), Docker orchestration (install/start/stop/restart/upgrade/remove app containers; static catalog with fixed ports; generic `deploy/docker/app.Dockerfile`), per-app registration tokens (no shared secret; hash-only storage; push + pull registration paths), Postgres schema+role provisioning, Gateway (HTTP routing + streaming proxy + federated search fan-out), admin webapp (passkey login, registry UI) |
 | `apps/tworoute` | implemented — LLM gateway: Space-scoped provider connections (openai-compatible + anthropic adapters), streaming `/completions`, workspace-API-key auth |
 | all other 15 apps | **scaffolded only** (folder + AGENTS.md/ENDPOINTS.md/MESSAGES.md/README + manifest.ts/messages.ts + starter feature skeleton for webapp ones) — not yet built out, per roadmap Phase 7+. Re-run `pnpm scaffold` any time; it never overwrites files that already exist. |
 
 ## Known gaps / deliberately deferred (see each app's README for detail)
-- Docker orchestration (install/upgrade apps via docker-compose from TwoDB's
-  admin UI) is not wired up — provisioning covers the Postgres side only.
-- Provisioning/self-registration guard is a shared secret header, not
-  mTLS/ACL — fine for one trusted host, revisit before any multi-host prod
-  deployment.
+- Docker orchestration is host-local (shells out to the `docker` CLI against
+  a static in-repo catalog) — no multi-host fleet management, and the admin
+  webapp doesn't expose the install/lifecycle buttons yet (API only).
 - TwoRoute's connection credentials are stored in plaintext — mirror
   TwoDB's `encryptSecret`/`decryptSecret` helper before real deployment.
 - No usage/quota tracking, no OAuth-subscription-based LLM providers.

@@ -3,21 +3,30 @@ import cors from "@fastify/cors";
 import type { Kysely } from "kysely";
 import type { ControlPlaneDb } from "../db/sqlite.js";
 import { createRegistryRepo } from "../db/registry.js";
-import { provisionAppDatabase, encryptSecret } from "../db/provisioning.js";
 import { setupAuth } from "../auth/index.js";
 import type { TwoDbConfig } from "../config.js";
 import { toWebRequest, sendWebResponse } from "./web-request.js";
 import { proxyToApp } from "./proxy.js";
 import { federatedSearch } from "./federated-search.js";
-
-const HOST_ID = process.env.TWODB_HOST_ID ?? "local";
+import { APP_CATALOG } from "../orchestrator/catalog.js";
+import {
+  installApp,
+  startApp,
+  stopApp,
+  restartApp,
+  upgradeApp,
+  removeApp,
+  getContainerStatus,
+  issueRegistrationToken,
+  provisionDatabase,
+} from "../orchestrator/install.js";
 
 export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfig) {
   const app = Fastify({ logger: true });
   await app.register(cors, { origin: config.AUTH_TRUSTED_ORIGINS, credentials: true });
 
   const registry = createRegistryRepo(db);
-  const { authEngine, resolveContext } = setupAuth(db, config);
+  const { resolveContext, authEngine } = setupAuth(db, config);
 
   // --- Identity: better-auth owns everything under /api/auth/* -----------
   app.all("/api/auth/*", async (req, reply) => {
@@ -25,39 +34,29 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     await sendWebResponse(reply, response);
   });
 
-  // --- Registry: apps self-register here on boot --------------------------
+  // --- Registry: an installed app calls this once it boots, presenting the
+  // unique per-app token TwoDB generated for it at install time (see
+  // orchestrator/install.ts). There is no shared secret anymore — a stolen
+  // token only ever impersonates the one app it was issued for, and is
+  // rotated automatically on every (re)install/upgrade.
   app.post("/registry/register", async (req, reply) => {
-    // Dev-grade shared-secret guard. Swap for mTLS/network isolation before
-    // any real multi-host deployment.
-    if (req.headers["x-provision-token"] !== config.AUTH_SECRET) {
-      return reply.code(401).send({ error: "invalid provision token" });
-    }
     const body = req.body as {
       slug: string;
-      name: string;
-      version: string;
-      shape: string;
-      basePath: string;
+      registrationToken: string;
       httpUrl: string;
       socketPath?: string;
-      hostId?: string;
-      capabilities: string[];
       manifest: unknown;
     };
 
-    await registry.registerApp({
+    const result = await registry.completeRegistration({
       slug: body.slug,
-      name: body.name,
-      version: body.version,
-      shape: body.shape,
-      basePath: body.basePath,
+      registrationToken: body.registrationToken,
       httpUrl: body.httpUrl,
       socketPath: body.socketPath,
-      hostId: body.hostId ?? HOST_ID,
-      capabilities: body.capabilities,
       manifestJson: body.manifest,
     });
 
+    if (!result.ok) return reply.code(401).send({ error: result.reason });
     return { ok: true };
   });
 
@@ -65,7 +64,13 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     const ctx = await resolveContext(new Headers(req.headers as any));
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const apps = await registry.listApps();
-    return apps.map((a) => ({ slug: a.slug, name: a.name, basePath: a.base_path, status: a.status }));
+    return apps.map((a) => ({
+      slug: a.slug,
+      name: a.name,
+      basePath: a.base_path,
+      status: a.status,
+      installStatus: a.install_status,
+    }));
   });
 
   app.get("/registry/apps/:slug/endpoint.json", async (req, reply) => {
@@ -73,24 +78,128 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
     const row = await registry.getApp(slug);
-    if (!row) return reply.code(404).send({ error: "not found" });
+    if (!row || !row.manifest_json) return reply.code(404).send({ error: "not found" });
     reply.type("application/json");
     return row.manifest_json;
   });
 
-  // --- Provisioning: admin-triggered, creates an app's Postgres schema+role
-  app.post("/registry/apps/:slug/provision", async (req, reply) => {
+  // --- Orchestrator: install/lifecycle-manage apps via Docker -------------
+  app.get("/orchestrator/catalog", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    return APP_CATALOG.map((e) => ({ slug: e.slug, hostPort: e.hostPort }));
+  });
+
+  /**
+   * Runs a long-lived lifecycle operation (docker build + run can take
+   * minutes on first install) in the background so the HTTP call returns
+   * immediately. Failures are recorded as install_status "failed" and
+   * logged — clients poll `GET /orchestrator/apps/:slug/status`.
+   */
+  function runLifecycle(slug: string, op: () => Promise<void>) {
+    void op().catch(async (err) => {
+      app.log.error({ err, slug }, "lifecycle operation failed");
+      await registry.setInstallStatus(slug, "failed").catch(() => {});
+    });
+  }
+
+  app.post("/orchestrator/apps/:slug/install", async (req, reply) => {
     const ctx = await resolveContext(new Headers(req.headers as any));
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
+    try {
+      runLifecycle(slug, () => installApp(slug, { registry, config }));
+      return { ok: true, status: "installing" };
+    } catch (err) {
+      return reply.code(500).send({ error: String(err) });
+    }
+  });
 
-    const result = await provisionAppDatabase(config.TWODB_PG_ADMIN_URL, slug);
-    const encrypted = encryptSecret(result.password, config.AUTH_SECRET);
-    await registry.setProvisioning(slug, result.schema, result.role, encrypted);
+  // --- Dev-mode primitives: same token/DB provisioning as a full install,
+  // without touching Docker — for running an app directly via `pnpm dev`
+  // instead of as a container. See apps/<slug>/README.md "Local dev" for
+  // the exact steps.
+  app.post("/orchestrator/apps/:slug/issue-token", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    try {
+      const result = await issueRegistrationToken(slug, { registry, config });
+      return result;
+    } catch (err) {
+      return reply.code(500).send({ error: String(err) });
+    }
+  });
 
-    // Connection string is returned exactly once — the caller (installer /
-    // admin UI) is responsible for writing it into the app's deployment env.
-    return { schema: result.schema, role: result.role, connectionString: result.connectionString };
+  app.post("/orchestrator/apps/:slug/provision-db", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    try {
+      const result = await provisionDatabase(slug, { registry, config });
+      return result;
+    } catch (err) {
+      return reply.code(500).send({ error: String(err) });
+    }
+  });
+
+  app.post("/orchestrator/apps/:slug/start", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    await startApp(slug, { registry, config });
+    return { ok: true };
+  });
+
+  app.post("/orchestrator/apps/:slug/stop", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    await stopApp(slug, { registry, config });
+    return { ok: true };
+  });
+
+  app.post("/orchestrator/apps/:slug/restart", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    await restartApp(slug, { registry, config });
+    return { ok: true };
+  });
+
+  app.post("/orchestrator/apps/:slug/upgrade", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    try {
+      runLifecycle(slug, () => upgradeApp(slug, { registry, config }));
+      return { ok: true, status: "installing" };
+    } catch (err) {
+      return reply.code(500).send({ error: String(err) });
+    }
+  });
+
+  app.delete("/orchestrator/apps/:slug", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    await removeApp(slug, { registry, config });
+    return { ok: true };
+  });
+
+  app.get("/orchestrator/apps/:slug/status", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    const row = await registry.getApp(slug);
+    const containerStatus = await getContainerStatus(slug, { registry, config });
+    return {
+      slug,
+      installStatus: row?.install_status ?? "not_installed",
+      registrationStatus: row?.status ?? "unknown",
+      containerStatus,
+      lastSeenAt: row?.last_seen_at ?? null,
+    };
   });
 
   // --- Federated search (v1: manifest-declared capability fan-out) -------
@@ -106,7 +215,9 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
   app.all("/apps/:slug/*", async (req, reply) => {
     const { slug } = req.params as { slug: string; "*": string };
     const app_ = await registry.getApp(slug);
-    if (!app_) return reply.code(404).send({ error: `app "${slug}" is not registered` });
+    if (!app_ || !app_.manifest_json) {
+      return reply.code(404).send({ error: `app "${slug}" is not registered` });
+    }
 
     const ctx = await resolveContext(
       new Headers(req.headers as any),

@@ -51,6 +51,18 @@ const completions = defineEndpoint({
   }),
 });
 
+const internalManifest = defineEndpoint({
+  name: "internalManifest",
+  method: "GET",
+  path: "/internal/manifest",
+  auth: "public",
+  description:
+    "Pull-registration endpoint TwoDB's orchestrator polls on this app's published port after starting its " +
+    "container. Guarded by the per-app registration token via the `x-registration-token` header (shared " +
+    "contract in core-platform/src/manifest/serve.ts) — not callable through the Gateway.",
+  response: z.object({ slug: z.string(), httpUrl: z.string(), manifest: z.unknown() }),
+});
+
 export const tworouteManifest = defineAppManifest({
   name: "TwoRoute",
   slug: "tworoute",
@@ -62,7 +74,7 @@ export const tworouteManifest = defineAppManifest({
   capabilities: [],
   coreDeps: ["core-data", "core-platform"],
   basePath: "/apps/tworoute",
-  endpoints: [listConnections, createConnection, completions],
+  endpoints: [listConnections, createConnection, completions, internalManifest],
 });
 
 export default tworouteManifest;

@@ -1,6 +1,7 @@
-import { registerWithGateway } from "@twodb/core-platform/manifest";
+import { toEndpointJson } from "@twodb/core-platform/manifest";
 import { loadTwoDbConfig } from "./config.js";
 import { openControlPlaneDb, bootstrapControlPlaneDb } from "./db/sqlite.js";
+import { createRegistryRepo } from "./db/registry.js";
 import { bootstrapAuthTables } from "./auth/index.js";
 import { buildServer } from "./gateway/server.js";
 import { twodbManifest } from "./manifest.js";
@@ -14,18 +15,26 @@ async function main() {
   // this is what makes TwoDB truly zero-setup on first run.
   await bootstrapAuthTables(db, config);
 
+  // TwoDB registers itself directly (see registry.ts's registerSelf doc
+  // comment — it's the one app that doesn't go through its own install/
+  // Docker lifecycle), so `twodb apps` / the admin UI can show its own
+  // control-plane endpoints the same way as any other app.
+  const registry = createRegistryRepo(db);
+  await registry.registerSelf({
+    slug: twodbManifest.slug,
+    name: twodbManifest.name,
+    version: twodbManifest.version,
+    shape: twodbManifest.shape,
+    basePath: twodbManifest.basePath,
+    httpUrl: config.AUTH_BASE_URL,
+    hostId: config.TWODB_HOST_ID,
+    capabilities: twodbManifest.capabilities,
+    manifestJson: toEndpointJson(twodbManifest),
+  });
+
   const server = await buildServer(db, config);
   await server.listen({ port: config.PORT, host: "0.0.0.0" });
   server.log.info(`TwoDB gateway listening on :${config.PORT}`);
-
-  // TwoDB registers itself too, so `twodb apps` / the admin UI can show its
-  // own control-plane endpoints the same way as any other app.
-  await registerWithGateway(twodbManifest, {
-    gatewayUrl: config.AUTH_BASE_URL,
-    provisionToken: config.AUTH_SECRET,
-    httpUrl: config.AUTH_BASE_URL,
-    hostId: process.env.TWODB_HOST_ID ?? "local",
-  }).catch((err) => server.log.warn({ err }, "self-registration failed (non-fatal)"));
 }
 
 main().catch((err) => {

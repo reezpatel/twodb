@@ -1,5 +1,11 @@
 import Fastify from "fastify";
 import { createPgDb } from "@twodb/core-data/db";
+import {
+  INTERNAL_MANIFEST_PATH,
+  REGISTRATION_TOKEN_HEADER,
+  handleManifestRequest,
+} from "@twodb/core-platform/manifest";
+import { tworouteManifest } from "./manifest.js";
 import type { TwoRouteConfig } from "./config.js";
 import { applySchema, type TwoRouteDb } from "./db/schema.js";
 import { createConnectionsRepo } from "./db/repository.js";
@@ -85,6 +91,18 @@ export async function buildServer(config: TwoRouteConfig) {
     } finally {
       reply.raw.end();
     }
+  });
+
+  // Pull-registration endpoint: TwoDB's orchestrator polls this on the
+  // container's published port and completes registration itself (see
+  // core-platform/src/manifest/serve.ts for why both push and pull exist).
+  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => {
+    const res = handleManifestRequest(
+      tworouteManifest,
+      { registrationToken: config.TWODB_PROVISION_TOKEN, httpUrl: config.HTTP_URL },
+      req.headers[REGISTRATION_TOKEN_HEADER],
+    );
+    return reply.code(res.status).send(res.body);
   });
 
   app.get("/healthz", async () => ({ ok: true }));

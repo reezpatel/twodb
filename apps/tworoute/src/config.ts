@@ -4,8 +4,8 @@ import { loadConfig, commonConfigFields } from "@twodb/core-data/config";
 export const configSchema = z.object({
   ...commonConfigFields,
   DATABASE_URL: z.string().url(),
+  /** The unique per-app registration token TwoDB issued for this app at install time — see @twodb/core-platform/manifest's registerWithGateway(). */
   TWODB_PROVISION_TOKEN: z.string(),
-  TWODB_HOST_ID: z.string().default("local"),
   HTTP_URL: z.string().url().default("http://localhost:4010"),
 });
 

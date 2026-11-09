@@ -3,16 +3,26 @@ import { toEndpointJson } from "./generate.js";
 
 export interface RegisterWithGatewayOptions {
   gatewayUrl: string;
-  provisionToken: string;
+  /**
+   * The unique, per-app registration token TwoDB generated for this exact
+   * app at install time (`TWODB_PROVISION_TOKEN` env var, injected by the
+   * Docker orchestrator — or obtained by hand via
+   * `POST /orchestrator/apps/:slug/issue-token` for local dev). There is no
+   * shared secret anymore: a stolen token only ever impersonates the one
+   * app it was issued for, and TwoDB rejects a token presented by the wrong
+   * slug.
+   */
+  registrationToken: string;
   httpUrl: string;
   socketPath?: string;
-  hostId: string;
 }
 
 /**
- * Every app calls this once on boot to self-register with TwoDB (per the
- * "apps register themselves into TwoAdmin" decision). Safe to call on every
- * restart — TwoDB upserts by slug.
+ * Every app calls this once on boot to register itself as reachable with
+ * TwoDB (the app itself was already installed/provisioned by TwoDB before
+ * this ever runs — see ECOSYSTEM.md "How other apps plug in"). Safe to call
+ * on every restart — TwoDB upserts by slug, as long as the token still
+ * matches what it issued.
  */
 export async function registerWithGateway(
   manifest: AppManifestSpec,
@@ -21,17 +31,12 @@ export async function registerWithGateway(
   const endpointJson = toEndpointJson(manifest);
   const res = await fetch(new URL("/registry/register", options.gatewayUrl), {
     method: "POST",
-    headers: { "content-type": "application/json", "x-provision-token": options.provisionToken },
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({
       slug: manifest.slug,
-      name: manifest.name,
-      version: manifest.version,
-      shape: manifest.shape,
-      basePath: manifest.basePath,
+      registrationToken: options.registrationToken,
       httpUrl: options.httpUrl,
       socketPath: options.socketPath,
-      hostId: options.hostId,
-      capabilities: manifest.capabilities,
       manifest: endpointJson,
     }),
   });

@@ -11,9 +11,8 @@ async function main() {
 
   await registerWithGateway(tworouteManifest, {
     gatewayUrl: config.TWODB_GATEWAY_URL,
-    provisionToken: config.TWODB_PROVISION_TOKEN,
+    registrationToken: config.TWODB_PROVISION_TOKEN,
     httpUrl: config.HTTP_URL,
-    hostId: config.TWODB_HOST_ID,
   }).catch((err) => server.log.warn({ err }, "self-registration with TwoDB failed (non-fatal)"));
 }
 
