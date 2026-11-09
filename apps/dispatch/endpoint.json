@@ -1,0 +1,16 @@
+{
+  "name": "Dispatch",
+  "slug": "dispatch",
+  "version": "0.1.0",
+  "shape": "backend",
+  "description": "Remote command runner — not yet implemented. See AGENTS.md before building it out.",
+  "capabilities": [],
+  "coreDeps": [
+    "core-data",
+    "core-platform",
+    "core-async"
+  ],
+  "basePath": "/apps/dispatch",
+  "generatedAt": "2026-11-09T12:16:47.037Z",
+  "endpoints": []
+}

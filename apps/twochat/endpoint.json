@@ -1,0 +1,16 @@
+{
+  "name": "TwoChat",
+  "slug": "twochat",
+  "version": "0.1.0",
+  "shape": "backend+webapp",
+  "description": "Chat/messenger — not yet implemented. See AGENTS.md before building it out.",
+  "capabilities": [],
+  "coreDeps": [
+    "core-data",
+    "core-platform",
+    "core-async"
+  ],
+  "basePath": "/apps/twochat",
+  "generatedAt": "2026-11-09T12:16:47.996Z",
+  "endpoints": []
+}

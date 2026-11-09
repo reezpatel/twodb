@@ -1,0 +1,29 @@
+{
+  "name": "@twodb/app-twodrive",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
+    "build": "tsc --noEmit",
+    "start": "tsx src/index.ts",
+    "gen:docs": "tsx scripts/gen-docs.ts",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@twodb/core-data": "workspace:*",
+    "@twodb/core-platform": "workspace:*",
+    "@twodb/core-async": "workspace:*",
+    "fastify": "^5.11.2",
+    "kysely": "^0.29.5",
+    "pg": "^8.23.0",
+    "zod": "^4.5.2",
+    "ulid": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.21.0",
+    "typescript": "^5.8.0",
+    "tsx": "^4.20.0"
+  }
+}

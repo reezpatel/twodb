@@ -1,0 +1,26 @@
+{
+  "name": "@twodb/core-async",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./engine": "./src/engine/index.ts",
+    "./registry": "./src/registry/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "kysely": "^0.29.5",
+    "pg": "^8.23.0",
+    "zod": "^4.5.2",
+    "ulid": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.21.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}

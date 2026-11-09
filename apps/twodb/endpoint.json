@@ -1,0 +1,247 @@
+{
+  "name": "TwoDB",
+  "slug": "twodb",
+  "version": "0.1.0",
+  "shape": "backend+webapp",
+  "description": "The control plane: app registry/self-registration, Postgres schema provisioning, identity (TwoAuth), and the Gateway every other app's traffic flows through.",
+  "capabilities": [],
+  "coreDeps": [
+    "core-data",
+    "core-platform",
+    "core-async"
+  ],
+  "basePath": "/",
+  "generatedAt": "2026-11-09T12:16:36.534Z",
+  "endpoints": [
+    {
+      "name": "registerApp",
+      "method": "POST",
+      "path": "/registry/register",
+      "auth": "public",
+      "description": "Self-registration endpoint every app calls on boot (shared-secret guarded via x-provision-token, not session/API-key auth — this is how an app first introduces itself before it has any workspace context).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "shape": {
+            "type": "string",
+            "enum": [
+              "backend",
+              "backend+webapp"
+            ]
+          },
+          "basePath": {
+            "type": "string"
+          },
+          "httpUrl": {
+            "type": "string"
+          },
+          "socketPath": {
+            "type": "string"
+          },
+          "hostId": {
+            "type": "string"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "manifest": {}
+        },
+        "required": [
+          "slug",
+          "name",
+          "version",
+          "shape",
+          "basePath",
+          "httpUrl",
+          "capabilities",
+          "manifest"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listApps",
+      "method": "GET",
+      "path": "/registry/apps",
+      "auth": "session-or-apiKey",
+      "description": "Lists every app currently registered with TwoDB.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "slug": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "basePath": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "slug",
+            "name",
+            "basePath",
+            "status"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "getAppManifest",
+      "method": "GET",
+      "path": "/registry/apps/:slug/endpoint.json",
+      "auth": "session-or-apiKey",
+      "description": "Returns one app's cached endpoint.json, as last reported at registration time.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "provisionApp",
+      "method": "POST",
+      "path": "/registry/apps/:slug/provision",
+      "auth": "session",
+      "description": "Creates (or rotates) a Postgres role+schema for the named app. Returns the connection string exactly once.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "connectionString": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema",
+          "role",
+          "connectionString"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "search",
+      "method": "POST",
+      "path": "/search",
+      "auth": "session-or-apiKey",
+      "description": "Federated search — fans a query out to every app that declared the `search` capability.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "app": {
+                  "type": "string"
+                },
+                "results": {
+                  "type": "array",
+                  "items": {}
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "app",
+                "results"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "proxy",
+      "method": "GET",
+      "path": "/apps/:slug/*",
+      "auth": "session-or-apiKey",
+      "description": "Generic reverse proxy to a registered app, over whichever transport (unix socket same-host, TCP otherwise) the registry chose. All methods are supported, not just GET; streaming responses are passed through unbuffered.",
+      "streaming": true
+    }
+  ]
+}

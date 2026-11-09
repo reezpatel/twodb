@@ -1,0 +1,196 @@
+@import "tailwindcss";
+@source "../components";
+@import "tw-animate-css";
+
+/*
+ * Isometric Lab theme — see THEME.MD for the full specification.
+ * Light is primary; dark is a faithful night version.
+ *
+ * Note: THEME.MD specifies `outline` at full ink contrast for isometric diagram
+ * line-work. For UI chrome (borders on cards, panels, inputs, etc.) we use a
+ * softened `outline` instead — a subtle hairline rather than a bold stroke.
+ */
+
+:root,
+[data-theme="light"] {
+  --paper: #f2efe8;
+  --paper-grid: #e3dfd5;
+  --stone: #eeebe2;
+  --stone-hatch: #c9bfae;
+  --ink: #1f1d1a;
+  --ink-muted: #5f5b54;
+  /* Neutral (no warm tint) muted text — used for sidebar/nav chrome instead of ink-muted */
+  --muted-foreground: #6b6b6b;
+  --outline: #ddd5c4;  --ion: #a9c1e8;
+  --ion-deep: #4f63ad;
+  --tritium: #a8d8b9;
+  --transmute: #eab0bd;
+  --materials: #f2bf8f;
+  --glow: #f6d77a;
+  --pin: #c8323f;
+
+  /* Card surface: same as stone in light, overridden to a neutral gray in dark */
+  --card: var(--stone);
+  /* Popover/menu surface: a touch lighter than stone so floating panels read as raised, not flat */
+  --popover: #f8f6f1;
+
+  --destructive: #c8323f;
+  --destructive-foreground: #f2efe8;
+  --success: #3f8a5c;
+  --success-foreground: #f2efe8;
+  --warning: #b4791f;
+  --warning-foreground: #f2efe8;
+  --info: var(--ion-deep);
+  --info-foreground: #f2efe8;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-10: 40px;
+
+  --radius-sm: 4px;
+  --radius-md: 10px;
+  --radius-pill: 999px;
+
+  --stroke-hair: 1px;
+  --stroke-line: 1.5px;
+}
+
+[data-theme="dark"] {
+  --paper: #1a1a1a;
+  --paper-grid: #1f1f1f;
+  --stone: #1e1e1e;
+  --stone-hatch: #373737;
+  --ink: #f1ede4;
+  --ink-muted: #a9a397;
+  /* Neutral (no warm tint) muted text — used for sidebar/nav chrome instead of ink-muted */
+  --muted-foreground: #a0a0a0;
+  --outline: #353535;
+  --ion: #5d76a6;
+  --ion-deep: #9fb4e6;
+  --tritium: #4c8763;
+  --transmute: #a9677a;
+  --materials: #b47c48;
+  --glow: #e8c45a;
+  --pin: #ef6f7a;
+
+  /* Neutral gray, no warm tint, close to paper lightness */
+  --card: #1f1f1f;
+  /* Popover/menu surface: a touch lighter than stone, still a plain neutral shade */
+  --popover: #282828;
+
+  --destructive: #ef6f7a;
+  --destructive-foreground: #1a1a1a;
+  --success: #6fb98a;
+  --success-foreground: #1a1a1a;
+  --warning: #e0a94e;
+  --warning-foreground: #1a1a1a;
+  --info: var(--ion-deep);
+  --info-foreground: #1a1a1a;
+}
+
+/* Follow the OS when no explicit theme is set */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1a1a1a;
+    --paper-grid: #1f1f1f;
+    --stone: #1e1e1e;
+    --stone-hatch: #373737;
+    --ink: #f1ede4;
+    --ink-muted: #a9a397;
+    --muted-foreground: #a0a0a0;
+    --outline: #353535;
+    --ion: #5d76a6;
+    --ion-deep: #9fb4e6;
+    --tritium: #4c8763;
+    --transmute: #a9677a;
+    --materials: #b47c48;
+    --glow: #e8c45a;
+    --pin: #ef6f7a;
+    --card: #1f1f1f;
+    --popover: #282828;
+    --destructive: #ef6f7a;
+    --destructive-foreground: #1a1a1a;
+    --success: #6fb98a;
+    --success-foreground: #1a1a1a;
+    --warning: #e0a94e;
+    --warning-foreground: #1a1a1a;
+    --info: var(--ion-deep);
+    --info-foreground: #1a1a1a;
+  }
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", "Inter", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --color-paper: var(--paper);
+  --color-paper-grid: var(--paper-grid);
+  --color-stone: var(--stone);
+  --color-stone-hatch: var(--stone-hatch);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-outline: var(--outline);
+
+  --color-ion: var(--ion);
+  --color-ion-deep: var(--ion-deep);
+  --color-tritium: var(--tritium);
+  --color-transmute: var(--transmute);
+  --color-materials: var(--materials);
+  --color-glow: var(--glow);
+  --color-pin: var(--pin);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  /* semantic aliases so existing utility names keep working */
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-card: var(--card);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--ink);
+  --color-primary-foreground: var(--paper);
+  --color-secondary: var(--stone);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--stone);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--paper-grid);
+  --color-accent-foreground: var(--ink);
+  --color-border: var(--outline);
+  --color-input: var(--outline);
+  --color-ring: var(--ion-deep);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-md);
+  --radius-pill: var(--radius-pill);
+  --radius-xl: var(--radius-md);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+/* The drafting-paper ground: faint square grid over paper */
+.il-sheet {
+  background-color: var(--paper);
+  padding: var(--space-6);
+  border-radius: var(--radius-md);
+  background-image: linear-gradient(var(--paper-grid) var(--stroke-hair), transparent var(--stroke-hair)),
+    linear-gradient(90deg, var(--paper-grid) var(--stroke-hair), transparent var(--stroke-hair));
+  background-size: var(--space-6) var(--space-6);
+}
+.il-sheet-plain {
+  background-image: none;
+}

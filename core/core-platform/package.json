@@ -1,0 +1,32 @@
+{
+  "name": "@twodb/core-platform",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./auth": "./src/auth/index.ts",
+    "./transport": "./src/transport/index.ts",
+    "./telemetry": "./src/telemetry/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@twodb/core-data": "workspace:*",
+    "better-auth": "^1.7.5",
+    "@better-auth/passkey": "^1.7.5",
+    "@better-auth/api-key": "^1.7.5",
+    "kysely": "^0.29.5",
+    "zod": "^4.5.2",
+    "pino": "^10.4.0",
+    "ulid": "^3.0.2",
+    "undici": "^7.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,6 +1,9 @@
 packages:
   - "apps/*"
-  - "packages/*"
+  - "apps/*/webapp"
+  - "core/*"
+  - "blocks"
+  - "tools/*"
 
 onlyBuiltDependencies:
   - esbuild

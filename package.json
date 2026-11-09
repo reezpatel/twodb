@@ -2,46 +2,22 @@
   "name": "twodb",
   "private": true,
   "scripts": {
-    "local": "pnpm --workspace-root run --parallel \"/^local:.*/\"",
-    "local:app": "pnpm --parallel --filter @twodb/desktop --filter @twodb/server dev",
+    "local": "pnpm --parallel --filter @twodb/app-twodb --filter @twodb/app-twodb-webapp --filter @twodb/app-tworoute dev",
     "local:blocks": "pnpm --filter @twodb/blocks storybook",
-    "runner": "pnpm --filter @twodb/runner dev",
-    "db:migrate": "pnpm --filter @twodb/server db:migrate",
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "db:up": "docker compose -f docker-compose.db.yaml up -d",
-    "db:down": "docker compose -f docker-compose.db.yaml down",
-    "db:logs": "docker compose -f docker-compose.db.yaml logs -f",
-    "db:ps": "docker compose -f docker-compose.db.yaml ps"
+    "gen:docs": "turbo gen:docs",
+    "scaffold": "node tools/scaffold-app.mjs",
+    "db:up": "docker compose -f deploy/docker-compose.db.yaml up -d",
+    "db:down": "docker compose -f deploy/docker-compose.db.yaml down",
+    "db:logs": "docker compose -f deploy/docker-compose.db.yaml logs -f",
+    "db:ps": "docker compose -f deploy/docker-compose.db.yaml ps"
   },
   "devDependencies": {
     "@types/pg": "^8.21.0",
-    "@types/ws": "^8.18.1",
     "turbo": "^2.5.0",
-    "esbuild": "^0.25.12",
-    "@babel/core": "^7.26.0",
-    "styled-jsx": "^5.1.7"
+    "typescript": "^5.8.0"
   },
-  "packageManager": "pnpm@11.11.0",
-  "dependencies": {
-    "@earendil-works/pi-coding-agent": "^0.84.4",
-    "@fastify/websocket": "^11.3.0",
-    "@tanstack/react-form": "^1.33.5",
-    "@tanstack/react-query": "^5.101.4",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
-    "fastify": "^5.11.2",
-    "fastify-plugin": "^6.0.0",
-    "kysely": "^0.29.5",
-    "lucide-react": "^1.29.0",
-    "pg": "^8.23.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "react-pluggable": "^0.4.3",
-    "react-router": "^7.18.2",
-    "ulid": "^3.0.2",
-    "ws": "^8.21.3",
-    "zod": "^4.5.2"
-  }
+  "packageManager": "pnpm@11.11.0"
 }

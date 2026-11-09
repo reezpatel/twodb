@@ -1,0 +1,31 @@
+{
+  "name": "@twodb/core-runtime",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "bin": {
+    "twodb": "./src/cli/bin.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./cli": "./src/cli/index.ts",
+    "./shell": "./src/shell/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "ulid": "^3.0.2"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.18",
+    "typescript": "^5.8.0",
+    "tsx": "^4.20.0"
+  }
+}

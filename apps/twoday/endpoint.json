@@ -1,0 +1,16 @@
+{
+  "name": "TwoDay",
+  "slug": "twoday",
+  "version": "0.1.0",
+  "shape": "backend+webapp",
+  "description": "Calendar — not yet implemented. See AGENTS.md before building it out.",
+  "capabilities": [],
+  "coreDeps": [
+    "core-data",
+    "core-platform",
+    "core-async"
+  ],
+  "basePath": "/apps/twoday",
+  "generatedAt": "2026-11-09T12:16:48.476Z",
+  "endpoints": []
+}

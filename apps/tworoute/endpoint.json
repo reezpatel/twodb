@@ -1,0 +1,168 @@
+{
+  "name": "TwoRoute",
+  "slug": "tworoute",
+  "version": "0.1.0",
+  "shape": "backend",
+  "description": "Multi-provider LLM gateway: Space-scoped provider connections plus a streaming OpenAI-compatible /completions endpoint any app — or any external tool with a workspace API key — can call.",
+  "capabilities": [],
+  "coreDeps": [
+    "core-data",
+    "core-platform"
+  ],
+  "basePath": "/apps/tworoute",
+  "generatedAt": "2026-11-09T12:16:41.000Z",
+  "endpoints": [
+    {
+      "name": "listConnections",
+      "method": "GET",
+      "path": "/connections",
+      "auth": "session",
+      "description": "Lists LLM provider connections visible to the caller's active spaces.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "default_model": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "provider",
+            "default_model"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createConnection",
+      "method": "POST",
+      "path": "/connections",
+      "auth": "session",
+      "description": "Registers a new LLM provider connection, scoped to one space.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "openai-compatible",
+              "anthropic"
+            ]
+          },
+          "baseUrl": {
+            "type": "string"
+          },
+          "apiKey": {
+            "type": "string"
+          },
+          "defaultModel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "spaceId",
+          "name",
+          "provider",
+          "baseUrl",
+          "apiKey"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "completions",
+      "method": "POST",
+      "path": "/completions",
+      "auth": "session-or-apiKey",
+      "description": "OpenAI-compatible chat completions endpoint. Pick a connection via `connectionId`, or the first connection visible in-scope if omitted. Any external tool (e.g. Cursor) can point at this using a workspace API key, same as an internal app would.",
+      "streaming": true,
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "content"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "stream": {
+            "type": "boolean"
+          },
+          "temperature": {
+            "type": "number"
+          },
+          "max_tokens": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "model",
+          "messages"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

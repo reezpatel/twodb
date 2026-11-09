@@ -1,0 +1,16 @@
+{
+  "name": "TwoPin",
+  "slug": "twopin",
+  "version": "0.1.0",
+  "shape": "backend+webapp",
+  "description": "Bookmarks/link aggregator — not yet implemented. See AGENTS.md before building it out.",
+  "capabilities": [],
+  "coreDeps": [
+    "core-data",
+    "core-platform",
+    "core-async"
+  ],
+  "basePath": "/apps/twopin",
+  "generatedAt": "2026-11-09T12:16:49.665Z",
+  "endpoints": []
+}

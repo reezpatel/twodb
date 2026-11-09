@@ -1,0 +1,16 @@
+{
+  "name": "TwoThing",
+  "slug": "twothing",
+  "version": "0.1.0",
+  "shape": "backend+webapp",
+  "description": "Inventory management — not yet implemented. See AGENTS.md before building it out.",
+  "capabilities": [],
+  "coreDeps": [
+    "core-data",
+    "core-platform",
+    "core-async"
+  ],
+  "basePath": "/apps/twothing",
+  "generatedAt": "2026-11-09T12:16:50.146Z",
+  "endpoints": []
+}

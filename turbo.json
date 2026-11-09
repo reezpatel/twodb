@@ -11,6 +11,10 @@
       "cache": false,
       "persistent": true
     },
-    "lint": {}
+    "lint": {},
+    "gen:docs": {
+      "dependsOn": ["^build"],
+      "outputs": ["ENDPOINTS.md", "MESSAGES.md", "endpoint.json", "messages.json"]
+    }
   }
 }
