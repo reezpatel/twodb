@@ -8,7 +8,8 @@
     "build": "tsc --noEmit",
     "start": "tsx src/index.ts",
     "gen:docs": "tsx scripts/gen-docs.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "provision:dev": "tsx scripts/provision-dev.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
