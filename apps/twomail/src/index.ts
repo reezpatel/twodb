@@ -7,7 +7,7 @@ import { serve } from "@hono/node-server";
 import { handleManifestRequest, INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER } from "@twodb/core-platform/manifest";
 import { manifest } from "./manifest.js";
 
-const port = Number(process.env.PORT ?? 6401);
+const port = Number(process.env.PORT ?? 6402);
 const registrationToken = process.env.TWODB_PROVISION_TOKEN;
 
 serve({

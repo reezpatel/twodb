@@ -9,7 +9,7 @@ export const configSchema = z.object({
    * (every app loads the same file), so TWODB_PORT takes precedence there.
    */
   TWODB_PORT: z.coerce.number().int().positive().optional(),
-  PORT: z.coerce.number().int().positive().default(4000),
+  PORT: z.coerce.number().int().positive().default(6400),
   /** TwoDB's own control-plane store — bootstrapped on first run, no setup required. */
   TWODB_SQLITE_FILE: z.string().default("./.data/twodb-control-plane.sqlite"),
   /** Admin connection to the shared Postgres cluster, used only for provisioning other apps' schemas/roles. */
@@ -17,12 +17,12 @@ export const configSchema = z.object({
   /** Hostname installed-app containers use to reach Postgres — "localhost" (TwoDB's own view) is never reachable from inside a container. Defaults to the service name docker-compose.db.yaml gives the Postgres container. */
   TWODB_PG_CONTAINER_HOST: z.string().default("twodb-postgres"),
   AUTH_SECRET: z.string().min(16).default("dev-only-secret-change-me-0000"), // dev default — MUST be set in production
-  AUTH_BASE_URL: z.string().url().default("http://localhost:4000"),
-  AUTH_TRUSTED_ORIGINS: z.string().default("http://localhost:5173").transform((v) => v.split(",")),
+  AUTH_BASE_URL: z.string().url().default("http://localhost:6400"),
+  AUTH_TRUSTED_ORIGINS: z.string().default("http://localhost:6500").transform((v) => v.split(",")),
   PASSKEY_RP_ID: z.string().default("localhost"),
-  PASSKEY_ORIGIN: z.string().url().default("http://localhost:5173"),
+  PASSKEY_ORIGIN: z.string().url().default("http://localhost:6500"),
   /** What TwoDB injects as `TWODB_GATEWAY_URL` into installed-app containers — "localhost" from TwoDB's own perspective is not reachable from inside a container when TwoDB itself runs on the host. */
-  TWODB_GATEWAY_URL_FOR_CONTAINERS: z.string().url().default("http://host.docker.internal:4000"),
+  TWODB_GATEWAY_URL_FOR_CONTAINERS: z.string().url().default("http://host.docker.internal:6400"),
   /**
    * If set (e.g. `ghcr.io/youruser`), installs/upgrades pull app images
    * (`<registry>/app-<slug>:<version ?? "latest">`) instead of building

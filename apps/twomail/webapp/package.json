@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "storybook": "storybook dev -p 6600",
+    "storybook": "storybook dev -p 6524",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

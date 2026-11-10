@@ -13,7 +13,7 @@ export const configSchema = z.object({
    * back to the registration token; production containers always get one.
    */
   TWODB_DATA_KEY: z.string().optional(),
-  HTTP_URL: z.string().url().default("http://localhost:6400"),
+  HTTP_URL: z.string().url().default("http://localhost:6401"),
 });
 
 export type TwoRouteConfig = z.infer<typeof configSchema>;

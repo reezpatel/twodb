@@ -25,5 +25,5 @@ export const commonConfigFields = {
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
   /** Every app dials TwoDB's gateway for anything cross-app. */
-  TWODB_GATEWAY_URL: z.string().url().default("http://localhost:4000"),
+  TWODB_GATEWAY_URL: z.string().url().default("http://localhost:6400"),
 };

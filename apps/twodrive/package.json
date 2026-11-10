@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "PORT=${PORT:-6405} tsx watch --env-file=../../.env src/index.ts",
+    "dev": "PORT=${PORT:-6406} tsx watch --env-file=../../.env src/index.ts",
     "build": "tsc --noEmit",
     "start": "tsx src/index.ts",
     "gen:docs": "tsx scripts/gen-docs.ts",

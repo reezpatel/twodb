@@ -8,7 +8,7 @@ program
   .description(
     "twodb-cli — generates live commands from any registered app's endpoint.json, served by TwoDB's gateway registry.",
   )
-  .option("--gateway <url>", "Gateway URL", process.env.TWODB_GATEWAY_URL ?? "http://localhost:4000")
+  .option("--gateway <url>", "Gateway URL", process.env.TWODB_GATEWAY_URL ?? "http://localhost:6400")
   .option("--api-key <key>", "Workspace API key", process.env.TWODB_API_KEY)
   .option("--workspace <id>", "Workspace id (only needed for session auth, not API keys)")
   .option("--space <ids>", "Comma-separated space ids (session auth only)");

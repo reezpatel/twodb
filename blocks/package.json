@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "storybook": "storybook dev -p 6699 --host 0.0.0.0",
+    "storybook": "storybook dev -p 6520 --host 0.0.0.0",
     "storybook:build": "storybook build",
     "build": "tsc --noEmit",
     "lint": "tsc --noEmit"

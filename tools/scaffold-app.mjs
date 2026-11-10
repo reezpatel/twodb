@@ -168,7 +168,7 @@ import { serve } from "@hono/node-server";
 import { handleManifestRequest, INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER } from "@twodb/core-platform/manifest";
 import { manifest } from "./manifest.js";
 
-const port = Number(process.env.PORT ?? 6416 /* TODO: this app's catalog port */);
+const port = Number(process.env.PORT ?? 6417 /* TODO: this app's catalog port */);
 const registrationToken = process.env.TWODB_PROVISION_TOKEN;
 
 serve({

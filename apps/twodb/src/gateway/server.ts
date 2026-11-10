@@ -267,7 +267,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
   app.get("/healthz", async () => ({ ok: true }));
 
   // --- Admin webapp: serve the built SPA when its dist exists (production
-  // image builds it; dev uses the Vite dev server on :5173 instead).
+  // image builds it; dev uses the Vite dev server on :6500 instead).
   const webappDist = path.join(REPO_ROOT, "apps/twodb/webapp/dist");
   if (existsSync(path.join(webappDist, "index.html"))) {
     await app.register(fastifyStatic, { root: webappDist, wildcard: false, index: false });

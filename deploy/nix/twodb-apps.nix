@@ -16,10 +16,10 @@
   #     no app ports are published on the host (TWODB_APP_PUBLISH_PORTS=false).
   #
   # Exposure:
-  #   - Humans: nginx vhost https://hub.twodb.io → 127.0.0.1:4000 (ACME).
+  #   - Humans: nginx vhost https://hub.twodb.io → 127.0.0.1:6400 (ACME).
   #     The same origin serves the admin webapp AND the gateway API
   #     (/api/auth, /registry, /orchestrator, /apps/<slug>/*).
-  #   - twodb-cli from other machines: NetBird mesh only — port 4000 is
+  #   - twodb-cli from other machines: NetBird mesh only — port 6400 is
   #     opened exclusively on nb-default, never publicly.
   #
   # Requires (already present via the memgraph/monolith stack):
@@ -109,13 +109,13 @@
         # for why "newer" over the default "missing").
         pull = "newer";
         # Gateway API on loopback only — nginx terminates TLS on 443.
-        ports = [ "127.0.0.1:4000:4000" ];
+        ports = [ "127.0.0.1:6400:6400" ];
         extraOptions = [
           "--network=${network}"
-          "--health-cmd=node -e \"fetch('http://localhost:4000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
+          "--health-cmd=node -e \"fetch('http://localhost:6400/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
         ];
         environment = {
-          PORT = "4000";
+          PORT = "6400";
           # Control-plane SQLite on the persistent volume (bootstraps itself
           # on first run — no setup step).
           TWODB_SQLITE_FILE = "/data/twodb-control-plane.sqlite";
@@ -124,7 +124,7 @@
           # Apps call home to the gateway by container name (they can't
           # reach the host's loopback — firewalled, and there'd be nothing
           # there anyway: the gateway is a container too).
-          TWODB_GATEWAY_URL_FOR_CONTAINERS = "http://twodb-control-plane:4000";
+          TWODB_GATEWAY_URL_FOR_CONTAINERS = "http://twodb-control-plane:6400";
           # The gateway proxies to apps by container name, not host port.
           TWODB_APP_HTTP_URL_TEMPLATE = "http://twodb-app-{slug}:{containerPort}";
           TWODB_APP_PUBLISH_PORTS = "false";
@@ -164,13 +164,13 @@
       ];
 
       # twodb-cli from mesh machines only; humans go through nginx on 443.
-      networking.firewall.interfaces."nb-default".allowedTCPPorts = [ 4000 ];
+      networking.firewall.interfaces."nb-default".allowedTCPPorts = [ 6400 ];
 
       services.nginx.virtualHosts.${domain} = {
         forceSSL = true;
         enableACME = true;
         locations."/" = {
-          proxyPass = "http://127.0.0.1:4000";
+          proxyPass = "http://127.0.0.1:6400";
           # core-async LISTEN/NOTIFY is server-side, but the explorer's
           # try-it and future streaming endpoints benefit from long timeouts
           # and websocket upgrade support.

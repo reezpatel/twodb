@@ -77,7 +77,7 @@ The same primitives are exposed individually for running an app via
 curl -X POST -H "x-api-key: $KEY" $GW/orchestrator/apps/tworoute/provision-db   # → DATABASE_URL
 curl -X POST -H "x-api-key: $KEY" $GW/orchestrator/apps/tworoute/issue-token    # → TWODB_PROVISION_TOKEN
 
-DATABASE_URL=... TWODB_PROVISION_TOKEN=... TWODB_GATEWAY_URL=http://localhost:4000 \
+DATABASE_URL=... TWODB_PROVISION_TOKEN=... TWODB_GATEWAY_URL=http://localhost:6400 \
   pnpm --filter @twodb/app-tworoute dev
 ```
 The dev-mode app push-registers itself on boot (host → localhost works
@@ -127,14 +127,15 @@ built admin webapp is served from the same origin (both handled by
 ## Port assignments
 
 Fixed per app (see `src/orchestrator/catalog.ts`) so installs are
-reproducible and a host-run dev stack never collides with containers:
-installable apps own 6400+ sequentially — `tworoute` 6400, `twomail` 6401,
-`twoday` 6402, `twocontacts` 6403, `twochat` 6404, `twodrive` 6405,
-`artisan` 6406, `dispatch` 6407, `tworing` 6408, `garden` 6409,
-`twothing` 6410, `twoloop` 6411, `membrain` 6412, `paintress` 6413,
-`twopin` 6414, `twodoo` 6415 (6416–6499 reserved). TwoDB itself stays on
-4000; dev webapps run on 5173 (twodb) and 5180+ (scaffolded apps).
-`pnpm local` at the repo root boots all of it via turbo.
+reproducible and a host-run dev stack never collides with containers.
+Everything lives in the 64XX/65XX band: TwoDB (control plane + gateway)
+6400; installable apps 6401+ sequentially — `tworoute` 6401, `twomail` 6402,
+`twoday` 6403, `twocontacts` 6404, `twochat` 6405, `twodrive` 6406,
+`artisan` 6407, `dispatch` 6408, `tworing` 6409, `garden` 6410,
+`twothing` 6411, `twoloop` 6412, `membrain` 6413, `paintress` 6414,
+`twopin` 6415, `twodoo` 6416 (6417–6499 reserved); dev webapps 6500 (twodb)
+and 6501+ (scaffolded apps); storybooks 6520+. `pnpm local` at the repo
+root boots all of it via turbo.
 
 ## How other apps plug in (once installed)
 1. Everything an app's frontend or other apps need from it flows through
