@@ -11,7 +11,7 @@
     "core-async"
   ],
   "basePath": "/apps/tworoute",
-  "generatedAt": "2026-11-10T19:18:27.387Z",
+  "generatedAt": "2026-11-10T19:30:06.387Z",
   "endpoints": [
     {
       "name": "listProviders",

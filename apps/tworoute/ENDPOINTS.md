@@ -9,7 +9,7 @@ Multi-provider LLM gateway: 24 provider kinds (OAuth for Claude Code & Codex inc
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-10T19:18:27.391Z_
+_Generated: 2026-11-10T19:30:06.392Z_
 
 ## Endpoints
 

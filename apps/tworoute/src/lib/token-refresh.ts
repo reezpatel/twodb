@@ -18,6 +18,9 @@ const OAUTH: Record<string, { url: string; clientId: string; form?: boolean }> =
   },
 };
 
+/** Providers whose credentials are OAuth-refreshable. */
+export const OAUTH_PROVIDERS = new Set(Object.keys(OAUTH));
+
 const ALLOWED_TOKEN_HOSTS = new Set(["console.anthropic.com", "auth.openai.com"]);
 const EXPIRY_SLACK_MS = 120_000;
 
@@ -42,14 +45,35 @@ export interface LiveConnection {
  * uses OAuth token exchange (claude-code, codex). Refreshed tokens are
  * persisted back to the connection's config column. Non-OAuth providers
  * pass through.
+ *
+ * Config keys are normalized: the UI stores camelCase (accessToken /
+ * refreshToken / accountId / expiresAt — the ConnectionDialog field keys)
+ * while the legacy import used snake_case (access_token / refresh_token /
+ * account_id / expires_at — what the OAuth flows return). Both are read;
+ * writes keep whichever casing the connection already used.
  */
-export async function ensureFreshTokens(connection: LiveConnection, db: Kysely<TwoRouteDb>, encrypt: (s: string) => string): Promise<ConnectionConfig> {
+function configGet(config: ConnectionConfig, camel: string, snake: string): string | undefined {
+  return config[camel] ?? config[snake];
+}
+
+export async function ensureFreshTokens(
+  connection: LiveConnection,
+  db: Kysely<TwoRouteDb>,
+  encrypt: (s: string) => string,
+  { force = false }: { force?: boolean } = {},
+): Promise<ConnectionConfig> {
   const config = { ...connection.configParsed };
   const oauth = OAUTH[connection.provider];
-  if (!oauth || !config.refresh_token) return config;
+  const refreshToken = configGet(config, "refreshToken", "refresh_token");
+  if (!oauth || !refreshToken) return config;
 
-  const expiresAt = Date.parse(config.expires_at ?? "");
-  if (config.access_token && Number.isFinite(expiresAt) && expiresAt - EXPIRY_SLACK_MS > Date.now()) {
+  const snakeStyle = "refresh_token" in config && !("refreshToken" in config);
+  const accessKey = snakeStyle ? "access_token" : "accessToken";
+  const refreshKey = snakeStyle ? "refresh_token" : "refreshToken";
+  const expiresKey = snakeStyle ? "expires_at" : "expiresAt";
+
+  const expiresAt = Date.parse(config[expiresKey] ?? "");
+  if (!force && config[accessKey] && Number.isFinite(expiresAt) && expiresAt - EXPIRY_SLACK_MS > Date.now()) {
     return config;
   }
 
@@ -65,7 +89,7 @@ export async function ensureFreshTokens(connection: LiveConnection, db: Kysely<T
 
   const payload = {
     grant_type: "refresh_token",
-    refresh_token: config.refresh_token,
+    refresh_token: refreshToken,
     client_id: oauth.clientId,
   };
   const res = await fetch(tokenUrl, {
@@ -75,18 +99,17 @@ export async function ensureFreshTokens(connection: LiveConnection, db: Kysely<T
   });
   if (!res.ok) {
     const body = await res.text();
-    if (config.access_token) return config; // stale token still beats none
+    if (config[accessKey]) return config; // stale token still beats none
     throw new Error(`token refresh failed (${res.status}): ${body.slice(0, 200)}`);
   }
 
   const tokens = (await res.json()) as TokenResponse;
   if (!tokens.access_token) throw new Error("token refresh returned no access_token");
-  config.access_token = tokens.access_token;
-  if (tokens.refresh_token) config.refresh_token = tokens.refresh_token;
-  if (tokens.expires_in) config.expires_at = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
+  config[accessKey] = tokens.access_token;
+  if (tokens.refresh_token) config[refreshKey] = tokens.refresh_token;
+  if (tokens.expires_in) config[expiresKey] = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
   // Persist the refreshed pair back (encrypted config blob).
-  const { config: _omit, ...rest } = config as Record<string, string>;
   const full = { ...config };
   await db
     .updateTable("llm_connection")

@@ -14,7 +14,7 @@ import { encryptSecret } from "./crypto.js";
 import { getProvider, PROVIDERS, getProviderSpec } from "./providers/index.js";
 import { readForwardedContext } from "./gateway-context.js";
 import { refreshConnectionModels, refreshConnectionQuotas, hasQuotaCollector } from "./lib/model-quota.js";
-import { ensureFreshTokens } from "./lib/token-refresh.js";
+import { ensureFreshTokens, OAUTH_PROVIDERS } from "./lib/token-refresh.js";
 import { startClaudeOAuth, pollClaudeOAuth, completeClaudeOAuth } from "./lib/claude-oauth.js";
 import { startCodexOAuth, pollCodexOAuth, completeCodexOAuth } from "./lib/codex-oauth.js";
 import { joinUrl } from "./providers/url.js";
@@ -226,9 +226,28 @@ export async function buildServer(config: TwoRouteConfig) {
     if (!live) return reply.code(404).send({ error: "not found" });
 
     try {
-      const fresh = await ensureFreshTokens(live, db, quotaCtx.encrypt);
+      let fresh = await ensureFreshTokens(live, db, quotaCtx.encrypt);
       const provider = getProvider(live.provider);
-      const models = provider.listModels ? await provider.listModels({ ...live, configParsed: fresh }) : null;
+      let models = provider.listModels ? await provider.listModels({ ...live, configParsed: fresh }) : null;
+      // Auth-shaped failure with a refresh token on file → one forced refresh
+      // (covers imports whose access token is corrupt/truncated while
+      // expires_at is still in the future) and retry once.
+      if (!models && OAUTH_PROVIDERS.has(live.provider)) {
+        try {
+          const upstream = await provider.streamCompletion({ ...live, configParsed: fresh }, {
+            model: live.default_model ?? "ping",
+            messages: [{ role: "user", content: "ping" }],
+            stream: false,
+            max_tokens: 1,
+          });
+          if (upstream.status === 401) {
+            fresh = await ensureFreshTokens(live, db, quotaCtx.encrypt, { force: true });
+            models = provider.listModels ? await provider.listModels({ ...live, configParsed: fresh }) : null;
+          }
+        } catch {
+          // fall through to the defaultModel path below
+        }
+      }
       if (models) return { ok: true, via: "models", modelCount: models.length };
       if (live.default_model) {
         const upstream = await provider.streamCompletion({ ...live, configParsed: fresh }, {
@@ -612,34 +631,109 @@ export async function buildServer(config: TwoRouteConfig) {
       reply.raw.setHeader(key, value);
     });
 
-    // Streamed completions are usage-logged too — the call, status and
-    // latency are measured; only the token counts stay null (SSE usage
-    // interception is deliberately deferred, v1).
     const status = upstream.ok ? ("ok" as const) : ("error" as const);
-    void connections
-      .logUsage({
-        connectionId: connection.id,
-        workspaceId: ctx.workspaceId,
-        model: request.model,
-        status,
-        latencyMs: Date.now() - started,
-      })
-      .catch(() => {});
 
     if (!upstream.body) {
       reply.raw.end();
+      void connections
+        .logUsage({
+          connectionId: connection.id,
+          workspaceId: ctx.workspaceId,
+          model: request.model,
+          status,
+          latencyMs: Date.now() - started,
+        })
+        .catch(() => {});
       return;
     }
+
+    // Streamed completions: pass chunks through unbuffered, while scanning
+    // SSE `data:` lines for the final usage chunk (OpenAI's
+    // stream_options.include_usage / Anthropic's message_delta usage) and
+    // streamed tool_call function names. The scan is per-chunk and
+    // stateless — SSE frames are line-delimited JSON, and both providers
+    // emit usage in a single complete event, so a chunk-boundary split of
+    // the payload would only miss metrics, never corrupt the stream.
+    const textDecoder = new TextDecoder();
+    let inputTokens: number | null = null;
+    let outputTokens: number | null = null;
+    const toolNames = new Set<string>();
+
     reply.hijack();
     const reader = upstream.body.getReader();
     try {
+      let buffer = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         reply.raw.write(value);
+        buffer += textDecoder.decode(value, { stream: true });
+        // Process only complete lines; carry the remainder.
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          const payload = line.slice(5).trim();
+          if (!payload || payload === "[DONE]") continue;
+          try {
+            const evt = JSON.parse(payload) as {
+              usage?: { prompt_tokens?: number; completion_tokens?: number; input_tokens?: number; output_tokens?: number };
+              delta?: { tool_calls?: Array<{ function?: { name?: unknown } }> };
+              message?: { usage?: { input_tokens?: number; output_tokens?: number } };
+            };
+            // OpenAI wire: final usage chunk (or anthropic-style names on
+            // openai-compatible providers).
+            const u = evt.usage;
+            if (u) {
+              inputTokens = u.prompt_tokens ?? u.input_tokens ?? inputTokens;
+              outputTokens = u.completion_tokens ?? u.output_tokens ?? outputTokens;
+            }
+            // Anthropic wire: message_delta carries usage.output_tokens; the
+            // input count arrives on the message_start event.
+            const au = evt.message?.usage;
+            if (au) {
+              inputTokens = au.input_tokens ?? inputTokens;
+              outputTokens = au.output_tokens ?? outputTokens;
+            }
+            // OpenAI wire: streamed tool calls carry the name on the first
+            // delta of each tool_call index.
+            for (const tc of evt.delta?.tool_calls ?? []) {
+              const name = tc.function?.name;
+              if (typeof name === "string" && name) toolNames.add(name);
+            }
+          } catch {
+            // not JSON — ignore
+          }
+        }
       }
     } finally {
       reply.raw.end();
+      // Usage row for the completion itself (tokens now captured from the
+      // stream when the provider reports them; still null if it doesn't).
+      void connections
+        .logUsage({
+          connectionId: connection.id,
+          workspaceId: ctx.workspaceId,
+          model: request.model,
+          status,
+          inputTokens,
+          outputTokens,
+          latencyMs: Date.now() - started,
+        })
+        .catch(() => {});
+      // Tool invocations chosen mid-stream get their own rows.
+      for (const tool of toolNames) {
+        void connections
+          .logUsage({
+            connectionId: connection.id,
+            workspaceId: ctx.workspaceId,
+            model: request.model,
+            status: "ok",
+            latencyMs: 0,
+            toolName: tool,
+          })
+          .catch(() => {});
+      }
     }
   }
 

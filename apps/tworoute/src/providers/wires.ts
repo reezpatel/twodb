@@ -9,21 +9,29 @@ import type { ConnectionConfig } from "../db/repository.js";
  * Credential choice (api key vs access token) follows the catalog's authKey.
  */
 
-function credential(connection: { api_key: string; configParsed: ConnectionConfig }): string {
-  const spec = getProviderSpec(
-    // provider id lives on the connection row; adapter is selected by caller
-    (connection as unknown as { provider: string }).provider,
-  );
+/** Credential lookup tolerant of both config casings (UI camelCase,
+ * legacy-import snake_case) — mirrors token-refresh.ts's normalization. */
+function configGet(config: ConnectionConfig, camel: string, snake: string): string | undefined {
+  return config[camel] ?? config[snake];
+}
+
+function credential(connection: { provider: string; api_key: string; configParsed: ConnectionConfig }): string {
+  const spec = getProviderSpec(connection.provider);
   if (spec?.authKey) {
-    const fromConfig = connection.configParsed[spec.authKey];
+    const fromConfig = configGet(connection.configParsed, spec.authKey, snakeOf(spec.authKey));
     if (fromConfig) return fromConfig;
   }
   return connection.api_key;
 }
 
+/** camelCase → snake_case for the legacy-config keys (accessToken → access_token). */
+function snakeOf(camel: string): string {
+  return camel.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+}
+
 function authHeaders(
   spec: ReturnType<typeof getProviderSpec>,
-  connection: { api_key: string; configParsed: ConnectionConfig },
+  connection: { provider: string; api_key: string; configParsed: ConnectionConfig },
 ): Record<string, string> {
   if (!spec) return {};
   if (spec.auth === "x-api-key") return { "x-api-key": credential(connection) };
@@ -95,7 +103,8 @@ export const responsesProvider: LlmProvider = {
   async streamCompletion(connection, req) {
     const spec = getProviderSpec(connection.provider);
     const headers = authHeaders(spec, connection);
-    if (connection.configParsed.accountId) headers["chatgpt-account-id"] = connection.configParsed.accountId;
+    const accountId = connection.configParsed.accountId ?? connection.configParsed.account_id;
+    if (accountId) headers["chatgpt-account-id"] = accountId;
     // Responses wire: messages become input items; system becomes instructions.
     const instructions = req.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
     const input = req.messages

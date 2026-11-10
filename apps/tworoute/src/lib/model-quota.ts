@@ -298,7 +298,7 @@ async function collectCodex(connection: LiveConn, ctx: QuotaCtx): Promise<QuotaS
 
   const json = await fetchJson("https://chatgpt.com/backend-api/wham/usage", {
     authorization: `Bearer ${token}`,
-    ...(config.account_id ? { "chatgpt-account-id": config.account_id } : {}),
+    ...((config.account_id ?? config.accountId) ? { "chatgpt-account-id": String(config.account_id ?? config.accountId) } : {}),
   });
 
   const rateLimit = asRecord(asRecord(json)?.rate_limit) ?? asRecord(json);
