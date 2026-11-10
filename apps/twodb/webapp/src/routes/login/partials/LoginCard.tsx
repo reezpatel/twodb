@@ -139,14 +139,15 @@ export function LoginCard(props: LoginCardProps) {
         <figure style={stagger(4)} className={cn(ENTER, "relative z-10 mt-auto flex flex-col gap-3")}>
           <blockquote className="text-2xl leading-[1.25] tracking-tight text-ink md:text-3xl">
             One passkey, one tap — and the whole platform is{" "}
-            <span className="italic">ours to bend</span>. No passwords, no lock-in.
+            <span className="italic">ours to bend</span>. One gateway, seventeen
+            apps, zero lock-in.
           </blockquote>
           <figcaption className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
             <span>Control plane</span>
             <span aria-hidden className="text-outline">
               |
             </span>
-            <span>TwoDB Hub</span>
+            <span>TwoDB — the everything platform</span>
           </figcaption>
         </figure>
       </aside>
