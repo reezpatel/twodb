@@ -24,8 +24,13 @@ export interface AuthEngineOptions {
    */
   firstUserBootstrap?: {
     hasUsers: () => Promise<boolean>;
-    /** Creates the user row; returns the new user's id. */
-    createUser: (name: string, email: string) => Promise<string>;
+    /**
+     * Returns the user id for this bootstrap email, creating the row on
+     * first use. MUST be idempotent: a cancelled ceremony leaves an orphan
+     * user (no passkey bound) that the boot-time sweep hasn't removed yet,
+     * so a retry must reuse that row, not hit the email unique constraint.
+     */
+    ensureUser: (email: string) => Promise<{ id: string; name: string; displayName: string }>;
   };
   google?: { clientId: string; clientSecret: string };
   /** PocketID (or any OIDC provider) via better-auth's generic OAuth plugin. */
@@ -57,8 +62,11 @@ function buildOptions(options: AuthEngineOptions): BetterAuthOptions {
               // strips unknown query keys).
               const email = (context ?? "").trim();
               if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("a valid email is required");
-              const userId = await options.firstUserBootstrap!.createUser(email, email);
-              return { id: userId, name: email, displayName: email };
+              // Idempotent across cancelled ceremonies: a prior options call
+              // may have already created this user (passkey never completed,
+              // so the boot sweep hasn't run). Reuse it rather than hitting
+              // the email unique constraint.
+              return options.firstUserBootstrap!.ensureUser(email);
             },
           }
         : undefined,

@@ -29,7 +29,17 @@ function buildEngineOptions(db: Kysely<ControlPlaneDb>, config: TwoDbConfig): Au
           .executeTakeFirst();
         return Number(row?.n ?? 0) > 0;
       },
-      createUser: async (name: string, email: string) => {
+      ensureUser: async (email: string) => {
+        // Idempotent: a cancelled ceremony leaves an orphan user (no passkey
+        // bound) that the boot sweep hasn't cleared yet — reuse it so a
+        // retry doesn't hit the email unique constraint.
+        const existing = await (db as any)
+          .selectFrom("user")
+          .select(["id", "name"])
+          .where("email", "=", email)
+          .executeTakeFirst();
+        if (existing) return { id: existing.id, name: existing.name, displayName: existing.name };
+
         // better-auth's user schema (id, name, email, emailVerified, image,
         // timestamps; admin plugin adds role). The passkey plugin never
         // creates this row itself, and the challenge binds to the id — so
@@ -41,7 +51,7 @@ function buildEngineOptions(db: Kysely<ControlPlaneDb>, config: TwoDbConfig): Au
           .insertInto("user")
           .values({
             id,
-            name,
+            name: email,
             email,
             emailVerified: 1, // better-auth stores booleans as 0/1 on sqlite
             image: null,
@@ -55,12 +65,12 @@ function buildEngineOptions(db: Kysely<ControlPlaneDb>, config: TwoDbConfig): Au
         // with a default space, so session auth (which requires workspace
         // membership) works immediately.
         const platform = createWorkspacePlatform(db as any);
-        const org = await platform.createOrg(`${name}'s org`);
+        const org = await platform.createOrg(`${email}'s org`);
         const workspace = await platform.createWorkspace(org.id, "Personal");
         await platform.createSpace(workspace.id, "default");
         await platform.addWorkspaceMember(workspace.id, id, "owner");
 
-        return id;
+        return { id, name: email, displayName: email };
       },
     },
     google:
