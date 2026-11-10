@@ -1,8 +1,12 @@
-import { Button } from "@twodb/blocks";
+import { Button, Input, Label } from "@twodb/blocks";
 
 export interface LoginCardProps {
   pending: boolean;
   error: string | null;
+  mode: "signin" | "register";
+  name: string;
+  onModeChange: (mode: "signin" | "register") => void;
+  onNameChange: (name: string) => void;
   onSignIn: () => void;
   onRegister: () => void;
 }
@@ -14,12 +18,34 @@ export function LoginCard(props: LoginCardProps) {
       <h1>TwoDB</h1>
       <p>Sign in with a passkey — no password, ever.</p>
       {props.error ? <p role="alert">{props.error}</p> : null}
-      <Button disabled={props.pending} onClick={props.onSignIn}>
-        Sign in with passkey
-      </Button>
-      <Button variant="secondary" disabled={props.pending} onClick={props.onRegister}>
-        First time? Register a passkey
-      </Button>
+
+      {props.mode === "register" ? (
+        <>
+          <Label htmlFor="passkey-name">Your name</Label>
+          <Input
+            id="passkey-name"
+            value={props.name}
+            onChange={(e) => props.onNameChange(e.target.value)}
+            placeholder="e.g. Reez"
+            autoComplete="name webauthn"
+          />
+          <Button disabled={props.pending} onClick={props.onRegister}>
+            {props.pending ? "Waiting for authenticator…" : "Create account + passkey"}
+          </Button>
+          <Button variant="ghost" disabled={props.pending} onClick={() => props.onModeChange("signin")}>
+            Back to sign in
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button disabled={props.pending} onClick={props.onSignIn}>
+            {props.pending ? "Waiting for authenticator…" : "Sign in with passkey"}
+          </Button>
+          <Button variant="ghost" disabled={props.pending} onClick={() => props.onModeChange("register")}>
+            First time? Register a passkey
+          </Button>
+        </>
+      )}
     </div>
   );
 }
