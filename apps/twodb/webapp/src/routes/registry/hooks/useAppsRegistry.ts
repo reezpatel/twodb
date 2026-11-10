@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
-import { gatewayClient, type RegisteredAppSummary } from "../../../lib/gateway-client.js";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { gatewayClient, type RegisteredAppSummary, type AppStatus } from "../../../lib/gateway-client.js";
 
-/** Business hook: loads + refreshes the registered-apps list, exposes provisioning. */
+/** Business hook: loads + refreshes the app list. */
 export function useAppsRegistryData() {
   const [apps, setApps] = useState<RegisteredAppSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,36 +20,69 @@ export function useAppsRegistryData() {
   return { apps, loading, refresh };
 }
 
-/** Business hook: provisioning a single app's Postgres schema+role, with per-row pending/result state. */
-export function useProvisionApp() {
-  const [provisioning, setProvisioning] = useState<string | null>(null);
-  const [result, setResult] = useState<{ slug: string; connectionString: string } | null>(null);
+/**
+ * Business hook: one app's live status + lifecycle actions
+ * (install/start/stop/restart/upgrade/remove). Polls while a lifecycle
+ * operation is in flight (`installing`), stops when settled.
+ */
+export function useAppLifecycle(slug: string) {
+  const [status, setStatus] = useState<AppStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const provision = useCallback(async (slug: string) => {
-    setProvisioning(slug);
-    try {
-      const res = await gatewayClient.provisionApp(slug);
-      setResult({ slug, connectionString: res.connectionString });
-    } finally {
-      setProvisioning(null);
+  const refresh = useCallback(async () => {
+    const s = await gatewayClient.getAppStatus(slug);
+    setStatus(s);
+    return s;
+  }, [slug]);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
     }
   }, []);
 
-  return { provisioning, result, provision, dismissResult: () => setResult(null) };
-}
+  const startPolling = useCallback(() => {
+    stopPolling();
+    pollRef.current = setInterval(async () => {
+      const s = await refresh();
+      if (s.installStatus !== "installing") {
+        stopPolling();
+        setBusy(false);
+      }
+    }, 3000);
+  }, [refresh, stopPolling]);
 
-/** Holding hook for the AppsRegistry component — composes the two business hooks above. */
-export function useAppsRegistry() {
-  const { apps, loading, refresh } = useAppsRegistryData();
-  const { provisioning, result, provision, dismissResult } = useProvisionApp();
+  useEffect(() => {
+    refresh();
+    return stopPolling;
+  }, [refresh, stopPolling]);
 
-  const provisionAndRefresh = useCallback(
-    async (slug: string) => {
-      await provision(slug);
-      await refresh();
+  const act = useCallback(
+    async (action: "install" | "start" | "stop" | "restart" | "upgrade") => {
+      setBusy(true);
+      try {
+        await gatewayClient.lifecycle(slug, action);
+        if (action === "install" || action === "upgrade" || action === "restart" || action === "start") {
+          startPolling();
+        } else {
+          await refresh();
+          setBusy(false);
+        }
+      } catch {
+        setBusy(false);
+      }
     },
-    [provision, refresh],
+    [slug, refresh, startPolling],
   );
 
-  return { apps, loading, provisioning, result, provisionAndRefresh, dismissResult };
+  const remove = useCallback(async () => {
+    setBusy(true);
+    await gatewayClient.removeApp(slug);
+    await refresh();
+    setBusy(false);
+  }, [slug, refresh]);
+
+  return { status, busy, act, remove };
 }

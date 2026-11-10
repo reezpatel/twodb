@@ -2,7 +2,7 @@
 
 > **Generated file — do not hand-edit.** Source of truth is `src/messages.ts` (Zod schemas via `@twodb/core-async/registry`). Regenerate with `pnpm gen:docs`.
 
-_Generated: 2026-11-09T15:32:50.941Z_
+_Generated: 2026-11-10T05:38:14.824Z_
 
 ## Queue jobs
 
@@ -10,4 +10,55 @@ _No queue jobs declared yet._
 
 ## Broadcast events
 
-_No broadcast events declared yet._
+### `llm.completion.recorded`
+
+One completed LLM call, with token counts — the basis for any future quota/billing.
+
+- **Direction**: `produces`
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "connectionId": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "inputTokens": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "outputTokens": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "latencyMs": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "error"
+      ]
+    }
+  },
+  "required": [
+    "connectionId",
+    "model",
+    "inputTokens",
+    "outputTokens",
+    "latencyMs",
+    "status"
+  ],
+  "additionalProperties": false
+}
+```

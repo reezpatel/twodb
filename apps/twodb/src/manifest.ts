@@ -53,6 +53,18 @@ const getAppManifest = defineEndpoint({
   request: z.object({ slug: z.string() }),
 });
 
+const getAppMessages = defineEndpoint({
+  name: "getAppMessages",
+  method: "GET",
+  path: "/registry/apps/:slug/messages.json",
+  auth: "session-or-apiKey",
+  description:
+    "Returns one app's messages contract (queue jobs + broadcast events) from its checked-in " +
+    "messages.json — unlike endpoint.json this isn't self-reported at registration, TwoDB serves the " +
+    "copy from its own monorepo checkout.",
+  request: z.object({ slug: z.string() }),
+});
+
 const listCatalog = defineEndpoint({
   name: "listCatalog",
   method: "GET",
@@ -95,14 +107,16 @@ const provisionDb = defineEndpoint({
   path: "/orchestrator/apps/:slug/provision-db",
   auth: "session",
   description:
-    "Creates (or rotates) a Postgres role+schema for the named app, independent of Docker. Returns both " +
-    "connection-string forms exactly once — plain for a local-dev `.env`, container-reachable for Docker.",
+    "Creates (or rotates) a Postgres role+schema for the named app, independent of Docker, and ensures its " +
+    "stable per-app data key exists (TWODB_DATA_KEY — never rotated, unlike registration tokens). Returns " +
+    "both connection-string forms + the data key exactly once.",
   request: z.object({ slug: z.string() }),
   response: z.object({
     schema: z.string(),
     role: z.string(),
     connectionString: z.string(),
     containerConnectionString: z.string(),
+    dataKey: z.string(),
   }),
 });
 
@@ -214,6 +228,7 @@ export const twodbManifest = defineAppManifest({
     registerApp,
     listApps,
     getAppManifest,
+    getAppMessages,
     listCatalog,
     installApp,
     issueToken,

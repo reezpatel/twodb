@@ -24,6 +24,13 @@ export interface RegisteredAppRow {
   pg_role: string | null;
   /** Encrypted full Postgres connection string (AES-256-GCM, keyed off AUTH_SECRET) — needed again every container (re)start. */
   pg_connection_string_encrypted: string | null;
+  /**
+   * Encrypted stable per-app data key (AES-256-GCM, keyed off AUTH_SECRET),
+   * injected into the container as TWODB_DATA_KEY. Unlike the registration
+   * token this NEVER rotates on upgrade — apps use it for encrypting their
+   * own data at rest, so rotating it would orphan existing rows.
+   */
+  data_key_encrypted: string | null;
   /** Hash (sha256) of the per-install registration token TwoDB generated — never store the plaintext. */
   registration_token_hash: string | null;
   image_tag: string | null;
@@ -65,6 +72,7 @@ export async function bootstrapControlPlaneDb(db: Kysely<ControlPlaneDb>): Promi
     .addColumn("pg_schema", "text")
     .addColumn("pg_role", "text")
     .addColumn("pg_connection_string_encrypted", "text")
+    .addColumn("data_key_encrypted", "text")
     .addColumn("registration_token_hash", "text")
     .addColumn("image_tag", "text")
     .addColumn("container_name", "text")

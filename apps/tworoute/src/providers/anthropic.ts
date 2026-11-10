@@ -1,4 +1,5 @@
 import type { LlmProvider, ChatMessage } from "./types.js";
+import { joinUrl } from "./url.js";
 
 function toAnthropicMessages(messages: ChatMessage[]) {
   const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
@@ -10,7 +11,7 @@ function toAnthropicMessages(messages: ChatMessage[]) {
 export const anthropicProvider: LlmProvider = {
   async streamCompletion(connection, req) {
     const { system, messages } = toAnthropicMessages(req.messages);
-    return fetch(new URL("/v1/messages", connection.base_url || "https://api.anthropic.com"), {
+    return fetch(joinUrl(connection.base_url || "https://api.anthropic.com", "/v1/messages"), {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -27,4 +28,8 @@ export const anthropicProvider: LlmProvider = {
       }),
     });
   },
+
+  // Anthropic has no public model-listing endpoint on the Messages API —
+  // returning null tells callers to fall back to manual model entry.
+  listModels: async () => null,
 };

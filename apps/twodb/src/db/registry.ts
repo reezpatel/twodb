@@ -58,6 +58,7 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
             pg_schema: null,
             pg_role: null,
             pg_connection_string_encrypted: null,
+            data_key_encrypted: null,
             image_tag: null,
             container_name: null,
             host_port: null,
@@ -76,6 +77,14 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
           pg_role: pgRole,
           pg_connection_string_encrypted: encryptedConnectionString,
         })
+        .where("slug", "=", slug)
+        .execute();
+    },
+
+    async setDataKey(slug: string, encryptedDataKey: string) {
+      await db
+        .updateTable("registered_app")
+        .set({ data_key_encrypted: encryptedDataKey })
         .where("slug", "=", slug)
         .execute();
     },
@@ -194,6 +203,7 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
             pg_schema: null,
             pg_role: null,
             pg_connection_string_encrypted: null,
+            data_key_encrypted: null,
             registration_token_hash: null,
             image_tag: null,
             container_name: null,

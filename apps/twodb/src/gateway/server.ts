@@ -1,5 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import type { Kysely } from "kysely";
 import type { ControlPlaneDb } from "../db/sqlite.js";
 import { createRegistryRepo } from "../db/registry.js";
@@ -21,9 +23,17 @@ import {
   provisionDatabase,
 } from "../orchestrator/install.js";
 
+// apps/twodb/src/gateway/server.ts -> repo root
+const REPO_ROOT = path.resolve(import.meta.dirname, "../../../..");
+
 export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfig) {
   const app = Fastify({ logger: true });
   await app.register(cors, { origin: config.AUTH_TRUSTED_ORIGINS, credentials: true });
+
+  // Preserve non-JSON request bodies as raw Buffers so the proxy can
+  // forward them byte-for-byte — Fastify's default 415s unknown content
+  // types, and JSON bodies get re-serialized in toWebRequest either way.
+  app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
 
   const registry = createRegistryRepo(db);
   const { resolveContext, authEngine } = setupAuth(db, config);
@@ -70,6 +80,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
       basePath: a.base_path,
       status: a.status,
       installStatus: a.install_status,
+      version: a.version,
     }));
   });
 
@@ -81,6 +92,23 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     if (!row || !row.manifest_json) return reply.code(404).send({ error: "not found" });
     reply.type("application/json");
     return row.manifest_json;
+  });
+
+  // Messages contract (jobs + broadcast events) isn't part of the
+  // self-reported manifest — apps generate their own messages.json from
+  // messages.ts, so TwoDB serves the checked-in copy from its own monorepo
+  // checkout rather than asking the app for it.
+  app.get("/registry/apps/:slug/messages.json", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    try {
+      const file = path.join(REPO_ROOT, "apps", slug, "messages.json");
+      const content = await fs.readFile(file, "utf8");
+      return reply.type("application/json").send(content);
+    } catch {
+      return reply.code(404).send({ error: `no messages contract for "${slug}"` });
+    }
   });
 
   // --- Orchestrator: install/lifecycle-manage apps via Docker -------------

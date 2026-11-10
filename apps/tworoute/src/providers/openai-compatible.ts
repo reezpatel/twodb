@@ -1,4 +1,5 @@
 import type { LlmProvider } from "./types.js";
+import { joinUrl } from "./url.js";
 
 /**
  * Covers OpenAI itself and every OpenAI-compatible provider (most of them —
@@ -8,7 +9,7 @@ import type { LlmProvider } from "./types.js";
  */
 export const openAiCompatibleProvider: LlmProvider = {
   async streamCompletion(connection, req) {
-    return fetch(new URL("/chat/completions", connection.base_url), {
+    return fetch(joinUrl(connection.base_url, "/chat/completions"), {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -16,5 +17,19 @@ export const openAiCompatibleProvider: LlmProvider = {
       },
       body: JSON.stringify(req),
     });
+  },
+
+  async listModels(connection) {
+    try {
+      const res = await fetch(joinUrl(connection.base_url, "/models"), {
+        headers: { authorization: `Bearer ${connection.api_key}` },
+      });
+      if (!res.ok) return null;
+      const body = (await res.json()) as { data?: Array<{ id: string }> };
+      if (!Array.isArray(body.data)) return null;
+      return body.data.map((m) => m.id).sort();
+    } catch {
+      return null;
+    }
   },
 };

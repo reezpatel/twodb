@@ -8,6 +8,8 @@ export default defineConfig({
     proxy: {
       "/api": { target: process.env.TWODB_GATEWAY_URL ?? "http://localhost:4000", changeOrigin: true },
       "/registry": { target: process.env.TWODB_GATEWAY_URL ?? "http://localhost:4000", changeOrigin: true },
+      "/orchestrator": { target: process.env.TWODB_GATEWAY_URL ?? "http://localhost:4000", changeOrigin: true },
+      "/apps": { target: process.env.TWODB_GATEWAY_URL ?? "http://localhost:4000", changeOrigin: true },
     },
   },
 });

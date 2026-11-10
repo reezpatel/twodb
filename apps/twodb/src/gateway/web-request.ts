@@ -1,6 +1,13 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 
-/** Converts a Fastify request into a standard Fetch API Request (for better-auth's handler). */
+/**
+ * Converts a Fastify request into a standard Fetch API Request (for
+ * better-auth's handler and the app proxy). Fastify's parsers may already
+ * have consumed the raw stream — JSON bodies come back as parsed objects,
+ * anything else as a Buffer (see the catch-all parser in server.ts) — so
+ * re-serialize from `req.body` when it's present instead of touching the
+ * disturbed `req.raw` stream.
+ */
 export function toWebRequest(req: FastifyRequest): Request {
   const protocol = (req.headers["x-forwarded-proto"] as string) ?? req.protocol;
   const url = `${protocol}://${req.headers.host}${req.url}`;
@@ -9,12 +16,26 @@ export function toWebRequest(req: FastifyRequest): Request {
     if (typeof value === "string") headers.append(key, value);
     else if (Array.isArray(value)) value.forEach((v) => headers.append(key, v));
   }
-  const hasBody = req.method !== "GET" && req.method !== "HEAD";
+
+  let body: any;
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    if (Buffer.isBuffer(req.body)) {
+      body = req.body;
+    } else if (req.body !== undefined && req.body !== null) {
+      body = JSON.stringify(req.body);
+    } else {
+      body = req.raw as any;
+    }
+    // Re-serialized/transformed bodies may differ in length from what the
+    // client sent — let undici recompute framing.
+    headers.delete("content-length");
+  }
+
   return new Request(url, {
     method: req.method,
     headers,
-    body: hasBody ? (req.raw as any) : undefined,
-    duplex: hasBody ? "half" : undefined,
+    body,
+    duplex: body ? "half" : undefined,
   } as any);
 }
 

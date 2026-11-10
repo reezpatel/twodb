@@ -33,11 +33,23 @@ Docker).
 
 ## Endpoints (see generated `ENDPOINTS.md`)
 - `POST /connections` — register a provider connection, scoped to a Space.
-- `GET /connections` — list connections visible to the caller's active Spaces.
-- `POST /completions` — OpenAI-shaped chat completion, streamed straight
-  through from whichever provider the resolved connection points at.
-  Callable by any app through the Gateway, or directly by an external tool
-  (Cursor, etc.) using a workspace API key.
+  `name` is unique per workspace (CLI/tests address connections by it); the
+  API key is encrypted at rest (AES-256-GCM keyed off `TWODB_DATA_KEY`).
+- `GET /connections` — list connections visible to the caller's active
+  Spaces (workspace-wide when there's no space filter). Keys never returned.
+- `PATCH /connections/:id` — update name/base URL/default model, or rotate
+  the key.
+- `DELETE /connections/:id` — delete; usage history is kept.
+- `POST /connections/:id/test` — smoke-test without burning a completion
+  (lists models when the provider supports it, else a 1-token ping).
+- `GET /connections/:id/models` — live model listing (OpenAI shape; 422 for
+  providers without a listing API).
+- `GET /usage?days=N` — token-usage summary per connection+model.
+- `POST /completions` — OpenAI-shaped chat completion. Non-streaming
+  requests are usage-logged and emit the `llm.completion.recorded` broadcast
+  event; `stream: true` is a raw pass-through. Callable by any app through
+  the Gateway, or directly by an external tool (Cursor, etc.) using a
+  workspace API key.
 
 ## Providers implemented
 - `openai-compatible` — pure pass-through (covers OpenAI, Groq, Together,
@@ -45,11 +57,13 @@ Docker).
 - `anthropic` — translates to the native Messages API shape.
 
 ## Known stubs / not hardened yet
-- API keys are stored in plaintext in the `llm_connection` table — mirror
-  TwoDB's `encryptSecret`/`decryptSecret` helper here before any real
+- Encryption at rest is AES-256-GCM keyed off `TWODB_DATA_KEY` (stable
+  per-app key injected by TwoDB's orchestrator) — fine for self-hosted/dev,
+  replace with a real secrets manager before any serious multi-tenant
   deployment.
-- No usage/quota tracking yet (the old monolith's `llm.ts` had an elaborate
-  per-provider quota-collection system — intentionally not ported; add it
-  back only when a concrete app needs it, as `core-async` jobs/events).
+- Streaming completions are raw pass-through and NOT usage-logged (the SSE
+  token counts would need interception; deliberately deferred) — only
+  non-streaming calls feed `/usage` and the `llm.completion.recorded` event.
+- No quota enforcement yet (usage is recorded, not limited).
 - No OAuth-based providers (e.g. "Claude Code" subscription auth) ported
   yet — only API-key-based connections.

@@ -9,7 +9,7 @@ The control plane: Docker-based app installation/lifecycle management, Postgres 
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-09T18:34:22.346Z_
+_Generated: 2026-11-10T05:38:14.379Z_
 
 ## Endpoints
 
@@ -112,6 +112,29 @@ Lists every app TwoDB knows about (installed, running, stopped, or not-yet-regis
 ### `GET /registry/apps/:slug/endpoint.json` — getAppManifest
 
 Returns one app's cached endpoint.json, as last reported at registration time.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "slug": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "slug"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /registry/apps/:slug/messages.json` — getAppMessages
+
+Returns one app's messages contract (queue jobs + broadcast events) from its checked-in messages.json — unlike endpoint.json this isn't self-reported at registration, TwoDB serves the copy from its own monorepo checkout.
 
 - **Auth**: `session-or-apiKey`
 
@@ -253,7 +276,7 @@ Issues a registration token without touching Docker — for running an app direc
 
 ### `POST /orchestrator/apps/:slug/provision-db` — provisionDatabase
 
-Creates (or rotates) a Postgres role+schema for the named app, independent of Docker. Returns both connection-string forms exactly once — plain for a local-dev `.env`, container-reachable for Docker.
+Creates (or rotates) a Postgres role+schema for the named app, independent of Docker, and ensures its stable per-app data key exists (TWODB_DATA_KEY — never rotated, unlike registration tokens). Returns both connection-string forms + the data key exactly once.
 
 - **Auth**: `session`
 
@@ -291,13 +314,17 @@ Creates (or rotates) a Postgres role+schema for the named app, independent of Do
     },
     "containerConnectionString": {
       "type": "string"
+    },
+    "dataKey": {
+      "type": "string"
     }
   },
   "required": [
     "schema",
     "role",
     "connectionString",
-    "containerConnectionString"
+    "containerConnectionString",
+    "dataKey"
   ],
   "additionalProperties": false
 }

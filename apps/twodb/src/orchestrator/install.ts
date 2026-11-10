@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import * as fs from "node:fs";
+import { randomBytes } from "node:crypto";
 import type { RegistryRepo } from "../db/registry.js";
 import type { TwoDbConfig } from "../config.js";
 import { getCatalogEntry, type CatalogEntry } from "./catalog.js";
@@ -67,10 +68,13 @@ export async function issueRegistrationToken(slug: string, opts: InstallOptions)
 
 /**
  * Creates (or re-reads, for a slug already provisioned) the app's Postgres
- * schema+role. Returns both connection-string forms exactly once — plain
- * for a developer's local `.env` (admin's own view of the host), and the
- * container-reachable form for Docker. Only the container form is persisted
- * (encrypted), since that's the one `upgradeApp`/`restartApp` need again.
+ * schema+role, and ensures the app has a stable data key (generated once,
+ * reused forever — apps use it to encrypt their own data at rest, so it
+ * must survive token rotation on upgrades). Returns connection strings and
+ * the data key exactly once per call — plain for a developer's local
+ * `.env` (admin's own view of the host), container-reachable for Docker.
+ * Only the container forms are persisted (encrypted), since that's what
+ * `upgradeApp`/`restartApp` need again.
  */
 export async function provisionDatabase(slug: string, opts: InstallOptions) {
   const provisioned = await provisionAppDatabase(
@@ -80,21 +84,40 @@ export async function provisionDatabase(slug: string, opts: InstallOptions) {
   );
   const encrypted = encryptSecret(provisioned.containerConnectionString, opts.config.AUTH_SECRET);
   await opts.registry.setProvisioning(slug, provisioned.schema, provisioned.role, encrypted);
+
+  const existing = await opts.registry.getApp(slug);
+  const dataKey = existing?.data_key_encrypted
+    ? decryptSecret(existing.data_key_encrypted, opts.config.AUTH_SECRET)
+    : randomBytes(32).toString("hex");
+  if (!existing?.data_key_encrypted) {
+    await opts.registry.setDataKey(slug, encryptSecret(dataKey, opts.config.AUTH_SECRET));
+  }
+
   return {
     schema: provisioned.schema,
     role: provisioned.role,
     connectionString: provisioned.connectionString,
     containerConnectionString: provisioned.containerConnectionString,
+    dataKey,
   };
 }
 
-function buildContainerEnv(entry: CatalogEntry, config: TwoDbConfig, registrationToken: string, dbUrl: string) {
+function buildContainerEnv(
+  entry: CatalogEntry,
+  config: TwoDbConfig,
+  registrationToken: string,
+  dbUrl: string,
+  dataKey: string,
+) {
   return {
     NODE_ENV: "production",
     PORT: String(entry.containerPort),
     DATABASE_URL: dbUrl,
     TWODB_GATEWAY_URL: config.TWODB_GATEWAY_URL_FOR_CONTAINERS,
     TWODB_PROVISION_TOKEN: registrationToken,
+    // Stable per-app key for the app's own encryption-at-rest — persists
+    // across upgrades (the registration token above does NOT).
+    TWODB_DATA_KEY: dataKey,
     TWODB_HOST_ID: "docker",
     // What the app tells TwoDB its reachable URL is at registration time —
     // the gateway proxies to this. Both run on the same host, so it's the
@@ -194,7 +217,7 @@ export async function installApp(slug: string, opts: InstallOptions, requestedVe
   if (!entry) throw new Error(`"${slug}" is not in the app catalog`);
 
   const { registrationToken } = await issueRegistrationToken(slug, opts);
-  const { containerConnectionString } = await provisionDatabase(slug, opts);
+  const { containerConnectionString, dataKey } = await provisionDatabase(slug, opts);
 
   const { ref, version } = await resolveImage(entry, opts, requestedVersion);
 
@@ -202,7 +225,7 @@ export async function installApp(slug: string, opts: InstallOptions, requestedVe
   await docker.runContainer({
     name,
     image: ref,
-    env: buildContainerEnv(entry, opts.config, registrationToken, containerConnectionString),
+    env: buildContainerEnv(entry, opts.config, registrationToken, containerConnectionString, dataKey),
     hostPort: entry.hostPort,
     containerPort: entry.containerPort,
   });
@@ -248,6 +271,17 @@ export async function upgradeApp(slug: string, opts: InstallOptions, targetVersi
   if (!row?.pg_connection_string_encrypted) throw new Error(`"${slug}" is not installed yet`);
 
   const dbUrl = decryptSecret(row.pg_connection_string_encrypted, opts.config.AUTH_SECRET);
+  // Installs pre-dating the data-key column have no key on file — generate
+  // one now and persist it so it's stable from here on. (Any data the app
+  // encrypted with a since-rotated registration token is already
+  // unrecoverable; that's the bug this column fixes.)
+  let dataKey: string;
+  if (row.data_key_encrypted) {
+    dataKey = decryptSecret(row.data_key_encrypted, opts.config.AUTH_SECRET);
+  } else {
+    dataKey = randomBytes(32).toString("hex");
+    await opts.registry.setDataKey(slug, encryptSecret(dataKey, opts.config.AUTH_SECRET));
+  }
   const { registrationToken } = await issueRegistrationToken(slug, opts);
 
   const { ref, version } = await resolveImage(entry, opts, targetVersion);
@@ -257,7 +291,7 @@ export async function upgradeApp(slug: string, opts: InstallOptions, targetVersi
   await docker.runContainer({
     name,
     image: ref,
-    env: buildContainerEnv(entry, opts.config, registrationToken, dbUrl),
+    env: buildContainerEnv(entry, opts.config, registrationToken, dbUrl, dataKey),
     hostPort: entry.hostPort,
     containerPort: entry.containerPort,
   });

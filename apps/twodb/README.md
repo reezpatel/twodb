@@ -23,9 +23,11 @@ There is **no shared registration secret**. Apps don't self-install — TwoDB
 1. `POST /orchestrator/apps/:slug/install` (session/API-key auth) kicks off
    an async lifecycle: provision the app's Postgres schema+role, generate a
    **unique per-app registration token** (only its sha256 hash is ever
-   stored), build the app's Docker image (`deploy/docker/app.Dockerfile`),
-   and start the container on `twodb-net` with the token + connection
-   string injected as env.
+   stored) plus a **stable per-app data key** (`TWODB_DATA_KEY` — never
+   rotated; apps use it for their own encryption at rest, so it must
+   survive upgrades), build/pull the app's Docker image, and start the
+   container on `twodb-net` with token + connection string + data key
+   injected as env.
 2. TwoDB then **pull-registers**: it polls the container's published port
    for `GET /internal/manifest` with the token and completes registration
    in-process. (Containers on firewalled Linux hosts can't reach TwoDB at
@@ -103,7 +105,8 @@ src/
 │   └── web-request.ts          Fastify <-> Fetch API Request/Response adapters
 ├── manifest.ts                TwoDB's own declarative endpoints (→ ENDPOINTS.md)
 └── messages.ts                 TwoDB's own broadcast events (→ MESSAGES.md)
-webapp/                        admin frontend (login, registry, workspace/space mgmt)
+webapp/                        admin frontend (passkey login, gateway explorer — Swagger-style
+                               endpoint/messages browser with try-it, app lifecycle controls)
 ```
 
 ## Port assignments
@@ -128,9 +131,13 @@ the exact header/payload contracts.
 ## Known stubs / not hardened yet
 - Registry pulls assume the images are public or the host's docker daemon is
   already logged in — there's no `TWODB_REGISTRY_TOKEN` handling yet.
-- Encrypted Postgres credentials are AES-256-GCM keyed off `AUTH_SECRET` —
-  fine for self-hosted/dev, replace with a real secrets manager before any
-  serious multi-tenant deployment.
+- Container status is only refreshed on demand (`GET .../status` or the
+  webapp's per-row polling) — no background reconciler yet, so a container
+  that crashes outside TwoDB's own start/stop calls won't be noticed until
+  someone polls.
+- Encrypted Postgres credentials and per-app data keys are AES-256-GCM
+  keyed off `AUTH_SECRET` — fine for self-hosted/dev, replace with a real
+  secrets manager before any serious multi-tenant deployment.
 - The Docker image build copies the whole workspace into the image rather
   than pruning to the app's dependency closure — revisit if image
   size/build time become a real problem.

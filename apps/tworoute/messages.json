@@ -1,7 +1,57 @@
 {
   "name": "TwoRoute",
   "slug": "tworoute",
-  "generatedAt": "2026-11-09T15:32:50.940Z",
+  "generatedAt": "2026-11-10T05:38:14.823Z",
   "jobs": [],
-  "events": []
+  "events": [
+    {
+      "event": "llm.completion.recorded",
+      "description": "One completed LLM call, with token counts — the basis for any future quota/billing.",
+      "direction": "produces",
+      "relatedApps": [],
+      "payload": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "inputTokens": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "outputTokens": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "latencyMs": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "error"
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "model",
+          "inputTokens",
+          "outputTokens",
+          "latencyMs",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
 }
