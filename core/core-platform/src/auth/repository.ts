@@ -124,6 +124,28 @@ export function createWorkspacePlatform(db: Kysely<AuthPlatformDb>) {
     async revokeApiKey(apiKeyId: string) {
       await db.updateTable("api_key").set({ revoked_at: now() }).where("id", "=", apiKeyId).execute();
     },
+
+    /** Lists a workspace's keys, newest first, without the hash (secret never
+     * leaves the DB — only issueApiKey's one-time rawKey return exposes it). */
+    async listApiKeys(workspaceId: string) {
+      return db
+        .selectFrom("api_key")
+        .select(["id", "name", "prefix", "scopes", "created_at", "last_used_at", "revoked_at"])
+        .where("workspace_id", "=", workspaceId)
+        .orderBy("created_at", "desc")
+        .execute()
+        .then((rows) =>
+          rows.map((r) => ({
+            id: r.id,
+            name: r.name,
+            prefix: r.prefix,
+            scopes: JSON.parse(r.scopes) as string[],
+            createdAt: r.created_at,
+            lastUsedAt: r.last_used_at,
+            revokedAt: r.revoked_at,
+          })),
+        );
+    },
   };
 }
 

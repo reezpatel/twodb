@@ -13,7 +13,7 @@ async function main() {
     gatewayUrl: config.TWODB_GATEWAY_URL,
     registrationToken: config.TWODB_PROVISION_TOKEN,
     httpUrl: config.HTTP_URL,
-  }).catch((err) => server.log.warn({ err }, "self-registration with TwoDB failed (non-fatal)"));
+  }).catch((err) => server.log.warn({ err }, "self-registration with TwoDB failed (gateway unreachable after retries, or token rejected — non-fatal)"));
 }
 
 main().catch((err) => {

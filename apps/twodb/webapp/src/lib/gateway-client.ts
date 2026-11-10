@@ -56,7 +56,54 @@ async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** A workspace API key's metadata — rawKey only appears once, at creation. */
+export interface ApiKeyMeta {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+/** A workspace space — the sub-scope that app resources (e.g. TwoRoute
+ * connections) link themselves to. */
+export interface SpaceMeta {
+  id: string;
+  name: string;
+  createdAt: string | null;
+}
+
+/** One row of the static install catalog (orchestrator/catalog.ts), served at
+ * /orchestrator/catalog — an app that can be installed but may not be
+ * registered yet. */
+export interface CatalogEntry {
+  slug: string;
+  hostPort: number;
+}
+
+/** A catalog entry padded into the RegisteredAppSummary shape so it renders in
+ * the same grid as registered apps. */
+export function catalogEntryToSummary(entry: CatalogEntry): RegisteredAppSummary {
+  return {
+    slug: entry.slug,
+    name: entry.slug,
+    basePath: `/${entry.slug}`,
+    status: "unknown",
+    installStatus: "not_installed",
+    version: null,
+    managed: true,
+    httpUrl: `http://localhost:${entry.hostPort}`,
+    capabilities: [],
+  };
+}
+
 export const gatewayClient = {
+  listCatalog(): Promise<CatalogEntry[]> {
+    return fetch("/orchestrator/catalog", { credentials: "include" }).then((r) => json(r));
+  },
+
   listApps(): Promise<RegisteredAppSummary[]> {
     return fetch("/registry/apps", { credentials: "include" }).then((r) => json(r));
   },
@@ -90,6 +137,37 @@ export const gatewayClient = {
       headers: { "content-type": "application/json" },
       credentials: "include",
       body: JSON.stringify(input),
+    }).then((r) => json(r));
+  },
+
+  /** A workspace API key's metadata (the raw secret only appears once at creation). */
+  listApiKeys(): Promise<{ keys: ApiKeyMeta[] }> {
+    return fetch("/registry/api-keys", { credentials: "include" }).then((r) => json(r));
+  },
+
+  createApiKey(name: string): Promise<{ key: ApiKeyMeta; rawKey: string }> {
+    return fetch("/registry/api-keys", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ name }),
+    }).then((r) => json(r));
+  },
+
+  revokeApiKey(id: string): Promise<{ ok: true }> {
+    return fetch(`/registry/api-keys/${id}`, { method: "DELETE", credentials: "include" }).then((r) => json(r));
+  },
+
+  listSpaces(): Promise<{ spaces: SpaceMeta[] }> {
+    return fetch("/registry/spaces", { credentials: "include" }).then((r) => json(r));
+  },
+
+  createSpace(name: string): Promise<{ space: { id: string; name: string } }> {
+    return fetch("/registry/spaces", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ name }),
     }).then((r) => json(r));
   },
 

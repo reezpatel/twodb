@@ -49,7 +49,7 @@ export function AddExternalDialog(props: AddExternalDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="secondary">
+        <Button size="md">
           <Plus className="size-4" aria-hidden /> Add external app
         </Button>
       </DialogTrigger>
@@ -60,8 +60,7 @@ export function AddExternalDialog(props: AddExternalDialogProps) {
           </span>
           <DialogTitle className="mt-3">Add external app</DialogTitle>
           <DialogDescription>
-            Register a URL as a gateway entry. TwoDB routes traffic to it but never installs, stops or upgrades it —
-            the app's lifecycle stays wherever it runs.
+            Register a URL as a gateway entry. TwoDB routes traffic to it but never installs, stops or upgrades it — the app's lifecycle stays wherever it runs.
           </DialogDescription>
         </DialogHeader>
         {props.error ? (

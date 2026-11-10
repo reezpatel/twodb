@@ -1,5 +1,5 @@
 import { AppShell, AppShellBody, AppShellMain, AppShellContent, NavSidebar, type NavGroupData, type NavItemData } from "@twodb/blocks";
-import { Compass, LayoutGrid, LogOut } from "lucide-react";
+import { Compass, KeyRound, LayoutGrid, LogOut, Boxes } from "lucide-react";
 import type { ReactNode } from "react";
 
 export interface HubChromeProps {
@@ -18,6 +18,8 @@ export function HubChrome(props: HubChromeProps) {
       items: [
         { id: "explorer", title: "Gateway explorer", icon: Compass },
         { id: "apps", title: "Apps", icon: LayoutGrid },
+        { id: "keys", title: "API keys", icon: KeyRound },
+        { id: "spaces", title: "Spaces", icon: Boxes },
       ],
     },
   ];

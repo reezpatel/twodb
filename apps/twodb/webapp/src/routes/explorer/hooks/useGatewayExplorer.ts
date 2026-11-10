@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router";
 import {
   gatewayClient,
   type RegisteredAppSummary,
@@ -7,25 +8,19 @@ import {
   type EndpointSpec,
 } from "../../../lib/gateway-client.js";
 
-/** Business hook: the app list + which one is selected in the explorer. */
+/** Business hook: the app list (for the picker tabs). */
 export function useExplorerApps() {
   const [apps, setApps] = useState<RegisteredAppSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
 
   useEffect(() => {
     gatewayClient
       .listApps()
-      .then((result) => {
-        setApps(result);
-        // Default to the first app that actually has a manifest registered.
-        const first = result.find((a) => a.status === "active") ?? result[0];
-        if (first) setSelectedSlug(first.slug);
-      })
+      .then((result) => setApps(result))
       .finally(() => setLoading(false));
   }, []);
 
-  return { apps, loading, selectedSlug, setSelectedSlug };
+  return { apps, loading };
 }
 
 /** Business hook: loads one app's endpoint.json + messages.json contracts. */
@@ -104,17 +99,39 @@ export function useTryIt(slug: string | null) {
   return { selectedEndpoint, select, pathInput, setPathInput, bodyInput, setBodyInput, sending, result, send };
 }
 
-/** Holding hook for the GatewayExplorer component. */
+/**
+ * Holding hook for the GatewayExplorer component. The URL owns the app + tab:
+ * /hub/:app/:tab — selecting an app or tab navigates; a missing/invalid
+ * tab param falls back to "endpoints".
+ */
 export function useGatewayExplorer() {
-  const { apps, loading: appsLoading, selectedSlug, setSelectedSlug } = useExplorerApps();
+  const { app: slugParam, tab: tabParam } = useParams();
+  const navigate = useNavigate();
+  const selectedSlug = slugParam ?? null;
+  const tab = tabParam === "messages" ? "messages" : "endpoints";
+
+  const { apps, loading: appsLoading } = useExplorerApps();
   const { endpoints, messages, loading: contractLoading, error } = useAppContract(selectedSlug);
   const tryIt = useTryIt(selectedSlug);
+
+  const setSelectedSlug = useCallback(
+    (slug: string) => navigate(`/hub/${slug}/endpoints`),
+    [navigate],
+  );
+  const setTab = useCallback(
+    (next: string) => {
+      if (selectedSlug && next !== tab) navigate(`/hub/${selectedSlug}/${next}`);
+    },
+    [navigate, selectedSlug, tab],
+  );
 
   return {
     apps,
     appsLoading,
     selectedSlug,
     setSelectedSlug,
+    tab,
+    setTab,
     endpoints,
     messages,
     contractLoading,

@@ -56,8 +56,15 @@ export default defineConfig({
       "/api": { target: gateway, changeOrigin: true },
       "/registry": { target: gateway, changeOrigin: true },
       "/orchestrator": { target: gateway, changeOrigin: true },
-      // NOTE: do NOT proxy "/apps" — that's an SPA route (react-router);
-      // proxying it breaks refresh on /apps (no index.html fallback).
+      // The gateway's app proxy (/apps/<slug>/<path>) doubles as the SPA's
+      // /apps page route — the page is EXACTLY "/apps" (react-router), API
+      // calls are always deeper (/apps/<slug>/...). Proxy only the latter;
+      // the bare /apps path falls through to Vite's SPA fallback.
+      "/apps": {
+        target: gateway,
+        changeOrigin: true,
+        bypass: (req) => (req.url === "/apps" || req.url === "/apps/" ? "/index.html" : undefined),
+      },
     },
   },
 });

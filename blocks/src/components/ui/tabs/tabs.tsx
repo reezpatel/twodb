@@ -44,7 +44,7 @@ const tabsTriggerVariants = cva(
     variants: {
       variant: {
         default: "text-muted-foreground hover:text-ink data-[state=active]:bg-paper data-[state=active]:text-ink",
-        button: "rounded-[8px] text-ink hover:text-ink data-[state=active]:bg-stone data-[state=active]:text-ink",
+        button: "rounded-[8px] text-ink hover:text-ink data-[state=active]:bg-stone-700 data-[state=active]:text-ink",
         line: "-mb-px border-b-2 border-transparent text-muted-foreground hover:text-ink data-[state=active]:border-ion-deep data-[state=active]:text-ink",
       },
       size: {
@@ -81,7 +81,13 @@ function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive
   return <TabsPrimitive.Root data-slot="tabs" className={cn("", className)} {...props} />;
 }
 
-function TabsList({ className, variant = "default", shape = "default", size = "md", ...props }: React.ComponentProps<typeof TabsPrimitive.List> & VariantProps<typeof tabsListVariants>) {
+function TabsList({
+  className,
+  variant = "default",
+  shape = "default",
+  size = "md",
+  ...props
+}: React.ComponentProps<typeof TabsPrimitive.List> & VariantProps<typeof tabsListVariants>) {
   return (
     <TabsContext.Provider value={{ variant: variant || "default", size: size || "md" }}>
       <TabsPrimitive.List data-slot="tabs-list" className={cn(tabsListVariants({ variant, shape, size }), className)} {...props} />

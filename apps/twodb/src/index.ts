@@ -1,6 +1,7 @@
 import { toEndpointJson } from "@twodb/core-platform/manifest";
 import { loadTwoDbConfig } from "./config.js";
-import { openControlPlaneDb, bootstrapControlPlaneDb } from "./db/sqlite.js";
+import { openControlPlaneDb } from "./db/sqlite.js";
+import { runMigrations } from "./db/migrate.js";
 import { createRegistryRepo } from "./db/registry.js";
 import { bootstrapAuthTables, sweepOrphanUsers } from "./auth/index.js";
 import { buildServer } from "./gateway/server.js";
@@ -10,7 +11,7 @@ async function main() {
   const config = loadTwoDbConfig();
 
   const db = openControlPlaneDb(config.TWODB_SQLITE_FILE);
-  await bootstrapControlPlaneDb(db);
+  await runMigrations(db);
   // better-auth's own tables (user/session/account/passkey/apikey/verification) —
   // this is what makes TwoDB truly zero-setup on first run.
   await bootstrapAuthTables(db, config);

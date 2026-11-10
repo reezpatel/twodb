@@ -27,8 +27,23 @@ export interface ResolveAuthContextOptions {
  * `AuthContext` — resolving either a better-auth session/bearer token or a
  * workspace-scoped API key. Returns null if unauthenticated.
  */
+/**
+ * Extracts a workspace API key from a Bearer Authorization header. TwoDB
+ * workspace keys have the shape twodb_<hex>_<hex> — better-auth session
+ * bearer tokens are opaque JWT-ish strings that never match this pattern,
+ * so there's no ambiguity about which system owns the token.
+ */
+function bearerApiKey(authorization: string | null): string | null {
+  if (!authorization?.startsWith("Bearer ")) return null;
+  const token = authorization.slice(7).trim();
+  return /^twodb_[0-9a-f]+_[0-9a-f]+$/.test(token) ? token : null;
+}
+
 export async function resolveAuthContext(options: ResolveAuthContextOptions): Promise<AuthContext | null> {
-  const apiKeyHeader = options.headers.get("x-api-key");
+  // x-api-key wins; otherwise a Bearer token that looks like a workspace API
+  // key (twodb_<hex>_<hex>) is verified as one — stock OpenAI SDK clients
+  // send their key in the Authorization slot and can't be told otherwise.
+  const apiKeyHeader = options.headers.get("x-api-key") ?? bearerApiKey(options.headers.get("authorization"));
   if (apiKeyHeader) {
     const result = await options.workspacePlatform.verifyApiKey(apiKeyHeader);
     if (!result) return null;

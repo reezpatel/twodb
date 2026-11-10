@@ -38,7 +38,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
 
   const registry = createRegistryRepo(db);
-  const { resolveContext, authEngine } = setupAuth(db, config);
+  const { resolveContext, authEngine, workspacePlatform } = setupAuth(db, config);
 
   // --- Identity: better-auth owns everything under /api/auth/* -----------
   app.all("/api/auth/*", async (req, reply) => {
@@ -111,9 +111,18 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
     const row = await registry.getApp(slug);
-    if (!row || !row.manifest_json) return reply.code(404).send({ error: "not found" });
+    if (!row) return reply.code(404).send({ error: "not found" });
     reply.type("application/json");
-    return row.manifest_json;
+    if (row.manifest_json) return row.manifest_json;
+    // External apps never self-report at boot — fall back to the checked-in
+    // endpoint.json from TwoDB's own monorepo checkout (same strategy as
+    // messages.json below).
+    try {
+      const file = path.join(REPO_ROOT, "apps", slug, "endpoint.json");
+      return await fs.readFile(file, "utf8");
+    } catch {
+      return reply.code(404).send({ error: "not found" });
+    }
   });
 
   // Messages contract (jobs + broadcast events) isn't part of the
@@ -138,6 +147,67 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     const ctx = await resolveContext(new Headers(req.headers as any));
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     return APP_CATALOG.map((e) => ({ slug: e.slug, hostPort: e.hostPort }));
+  });
+
+  // --- API keys (workspace platform's api_key table — what x-api-key auth
+  // verifies against). Session-only: creating keys is an interactive act. ---
+  app.get("/registry/api-keys", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    return { keys: await workspacePlatform.listApiKeys(ctx.workspaceId) };
+  });
+
+  // --- Spaces: the workspace's sub-scopes that apps (e.g. TwoRoute
+  // connections) link themselves to. Session-only, workspace-scoped. ---
+  app.get("/registry/spaces", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    const spaces = await workspacePlatform.listSpaces(ctx.workspaceId);
+    return { spaces: spaces.map((s) => ({ id: s.id, name: s.name, createdAt: (s as any).created_at ?? null })) };
+  });
+
+  app.post("/registry/spaces", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    const body = req.body as { name?: string };
+    const name = body?.name?.trim();
+    if (!name) return reply.code(400).send({ error: "name is required" });
+    // Same workspace as the caller's — spaces can't be created cross-workspace.
+    const space = await workspacePlatform.createSpace(ctx.workspaceId, name);
+    return { space: { id: space.id, name: space.name } };
+  });
+
+  app.post("/registry/api-keys", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    const body = req.body as { name?: string };
+    const name = body?.name?.trim();
+    if (!name) return reply.code(400).send({ error: "name is required" });
+    // Raw key returned exactly once — only its sha256 is stored.
+    const issued = await workspacePlatform.issueApiKey(ctx.workspaceId, ctx.userId!, name);
+    return {
+      key: {
+        id: issued.id,
+        name: issued.name,
+        prefix: issued.prefix,
+        scopes: JSON.parse(issued.scopes) as string[],
+        createdAt: issued.created_at,
+        lastUsedAt: null,
+        revokedAt: null,
+      },
+      rawKey: issued.rawKey,
+    };
+  });
+
+  app.delete("/registry/api-keys/:id", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    const { id } = req.params as { id: string };
+    // Only revoke keys that belong to the caller's workspace — never by bare id.
+    const keys = await workspacePlatform.listApiKeys(ctx.workspaceId);
+    if (!keys.some((k) => k.id === id)) return reply.code(404).send({ error: "not found" });
+    await workspacePlatform.revokeApiKey(id);
+    return { ok: true };
   });
 
   /**
@@ -289,7 +359,9 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
   app.all("/apps/:slug/*", async (req, reply) => {
     const { slug } = req.params as { slug: string; "*": string };
     const app_ = await registry.getApp(slug);
-    if (!app_ || !app_.manifest_json) {
+    // Registered row is enough to proxy: external apps never self-report a
+    // manifest at boot, so an empty manifest_json must not block their traffic.
+    if (!app_) {
       return reply.code(404).send({ error: `app "${slug}" is not registered` });
     }
 

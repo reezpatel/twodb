@@ -1,4 +1,8 @@
 import type { LlmConnectionRow } from "../db/schema.js";
+import type { ConnectionConfig } from "../db/repository.js";
+
+/** A connection with decrypted, parsed config — what adapters receive. */
+export type LiveConnection = LlmConnectionRow & { configParsed: ConnectionConfig };
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -15,12 +19,12 @@ export interface CompletionRequest {
 
 export interface LlmProvider {
   /** Streams the raw upstream response body through unmodified — the Gateway/CLI pass it straight to the caller. */
-  streamCompletion(connection: LlmConnectionRow, req: CompletionRequest): Promise<Response>;
+  streamCompletion(connection: LiveConnection, req: CompletionRequest): Promise<Response>;
 
   /**
    * Best-effort model listing (OpenAI's `GET /models` shape). Providers
    * without a listing API return null and the caller falls back to manual
    * model entry. Never throws — a listing failure shouldn't break anything.
    */
-  listModels?(connection: LlmConnectionRow): Promise<string[] | null>;
+  listModels?(connection: LiveConnection): Promise<string[] | null>;
 }

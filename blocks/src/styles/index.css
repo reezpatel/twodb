@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @source "../components";
 @import "tw-animate-css";
+/* Legacy TwoDB type: Outfit (variable). Loaded here so every app importing
+   this stylesheet gets the font with no extra wiring. */
+@import "@fontsource-variable/outfit";
 
 /*
  * Isometric Lab theme — see THEME.MD for the full specification.
@@ -58,71 +61,77 @@
 }
 
 [data-theme="dark"] {
-  --paper: #1a1a1a;
-  --paper-grid: #1f1f1f;
-  --stone: #1e1e1e;
-  --stone-hatch: #373737;
-  --ink: #f1ede4;
-  --ink-muted: #a9a397;
-  /* Neutral (no warm tint) muted text — used for sidebar/nav chrome instead of ink-muted */
-  --muted-foreground: #a0a0a0;
-  --outline: #353535;
-  --ion: #5d76a6;
-  --ion-deep: #9fb4e6;
-  --tritium: #4c8763;
-  --transmute: #a9677a;
-  --materials: #b47c48;
-  --glow: #e8c45a;
-  --pin: #ef6f7a;
+  /*
+   * Legacy TwoDB "Oldworld" palette (VSCode theme port) — graphite grounds,
+   * lavender-tinted foreground, and the Oldworld accent family
+   * (lavender/magenta/orange/green/blue/red) instead of warm tints.
+   */
+  --paper: oklch(0.178 0 0);
+  --paper-grid: oklch(0.27 0.005 286);
+  --stone: oklch(0.244 0 0);
+  --stone-hatch: oklch(0.306 0.005 286.1);
+  --ink: oklch(0.833 0.009 301.3);
+  --ink-muted: oklch(0.698 0.015 299.7);
+  /* Neutral muted text for sidebar/nav chrome */
+  --muted-foreground: oklch(0.698 0.015 299.7);
+  --outline: oklch(0.27 0.005 286);
+  /* Oldworld accents: lavender · magenta · orange · green · blue · red */
+  --ion: oklch(0.66 0.05 300.5);
+  --ion-deep: oklch(0.734 0.067 295.7);
+  --tritium: oklch(0.749 0.058 156.9);
+  --transmute: oklch(0.735 0.065 347);
+  --materials: oklch(0.735 0.046 73.4);
+  --glow: oklch(0.819 0.065 53.5);
+  --pin: oklch(0.731 0.131 359.7);
 
-  /* Neutral gray, no warm tint, close to paper lightness */
-  --card: #1f1f1f;
-  /* Popover/menu surface: a touch lighter than stone, still a plain neutral shade */
-  --popover: #282828;
+  /* Card surface: legacy card (one step above background) */
+  --card: oklch(0.196 0 0);
+  /* Popover/menu surface: legacy popover — same as card */
+  --popover: oklch(0.196 0 0);
 
-  --destructive: #ef6f7a;
-  --destructive-foreground: #1a1a1a;
-  --success: #6fb98a;
-  --success-foreground: #1a1a1a;
-  --warning: #e0a94e;
-  --warning-foreground: #1a1a1a;
+  --destructive: oklch(0.731 0.131 359.7);
+  --destructive-foreground: oklch(0.187 0 0);
+  --success: oklch(0.749 0.058 156.9);
+  --success-foreground: oklch(0.187 0 0);
+  --warning: oklch(0.819 0.065 53.5);
+  --warning-foreground: oklch(0.187 0 0);
   --info: var(--ion-deep);
-  --info-foreground: #1a1a1a;
+  --info-foreground: oklch(0.187 0 0);
 }
 
 /* Follow the OS when no explicit theme is set */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #1a1a1a;
-    --paper-grid: #1f1f1f;
-    --stone: #1e1e1e;
-    --stone-hatch: #373737;
-    --ink: #f1ede4;
-    --ink-muted: #a9a397;
-    --muted-foreground: #a0a0a0;
-    --outline: #353535;
-    --ion: #5d76a6;
-    --ion-deep: #9fb4e6;
-    --tritium: #4c8763;
-    --transmute: #a9677a;
-    --materials: #b47c48;
-    --glow: #e8c45a;
-    --pin: #ef6f7a;
-    --card: #1f1f1f;
-    --popover: #282828;
-    --destructive: #ef6f7a;
-    --destructive-foreground: #1a1a1a;
-    --success: #6fb98a;
-    --success-foreground: #1a1a1a;
-    --warning: #e0a94e;
-    --warning-foreground: #1a1a1a;
+    --paper: oklch(0.178 0 0);
+    --paper-grid: oklch(0.27 0.005 286);
+    --stone: oklch(0.244 0 0);
+    --stone-hatch: oklch(0.306 0.005 286.1);
+    --ink: oklch(0.833 0.009 301.3);
+    --ink-muted: oklch(0.698 0.015 299.7);
+    --muted-foreground: oklch(0.698 0.015 299.7);
+    --outline: oklch(0.27 0.005 286);
+    --ion: oklch(0.66 0.05 300.5);
+    --ion-deep: oklch(0.734 0.067 295.7);
+    --tritium: oklch(0.749 0.058 156.9);
+    --transmute: oklch(0.735 0.065 347);
+    --materials: oklch(0.735 0.046 73.4);
+    --glow: oklch(0.819 0.065 53.5);
+    --pin: oklch(0.731 0.131 359.7);
+    --card: oklch(0.196 0 0);
+    --popover: oklch(0.196 0 0);
+    --destructive: oklch(0.731 0.131 359.7);
+    --destructive-foreground: oklch(0.187 0 0);
+    --success: oklch(0.749 0.058 156.9);
+    --success-foreground: oklch(0.187 0 0);
+    --warning: oklch(0.819 0.065 53.5);
+    --warning-foreground: oklch(0.187 0 0);
     --info: var(--ion-deep);
-    --info-foreground: #1a1a1a;
+    --info-foreground: oklch(0.187 0 0);
   }
 }
 
 @theme inline {
-  --font-sans: "Inter Variable", "Inter", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-sans: "Outfit Variable", "Outfit", "Helvetica Neue", Arial, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, Menlo, monospace;
 
   --color-paper: var(--paper);
@@ -174,6 +183,9 @@
   --radius-lg: var(--radius-md);
   --radius-pill: var(--radius-pill);
   --radius-xl: var(--radius-md);
+
+  /* One step past Tailwind's max 7xl (80rem) — used by wide registry grids. */
+  --container-8xl: 90rem;
 }
 
 body {
@@ -190,6 +202,31 @@ body,
 #root {
   height: 100%;
   letter-spacing: 0.02em;
+}
+
+/* Minimal scrollbars everywhere — thin, token-tinted (brighter on hover),
+   same scheme as the legacy app. Firefox via scrollbar-*; Chromium/WebKit
+   via ::-webkit-scrollbar. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 22%, transparent) transparent;
+}
+*:hover {
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 45%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklab, var(--muted-foreground) 22%, transparent);
+  border-radius: 999px;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* The drafting-paper ground: faint square grid over paper */

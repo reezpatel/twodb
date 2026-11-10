@@ -56,7 +56,13 @@ export function openControlPlaneDb(file: string): Kysely<ControlPlaneDb> {
   return createSqliteDb<ControlPlaneDb>({ file });
 }
 
-/** Idempotent — safe to call on every boot. Creates every control-plane table TwoDB owns. */
+/**
+ * Superseded by src/migrations (Kysely Migrator — see db/migrate.ts); kept
+ * only as historical reference of the pre-migration self-bootstrapping DDL.
+ * Do NOT call this: new schema changes belong in a numbered migration.
+ */
+
+/** @deprecated Use runMigrations() (db/migrate.ts) instead. */
 export async function bootstrapControlPlaneDb(db: Kysely<ControlPlaneDb>): Promise<void> {
   await applyAuthPlatformSchema(db as any);
 

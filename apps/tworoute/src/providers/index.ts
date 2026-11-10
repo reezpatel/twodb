@@ -1,16 +1,24 @@
 import type { LlmProvider } from "./types.js";
-import { openAiCompatibleProvider } from "./openai-compatible.js";
-import { anthropicProvider } from "./anthropic.js";
+import { openAiCompatibleProvider, anthropicProvider, responsesProvider } from "./wires.js";
+import { getProviderSpec } from "./catalog.js";
 
 export * from "./types.js";
+export * from "./catalog.js";
 
-const registry: Record<string, LlmProvider> = {
-  "openai-compatible": openAiCompatibleProvider,
-  anthropic: anthropicProvider,
-};
-
+/**
+ * Provider lookup is catalog-driven: the catalog's `api` field picks the
+ * wire adapter. Legacy had a per-provider registry; one entry per wire is
+ * all that actually varies.
+ */
 export function getProvider(kind: string): LlmProvider {
-  const provider = registry[kind];
-  if (!provider) throw new Error(`unknown LLM provider kind: ${kind}`);
-  return provider;
+  const spec = getProviderSpec(kind);
+  if (!spec) throw new Error(`unknown LLM provider: ${kind}`);
+  switch (spec.api) {
+    case "openai":
+      return openAiCompatibleProvider;
+    case "anthropic":
+      return anthropicProvider;
+    case "responses":
+      return responsesProvider;
+  }
 }

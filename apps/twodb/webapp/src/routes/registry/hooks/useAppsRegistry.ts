@@ -1,15 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { gatewayClient, type RegisteredAppSummary, type AppStatus } from "../../../lib/gateway-client.js";
+import {
+  gatewayClient,
+  type RegisteredAppSummary,
+  type AppStatus,
+  type CatalogEntry,
+} from "../../../lib/gateway-client.js";
 
-/** Business hook: loads + refreshes the app list. */
+/** Business hook: loads + refreshes the app list, merged with the static
+ * install catalog (catalog entries not yet registered appear as
+ * not-yet-installed cards in the same grid). */
 export function useAppsRegistryData() {
   const [apps, setApps] = useState<RegisteredAppSummary[]>([]);
+  const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const result = await gatewayClient.listApps();
-    setApps(result);
+    const [registered, catalogEntries] = await Promise.all([
+      gatewayClient.listApps(),
+      gatewayClient.listCatalog().catch(() => [] as CatalogEntry[]),
+    ]);
+    setApps(registered);
+    setCatalog(catalogEntries);
     setLoading(false);
   }, []);
 
@@ -17,7 +29,7 @@ export function useAppsRegistryData() {
     refresh();
   }, [refresh]);
 
-  return { apps, loading, refresh };
+  return { apps, catalog, loading, refresh };
 }
 
 /** Business hook: register an external (unmanaged) app. */
@@ -55,9 +67,15 @@ export function useAppLifecycle(slug: string) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async () => {
-    const s = await gatewayClient.getAppStatus(slug);
-    setStatus(s);
-    return s;
+    try {
+      const s = await gatewayClient.getAppStatus(slug);
+      setStatus(s);
+      return s;
+    } catch {
+      // Not-yet-registered catalog app (or control plane hiccup) — no status yet.
+      setStatus(null);
+      return null;
+    }
   }, [slug]);
 
   const stopPolling = useCallback(() => {
@@ -71,7 +89,7 @@ export function useAppLifecycle(slug: string) {
     stopPolling();
     pollRef.current = setInterval(async () => {
       const s = await refresh();
-      if (s.installStatus !== "installing") {
+      if (!s || s.installStatus !== "installing") {
         stopPolling();
         setBusy(false);
       }

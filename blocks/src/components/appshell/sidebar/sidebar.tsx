@@ -11,6 +11,12 @@ export interface SidebarProps extends Omit<React.ComponentProps<"aside">, "onRes
    * (e.g. `AppShellBody`, which is `relative` by default).
    */
   mode?: "push" | "overlay";
+  /**
+   * "responsive" docks with push behavior on lg+ screens and floats as an
+   * overlay (togglable via `open`) below lg — the common desktop-dock /
+   * mobile-sheet pattern.
+   */
+  variant?: "fixed" | "responsive";
   /** Whether the panel is shown. Defaults to true. In "push" mode it animates its width to 0; in "overlay" mode it slides off-screen. */
   open?: boolean;
   /** Called when the overlay backdrop is clicked, or Escape is pressed while the panel has focus. Only relevant in "overlay" mode. */
@@ -28,6 +34,28 @@ export interface SidebarProps extends Omit<React.ComponentProps<"aside">, "onRes
 
 const KEYBOARD_STEP = 16;
 
+/** lg breakpoint of the default blocks/Tailwind theme (1024px). */
+const LARGE_VIEWPORT_QUERY = "(min-width: 1024px)";
+
+/** SSR-safe live viewport test — false below lg, true on lg+. */
+function isLargeViewport(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return true;
+  return window.matchMedia(LARGE_VIEWPORT_QUERY).matches;
+}
+
+/** Re-renders on viewport class change so a `variant="responsive"` Sidebar
+ * swaps between docked (push) and floating (overlay) without remounting. */
+function useViewportVariant(): boolean {
+  const [large, setLarge] = React.useState(isLargeViewport);
+  React.useEffect(() => {
+    const mql = window.matchMedia(LARGE_VIEWPORT_QUERY);
+    const onChange = () => setLarge(mql.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return large;
+}
+
 /** A left- or right-docked panel, resizable by dragging the edge shared with the main content, in "push" or "overlay" mode. */
 function Sidebar({
   className,
@@ -35,6 +63,7 @@ function Sidebar({
   children,
   side = "right",
   mode = "push",
+  variant = "fixed",
   open = true,
   onOpenChange,
   defaultWidth = 280,
@@ -45,6 +74,10 @@ function Sidebar({
   resizable = true,
   ...props
 }: SidebarProps) {
+  // responsive: lg+ pushes (always docked, open ignored), below lg floats as
+  // an overlay whose visibility is the `open` prop.
+  const isLarge = useViewportVariant();
+  const isOverlay = variant === "responsive" ? !isLarge : mode === "overlay";
   const [uncontrolledWidth, setUncontrolledWidth] = React.useState(defaultWidth);
   const width = controlledWidth ?? uncontrolledWidth;
   const setWidth = (next: number) => {
@@ -104,7 +137,7 @@ function Sidebar({
     />
   ) : null;
 
-  if (mode === "overlay") {
+  if (isOverlay) {
     return (
       <>
         <div

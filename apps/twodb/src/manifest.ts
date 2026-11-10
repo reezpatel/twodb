@@ -74,6 +74,83 @@ const listCatalog = defineEndpoint({
   response: z.array(z.object({ slug: z.string(), hostPort: z.number() })),
 });
 
+const listApiKeys = defineEndpoint({
+  name: "listApiKeys",
+  method: "GET",
+  path: "/registry/api-keys",
+  auth: "session",
+  description:
+    "Lists the caller's workspace API keys (workspace platform's api_key table — the ones x-api-key auth verifies). " +
+    "Hashes never leave the DB; revoked keys are included with their revokedAt set.",
+  response: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      prefix: z.string(),
+      scopes: z.array(z.string()),
+      createdAt: z.string(),
+      lastUsedAt: z.string().nullable(),
+      revokedAt: z.string().nullable(),
+    }),
+  ),
+});
+
+const createApiKey = defineEndpoint({
+  name: "createApiKey",
+  method: "POST",
+  path: "/registry/api-keys",
+  auth: "session",
+  description:
+    "Issues a workspace API key. The raw key (format twodb_<prefix>_<secret>) is returned EXACTLY ONCE — only its " +
+    "sha256 is stored. Use it as the x-api-key header on gateway calls.",
+  request: z.object({ name: z.string() }),
+  response: z.object({
+    key: z.object({
+      id: z.string(),
+      name: z.string(),
+      prefix: z.string(),
+      scopes: z.array(z.string()),
+      createdAt: z.string(),
+      lastUsedAt: z.string().nullable(),
+      revokedAt: z.string().nullable(),
+    }),
+    rawKey: z.string(),
+  }),
+});
+
+const revokeApiKey = defineEndpoint({
+  name: "revokeApiKey",
+  method: "DELETE",
+  path: "/registry/api-keys/:id",
+  auth: "session",
+  description:
+    "Revokes one of the caller's workspace API keys. Scoped to the workspace: ids from another workspace 404.",
+  request: z.object({ id: z.string() }),
+  response: z.object({ ok: z.literal(true) }),
+});
+
+const listSpaces = defineEndpoint({
+  name: "listSpaces",
+  method: "GET",
+  path: "/registry/spaces",
+  auth: "session",
+  description:
+    "Lists the caller's workspace spaces — the sub-scopes that apps (e.g. TwoRoute connections) link themselves to.",
+  response: z.array(z.object({ id: z.string(), name: z.string(), createdAt: z.string().nullable() })),
+});
+
+const createSpace = defineEndpoint({
+  name: "createSpace",
+  method: "POST",
+  path: "/registry/spaces",
+  auth: "session",
+  description: "Creates a space in the caller's workspace.",
+  request: z.object({ name: z.string() }),
+  response: z.object({ space: z.object({ id: z.string(), name: z.string() }) }),
+});
+
+
+
 const installApp = defineEndpoint({
   name: "installApp",
   method: "POST",
@@ -230,6 +307,11 @@ export const twodbManifest = defineAppManifest({
     getAppManifest,
     getAppMessages,
     listCatalog,
+    listApiKeys,
+    createApiKey,
+    revokeApiKey,
+    listSpaces,
+    createSpace,
     installApp,
     issueToken,
     provisionDb,

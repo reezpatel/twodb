@@ -88,7 +88,7 @@ function NavSidebar({
     <div
       data-slot="nav-sidebar"
       aria-hidden={!open}
-      className={cn("relative h-full shrink-0 overflow-hidden border-r border-outline bg-stone transition-[width,opacity] duration-200 ease-out", className)}
+      className={cn("relative h-full shrink-0 overflow-hidden border-r border-outline bg-card transition-[width,opacity] duration-200 ease-out", className)}
       style={{ width: open ? width : 0, opacity: open ? 1 : 0 }}
     >
       {resizable && open ? (

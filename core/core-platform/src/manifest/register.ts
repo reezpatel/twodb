@@ -23,24 +23,53 @@ export interface RegisterWithGatewayOptions {
  * this ever runs — see ECOSYSTEM.md "How other apps plug in"). Safe to call
  * on every restart — TwoDB upserts by slug, as long as the token still
  * matches what it issued.
+ *
+ * Retries with backoff until the gateway is reachable: turbo starts every
+ * app in parallel, so this usually runs before TwoDB is listening on its
+ * port. A network-level failure (gateway not up yet) is waited out; an HTTP
+ * error response (bad token etc.) still fails fast — retrying won't fix it.
  */
 export async function registerWithGateway(
   manifest: AppManifestSpec,
   options: RegisterWithGatewayOptions,
+  { attempts = 30, intervalMs = 2000 }: { attempts?: number; intervalMs?: number } = {},
 ): Promise<void> {
   const endpointJson = toEndpointJson(manifest);
-  const res = await fetch(new URL("/registry/register", options.gatewayUrl), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      slug: manifest.slug,
-      registrationToken: options.registrationToken,
-      httpUrl: options.httpUrl,
-      socketPath: options.socketPath,
-      manifest: endpointJson,
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`registerWithGateway(${manifest.slug}) failed: ${res.status} ${await res.text()}`);
+  const url = new URL("/registry/register", options.gatewayUrl);
+  let lastError: unknown = new Error("never attempted");
+
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          slug: manifest.slug,
+          registrationToken: options.registrationToken,
+          httpUrl: options.httpUrl,
+          socketPath: options.socketPath,
+          manifest: endpointJson,
+        }),
+      });
+      if (res.ok) return;
+      // The gateway answered — a real rejection (wrong token, etc.).
+      // Retrying won't change the answer.
+      throw new Error(`registerWithGateway(${manifest.slug}) failed: ${res.status} ${await res.text()}`);
+    } catch (err) {
+      lastError = err;
+      // Only network-level failures are retryable — they mean the gateway
+      // isn't listening yet (turbo started us in parallel). Undici wraps
+      // ECONNREFUSED etc. as TypeError("fetch failed") with a `cause`;
+      // anything else (our own HTTP-status throw, a real fetch bug) fails
+      // fast because retrying won't change the answer.
+      const isNetworkFailure =
+        err instanceof TypeError && /fetch failed/.test(err.message ?? "");
+      if (!isNetworkFailure) throw err;
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
   }
+
+  throw new Error(
+    `registerWithGateway(${manifest.slug}) could not reach ${options.gatewayUrl} after ${attempts} attempts: ${String(lastError)}`,
+  );
 }

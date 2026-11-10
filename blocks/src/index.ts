@@ -2,7 +2,7 @@
 export { cn } from "./lib/utils";
 export { Button, buttonVariants, type ButtonProps } from "./components/ui/button/button";
 export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./components/ui/card/card";
-export { Chip, chipVariants, CHIP_ZONES, CHIP_TONES } from "./components/ui/chip/chip";
+export { Chip, chipVariants, CHIP_ZONES, CHIP_TONES, type ChipZone, type ChipTone } from "./components/ui/chip/chip";
 export {
   Dialog,
   DialogTrigger,
@@ -21,6 +21,36 @@ export { Label } from "./components/ui/form/label";
 export { RadioGroup, RadioGroupItem } from "./components/ui/form/radio-group";
 export { Switch } from "./components/ui/form/switch";
 export { Textarea } from "./components/ui/form/textarea";
+export {
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableRow,
+  TableHead,
+  TableCell,
+  TableCaption,
+} from "./components/ui/table/table";
+export { Collapsible, CollapsibleTrigger, CollapsibleContent, CollapsibleChevron } from "./components/ui/collapsible/collapsible";
+export { Badge, badgeVariants, type BadgeTone } from "./components/ui/badge/badge";
+export { DraggableWidgetGrid, type WidgetItem, type WidgetSize } from "./components/ui/widget-grid/widget-grid";
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuGroup,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from "./components/ui/dropdown-menu/dropdown-menu";
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs/tabs";
 
 // App shell
