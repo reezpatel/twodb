@@ -156,10 +156,12 @@ async function pullRegister(
 /**
  * Resolves the image ref to install, honoring TWODB_APP_IMAGE_REGISTRY:
  * - registry configured -> pull `registry/app-<slug>:<version ?? "latest">`
- *   (images released by CI from `<slug>/vX.Y.Z` tags — see
+ *   (images released by CI from repo-wide `vX.Y.Z` tags — see
  *   .github/workflows/release-app.yml);
  * - not configured (the monorepo dev default) -> build locally from the
- *   workspace checkout and tag `twodb/<slug>:<package.json version>`.
+ *   workspace checkout and tag `twodb/<slug>:<package.json version>` (the
+ *   package.json version only labels local builds; release versions come
+ *   from the git tag).
  * Returns the ref actually used and the version it was stamped with.
  */
 async function resolveImage(

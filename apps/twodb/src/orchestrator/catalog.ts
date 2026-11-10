@@ -20,8 +20,8 @@ export interface CatalogEntry {
 
 // NOTE: TwoDB itself is deliberately NOT here — it's the thing doing the
 // installing (circular), and it runs on the host with its own SQLite file.
-// Its Docker image is still released via CI tags (twodb/vX.Y.Z), but
-// deploying it is a bootstrap step outside the orchestrator's scope.
+// Its Docker image is still released by CI when a repo-wide tag touches it,
+// but deploying it is a bootstrap step outside the orchestrator's scope.
 export const APP_CATALOG: CatalogEntry[] = [
   { slug: "tworoute", pkgName: "@twodb/app-tworoute", containerPort: 4010, hostPort: 4010 },
   { slug: "twomail", pkgName: "@twodb/app-twomail", containerPort: 4011, hostPort: 4011 },

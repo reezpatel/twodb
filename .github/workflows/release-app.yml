@@ -1,29 +1,104 @@
-name: Release app image
+name: Release app images
 
-# Per-app Docker image releases. The old monolith's single `v*` tag is gone —
-# every app now releases independently with its own tag:
+# One release tag for the whole repo — push `vX.Y.Z` and CI releases the
+# Docker image of every app whose code changed since the previous tag:
 #
-#   git tag tworoute/v0.2.0 && git push origin tworoute/v0.2.0
+#   git tag v0.2.0 && git push origin v0.2.0
 #
-# builds ghcr.io/<owner>/app-tworoute:0.2.0 (+ :latest). Apps that didn't
-# change simply don't get a new tag — nothing forces version lockstep across
-# the ecosystem. Skipping a version for one app is fine.
+# -> ghcr.io/<owner>/app-tworoute:0.2.0 (+ :latest), same for every other
+# affected app. Apps that didn't change are simply not released — versions
+# can lag behind per app, that's fine. Changes to shared code (core/,
+# blocks/, the Dockerfile, the lockfile) affect every app and release them
+# all.
 #
 # The app image is the same `deploy/docker/app.Dockerfile` TwoDB's
 # orchestrator builds locally at install time; these published images are
-# what a future multi-host / registry-based install path would pull.
+# what installs pull when TwoDB runs with TWODB_APP_IMAGE_REGISTRY set.
 
 on:
   push:
     tags:
-      - "*/v*.*.*"
+      - "v*.*.*"
 
 permissions:
   contents: read
   packages: write
 
 jobs:
+  affected:
+    runs-on: ubuntu-latest
+    outputs:
+      any: ${{ steps.compute.outputs.any }}
+      matrix: ${{ steps.compute.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # need the full tag history to diff against the previous release
+
+      - name: Compute affected apps
+        id: compute
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::tag '$tag' must be 'v<major>.<minor>.<patch>'"
+            exit 1
+          fi
+
+          # All releasable apps — keep in sync with
+          # apps/twodb/src/orchestrator/catalog.ts.
+          apps="twodb tworoute twomail twoday twocontacts twochat twodrive artisan dispatch tworing garden twothing twoloop membrain paintress twopin twodoo"
+
+          prev="$(git tag --list 'v*.*.*' --sort=-v:refname | grep -vx "$tag" | head -1 || true)"
+
+          affected=""
+          if [ -z "$prev" ]; then
+            echo "no previous release tag found -> releasing every app"
+            affected="$apps"
+          else
+            changed="$(git diff --name-only "$prev" HEAD)"
+            echo "changed files since ${prev}:"
+            echo "$changed" | sed 's/^/  /'
+            # Shared code is baked into every app's image.
+            if echo "$changed" | grep -qE '^(core/|blocks/|tools/|deploy/docker/|pnpm-lock\.yaml|pnpm-workspace\.yaml)'; then
+              echo "shared code changed -> releasing every app"
+              affected="$apps"
+            else
+              for app in $apps; do
+                if echo "$changed" | grep -q "^apps/${app}/"; then
+                  affected="${affected:+$affected }$app"
+                fi
+              done
+            fi
+          fi
+
+          if [ -z "$affected" ]; then
+            echo "no app code changed -> nothing to release"
+            echo "any=false" >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "releasing: $affected"
+          matrix='{"include":['
+          sep=""
+          for app in $affected; do
+            matrix="${matrix}${sep}{\"slug\":\"${app}\",\"pkg\":\"@twodb/app-${app}\"}"
+            sep=","
+          done
+          matrix="${matrix}]}"
+          echo "any=true" >> "$GITHUB_OUTPUT"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   release:
+    needs: affected
+    if: needs.affected.outputs.any == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.affected.outputs.matrix) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -31,24 +106,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Parse app slug + version from tag
-        id: tag
-        shell: bash
-        run: |
-          ref="${GITHUB_REF_NAME}"            # e.g. "tworoute/v0.2.0"
-          slug="${ref%%/*}"                   # "tworoute"
-          version="${ref#*/v}"                # "0.2.0"
-          case "$slug" in
-            twodb|tworoute|twomail|twoday|twocontacts|twochat|twodrive|artisan|dispatch|tworing|garden|twothing|twoloop|membrain|paintress|twopin|twodoo) ;;
-            *) echo "::error::unknown app slug '$slug' in tag '$ref' — must be one of the catalog slugs in apps/twodb/src/orchestrator/catalog.ts"; exit 1 ;;
-          esac
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::tag '$ref' must be '<slug>/v<major>.<minor>.<patch>'"
-            exit 1
-          fi
-          echo "slug=$slug" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "pkg=@twodb/app-$slug" >> "$GITHUB_OUTPUT"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3 # zizmor: ignore[unpinned-uses]
 
       - name: Log in to GHCR
         uses: docker/login-action@v3 # zizmor: ignore[unpinned-uses]
@@ -61,9 +120,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5 # zizmor: ignore[unpinned-uses]
         with:
-          images: ghcr.io/${{ github.repository_owner }}/app-${{ steps.tag.outputs.slug }}
+          images: ghcr.io/${{ github.repository_owner }}/app-${{ matrix.slug }}
           tags: |
-            type=raw,value=${{ steps.tag.outputs.version }}
+            type=semver,pattern={{version}}
             type=raw,value=latest
 
       - name: Build and push
@@ -72,9 +131,9 @@ jobs:
           context: .
           file: deploy/docker/app.Dockerfile
           build-args: |
-            APP_PKG=${{ steps.tag.outputs.pkg }}
+            APP_PKG=${{ matrix.pkg }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=app-${{ steps.tag.outputs.slug }}
-          cache-to: type=gha,mode=max,scope=app-${{ steps.tag.outputs.slug }}
+          cache-from: type=gha,scope=app-${{ matrix.slug }}
+          cache-to: type=gha,mode=max,scope=app-${{ matrix.slug }}

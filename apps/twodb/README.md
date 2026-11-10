@@ -45,23 +45,19 @@ container + registry row; deliberately does NOT drop the Postgres schema).
 
 ## Versions & image sources
 
-Every app releases **independently** — no lockstep versions, skipping one
-app's release is fine:
-
-```bash
-git tag tworoute/v0.2.0 && git push origin tworoute/v0.2.0
-```
-
-CI (`.github/workflows/release-app.yml`) builds just that app and publishes
-`ghcr.io/<owner>/app-tworoute:0.2.0` (+ `:latest`). Main-branch pushes only
-smoke-build every app's image (`.github/workflows/docker-image.yaml`) — they
-publish nothing.
+Releases are driven by a **single git tag for the whole repo** — push
+`vX.Y.Z` and CI (`.github/workflows/release-app.yml`) publishes the Docker
+image of every app whose code changed since the previous tag as
+`ghcr.io/<owner>/app-<slug>:X.Y.Z` (+ `:latest`). Apps that didn't change
+aren't released, so per-app versions can lag behind — that's fine. Changes
+to shared code (`core/`, `blocks/`, the Dockerfile, the lockfile) release
+every app. Nothing builds or publishes on `main` pushes.
 
 Where an install gets its image depends on `TWODB_APP_IMAGE_REGISTRY`:
 - **Unset** (monorepo dev default) → built locally from the workspace
   checkout via `deploy/docker/app.Dockerfile`, tagged
-  `twodb/<slug>:<package.json version>` (package.json is the version source
-  of truth).
+  `twodb/<slug>:<package.json version>` (package.json only labels local
+  builds — the release version comes from the git tag).
 - **Set** (e.g. `ghcr.io/youruser`) → pulled from
   `<registry>/app-<slug>:<version ?? latest>` — the images CI released.
 
