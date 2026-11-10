@@ -26,7 +26,7 @@ export { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs/t
 // App shell
 export { AppShell, AppShellBody, AppShellMain, AppShellHeader, AppShellContent } from "./components/appshell/shell/shell";
 export { IconRail, IconRailSpacer, IconRailItem } from "./components/appshell/nav/icon-rail";
-export { NavItem, NavSection } from "./components/appshell/nav/nav-item";
+export { NavItem, NavSection, type NavGroupData, type NavItemData } from "./components/appshell/nav/nav-item";
 export { NavSidebar } from "./components/appshell/nav/nav-sidebar";
 export { NavSidebarToggle } from "./components/appshell/nav/nav-sidebar-toggle";
 export { WorkspaceSwitcher } from "./components/appshell/nav/workspace-switcher";

@@ -1,35 +1,17 @@
-import { useState } from "react";
-import { AppShell, AppShellBody, AppShellMain, AppShellHeader, AppShellContent, Tabs, TabsList, TabsTrigger, TabsContent } from "@twodb/blocks";
 import { RequireAuth } from "./routes/auth/RequireAuth.js";
-import { AppsRegistry } from "./routes/registry/AppsRegistry.js";
 import { GatewayExplorer } from "./routes/explorer/GatewayExplorer.js";
+import { AppsRegistry } from "./routes/registry/AppsRegistry.js";
+import { HubChrome } from "./routes/shell/partials/HubChrome.js";
+import { useHubShell } from "./routes/shell/hooks/useHubShell.js";
 
 export function App() {
-  const [tab, setTab] = useState("explorer");
+  const { activeId, onNavSelect, userEmail, userName } = useHubShell();
 
   return (
     <RequireAuth>
-      <AppShell>
-        <AppShellBody>
-          <AppShellMain>
-            <AppShellHeader>TwoDB — control plane</AppShellHeader>
-            <AppShellContent>
-              <Tabs value={tab} onValueChange={setTab}>
-                <TabsList>
-                  <TabsTrigger value="explorer">Gateway explorer</TabsTrigger>
-                  <TabsTrigger value="registry">Apps</TabsTrigger>
-                </TabsList>
-                <TabsContent value="explorer">
-                  <GatewayExplorer />
-                </TabsContent>
-                <TabsContent value="registry">
-                  <AppsRegistry />
-                </TabsContent>
-              </Tabs>
-            </AppShellContent>
-          </AppShellMain>
-        </AppShellBody>
-      </AppShell>
+      <HubChrome activeId={activeId} onNavSelect={onNavSelect} userEmail={userEmail} userName={userName}>
+        {activeId === "apps" ? <AppsRegistry /> : <GatewayExplorer />}
+      </HubChrome>
     </RequireAuth>
   );
 }
