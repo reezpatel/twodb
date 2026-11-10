@@ -83,7 +83,27 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
       status: a.status,
       installStatus: a.install_status,
       version: a.version,
+      managed: a.managed === 1,
+      httpUrl: a.http_url,
+      capabilities: JSON.parse(a.capabilities || "[]"),
     }));
+  });
+
+  /** Register an external (unmanaged) app: URL-based entry for the gateway; lifecycle stays with the app. */
+  app.post("/registry/apps/external", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    const body = req.body as { slug?: string; name?: string; httpUrl?: string; basePath?: string; capabilities?: string[] };
+    if (!body?.slug || !body?.name || !body?.httpUrl) return reply.code(400).send({ error: "slug, name and httpUrl are required" });
+    const result = await registry.registerExternal({
+      slug: body.slug,
+      name: body.name,
+      httpUrl: body.httpUrl,
+      basePath: body.basePath,
+      capabilities: body.capabilities,
+    });
+    if (!result.ok) return reply.code(409).send({ error: result.reason });
+    return { ok: true };
   });
 
   app.get("/registry/apps/:slug/endpoint.json", async (req, reply) => {
@@ -133,10 +153,21 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     });
   }
 
+  /** 409s for external apps: their lifecycle belongs to whoever runs them, not us. */
+  async function requireManaged(slug: string, reply: unknown): Promise<boolean> {
+    const row = await registry.getApp(slug);
+    if (row && row.managed === 0) {
+      (reply as any).code(409).send({ error: `"${slug}" is an external (unmanaged) app — its lifecycle is owned outside the control plane` });
+      return false;
+    }
+    return true;
+  }
+
   app.post("/orchestrator/apps/:slug/install", async (req, reply) => {
     const ctx = await resolveContext(new Headers(req.headers as any));
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
+    if (!(await requireManaged(slug, reply))) return;
     const version = (req.body as { version?: string } | null)?.version;
     try {
       runLifecycle(slug, () => installApp(slug, { registry, config }, version));
@@ -178,6 +209,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     const ctx = await resolveContext(new Headers(req.headers as any));
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
+    if (!(await requireManaged(slug, reply))) return;
     await startApp(slug, { registry, config });
     return { ok: true };
   });
@@ -186,6 +218,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     const ctx = await resolveContext(new Headers(req.headers as any));
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
+    if (!(await requireManaged(slug, reply))) return;
     await stopApp(slug, { registry, config });
     return { ok: true };
   });
@@ -194,6 +227,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     const ctx = await resolveContext(new Headers(req.headers as any));
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
+    if (!(await requireManaged(slug, reply))) return;
     await restartApp(slug, { registry, config });
     return { ok: true };
   });
@@ -202,6 +236,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     const ctx = await resolveContext(new Headers(req.headers as any));
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
+    if (!(await requireManaged(slug, reply))) return;
     const version = (req.body as { version?: string } | null)?.version;
     try {
       runLifecycle(slug, () => upgradeApp(slug, { registry, config }, version));
@@ -215,6 +250,11 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     const ctx = await resolveContext(new Headers(req.headers as any));
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
+    const row = await registry.getApp(slug);
+    if (row?.managed === 0) {
+      await registry.remove(slug);
+      return { ok: true };
+    }
     await removeApp(slug, { registry, config });
     return { ok: true };
   });

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@twodb/blocks";
+import { toast } from "sonner";
 import { useGatewayExplorer } from "./hooks/useGatewayExplorer.js";
+import { AppCardGrid } from "./partials/AppCardGrid.js";
 import { EndpointListItem } from "./partials/EndpointListItem.js";
 import { EndpointDetail } from "./partials/EndpointDetail.js";
 import { TryItPanel } from "./partials/TryItPanel.js";
@@ -32,91 +34,84 @@ export function GatewayExplorer() {
 
   if (appsLoading) return <p>Loading…</p>;
 
+  const explore = (slug: string) => {
+    if (slug === selectedSlug) return;
+    setSelectedSlug(slug);
+    select(null);
+    const app = apps.find((a) => a.slug === slug);
+    toast.success(`${app?.name ?? slug} selected`, {
+      description: "Loading its endpoint contract — try any route through the gateway.",
+    });
+  };
+
   return (
-    <div style={{ display: "flex", gap: 16, height: "100%" }}>
-      {/* App picker */}
-      <div style={{ minWidth: 180, borderRight: "1px solid var(--border, #e5e7eb)", paddingRight: 8 }}>
-        <h4 style={{ fontSize: 13, textTransform: "uppercase", opacity: 0.7 }}>Apps</h4>
-        {apps.map((app) => (
-          <button
-            key={app.slug}
-            onClick={() => {
-              setSelectedSlug(app.slug);
-              select(null);
-            }}
-            style={{
-              display: "block",
-              width: "100%",
-              textAlign: "left",
-              padding: "6px 8px",
-              border: "none",
-              borderRadius: 4,
-              cursor: "pointer",
-              background: selectedSlug === app.slug ? "var(--accent, #e5e7eb)" : "transparent",
-            }}
-          >
-            <div style={{ fontWeight: 500, fontSize: 14 }}>{app.name}</div>
-            <div style={{ fontSize: 11, opacity: 0.6 }}>
-              {app.status === "active" ? "● " : "○ "}
-              {app.status}
-              {app.version ? ` · v${app.version}` : ""}
-            </div>
-          </button>
-        ))}
-      </div>
+    <div className="flex flex-col gap-6">
+      {/* App picker — connect-style card grid */}
+      <section>
+        <p className="text-sm font-medium text-ink-muted">Gateway explorer</p>
+        <h2 className="mt-1 font-sans text-2xl font-bold tracking-tight text-ink">Connected apps</h2>
+        <p className="mt-1 text-[13px] text-ink-muted">
+          Pick an app to inspect its API contract and call its endpoints through the gateway.
+        </p>
+        <div className="mt-4">
+          <AppCardGrid apps={apps} selectedSlug={selectedSlug} onExplore={explore} />
+        </div>
+      </section>
 
       {/* Contract pane */}
-      <div style={{ flex: 1, overflow: "auto", minWidth: 0 }}>
-        {error ? <p style={{ opacity: 0.7 }}>{error}</p> : null}
-        {contractLoading ? <p>Loading contract…</p> : null}
+      {selectedSlug ? (
+        <section className="min-w-0">
+          {error ? <p style={{ opacity: 0.7 }}>{error}</p> : null}
+          {contractLoading ? <p>Loading contract…</p> : null}
 
-        {endpoints ? (
-          <Tabs value={tab} onValueChange={setTab}>
-            <TabsList>
-              <TabsTrigger value="endpoints">Endpoints ({endpoints.endpoints.length})</TabsTrigger>
-              <TabsTrigger value="messages">Messages</TabsTrigger>
-            </TabsList>
+          {endpoints ? (
+            <Tabs value={tab} onValueChange={setTab}>
+              <TabsList>
+                <TabsTrigger value="endpoints">Endpoints ({endpoints.endpoints.length})</TabsTrigger>
+                <TabsTrigger value="messages">Messages</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="endpoints">
-              <div style={{ display: "flex", gap: 16 }}>
-                <div style={{ minWidth: 260 }}>
-                  {endpoints.endpoints.map((ep) => (
-                    <EndpointListItem
-                      key={`${ep.method} ${ep.path}`}
-                      endpoint={ep}
-                      selected={selectedEndpoint?.name === ep.name}
-                      onSelect={() => select(ep)}
-                    />
-                  ))}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {selectedEndpoint ? (
-                    <>
-                      <EndpointDetail appSlug={endpoints.slug} basePath={endpoints.basePath} endpoint={selectedEndpoint} />
-                      <TryItPanel
-                        endpoint={selectedEndpoint}
-                        pathInput={pathInput}
-                        bodyInput={bodyInput}
-                        sending={sending}
-                        result={result}
-                        onPathChange={setPathInput}
-                        onBodyChange={setBodyInput}
-                        onSend={send}
+              <TabsContent value="endpoints">
+                <div style={{ display: "flex", gap: 16 }}>
+                  <div style={{ minWidth: 260 }}>
+                    {endpoints.endpoints.map((ep) => (
+                      <EndpointListItem
+                        key={`${ep.method} ${ep.path}`}
+                        endpoint={ep}
+                        selected={selectedEndpoint?.name === ep.name}
+                        onSelect={() => select(ep)}
                       />
-                    </>
-                  ) : (
-                    <p style={{ opacity: 0.6 }}>Select an endpoint to inspect its contract.</p>
-                  )}
+                    ))}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {selectedEndpoint ? (
+                      <>
+                        <EndpointDetail appSlug={endpoints.slug} basePath={endpoints.basePath} endpoint={selectedEndpoint} />
+                        <TryItPanel
+                          endpoint={selectedEndpoint}
+                          pathInput={pathInput}
+                          bodyInput={bodyInput}
+                          sending={sending}
+                          result={result}
+                          onPathChange={setPathInput}
+                          onBodyChange={setBodyInput}
+                          onSend={send}
+                        />
+                      </>
+                    ) : (
+                      <p style={{ opacity: 0.6 }}>Select an endpoint to inspect its contract.</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </TabsContent>
+              </TabsContent>
 
-            <TabsContent value="messages">
-              {messages ? <MessagesView messages={messages} /> : <p style={{ opacity: 0.6 }}>No messages contract found.</p>}
-            </TabsContent>
-          </Tabs>
-        ) : null}
-      </div>
+              <TabsContent value="messages">
+                {messages ? <MessagesView messages={messages} /> : <p style={{ opacity: 0.6 }}>No messages contract found.</p>}
+              </TabsContent>
+            </Tabs>
+          ) : null}
+        </section>
+      ) : null}
     </div>
   );
 }

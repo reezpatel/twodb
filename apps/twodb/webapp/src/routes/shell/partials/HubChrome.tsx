@@ -1,12 +1,4 @@
-import {
-  AppShell,
-  AppShellBody,
-  AppShellMain,
-  AppShellContent,
-  NavSidebar,
-  type NavGroupData,
-  type NavItemData,
-} from "@twodb/blocks";
+import { AppShell, AppShellBody, AppShellMain, AppShellContent, NavSidebar, type NavGroupData, type NavItemData } from "@twodb/blocks";
 import { Compass, LayoutGrid, LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -40,7 +32,7 @@ export function HubChrome(props: HubChromeProps) {
           footerItems={footerItems}
           activeId={props.activeId}
           onSelect={props.onNavSelect}
-          workspaces={props.userName ? [props.userName] : []}
+          workspaces={[]}
           activeWorkspace={props.userName || "TwoDB"}
         />
         <AppShellMain>

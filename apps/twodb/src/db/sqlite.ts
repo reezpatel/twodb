@@ -7,7 +7,9 @@ export type InstallStatus =
   | "running"
   | "stopped"
   | "failed"
-  | "uninstalled";
+  | "uninstalled"
+  /** Unmanaged entry: registered for the gateway, lifecycle owned elsewhere. */
+  | "external";
 
 export interface RegisteredAppRow {
   slug: string;
@@ -16,6 +18,8 @@ export interface RegisteredAppRow {
   shape: string;
   base_path: string;
   http_url: string;
+  /** 1 = control plane owns lifecycle (install/stop/upgrade); 0 = external entry. */
+  managed: number;
   socket_path: string | null;
   host_id: string;
   capabilities: string; // JSON string[]
@@ -78,6 +82,7 @@ export async function bootstrapControlPlaneDb(db: Kysely<ControlPlaneDb>): Promi
     .addColumn("container_name", "text")
     .addColumn("host_port", "integer")
     .addColumn("install_status", "text", (c) => c.notNull().defaultTo("not_installed"))
+    .addColumn("managed", "integer", (c) => c.notNull().defaultTo(1))
     .addColumn("installed_at", "text")
     .addColumn("registered_at", "text")
     .addColumn("last_seen_at", "text")

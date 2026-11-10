@@ -1,6 +1,7 @@
 import type { Kysely } from "kysely";
 import { createHash } from "node:crypto";
 import type { ControlPlaneDb, RegisteredAppRow, InstallStatus } from "./sqlite.js";
+import { getCatalogEntry } from "../orchestrator/catalog.js";
 
 export interface CreateInstallInput {
   slug: string;
@@ -10,6 +11,18 @@ export interface CreateInstallInput {
   basePath: string;
   hostId: string;
   capabilities: string[];
+}
+
+export interface RegisterExternalInput {
+  slug: string;
+  name: string;
+  /** Where the app actually serves (e.g. http://192.168.2.9:7001). */
+  httpUrl: string;
+  /** Optional path prefix the gateway should strip when proxying. */
+  basePath?: string;
+  capabilities?: string[];
+  /** App self-reported manifest (endpoint.json), if it serves one at GET /internal/manifest. */
+  manifestJson?: unknown;
 }
 
 function hashToken(token: string): string {
@@ -52,6 +65,7 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
           .values({
             ...base,
             slug: input.slug,
+            managed: 1,
             http_url: "",
             socket_path: null,
             manifest_json: "",
@@ -153,6 +167,69 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
     },
 
     /**
+     * Registers an EXTERNAL (unmanaged) app: an entry based on its URL that
+     * the control plane routes through the gateway but whose lifecycle it
+     * does NOT own — no container, no install/stop/upgrade, no provisioning.
+     * The gateway proxies `/<basePath>` to `httpUrl`; health is whatever the
+     * app reports on last_seen_at when it self-registers, or "external".
+     */
+    async registerExternal(input: RegisterExternalInput): Promise<{ ok: true } | { ok: false; reason: string }> {
+      const slug = input.slug.trim().toLowerCase();
+      if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return { ok: false, reason: "slug must be kebab-case" };
+      if (!/^https?:\/\//.test(input.httpUrl)) return { ok: false, reason: "httpUrl must be an http(s) URL" };
+      if (getCatalogEntry && getCatalogEntry(slug) && slug !== "twodb") {
+        // allow shadowing catalog apps only if they aren't currently managed-installed
+        const existing = await db.selectFrom("registered_app").select(["slug", "managed", "install_status"]).where("slug", "=", slug).executeTakeFirst();
+        if (existing?.managed && existing.install_status !== "not_installed" && existing.install_status !== "uninstalled") {
+          return { ok: false, reason: `"${slug}" is a managed catalog app currently installed — remove it first` };
+        }
+      }
+
+      const basePath = (input.basePath ?? `/${slug}`).replace(/\/+$/, "") || `/${slug}`;
+      const now = new Date().toISOString();
+      const row = {
+        name: input.name.trim(),
+        version: "external",
+        shape: "external",
+        base_path: basePath,
+        http_url: input.httpUrl.replace(/\/+$/, ""),
+        host_id: "external",
+        capabilities: JSON.stringify(input.capabilities ?? []),
+        manifest_json: input.manifestJson ? JSON.stringify(input.manifestJson) : "",
+        install_status: "external" as InstallStatus,
+        managed: 0,
+        registered_at: now,
+        last_seen_at: null,
+        status: "external",
+      };
+
+      const existing = await db.selectFrom("registered_app").select("slug").where("slug", "=", slug).executeTakeFirst();
+      if (existing) {
+        await db.updateTable("registered_app").set(row).where("slug", "=", slug).execute();
+      } else {
+        await db
+          .insertInto("registered_app")
+          .values({
+            ...row,
+            slug,
+            managed: 1,
+            socket_path: null,
+            pg_schema: null,
+            pg_role: null,
+            pg_connection_string_encrypted: null,
+            data_key_encrypted: null,
+            registration_token_hash: null,
+            image_tag: null,
+            container_name: null,
+            host_port: null,
+            installed_at: null,
+          })
+          .execute();
+      }
+      return { ok: true };
+    },
+
+    /**
      * TwoDB is the one app that doesn't go through the install/Docker
      * lifecycle — it *is* the thing installing everyone else — so it writes
      * its own registry row directly instead of presenting a registration
@@ -186,6 +263,7 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
         capabilities: JSON.stringify(input.capabilities),
         manifest_json: JSON.stringify(input.manifestJson),
         install_status: "running" as InstallStatus,
+        managed: 1,
         status: "active",
         registered_at: new Date().toISOString(),
         last_seen_at: new Date().toISOString(),

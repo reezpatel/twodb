@@ -9,6 +9,9 @@ export interface RegisteredAppSummary {
   status: string;
   installStatus: string;
   version: string | null;
+  managed: boolean;
+  httpUrl: string;
+  capabilities: string[];
 }
 
 export interface EndpointSpec {
@@ -78,6 +81,16 @@ export const gatewayClient = {
 
   removeApp(slug: string): Promise<{ ok: true }> {
     return fetch(`/orchestrator/apps/${slug}`, { method: "DELETE", credentials: "include" }).then((r) => json(r));
+  },
+
+  /** Register an external (unmanaged) app — URL entry for the gateway, no lifecycle. */
+  registerExternalApp(input: { slug: string; name: string; httpUrl: string; basePath?: string }): Promise<{ ok: true }> {
+    return fetch("/registry/apps/external", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(input),
+    }).then((r) => json(r));
   },
 
   /**

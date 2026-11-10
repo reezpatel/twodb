@@ -20,6 +20,30 @@ export function useAppsRegistryData() {
   return { apps, loading, refresh };
 }
 
+/** Business hook: register an external (unmanaged) app. */
+export function useAddExternalApp(onAdded: () => void) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const add = useCallback(
+    async (input: { slug: string; name: string; httpUrl: string; basePath?: string }) => {
+      setBusy(true);
+      setError(null);
+      try {
+        await gatewayClient.registerExternalApp(input);
+        onAdded();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onAdded],
+  );
+
+  return { add, busy, error };
+}
+
 /**
  * Business hook: one app's live status + lifecycle actions
  * (install/start/stop/restart/upgrade/remove). Polls while a lifecycle

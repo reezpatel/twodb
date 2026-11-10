@@ -108,7 +108,7 @@ function NavSidebar({
       ) : null}
 
       <div className="flex h-full flex-col p-2" style={{ width }}>
-        {workspaces && activeWorkspace ? (
+        {workspaces?.length && activeWorkspace ? (
           <div className="px-0 pb-2">
             <WorkspaceSwitcher workspaces={workspaces} value={activeWorkspace} onChange={onWorkspaceChange} onCreate={onCreateWorkspace} />
           </div>
