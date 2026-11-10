@@ -1,17 +1,26 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import basicSsl from "@vitejs/plugin-basic-ssl";
+
+const gateway = process.env.TWODB_GATEWAY_URL ?? "http://localhost:6400";
+// WebAuthn needs a secure context, so HTTPS is required when you browse the
+// dev server by LAN IP (e.g. https://192.168.2.5:6500) instead of localhost.
+// Opt in with DEV_HTTPS=true in the root .env — off by default so headless /
+// CI runs aren't bothered by the self-signed cert.
+const devHttps = process.env.DEV_HTTPS === "true";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), ...(devHttps ? [basicSsl()] : [])],
   server: {
     port: 6500,
     strictPort: true,
+    host: true, // listen on all interfaces so the LAN IP works
     proxy: {
-      "/api": { target: process.env.TWODB_GATEWAY_URL ?? "http://localhost:6400", changeOrigin: true },
-      "/registry": { target: process.env.TWODB_GATEWAY_URL ?? "http://localhost:6400", changeOrigin: true },
-      "/orchestrator": { target: process.env.TWODB_GATEWAY_URL ?? "http://localhost:6400", changeOrigin: true },
-      "/apps": { target: process.env.TWODB_GATEWAY_URL ?? "http://localhost:6400", changeOrigin: true },
+      "/api": { target: gateway, changeOrigin: true },
+      "/registry": { target: gateway, changeOrigin: true },
+      "/orchestrator": { target: gateway, changeOrigin: true },
+      "/apps": { target: gateway, changeOrigin: true },
     },
   },
 });
