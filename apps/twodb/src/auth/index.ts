@@ -38,7 +38,23 @@ function buildEngineOptions(db: Kysely<ControlPlaneDb>, config: TwoDbConfig): Au
           .select(["id", "name"])
           .where("email", "=", email)
           .executeTakeFirst();
-        if (existing) return { id: existing.id, name: existing.name, displayName: existing.name };
+        if (existing) {
+          // A prior run may have created the user but crashed before seeding
+          // a workspace (pre-transaction) — repair that so session auth works.
+          const membership = await (db as any)
+            .selectFrom("workspace_member")
+            .select("workspace_id")
+            .where("user_id", "=", existing.id)
+            .executeTakeFirst();
+          if (!membership) {
+            const platform = createWorkspacePlatform(db as any);
+            const org = await platform.createOrg(`org-${existing.id}`);
+            const workspace = await platform.createWorkspace(org.id, "Personal");
+            await platform.createSpace(workspace.id, "default");
+            await platform.addWorkspaceMember(workspace.id, existing.id, "owner");
+          }
+          return { id: existing.id, name: existing.name, displayName: existing.name };
+        }
 
         // better-auth's user schema (id, name, email, emailVerified, image,
         // timestamps; admin plugin adds role). The passkey plugin never
@@ -47,28 +63,33 @@ function buildEngineOptions(db: Kysely<ControlPlaneDb>, config: TwoDbConfig): Au
         // user is a superadmin.
         const id = ulid();
         const now = new Date().toISOString();
-        await (db as any)
-          .insertInto("user")
-          .values({
-            id,
-            name: email,
-            email,
-            emailVerified: 1, // better-auth stores booleans as 0/1 on sqlite
-            image: null,
-            role: "admin",
-            createdAt: now,
-            updatedAt: now,
-          })
-          .execute();
+        // Fully transactional: user + org + workspace + space + membership
+        // commit together or not at all — a failure partway (e.g. a slug
+        // collision) must not leave a user with no workspace, which the
+        // "existing user" fast-path would then skip re-seeding. The org slug
+        // is namespaced by the user id so concurrent/partial retries can
+        // never collide.
+        await (db as any).transaction().execute(async (trx: any) => {
+          await trx
+            .insertInto("user")
+            .values({
+              id,
+              name: email,
+              email,
+              emailVerified: 1, // better-auth stores booleans as 0/1 on sqlite
+              image: null,
+              role: "admin",
+              createdAt: now,
+              updatedAt: now,
+            })
+            .execute();
 
-        // Zero-setup bootstrap: the first user gets a personal workspace
-        // with a default space, so session auth (which requires workspace
-        // membership) works immediately.
-        const platform = createWorkspacePlatform(db as any);
-        const org = await platform.createOrg(`${email}'s org`);
-        const workspace = await platform.createWorkspace(org.id, "Personal");
-        await platform.createSpace(workspace.id, "default");
-        await platform.addWorkspaceMember(workspace.id, id, "owner");
+          const platform = createWorkspacePlatform(trx);
+          const org = await platform.createOrg(`org-${id}`);
+          const workspace = await platform.createWorkspace(org.id, "Personal");
+          await platform.createSpace(workspace.id, "default");
+          await platform.addWorkspaceMember(workspace.id, id, "owner");
+        });
 
         return { id, name: email, displayName: email };
       },
