@@ -11,21 +11,22 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@fastify/static": "^10.1.10",
+    "@twodb/core-async": "workspace:*",
     "@twodb/core-data": "workspace:*",
     "@twodb/core-platform": "workspace:*",
-    "@twodb/core-async": "workspace:*",
     "fastify": "^5.11.2",
-    "@fastify/cors": "^10.0.1",
-    "pg": "^8.23.0",
     "kysely": "^0.29.5",
-    "zod": "^4.5.2",
+    "pg": "^8.23.0",
     "ulid": "^3.0.2",
-    "undici": "^7.2.0"
+    "undici": "^7.2.0",
+    "zod": "^4.5.2"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/pg": "^8.21.0",
-    "typescript": "^5.8.0",
-    "tsx": "^4.20.0"
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
   }
 }

@@ -59,6 +59,8 @@ export interface RunContainerOptions {
   env: Record<string, string>;
   hostPort: number;
   containerPort: number;
+  /** Publish hostPort on the host. False when TwoDB itself is containerized and reaches apps over the shared network by container name. */
+  publish: boolean;
 }
 
 export async function runContainer(opts: RunContainerOptions): Promise<void> {
@@ -68,6 +70,12 @@ export async function runContainer(opts: RunContainerOptions): Promise<void> {
   await docker(["rm", "-f", opts.name]).catch(() => {});
 
   const envArgs = Object.entries(opts.env).flatMap(([k, v]) => ["-e", `${k}=${v}`]);
+  const publishArgs = opts.publish ? ["-p", `${opts.hostPort}:${opts.containerPort}`] : [];
+  // Only map host.docker.internal when the env actually references it —
+  // podman's docker-compat socket rejects "host-gateway" on some versions,
+  // and container-mode deployments don't need it at all.
+  const needsHostGateway = Object.values(opts.env).some((v) => v.includes("host.docker.internal"));
+  const hostGatewayArgs = needsHostGateway ? ["--add-host", "host.docker.internal:host-gateway"] : [];
   await docker([
     "run",
     "-d",
@@ -75,15 +83,10 @@ export async function runContainer(opts: RunContainerOptions): Promise<void> {
     opts.name,
     "--network",
     DOCKER_NETWORK,
-    // Makes `host.docker.internal` resolve on Linux too (it's automatic on
-    // Docker Desktop for Mac/Windows) — installed apps reach TwoDB itself
-    // through it via TWODB_GATEWAY_URL_FOR_CONTAINERS.
-    "--add-host",
-    "host.docker.internal:host-gateway",
+    ...hostGatewayArgs,
     "--restart",
     "unless-stopped",
-    "-p",
-    `${opts.hostPort}:${opts.containerPort}`,
+    ...publishArgs,
     ...envArgs,
     opts.image,
   ]);

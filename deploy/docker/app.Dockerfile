@@ -15,6 +15,17 @@ FROM node:22-slim AS base
 
 RUN corepack enable && corepack prepare pnpm@11.11.0 --activate
 
+# Docker CLI (static client binary only — no daemon). Only the TwoDB
+# control-plane image uses it: when TwoDB itself runs as a container it
+# orchestrates sibling app containers by shelling out to `docker` against a
+# mounted /var/run/docker.sock. ~30MB in every app image is the price for
+# keeping ONE generic Dockerfile; acceptable for now.
+RUN ARCH="$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/aarch64/')" \
+  && curl -fsSL "https://download.docker.com/linux/static/stable/${ARCH}/docker-27.5.1.tgz" \
+     | tar -xz -C /tmp --strip-components=1 docker/docker \
+  && mv /tmp/docker /usr/local/bin/docker \
+  && docker --version
+
 WORKDIR /repo
 
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
@@ -31,6 +42,10 @@ ENV APP_PKG=${APP_PKG}
 # Fail fast at build time if APP_PKG was forgotten, instead of a confusing
 # runtime error from pnpm.
 RUN test -n "$APP_PKG" || (echo "APP_PKG build-arg is required" && exit 1)
+
+# The control-plane image also carries the built admin webapp — the server
+# serves it from apps/twodb/webapp/dist when present (see gateway/server.ts).
+RUN if [ "$APP_PKG" = "@twodb/app-twodb" ]; then pnpm --filter @twodb/app-twodb-webapp build; fi
 
 EXPOSE 3000-9000
 

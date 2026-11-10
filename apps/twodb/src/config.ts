@@ -25,6 +25,20 @@ export const configSchema = z.object({
    * default.
    */
   TWODB_APP_IMAGE_REGISTRY: z.string().optional(),
+  /**
+   * What gets injected as the app's own HTTP_URL (what it tells the Gateway
+   * to proxy to). Placeholders: {slug}, {hostPort}, {containerPort}.
+   * Default works when TwoDB runs ON the host. When TwoDB itself runs as a
+   * container on twodb-net, use e.g. "http://twodb-app-{slug}:{containerPort}"
+   * and set TWODB_APP_PUBLISH_PORTS=false — localhost inside TwoDB's
+   * container is TwoDB itself, not the app.
+   */
+  TWODB_APP_HTTP_URL_TEMPLATE: z.string().default("http://localhost:{hostPort}"),
+  /** Publish each app's containerPort on the host. Disable when TwoDB is containerized and talks to apps over the shared docker network by container name. */
+  TWODB_APP_PUBLISH_PORTS: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
   TWODB_HOST_ID: z.string().default("local"),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),

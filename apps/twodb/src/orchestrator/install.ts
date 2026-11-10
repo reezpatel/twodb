@@ -102,6 +102,12 @@ export async function provisionDatabase(slug: string, opts: InstallOptions) {
   };
 }
 
+function appHttpUrl(config: TwoDbConfig, entry: CatalogEntry): string {
+  return config.TWODB_APP_HTTP_URL_TEMPLATE.replaceAll("{slug}", entry.slug)
+    .replaceAll("{hostPort}", String(entry.hostPort))
+    .replaceAll("{containerPort}", String(entry.containerPort));
+}
+
 function buildContainerEnv(
   entry: CatalogEntry,
   config: TwoDbConfig,
@@ -120,9 +126,8 @@ function buildContainerEnv(
     TWODB_DATA_KEY: dataKey,
     TWODB_HOST_ID: "docker",
     // What the app tells TwoDB its reachable URL is at registration time —
-    // the gateway proxies to this. Both run on the same host, so it's the
-    // published host port as seen from the host's loopback.
-    HTTP_URL: `http://localhost:${entry.hostPort}`,
+    // the gateway proxies to this. See TWODB_APP_HTTP_URL_TEMPLATE.
+    HTTP_URL: appHttpUrl(config, entry),
   };
 }
 
@@ -143,7 +148,7 @@ async function pullRegister(
   opts: InstallOptions,
   { attempts = 60, intervalMs = 2000 }: { attempts?: number; intervalMs?: number } = {},
 ): Promise<void> {
-  const url = `http://localhost:${entry.hostPort}/internal/manifest`;
+  const url = `${appHttpUrl(opts.config, entry)}/internal/manifest`;
   let lastError: unknown = new Error("never attempted");
 
   for (let i = 0; i < attempts; i++) {
@@ -228,6 +233,7 @@ export async function installApp(slug: string, opts: InstallOptions, requestedVe
     env: buildContainerEnv(entry, opts.config, registrationToken, containerConnectionString, dataKey),
     hostPort: entry.hostPort,
     containerPort: entry.containerPort,
+    publish: opts.config.TWODB_APP_PUBLISH_PORTS,
   });
   await opts.registry.setContainerInfo(entry.slug, { imageTag: ref, containerName: name, hostPort: entry.hostPort });
   await opts.registry.setVersion(entry.slug, version);
@@ -294,6 +300,7 @@ export async function upgradeApp(slug: string, opts: InstallOptions, targetVersi
     env: buildContainerEnv(entry, opts.config, registrationToken, dbUrl, dataKey),
     hostPort: entry.hostPort,
     containerPort: entry.containerPort,
+    publish: opts.config.TWODB_APP_PUBLISH_PORTS,
   });
   await opts.registry.setContainerInfo(entry.slug, { imageTag: ref, containerName: name, hostPort: entry.hostPort });
   await opts.registry.setVersion(entry.slug, version);

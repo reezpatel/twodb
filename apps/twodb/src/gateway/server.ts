@@ -1,6 +1,8 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
 import * as fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 import * as path from "node:path";
 import type { Kysely } from "kysely";
 import type { ControlPlaneDb } from "../db/sqlite.js";
@@ -263,6 +265,22 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
   });
 
   app.get("/healthz", async () => ({ ok: true }));
+
+  // --- Admin webapp: serve the built SPA when its dist exists (production
+  // image builds it; dev uses the Vite dev server on :5173 instead).
+  const webappDist = path.join(REPO_ROOT, "apps/twodb/webapp/dist");
+  if (existsSync(path.join(webappDist, "index.html"))) {
+    await app.register(fastifyStatic, { root: webappDist, wildcard: false, index: false });
+    app.setNotFoundHandler((req, reply) => {
+      const pathname = new URL(req.url, "http://internal").pathname;
+      const isApi = /^\/(api|registry|orchestrator|apps|search|healthz)(\/|$)/.test(pathname);
+      const wantsHtml =
+        !isApi &&
+        ((req.headers.accept ?? "").includes("text/html") || (req.method === "GET" && !path.extname(pathname)));
+      if (req.method === "GET" && wantsHtml) return reply.sendFile("index.html");
+      return reply.code(404).send({ error: "not found" });
+    });
+  }
 
   return app;
 }

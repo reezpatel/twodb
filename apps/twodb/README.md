@@ -109,6 +109,21 @@ webapp/                        admin frontend (passkey login, gateway explorer â
                                endpoint/messages browser with try-it, app lifecycle controls)
 ```
 
+## Deploying (NixOS)
+
+`deploy/nix/twodb-apps.nix` is a flake-parts module that runs the whole
+apps cluster on a server: a dedicated Postgres container, and the control
+plane itself as a container (`ghcr.io/reezpatel/app-twodb:latest`) that
+orchestrates sibling app containers through the host's docker/podman
+socket. In that mode the gateway and the apps talk to each other by
+container name on the shared `twodb-net` network â€” set
+`TWODB_APP_HTTP_URL_TEMPLATE=http://twodb-app-{slug}:{containerPort}` and
+`TWODB_APP_PUBLISH_PORTS=false` (the module does this for you).
+
+For the image to orchestrate, it bundles the static `docker` CLI and the
+built admin webapp is served from the same origin (both handled by
+`deploy/docker/app.Dockerfile` when `APP_PKG=@twodb/app-twodb`).
+
 ## Port assignments
 
 Fixed per app (see `src/orchestrator/catalog.ts`) so installs are
