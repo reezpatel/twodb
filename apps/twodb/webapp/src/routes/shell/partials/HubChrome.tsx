@@ -3,9 +3,6 @@ import {
   AppShellBody,
   AppShellMain,
   AppShellContent,
-  IconRail,
-  IconRailSpacer,
-  IconRailItem,
   NavSidebar,
   type NavGroupData,
   type NavItemData,
@@ -21,7 +18,7 @@ export interface HubChromeProps {
   children: ReactNode;
 }
 
-/** Dumb chrome only — composes blocks' AppShell pieces; state lives in useHubShell(). */
+/** Dumb chrome only — composes blocks' AppShell + NavSidebar; state lives in useHubShell(). */
 export function HubChrome(props: HubChromeProps) {
   const groups: NavGroupData[] = [
     {
@@ -33,20 +30,11 @@ export function HubChrome(props: HubChromeProps) {
     },
   ];
 
-  const footerItems: NavItemData[] = [
-    { id: "logout", title: "Sign out", icon: LogOut, shortcut: "⌘Q" },
-  ];
+  const footerItems: NavItemData[] = [{ id: "logout", title: "Sign out", icon: LogOut }];
 
   return (
     <AppShell>
       <AppShellBody>
-        <IconRail>
-          <IconRailItem icon={Compass} label="Gateway explorer" active={props.activeId === "explorer"} onClick={() => props.onNavSelect("explorer")} />
-          <IconRailItem icon={LayoutGrid} label="Apps" active={props.activeId === "apps"} onClick={() => props.onNavSelect("apps")} />
-          <IconRailSpacer />
-          <IconRailItem icon={LogOut} label="Sign out" onClick={() => props.onNavSelect("logout")} />
-        </IconRail>
-
         <NavSidebar
           groups={groups}
           footerItems={footerItems}

@@ -182,6 +182,15 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Full-height app shells: the shell is a h-full column, so the root chain
+   (html → body → #root) must carry height, or sidebars collapse to content
+   height instead of stretching viewport-to-viewport. */
+html,
+body,
+#root {
+  height: 100%;
+}
+
 /* The drafting-paper ground: faint square grid over paper */
 .il-sheet {
   background-color: var(--paper);
