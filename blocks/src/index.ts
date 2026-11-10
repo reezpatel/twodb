@@ -1,4 +1,5 @@
 // UI primitives
+export { cn } from "./lib/utils";
 export { Button, buttonVariants, type ButtonProps } from "./components/ui/button/button";
 export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./components/ui/card/card";
 export { Chip, chipVariants, CHIP_ZONES, CHIP_TONES } from "./components/ui/chip/chip";
