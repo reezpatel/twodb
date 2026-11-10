@@ -3,13 +3,20 @@ import { loadConfig, commonConfigFields } from "@twodb/core-data/config";
 
 export const configSchema = z.object({
   ...commonConfigFields,
+  /**
+   * TwoDB's own listen port — PORT by default (the NixOS module and Docker
+   * set PORT), but in dev the shared root .env's PORT belongs to TwoRoute
+   * (every app loads the same file), so TWODB_PORT takes precedence there.
+   */
+  TWODB_PORT: z.coerce.number().int().positive().optional(),
+  PORT: z.coerce.number().int().positive().default(4000),
   /** TwoDB's own control-plane store — bootstrapped on first run, no setup required. */
   TWODB_SQLITE_FILE: z.string().default("./.data/twodb-control-plane.sqlite"),
   /** Admin connection to the shared Postgres cluster, used only for provisioning other apps' schemas/roles. */
-  TWODB_PG_ADMIN_URL: z.string().url(),
+  TWODB_PG_ADMIN_URL: z.string().url().default("postgres://twodb:twodb@localhost:5432/twodb"), // dev default — set explicitly in production
   /** Hostname installed-app containers use to reach Postgres — "localhost" (TwoDB's own view) is never reachable from inside a container. Defaults to the service name docker-compose.db.yaml gives the Postgres container. */
   TWODB_PG_CONTAINER_HOST: z.string().default("twodb-postgres"),
-  AUTH_SECRET: z.string().min(16),
+  AUTH_SECRET: z.string().min(16).default("dev-only-secret-change-me-0000"), // dev default — MUST be set in production
   AUTH_BASE_URL: z.string().url().default("http://localhost:4000"),
   AUTH_TRUSTED_ORIGINS: z.string().default("http://localhost:5173").transform((v) => v.split(",")),
   PASSKEY_RP_ID: z.string().default("localhost"),

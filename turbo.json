@@ -1,11 +1,17 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "concurrency": "100",
-  "globalPassThroughEnv": ["TWODB_*"],
+  "globalPassThroughEnv": [
+    "TWODB_*"
+  ],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
     },
     "dev": {
       "cache": false,
@@ -13,8 +19,15 @@
     },
     "lint": {},
     "gen:docs": {
-      "dependsOn": ["^build"],
-      "outputs": ["ENDPOINTS.md", "MESSAGES.md", "endpoint.json", "messages.json"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "ENDPOINTS.md",
+        "MESSAGES.md",
+        "endpoint.json",
+        "messages.json"
+      ]
     }
   }
 }

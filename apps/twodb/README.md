@@ -127,11 +127,14 @@ built admin webapp is served from the same origin (both handled by
 ## Port assignments
 
 Fixed per app (see `src/orchestrator/catalog.ts`) so installs are
-reproducible: `tworoute` 4010, `twomail` 4011, `twoday` 4012,
-`twocontacts` 4013, `twochat` 4014, `twodrive` 4015, `artisan` 4016,
-`dispatch` 4017, `tworing` 4018, `garden` 4019, `twothing` 4020,
-`twoloop` 4021, `membrain` 4022, `paintress` 4023, `twopin` 4024,
-`twodoo` 4025. TwoDB itself stays on 4000.
+reproducible and a host-run dev stack never collides with containers:
+installable apps own 6400+ sequentially — `tworoute` 6400, `twomail` 6401,
+`twoday` 6402, `twocontacts` 6403, `twochat` 6404, `twodrive` 6405,
+`artisan` 6406, `dispatch` 6407, `tworing` 6408, `garden` 6409,
+`twothing` 6410, `twoloop` 6411, `membrain` 6412, `paintress` 6413,
+`twopin` 6414, `twodoo` 6415 (6416–6499 reserved). TwoDB itself stays on
+4000; dev webapps run on 5173 (twodb) and 5180+ (scaffolded apps).
+`pnpm local` at the repo root boots all of it via turbo.
 
 ## How other apps plug in (once installed)
 1. Everything an app's frontend or other apps need from it flows through

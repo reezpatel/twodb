@@ -1,46 +1,48 @@
-// Static catalog of installable apps. This is a monorepo today (every app
-// lives under apps/<slug> and is built from the same repo checkout TwoDB
-// itself runs from), so "installable" just means "has a package.json under
-// apps/<slug> with a manifest.ts" — there's no separate registry server to
-// query yet. When apps start shipping as standalone images/repos, this
-// catalog is the one place that changes to a real lookup.
-//
-// Ports are a fixed, hand-assigned map so installs are reproducible and two
-// apps never collide — see README.md "Port assignments" for the full table.
-
+/**
+ * The installable app catalog — the single place that knows every
+ * installable app's name, workspace package and FIXED ports. Ports are
+ * stable per app (not allocated) so a developer running a stack on the host
+ * and TwoDB running containers never collide: each app owns its port across
+ * environments.
+ *
+ * Port allocation:
+ * - TwoDB (control plane + gateway): 4000 — unchanged; hub.twodb.io, the
+ *   NixOS module, TWODB_GATEWAY_URL and every existing deploy point there.
+ * - Installable apps: 6400+ sequentially (see the roadmap: "new apps run
+ *   from port 6400 to 6500"). Reserved block for future apps: 6416–6499.
+ * - Local dev webapps (Vite): twodb 5173 (established; PASSKEY_ORIGIN and
+ *   the Vite proxy target it), scaffold webapps 5180+ sequentially.
+ */
 export interface CatalogEntry {
   slug: string;
-  /** Workspace package name, e.g. "@twodb/app-tworoute" — used for `pnpm --filter <pkgName> start`. */
+  name: string;
+  /** pnpm workspace package name — used to resolve endpoint.json in dev. */
   pkgName: string;
-  /** Port the app's Fastify server listens on *inside* its container. */
+  /** Port the app listens on inside its container (PORT env). */
   containerPort: number;
-  /** Port published on the host so the Gateway (and you) can reach it at http://localhost:<hostPort>. */
+  /** Host port TwoDB publishes the container on (same value; fixed per app). */
   hostPort: number;
 }
 
-// NOTE: TwoDB itself is deliberately NOT here — it's the thing doing the
-// installing (circular), and it runs on the host with its own SQLite file.
-// Its Docker image is still released by CI when a repo-wide tag touches it,
-// but deploying it is a bootstrap step outside the orchestrator's scope.
 export const APP_CATALOG: CatalogEntry[] = [
-  { slug: "tworoute", pkgName: "@twodb/app-tworoute", containerPort: 4010, hostPort: 4010 },
-  { slug: "twomail", pkgName: "@twodb/app-twomail", containerPort: 4011, hostPort: 4011 },
-  { slug: "twoday", pkgName: "@twodb/app-twoday", containerPort: 4012, hostPort: 4012 },
-  { slug: "twocontacts", pkgName: "@twodb/app-twocontacts", containerPort: 4013, hostPort: 4013 },
-  { slug: "twochat", pkgName: "@twodb/app-twochat", containerPort: 4014, hostPort: 4014 },
-  { slug: "twodrive", pkgName: "@twodb/app-twodrive", containerPort: 4015, hostPort: 4015 },
-  { slug: "artisan", pkgName: "@twodb/app-artisan", containerPort: 4016, hostPort: 4016 },
-  { slug: "dispatch", pkgName: "@twodb/app-dispatch", containerPort: 4017, hostPort: 4017 },
-  { slug: "tworing", pkgName: "@twodb/app-tworing", containerPort: 4018, hostPort: 4018 },
-  { slug: "garden", pkgName: "@twodb/app-garden", containerPort: 4019, hostPort: 4019 },
-  { slug: "twothing", pkgName: "@twodb/app-twothing", containerPort: 4020, hostPort: 4020 },
-  { slug: "twoloop", pkgName: "@twodb/app-twoloop", containerPort: 4021, hostPort: 4021 },
-  { slug: "membrain", pkgName: "@twodb/app-membrain", containerPort: 4022, hostPort: 4022 },
-  { slug: "paintress", pkgName: "@twodb/app-paintress", containerPort: 4023, hostPort: 4023 },
-  { slug: "twopin", pkgName: "@twodb/app-twopin", containerPort: 4024, hostPort: 4024 },
-  { slug: "twodoo", pkgName: "@twodb/app-twodoo", containerPort: 4025, hostPort: 4025 },
+  { slug: "tworoute", name: "TwoRoute", pkgName: "@twodb/app-tworoute", containerPort: 6400, hostPort: 6400 },
+  { slug: "twomail", name: "TwoMail", pkgName: "@twodb/app-twomail", containerPort: 6401, hostPort: 6401 },
+  { slug: "twoday", name: "TwoDay", pkgName: "@twodb/app-twoday", containerPort: 6402, hostPort: 6402 },
+  { slug: "twocontacts", name: "TwoContacts", pkgName: "@twodb/app-twocontacts", containerPort: 6403, hostPort: 6403 },
+  { slug: "twochat", name: "TwoChat", pkgName: "@twodb/app-twochat", containerPort: 6404, hostPort: 6404 },
+  { slug: "twodrive", name: "TwoDrive", pkgName: "@twodb/app-twodrive", containerPort: 6405, hostPort: 6405 },
+  { slug: "artisan", name: "Artisan", pkgName: "@twodb/app-artisan", containerPort: 6406, hostPort: 6406 },
+  { slug: "dispatch", name: "Dispatch", pkgName: "@twodb/app-dispatch", containerPort: 6407, hostPort: 6407 },
+  { slug: "tworing", name: "TwoRing", pkgName: "@twodb/app-tworing", containerPort: 6408, hostPort: 6408 },
+  { slug: "garden", name: "Garden", pkgName: "@twodb/app-garden", containerPort: 6409, hostPort: 6409 },
+  { slug: "twothing", name: "TwoThing", pkgName: "@twodb/app-twothing", containerPort: 6410, hostPort: 6410 },
+  { slug: "twoloop", name: "TwoLoop", pkgName: "@twodb/app-twoloop", containerPort: 6411, hostPort: 6411 },
+  { slug: "membrain", name: "Membrain", pkgName: "@twodb/app-membrain", containerPort: 6412, hostPort: 6412 },
+  { slug: "paintress", name: "Paintress", pkgName: "@twodb/app-paintress", containerPort: 6413, hostPort: 6413 },
+  { slug: "twopin", name: "TwoPin", pkgName: "@twodb/app-twopin", containerPort: 6414, hostPort: 6414 },
+  { slug: "twodoo", name: "TwoDoo", pkgName: "@twodb/app-twodoo", containerPort: 6415, hostPort: 6415 },
 ];
 
 export function getCatalogEntry(slug: string): CatalogEntry | undefined {
-  return APP_CATALOG.find((e) => e.slug === slug);
+  return APP_CATALOG.find((entry) => entry.slug === slug);
 }

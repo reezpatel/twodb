@@ -20,6 +20,9 @@ importers:
 
   apps/artisan:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -32,6 +35,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -94,6 +100,9 @@ importers:
 
   apps/dispatch:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -106,6 +115,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -134,6 +146,9 @@ importers:
 
   apps/garden:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -146,6 +161,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -208,6 +226,9 @@ importers:
 
   apps/membrain:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -220,6 +241,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -248,6 +272,9 @@ importers:
 
   apps/paintress:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -260,6 +287,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -322,6 +352,9 @@ importers:
 
   apps/twochat:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -334,6 +367,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -396,6 +432,9 @@ importers:
 
   apps/twocontacts:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -408,6 +447,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -436,6 +478,9 @@ importers:
 
   apps/twoday:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -448,6 +493,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -611,6 +659,9 @@ importers:
 
   apps/twodoo:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -623,6 +674,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -685,6 +739,9 @@ importers:
 
   apps/twodrive:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -697,6 +754,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -759,6 +819,9 @@ importers:
 
   apps/twoloop:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -771,6 +834,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -833,6 +899,9 @@ importers:
 
   apps/twomail:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -845,6 +914,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -907,6 +979,9 @@ importers:
 
   apps/twopin:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -919,6 +994,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -981,6 +1059,9 @@ importers:
 
   apps/tworing:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -993,6 +1074,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -1098,6 +1182,9 @@ importers:
 
   apps/twothing:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.18
+        version: 1.19.18(hono@4.13.17)
       '@twodb/core-async':
         specifier: workspace:*
         version: link:../../core/core-async
@@ -1110,6 +1197,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      hono:
+        specifier: ^4.13.17
+        version: 4.13.17
       kysely:
         specifier: ^0.29.5
         version: 0.29.5
@@ -2029,6 +2119,12 @@ packages:
 
   '@hexagon/base64@1.1.28':
     resolution: {integrity: sha512-lhqDEAvWixy3bZ+UOYbPwUbBkwBq5C1LAJ/xPC8Oi+lL54oyakv/npbA0aU2hgCsx/1NUd4IBvV03+aUBWxerw==}
+
+  '@hono/node-server@1.19.18':
+    resolution: {integrity: sha512-609kppIP9GITS+EwPyB6Kiq8z2yXONaYD1VHpo7MMP9celRJYbkFr9KakJncHwK0EK/XYtlogqmrLchDv5HX5w==}
+    engines: {node: '>=18.14.1'}
+    peerDependencies:
+      hono: ^4
 
   '@isaacs/nonrecursive-glob-match@1.1.0':
     resolution: {integrity: sha512-GPm/Dbvk5RLmhRnxXIa7nTpK0xtl4E0wj0MslsuNiJ1FIROU+2+9lgUC/dgF7Ey4QCWhfEsgxilMRMCdHPfDfw==}
@@ -4030,6 +4126,10 @@ packages:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
+  hono@4.13.17:
+    resolution: {integrity: sha512-vZIcbkvjOR5hHRWERbGkr8fGfF0GGM1ooYkuH448iO3b2AdVEr3AXZSw4Z3Kn+1L5z0CVoVeyV29VGYmFh05kQ==}
+    engines: {node: '>=16.9.0'}
+
   http-errors@2.0.1:
     resolution: {integrity: sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==}
     engines: {node: '>= 0.8'}
@@ -5580,6 +5680,10 @@ snapshots:
   '@fontsource-variable/jetbrains-mono@5.3.0': {}
 
   '@hexagon/base64@1.1.28': {}
+
+  '@hono/node-server@1.19.18(hono@4.13.17)':
+    dependencies:
+      hono: 4.13.17
 
   '@isaacs/nonrecursive-glob-match@1.1.0': {}
 
@@ -7521,6 +7625,8 @@ snapshots:
   hasown@2.0.4:
     dependencies:
       function-bind: 1.1.2
+
+  hono@4.13.17: {}
 
   http-errors@2.0.1:
     dependencies:

@@ -2,7 +2,7 @@
   "name": "twodb",
   "private": true,
   "scripts": {
-    "local": "pnpm --parallel --filter @twodb/app-twodb --filter @twodb/app-twodb-webapp --filter @twodb/app-tworoute dev",
+    "local": "pnpm local:apps",
     "local:blocks": "pnpm --filter @twodb/blocks storybook",
     "dev": "turbo dev",
     "build": "turbo build",
@@ -12,7 +12,9 @@
     "db:up": "docker compose -f deploy/docker-compose.db.yaml up -d",
     "db:down": "docker compose -f deploy/docker-compose.db.yaml down",
     "db:logs": "docker compose -f deploy/docker-compose.db.yaml logs -f",
-    "db:ps": "docker compose -f deploy/docker-compose.db.yaml ps"
+    "db:ps": "docker compose -f deploy/docker-compose.db.yaml ps",
+    "local:apps": "turbo run dev --filter='./apps/*' --filter='./apps/*/webapp' --parallel",
+    "local:platform": "pnpm --parallel --filter @twodb/app-twodb --filter @twodb/app-twodb-webapp --filter @twodb/app-tworoute dev"
   },
   "devDependencies": {
     "@types/pg": "^8.21.0",

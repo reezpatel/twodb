@@ -37,8 +37,8 @@ async function main() {
   });
 
   const server = await buildServer(db, config);
-  await server.listen({ port: config.PORT, host: "0.0.0.0" });
-  server.log.info(`TwoDB gateway listening on :${config.PORT}`);
+  await server.listen({ port: config.TWODB_PORT ?? config.PORT, host: "0.0.0.0" });
+  server.log.info(`TwoDB gateway listening on :${config.TWODB_PORT ?? config.PORT}`);
 }
 
 main().catch((err) => {
