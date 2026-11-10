@@ -19,18 +19,22 @@ function buildEngineOptions(db: Kysely<ControlPlaneDb>, config: TwoDbConfig): Au
     trustedOrigins: config.AUTH_TRUSTED_ORIGINS,
     passkey: { rpName: "TwoDB", rpID: config.PASSKEY_RP_ID, origin: config.PASSKEY_ORIGIN },
     firstUserBootstrap: {
+      // Bootstrap closes once a user WITH a passkey exists — orphan users
+      // from cancelled ceremonies (no passkey bound) keep registration open.
       hasUsers: async () => {
-        const row = await db
-          .selectFrom("user" as any)
-          .select((eb) => eb.fn.countAll().as("n"))
+        const row = await (db as any)
+          .selectFrom("user")
+          .innerJoin("passkey", "passkey.userId", "user.id")
+          .select((eb: any) => eb.fn.countAll().as("n"))
           .executeTakeFirst();
-        return Number((row as any)?.n ?? 0) > 0;
+        return Number(row?.n ?? 0) > 0;
       },
-      createUser: async (name: string) => {
+      createUser: async (name: string, email: string) => {
         // better-auth's user schema (id, name, email, emailVerified, image,
-        // timestamps) — the passkey plugin never creates this row itself, so
-        // first-run bootstrap must. Email is unused in the passwordless-only
-        // model but the column is NOT NULL in better-auth's schema.
+        // timestamps; admin plugin adds role). The passkey plugin never
+        // creates this row itself, and the challenge binds to the id — so
+        // first-run bootstrap creates it at options-generation time. First
+        // user is a superadmin.
         const id = ulid();
         const now = new Date().toISOString();
         await (db as any)
@@ -38,9 +42,10 @@ function buildEngineOptions(db: Kysely<ControlPlaneDb>, config: TwoDbConfig): Au
           .values({
             id,
             name,
-            email: `${id}@passkey.local`,
-            emailVerified: true,
+            email,
+            emailVerified: 1, // better-auth stores booleans as 0/1 on sqlite
             image: null,
+            role: "admin",
             createdAt: now,
             updatedAt: now,
           })
@@ -94,6 +99,22 @@ export function setupAuth(db: Kysely<ControlPlaneDb>, config: TwoDbConfig) {
   }
 
   return { authEngine, workspacePlatform, resolveContext };
+}
+
+/**
+ * Sweeps bootstrap orphans: user rows created by a sessionless
+ * generate-register-options whose ceremony was never completed (no passkey
+ * bound). Called on every boot — safe because the sweep only touches users
+ * with zero passkeys, which outside bootstrap is impossible (every other
+ * flow creates the passkey atomically with the user or requires a session).
+ */
+export async function sweepOrphanUsers(db: Kysely<ControlPlaneDb>): Promise<void> {
+  await (db as any)
+    .deleteFrom("user")
+    .where(({ not, exists, selectFrom, lit }: any) =>
+      not(exists(selectFrom("passkey").select(lit(1)).whereRef("passkey.userId", "=", "user.id"))),
+    )
+    .execute();
 }
 
 export type AuthSetup = ReturnType<typeof setupAuth>;

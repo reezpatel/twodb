@@ -2,7 +2,7 @@ import { toEndpointJson } from "@twodb/core-platform/manifest";
 import { loadTwoDbConfig } from "./config.js";
 import { openControlPlaneDb, bootstrapControlPlaneDb } from "./db/sqlite.js";
 import { createRegistryRepo } from "./db/registry.js";
-import { bootstrapAuthTables } from "./auth/index.js";
+import { bootstrapAuthTables, sweepOrphanUsers } from "./auth/index.js";
 import { buildServer } from "./gateway/server.js";
 import { twodbManifest } from "./manifest.js";
 
@@ -14,6 +14,10 @@ async function main() {
   // better-auth's own tables (user/session/account/passkey/apikey/verification) —
   // this is what makes TwoDB truly zero-setup on first run.
   await bootstrapAuthTables(db, config);
+  // Remove users left behind by cancelled first-run passkey ceremonies
+  // (sessionless registration creates the user at options-generation time;
+  // see core-platform auth engine's firstUserBootstrap).
+  await sweepOrphanUsers(db);
 
   // TwoDB registers itself directly (see registry.ts's registerSelf doc
   // comment — it's the one app that doesn't go through its own install/

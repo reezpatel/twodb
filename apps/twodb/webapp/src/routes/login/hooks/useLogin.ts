@@ -6,7 +6,7 @@ export function useLogin() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [mode, setMode] = useState<"signin" | "register">("signin");
-  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
 
   const signInWithPasskey = useCallback(async () => {
     setPending(true);
@@ -17,19 +17,25 @@ export function useLogin() {
   }, []);
 
   const registerPasskey = useCallback(async () => {
+    const trimmed = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError("Enter a valid email address");
+      return;
+    }
     setPending(true);
     setError(null);
     // First-run bootstrap: no session yet — the server allows sessionless
-    // registration only while the instance has zero users, creates the user
-    // at verify time, and (thanks to createSession) signs us in immediately.
+    // registration only while no passkey-bound user exists, creates the user
+    // (superadmin) at options time, and (thanks to createSession) signs us
+    // in immediately after the ceremony.
     const { error: err } = await authClient.passkey.addPasskey({
       name: "primary",
       createSession: true,
-      fetchOptions: { body: { userName: name.trim() || "owner" } },
-    } as any);
+      context: trimmed, // email rides the plugin's declared context param (its query schema strips unknown keys)
+    });
     setPending(false);
     if (err) setError(err.message ?? "Passkey registration failed");
-  }, [name]);
+  }, [email]);
 
-  return { error, pending, mode, setMode, name, setName, signInWithPasskey, registerPasskey };
+  return { error, pending, mode, setMode, email, setEmail, signInWithPasskey, registerPasskey };
 }

@@ -4,9 +4,9 @@ export interface LoginCardProps {
   pending: boolean;
   error: string | null;
   mode: "signin" | "register";
-  name: string;
+  email: string;
   onModeChange: (mode: "signin" | "register") => void;
-  onNameChange: (name: string) => void;
+  onEmailChange: (email: string) => void;
   onSignIn: () => void;
   onRegister: () => void;
 }
@@ -21,13 +21,14 @@ export function LoginCard(props: LoginCardProps) {
 
       {props.mode === "register" ? (
         <>
-          <Label htmlFor="passkey-name">Your name</Label>
+          <Label htmlFor="register-email">Email</Label>
           <Input
-            id="passkey-name"
-            value={props.name}
-            onChange={(e) => props.onNameChange(e.target.value)}
-            placeholder="e.g. Reez"
-            autoComplete="name webauthn"
+            id="register-email"
+            type="email"
+            value={props.email}
+            onChange={(e) => props.onEmailChange(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email webauthn"
           />
           <Button disabled={props.pending} onClick={props.onRegister}>
             {props.pending ? "Waiting for authenticator…" : "Create account + passkey"}

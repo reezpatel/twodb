@@ -4,7 +4,6 @@ import { admin, bearer, genericOAuth } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { apiKey as betterAuthApiKeyPlugin } from "@better-auth/api-key";
 import type { Kysely } from "kysely";
-import { ulid } from "ulid";
 
 export interface AuthEngineOptions {
   /** Shared Kysely instance (TwoDB's own control-plane DB — SQLite by default). */
@@ -16,14 +15,17 @@ export interface AuthEngineOptions {
   passkey: { rpName: string; rpID: string; origin: string };
   /**
    * First-run bootstrap: allow sessionless passkey registration when the
-   * instance has no users yet. Registration closes itself as soon as the
-   * first user exists. The plugin never creates the user row itself —
-   * `createUser` must do that (called from afterVerification).
+   * instance has no users yet. The user id is baked into the WebAuthn
+   * challenge (and becomes the passkey's userId), so the user row is
+   * created at options-GENERATION time, not verify time — a cancelled
+   * ceremony can therefore leave an orphan user with no passkey; apps
+   * should sweep those on boot (see apps/twodb/src/auth/index.ts).
+   * Registration closes itself as soon as a user WITH a passkey exists.
    */
   firstUserBootstrap?: {
     hasUsers: () => Promise<boolean>;
     /** Creates the user row; returns the new user's id. */
-    createUser: (name: string) => Promise<string>;
+    createUser: (name: string, email: string) => Promise<string>;
   };
   google?: { clientId: string; clientSecret: string };
   /** PocketID (or any OIDC provider) via better-auth's generic OAuth plugin. */
@@ -40,31 +42,23 @@ function buildOptions(options: AuthEngineOptions): BetterAuthOptions {
       registration: options.firstUserBootstrap
         ? {
             requireSession: false,
-            // Sessionless registration only while the instance has zero
-            // users — after bootstrap this path closes itself. The user row
-            // is created at verify time (afterVerification below), NOT here:
-            // the options call happens before the authenticator ceremony,
-            // and creating the user here would leave an orphan row if the
-            // user cancels the OS prompt.
-            resolveUser: async ({ ctx }) => {
+            resolveUser: async ({ context }) => {
+              // Once any user WITH a passkey exists, bootstrap is closed —
+              // defer to the session the plugin itself resolved.
               if (await options.firstUserBootstrap!.hasUsers()) {
-                const session = await (ctx as any).context?.getSession?.(ctx);
-                if (!session?.user) throw new Error("session required");
-                return { id: session.user.id, name: session.user.name ?? "user", displayName: session.user.name };
+                throw new Error("session required");
               }
-              // Placeholder id — replaced by the real one created in
-              // afterVerification. Only used for the WebAuthn options payload.
-              return { id: `bootstrap-${ulid()}`, name: "owner", displayName: "owner" };
-            },
-            afterVerification: async ({ ctx, user }) => {
-              if (await options.firstUserBootstrap!.hasUsers()) return {};
-              // First ever user: create the row now that the ceremony has
-              // actually succeeded, then hand the real id back so the
-              // passkey row (and the createSession login) bind to it.
-              const body = (ctx as any).body ?? {};
-              const name = typeof body.userName === "string" && body.userName.trim() ? body.userName.trim() : user.name;
-              const userId = await options.firstUserBootstrap!.createUser(name);
-              return { userId, name };
+              // Zero-user bootstrap: create the real user NOW. The id is
+              // baked into the WebAuthn challenge cookie and becomes the
+              // passkey's userId at verify time, so a placeholder here
+              // would 500 the verify call. Orphan users (ceremony cancelled)
+              // are swept on boot by the app. The email arrives via the
+              // plugin's declared `context` query param (its Zod schema
+              // strips unknown query keys).
+              const email = (context ?? "").trim();
+              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("a valid email is required");
+              const userId = await options.firstUserBootstrap!.createUser(email, email);
+              return { id: userId, name: email, displayName: email };
             },
           }
         : undefined,
