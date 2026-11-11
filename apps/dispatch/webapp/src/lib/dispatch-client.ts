@@ -67,9 +67,11 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 function post<T>(path: string, body?: unknown): Promise<T> {
+  // content-type only with a body — Fastify's parser 400s an empty body
+  // labeled application/json (shutdown/terminate post with no payload).
   return fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: body === undefined ? undefined : { "content-type": "application/json" },
     credentials: "include",
     body: body === undefined ? undefined : JSON.stringify(body),
   }).then((r) => json<T>(r));
