@@ -426,12 +426,29 @@ export async function buildServer(config: DispatchConfig) {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const body = (req.body ?? {}) as {
-      runnerId: string; identifier: string; memMb?: number; vcpu?: number; idleShutdownSec?: number;
+      runnerId?: string; identifier: string; memMb?: number; vcpu?: number; idleShutdownSec?: number;
     };
-    if (!body?.runnerId || !body?.identifier) return reply.code(400).send({ error: "runnerId and identifier are required" });
-    const runner = mustRunner(ctx, body.runnerId, reply);
-    if (!runner) return reply;
+    if (!body?.identifier) return reply.code(400).send({ error: "identifier is required" });
+    // Runner selection: explicit runnerId (name) wins; without one, an
+    // existing VM row names its runner (resume on the same host), else the
+    // first online microvm-host boots a fresh VM.
     let vm = await repo.getMicrovm(ctx.workspaceId, body.identifier);
+    let runnerName = body.runnerId ?? null;
+    if (!runnerName && vm) {
+      for (const online of hub.listOnline(ctx.workspaceId)) {
+        if (online.runnerId === vm.runner_id) {
+          runnerName = online.name;
+          break;
+        }
+      }
+    }
+    if (!runnerName) {
+      const fallback = hub.listOnline(ctx.workspaceId).find((r) => true);
+      if (fallback) runnerName = fallback.name;
+    }
+    if (!runnerName) return reply.code(409).send({ error: "no online runner to boot on" });
+    const runner = mustRunner(ctx, runnerName, reply);
+    if (!runner) return reply;
     // Any previous lifecycle (idle-stopped or archived) means /app lives in
     // the archive store — the runner restores it. Rows get pruned; archives
     // outlive them, so a stored archive also forces resume.

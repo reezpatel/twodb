@@ -9,7 +9,7 @@ Runner manager: remote command exec (one-shot + streamed), long-running jobs wit
 - **Capabilities**: exec
 - **Core deps**: core-data, core-platform
 
-_Generated: 2026-11-11T08:27:11.968Z_
+_Generated: 2026-11-11T10:18:19.211Z_
 
 ## Endpoints
 
@@ -918,7 +918,6 @@ Boots an ephemeral Firecracker microvm on a microvm-host runner. If the identifi
     }
   },
   "required": [
-    "runnerId",
     "identifier"
   ],
   "additionalProperties": false

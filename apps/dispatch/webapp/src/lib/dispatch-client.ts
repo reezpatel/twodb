@@ -156,8 +156,10 @@ export const dispatchClient = {
   },
 
   // --- microvms ------------------------------------------------------------------
+  /** Boot or resume by identifier — runnerId optional (server resolves the
+   *  VM's runner, falling back to any online runner). */
   bootMicrovm(input: {
-    runnerId: string;
+    runnerId?: string;
     identifier: string;
     memMb?: number;
     vcpu?: number;

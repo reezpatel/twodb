@@ -23,7 +23,7 @@ export function useMicrovms() {
   }, [refresh]);
 
   const boot = useCallback(
-    async (input: { runnerId: string; identifier: string; memMb?: number; vcpu?: number; idleShutdownSec?: number }) => {
+    async (input: { runnerId?: string; identifier: string; memMb?: number; vcpu?: number; idleShutdownSec?: number }) => {
       setBusy(true);
       try {
         const vm = await dispatchClient.bootMicrovm(input);

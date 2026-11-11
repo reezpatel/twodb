@@ -12,7 +12,7 @@
     "core-platform"
   ],
   "basePath": "/apps/dispatch",
-  "generatedAt": "2026-11-11T08:27:11.964Z",
+  "generatedAt": "2026-11-11T10:18:19.207Z",
   "endpoints": [
     {
       "name": "createRunner",
@@ -837,7 +837,6 @@
           }
         },
         "required": [
-          "runnerId",
           "identifier"
         ],
         "additionalProperties": false

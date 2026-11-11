@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Play } from "lucide-react";
 import { Badge, Button, Card, CardContent } from "@twodb/blocks";
 import type { Microvm } from "../../../lib/dispatch-client.js";
 
@@ -6,6 +7,7 @@ export interface MicrovmCardProps {
   vm: Microvm;
   busy: boolean;
   onOpen: () => void;
+  onBoot: () => void;
   onShutdown: (archive: boolean) => void;
 }
 
@@ -41,7 +43,14 @@ export function MicrovmCard(props: MicrovmCardProps) {
                   Stop
                 </Button>
               </>
-            ) : null}
+            ) : (
+              // Boot on the same identifier = resume: fresh VM with /app
+              // restored from its archive (idle-stopped or archived alike).
+              <Button size="sm" variant="primary" disabled={props.busy} onClick={props.onBoot}>
+                <Play className="size-3.5" />
+                {vm.status === "idle-stopped" ? "Resume" : "Boot"}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

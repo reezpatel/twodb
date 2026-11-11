@@ -36,6 +36,7 @@ export function MicrovmsView() {
             vm={vm}
             busy={microvms.busy}
             onOpen={() => navigate(`/microvms/${encodeURIComponent(vm.identifier)}`)}
+            onBoot={() => void microvms.boot({ identifier: vm.identifier })}
             onShutdown={(archive) => void microvms.shutdown(vm.identifier, archive)}
           />
         ))}

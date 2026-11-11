@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ExternalLink, RefreshCw, TerminalSquare } from "lucide-react";
+import { ExternalLink, Play, RefreshCw, TerminalSquare } from "lucide-react";
 import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger } from "@twodb/blocks";
 import { dispatchClient, type Microvm } from "../../../lib/dispatch-client.js";
 import { useVmConsole, useVmTerminal } from "../hooks/useVmDetail.js";
@@ -9,6 +9,9 @@ export interface VmDetailPanelProps {
   error: string | null;
   reload: () => Promise<void>;
   identifier: string;
+  /** Boot/resume by identifier (no runnerId — server resolves). */
+  onBoot: () => Promise<unknown>;
+  bootBusy: boolean;
 }
 
 /** Microvm detail: exec console + live terminal (vsock pty relay). */
@@ -39,6 +42,12 @@ export function VmDetailPanel(props: VmDetailPanelProps) {
           <Button size="sm" variant="ghost" onClick={() => void props.reload()}>
             <RefreshCw className="size-3.5" />
           </Button>
+          {!running ? (
+            <Button size="sm" variant="primary" disabled={props.bootBusy} onClick={() => void props.onBoot()}>
+              <Play className="size-3.5" />
+              {props.vm?.status === "idle-stopped" ? "Resume" : "Boot"}
+            </Button>
+          ) : null}
           <Button
             size="sm"
             variant={terminalOn ? "secondary" : "primary"}

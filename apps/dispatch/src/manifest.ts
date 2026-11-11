@@ -73,11 +73,17 @@ const vmExecRequest = vmRequest.extend({
   timeoutMs: z.number().int().positive().max(600_000).optional(),
 });
 
-const vmBootRequest = vmRequest.extend({
+const vmBootRequest = z.object({
+  /** Optional — the server resolves the VM's runner (resume) or falls back
+   *  to any online runner. */
+  runnerId: z.string().optional(),
+  /** Stable microvm identifier — same id resumes (restores /app). */
+  identifier: z.string(),
   memMb: z.number().int().positive().max(8192).optional(),
   vcpu: z.number().int().positive().max(8).optional(),
   idleShutdownSec: z.number().int().positive().max(86_400).optional(),
 });
+
 
 export const dispatchManifest = defineAppManifest({
   name: "Dispatch",
