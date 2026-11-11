@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -22,6 +23,13 @@ type callState struct {
 	done bool
 }
 
+// jobHandle: a running job's process + its still-open stdin (jobInput feed).
+type jobHandle struct {
+	process     *os.Process
+	stdin       io.WriteCloser
+	stdinClosed bool
+}
+
 // Set once main() wires the runner; archive flows (microvm.go) need to send
 // frames outside a handler's closure.
 var globalRunner *runner
@@ -36,7 +44,7 @@ type runner struct {
 	conn  *websocket.Conn
 	write sync.Mutex
 
-	jobs   map[string]*os.Process
+	jobs   map[string]*jobHandle
 	jobsMu sync.Mutex
 	calls  map[string]*callState
 	callsMu sync.Mutex
@@ -172,6 +180,8 @@ func (r *runner) handle(f frame) {
 		r.doJobCreate(f)
 	case "jobSignal":
 		r.doJobSignal(f)
+	case "jobInput":
+		r.doJobInput(f)
 	case "vmBoot":
 		r.doVmBoot(f)
 	case "vmExec":
@@ -273,13 +283,15 @@ func (r *runner) doJobCreate(f frame) {
 	})
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()
+	// stdin stays open so callers can feed the job later (jobInput frames).
+	stdin, _ := cmd.StdinPipe()
 
 	if err := cmd.Start(); err != nil {
 		_ = r.send(frame{"type": "jobStatus", "jobId": jobID, "status": "failed", "exitCode": -1})
 		return
 	}
 	r.jobsMu.Lock()
-	r.jobs[jobID] = cmd.Process
+	r.jobs[jobID] = &jobHandle{process: cmd.Process, stdin: stdin}
 	r.jobsMu.Unlock()
 
 	go func() {
@@ -291,10 +303,47 @@ func (r *runner) doJobCreate(f frame) {
 	go func() {
 		exit := exitCode(cmd.Wait())
 		r.jobsMu.Lock()
+		if h := r.jobs[jobID]; h != nil {
+			h.stdinClosed = true
+		}
 		delete(r.jobs, jobID)
 		r.jobsMu.Unlock()
 		_ = r.send(frame{"type": "jobStatus", "jobId": jobID, "status": statusFor(exit), "exitCode": exit})
 	}()
+}
+
+// jobInput: feed bytes to a running job's stdin (data) or close it (eof:1).
+func (r *runner) doJobInput(f frame) {
+	jobID := f.str("jobId")
+	r.jobsMu.Lock()
+	h := r.jobs[jobID]
+	r.jobsMu.Unlock()
+	if h == nil {
+		_ = r.send(frame{"type": "result", "callId": f.str("callId"), "error": "job not running"})
+		return
+	}
+	if eof, _ := f["eof"].(bool); eof {
+		if !h.stdinClosed {
+			h.stdinClosed = true
+			h.stdin.Close()
+		}
+		_ = r.send(frame{"type": "result", "callId": f.str("callId"), "ok": true})
+		return
+	}
+	data, _ := f["data"].(string)
+	if data == "" {
+		_ = r.send(frame{"type": "result", "callId": f.str("callId"), "error": "data required"})
+		return
+	}
+	if h.stdinClosed {
+		_ = r.send(frame{"type": "result", "callId": f.str("callId"), "error": "stdin closed"})
+		return
+	}
+	if _, err := h.stdin.Write([]byte(data)); err != nil {
+		_ = r.send(frame{"type": "result", "callId": f.str("callId"), "error": err.Error()})
+		return
+	}
+	_ = r.send(frame{"type": "result", "callId": f.str("callId"), "ok": true})
 }
 
 func (r *runner) pumpJob(jobID, stream string, rd interface{ Read([]byte) (int, error) }) {
@@ -346,14 +395,14 @@ func indexByte(b []byte, c byte) int {
 func (r *runner) doJobSignal(f frame) {
 	jobID := f.str("jobId")
 	r.jobsMu.Lock()
-	p := r.jobs[jobID]
+	h := r.jobs[jobID]
 	r.jobsMu.Unlock()
-	if p == nil {
+	if h == nil {
 		return
 	}
-	_ = p.Signal(os.Interrupt)
+	_ = h.process.Signal(os.Interrupt)
 	time.AfterFunc(5*time.Second, func() {
-		_ = p.Signal(os.Kill)
+		_ = h.process.Signal(os.Kill)
 	})
 }
 
@@ -395,8 +444,8 @@ func statusFor(exit int) string {
 
 func (r *runner) shutdownAll() {
 	r.jobsMu.Lock()
-	for _, p := range r.jobs {
-		_ = p.Signal(os.Kill)
+	for _, h := range r.jobs {
+		_ = h.process.Signal(os.Kill)
 	}
 	r.jobsMu.Unlock()
 	r.vmsMu.Lock()

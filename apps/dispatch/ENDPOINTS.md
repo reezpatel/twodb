@@ -9,7 +9,7 @@ Runner manager: remote command exec (one-shot + streamed), long-running jobs wit
 - **Capabilities**: exec
 - **Core deps**: core-data, core-platform
 
-_Generated: 2026-11-11T06:45:37.191Z_
+_Generated: 2026-11-11T07:17:14.815Z_
 
 ## Endpoints
 
@@ -790,6 +790,52 @@ Terminates a running job (SIGTERM then SIGKILL on the runner).
     "exitCode",
     "startedAt",
     "endedAt"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /jobs/:id/input` — jobInput
+
+Feeds stdin to a running job: {data} appends bytes; {eof:true} closes the job's stdin (EOF for the program). For interactive jobs — REPLs, confirmation prompts, anything that reads stdin mid-run.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "data": {
+      "type": "string"
+    },
+    "eof": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
   ],
   "additionalProperties": false
 }

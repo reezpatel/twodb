@@ -12,7 +12,7 @@
     "core-platform"
   ],
   "basePath": "/apps/dispatch",
-  "generatedAt": "2026-11-11T06:45:37.187Z",
+  "generatedAt": "2026-11-11T07:17:14.810Z",
   "endpoints": [
     {
       "name": "createRunner",
@@ -726,6 +726,45 @@
           "exitCode",
           "startedAt",
           "endedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jobInput",
+      "method": "POST",
+      "path": "/jobs/:id/input",
+      "auth": "session-or-apiKey",
+      "description": "Feeds stdin to a running job: {data} appends bytes; {eof:true} closes the job's stdin (EOF for the program). For interactive jobs — REPLs, confirmation prompts, anything that reads stdin mid-run.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "data": {
+            "type": "string"
+          },
+          "eof": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
         ],
         "additionalProperties": false
       }

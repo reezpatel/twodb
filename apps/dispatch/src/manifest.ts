@@ -208,6 +208,18 @@ export const dispatchManifest = defineAppManifest({
       response: jobSummary,
     }),
     defineEndpoint({
+      name: "jobInput",
+      method: "POST",
+      path: "/jobs/:id/input",
+      auth: "session-or-apiKey",
+      description:
+        "Feeds stdin to a running job: {data} appends bytes; {eof:true} closes the " +
+        "job's stdin (EOF for the program). For interactive jobs — REPLs, confirmation " +
+        "prompts, anything that reads stdin mid-run.",
+      request: z.object({ id: z.string(), data: z.string().optional(), eof: z.boolean().optional() }),
+      response: z.object({ ok: z.boolean() }),
+    }),
+    defineEndpoint({
       name: "tailJob",
       method: "GET",
       path: "/jobs/:id/tail",

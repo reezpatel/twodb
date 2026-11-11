@@ -302,6 +302,31 @@ export async function buildServer(config: DispatchConfig) {
     return updated ? { ...updated, runnerName: runner.name } : { ok: true };
   });
 
+  /** Feed stdin to a running job (interactive programs: REPLs, prompts,
+   *  long-lived watchers). data is raw text; eof=1 closes the job's stdin
+   *  so anything reading to EOF finishes. */
+  app.post("/jobs/:id/input", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const job = await repo.getJob(ctx.workspaceId, id);
+    if (!job) return reply.code(404).send({ error: "not found" });
+    if (job.status !== "running") return reply.code(409).send({ error: `job is ${job.status}` });
+    const runner = hub.listOnline(ctx.workspaceId).find((r) => r.runnerId === job.runner_id);
+    if (!runner) return reply.code(409).send({ error: "runner is offline" });
+    const body = (req.body ?? {}) as { data?: string; eof?: boolean };
+    if (!body.data && !body.eof) return reply.code(400).send({ error: "data or eof is required" });
+    const res = await hub.sendToRunner(runner, {
+      type: "jobInput",
+      callId: newId(),
+      jobId: id,
+      data: body.data,
+      eof: body.eof ?? false,
+    }, { timeoutMs: 10_000 });
+    if (!res || res.error) return reply.code(422).send({ error: (res as any)?.error ?? "input failed" });
+    return { ok: true };
+  });
+
   app.get("/jobs/:id/tail", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;

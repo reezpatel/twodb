@@ -63,7 +63,7 @@ func main() {
 		name:          *name,
 		microvm:       *vmHost,
 		stateDir:      dir,
-		jobs:          map[string]*os.Process{},
+		jobs:          map[string]*jobHandle{},
 		calls:         map[string]*callState{},
 		vms:           map[string]*microvm{},
 		resultWaiters: map[string]chan map[string]any{},
