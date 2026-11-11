@@ -23,6 +23,7 @@ export interface EndpointJson {
   coreDeps: string[];
   basePath: string;
   generatedAt: string;
+  websocketPaths?: string[];
   endpoints: Array<{
     name: string;
     method: string;
@@ -48,6 +49,7 @@ export function toEndpointJson(manifest: AppManifestSpec): EndpointJson {
     coreDeps: manifest.coreDeps,
     basePath: manifest.basePath,
     generatedAt: new Date().toISOString(),
+    websocketPaths: manifest.websocketPaths,
     endpoints: manifest.endpoints.map((e) => ({
       name: e.name,
       method: e.method,

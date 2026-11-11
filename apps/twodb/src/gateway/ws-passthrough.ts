@@ -4,6 +4,7 @@ import * as net from "node:net";
 import type { RegisteredAppRow } from "../db/sqlite.js";
 import { pickTransport, createDialer } from "@twodb/core-platform/transport";
 import { GATEWAY_HOST_ID } from "./proxy.js";
+import { isDeclaredWebsocketPath } from "./ws-paths.js";
 
 
 /**
@@ -48,9 +49,10 @@ export function registerWsPassthrough(app: FastifyInstance, getApp: (slug: strin
       return;
     }
 
-    // Only bridged for apps that actually registered WS-capable paths
-    // (dispatch for now). Keeps the passthrough deny-by-default.
-    if (slug !== "dispatch") {
+    // Deny-by-default: only bridged for paths the app declared in its manifest
+    // (`websocketPaths`). Dispatch predates that field and stays allowed.
+    const declared = isDeclaredWebsocketPath(row.manifest_json, "/" + rest.replace(/^\/+/, ""));
+    if (slug !== "dispatch" && !declared) {
       socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
       socket.destroy();
       return;

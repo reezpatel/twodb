@@ -185,7 +185,13 @@ function handleFrame(socket: WebSocket, runner: RunnerRow, raw: unknown, enrolle
           chunk: String(frame.chunk ?? ""),
         })
         .catch(() => {});
-      hub_.publish(callIdOut, { type: "output", callId: callIdOut, stream: frame.stream, chunk: frame.chunk });
+      hub_.publish(callIdOut, {
+        type: frame.done ? "done" : "output",
+        callId: callIdOut,
+        stream: frame.stream,
+        chunk: frame.chunk,
+        exitCode: frame.exitCode ?? null,
+      });
       return;
     }
     case "jobLog": {

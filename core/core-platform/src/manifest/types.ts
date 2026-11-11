@@ -39,6 +39,11 @@ export interface AppManifestSpec {
   /** Base path the Gateway mounts this app under, e.g. "/apps/twomail". */
   basePath: string;
   endpoints: EndpointSpec[];
+  /**
+   * Paths (relative to basePath, `:param` segments allowed) that accept WebSocket
+   * upgrades. The Gateway only bridges upgrades for paths declared here.
+   */
+  websocketPaths?: string[];
 }
 
 export function defineEndpoint(spec: EndpointSpec): EndpointSpec {
