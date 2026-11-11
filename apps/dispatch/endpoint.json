@@ -3,14 +3,1124 @@
   "slug": "dispatch",
   "version": "0.1.0",
   "shape": "backend",
-  "description": "Remote command runner — not yet implemented. See AGENTS.md before building it out.",
-  "capabilities": [],
+  "description": "Runner manager: remote command exec (one-shot + streamed), long-running jobs with tail/SSE follow, and ephemeral Firecracker microvms with a persistent /app that survives shutdown (zipped to S3 on shutdown, restored on resume, archived after a configurable inactivity window). Runners connect over a long-lived WebSocket and carry a friendly, workspace-unique identifier.",
+  "capabilities": [
+    "exec"
+  ],
   "coreDeps": [
     "core-data",
-    "core-platform",
-    "core-async"
+    "core-platform"
   ],
   "basePath": "/apps/dispatch",
-  "generatedAt": "2026-11-09T12:16:47.037Z",
-  "endpoints": []
+  "generatedAt": "2026-11-11T06:45:37.187Z",
+  "endpoints": [
+    {
+      "name": "createRunner",
+      "method": "POST",
+      "path": "/runners",
+      "auth": "session-or-apiKey",
+      "description": "Creates a runner entry and returns its key (twodbrun_...) exactly once — the runner presents this key on its WebSocket connect. Optionally give a friendly name; one is generated otherwise.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "host",
+              "microvm-host"
+            ]
+          },
+          "meta": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "runner": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "host",
+                  "microvm-host"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "online",
+                  "offline"
+                ]
+              },
+              "meta": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "lastSeenAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "kind",
+              "status",
+              "meta",
+              "lastSeenAt",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "runner",
+          "key"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listRunners",
+      "method": "GET",
+      "path": "/runners",
+      "auth": "session-or-apiKey",
+      "description": "All runners in the workspace with online status and host metadata.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "host",
+                "microvm-host"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "online",
+                "offline"
+              ]
+            },
+            "meta": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            },
+            "lastSeenAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "kind",
+            "status",
+            "meta",
+            "lastSeenAt",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "deleteRunner",
+      "method": "DELETE",
+      "path": "/runners/:name",
+      "auth": "session-or-apiKey",
+      "description": "Removes a runner and revokes its key (its WS is dropped if online).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "execCommand",
+      "method": "POST",
+      "path": "/exec",
+      "auth": "session-or-apiKey",
+      "description": "Runs a one-shot command on a runner and returns the collected stdout/stderr + exit code. The whole output is buffered on the runner before it answers.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "runnerId": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "env": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 600000
+          }
+        },
+        "required": [
+          "runnerId",
+          "command"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "exitCode": {
+            "type": "number"
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "exitCode",
+          "stdout",
+          "stderr",
+          "durationMs"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "callCommand",
+      "method": "POST",
+      "path": "/calls",
+      "auth": "session-or-apiKey",
+      "description": "Starts a command on a runner and returns a callId immediately; subscribe to GET /calls/:callId/stream (SSE) for live output chunks and the done frame. Chosen when output is large or long-lived; execCommand otherwise.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "runnerId": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "env": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 600000
+          }
+        },
+        "required": [
+          "runnerId",
+          "command"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "callId": {
+            "type": "string"
+          },
+          "runnerName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "callId",
+          "runnerName"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "streamCall",
+      "method": "GET",
+      "path": "/calls/:callId/stream",
+      "auth": "session-or-apiKey",
+      "description": "SSE stream of a call's output: one `data:` frame per output chunk ({stream:'stdout'|'stderr', chunk}) and a final {done, exitCode}. Replays chunks recorded before the subscribe (kept in memory) so slow joiners see the full transcript.",
+      "streaming": true,
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "callId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "callId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "string"
+      }
+    },
+    {
+      "name": "createJob",
+      "method": "POST",
+      "path": "/jobs",
+      "auth": "session-or-apiKey",
+      "description": "Starts a long-running job (detached) on a runner. Returns immediately with the job id; logs stream to GET /jobs/:id/tail.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "runnerId": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "env": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "runnerId",
+          "command"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "runnerId": {
+            "type": "string"
+          },
+          "runnerName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resourceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "command": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "terminated"
+            ]
+          },
+          "exitCode": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "endedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "runnerId",
+          "runnerName",
+          "resourceId",
+          "command",
+          "status",
+          "exitCode",
+          "startedAt",
+          "endedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listJobs",
+      "method": "GET",
+      "path": "/jobs",
+      "auth": "session-or-apiKey",
+      "description": "Jobs in the workspace, newest first; filter by runnerId/resourceId/status.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "runnerId": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "terminated"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 500
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "runnerId": {
+              "type": "string"
+            },
+            "runnerName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "resourceId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "command": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "running",
+                "completed",
+                "failed",
+                "terminated"
+              ]
+            },
+            "exitCode": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "startedAt": {
+              "type": "string"
+            },
+            "endedAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "runnerId",
+            "runnerName",
+            "resourceId",
+            "command",
+            "status",
+            "exitCode",
+            "startedAt",
+            "endedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "getJob",
+      "method": "GET",
+      "path": "/jobs/:id",
+      "auth": "session-or-apiKey",
+      "description": "Job status by id.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "runnerId": {
+            "type": "string"
+          },
+          "runnerName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resourceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "command": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "terminated"
+            ]
+          },
+          "exitCode": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "endedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "runnerId",
+          "runnerName",
+          "resourceId",
+          "command",
+          "status",
+          "exitCode",
+          "startedAt",
+          "endedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "terminateJob",
+      "method": "POST",
+      "path": "/jobs/:id/terminate",
+      "auth": "session-or-apiKey",
+      "description": "Terminates a running job (SIGTERM then SIGKILL on the runner).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "runnerId": {
+            "type": "string"
+          },
+          "runnerName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resourceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "command": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "terminated"
+            ]
+          },
+          "exitCode": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "endedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "runnerId",
+          "runnerName",
+          "resourceId",
+          "command",
+          "status",
+          "exitCode",
+          "startedAt",
+          "endedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "tailJob",
+      "method": "GET",
+      "path": "/jobs/:id/tail",
+      "auth": "session-or-apiKey",
+      "description": "Job log tail. Without follow: current buffer, up to `lines`. With follow=1: SSE that replays then keeps streaming new lines until the job ends.",
+      "streaming": true,
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
+          "follow": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "string"
+      }
+    },
+    {
+      "name": "bootMicrovm",
+      "method": "POST",
+      "path": "/microvms/boot",
+      "auth": "session-or-apiKey",
+      "description": "Boots an ephemeral Firecracker microvm on a microvm-host runner. If the identifier was never used (or is past the archive window), boots fresh; if it was idle-stopped, resumes it — /app is restored from its S3 zip first. The VM auto-shuts-down after idleShutdownSec of inactivity (zipping /app back to S3), and a command to the same identifier resumes it.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "runnerId": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "memMb": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 8192
+          },
+          "vcpu": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 8
+          },
+          "idleShutdownSec": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 86400
+          }
+        },
+        "required": [
+          "runnerId",
+          "identifier"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "runnerId": {
+            "type": "string"
+          },
+          "runnerName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "idle-stopped",
+              "archived",
+              "failed"
+            ]
+          },
+          "cid": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "bootCount": {
+            "type": "number"
+          },
+          "lastActiveAt": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "identifier",
+          "runnerId",
+          "runnerName",
+          "status",
+          "cid",
+          "bootCount",
+          "lastActiveAt",
+          "createdAt",
+          "archivedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "execInMicrovm",
+      "method": "POST",
+      "path": "/microvms/exec",
+      "auth": "session-or-apiKey",
+      "description": "Runs a command inside a microvm (booting/resuming it if needed) over vsock and returns the buffered output. Marks the VM active (resets its idle timer).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "runnerId": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 600000
+          }
+        },
+        "required": [
+          "runnerId",
+          "identifier",
+          "command"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "exitCode": {
+            "type": "number"
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "exitCode",
+          "stdout",
+          "stderr",
+          "durationMs"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listMicrovms",
+      "method": "GET",
+      "path": "/microvms",
+      "auth": "session-or-apiKey",
+      "description": "Microvms in the workspace with lifecycle status.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "identifier": {
+              "type": "string"
+            },
+            "runnerId": {
+              "type": "string"
+            },
+            "runnerName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "running",
+                "idle-stopped",
+                "archived",
+                "failed"
+              ]
+            },
+            "cid": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "bootCount": {
+              "type": "number"
+            },
+            "lastActiveAt": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "archivedAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "identifier",
+            "runnerId",
+            "runnerName",
+            "status",
+            "cid",
+            "bootCount",
+            "lastActiveAt",
+            "createdAt",
+            "archivedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "microvmStream",
+      "method": "GET",
+      "path": "/microvms/:identifier/stream",
+      "auth": "session-or-apiKey",
+      "description": "Raw WS relay to a microvm's terminal (pty bytes in both directions) or its VSCode fork (code-server): ?mode=terminal|vscode. Runners host the relay over vsock; dispatch bridges it to callers through the Gateway's WS passthrough.",
+      "streaming": true,
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "terminal",
+              "vscode"
+            ]
+          }
+        },
+        "required": [
+          "identifier",
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "string"
+      }
+    },
+    {
+      "name": "shutdownMicrovm",
+      "method": "POST",
+      "path": "/microvms/:identifier/shutdown",
+      "auth": "session-or-apiKey",
+      "description": "Shuts a microvm down gracefully: zips /app, uploads to S3 (stub), powers off. Same-identifier resume restores /app. Pass archive=1 to also sweep it for archive after inactivity.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string"
+          },
+          "archive": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "identifier"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "runnerId": {
+            "type": "string"
+          },
+          "runnerName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "idle-stopped",
+              "archived",
+              "failed"
+            ]
+          },
+          "cid": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "bootCount": {
+            "type": "number"
+          },
+          "lastActiveAt": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "identifier",
+          "runnerId",
+          "runnerName",
+          "status",
+          "cid",
+          "bootCount",
+          "lastActiveAt",
+          "createdAt",
+          "archivedAt"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
 }

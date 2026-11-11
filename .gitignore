@@ -21,3 +21,7 @@ scratch_pad/
 
 # mkcert dev certs (generate with tools/dev-certs.sh)
 .dev-certs/*.pem
+
+# Go build artifacts (dispatch's runner + guest agent ship as built binaries)
+apps/two-runner/two-runner
+apps/two-runner/two-vm-agent

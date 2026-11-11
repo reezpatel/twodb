@@ -11,6 +11,7 @@ import { setupAuth } from "../auth/index.js";
 import type { TwoDbConfig } from "../config.js";
 import { toWebRequest, sendWebResponse } from "./web-request.js";
 import { proxyToApp } from "./proxy.js";
+import { registerWsPassthrough } from "./ws-passthrough.js";
 import { federatedSearch } from "./federated-search.js";
 import { APP_CATALOG } from "../orchestrator/catalog.js";
 import {
@@ -377,6 +378,16 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
   });
 
   app.get("/healthz", async () => ({ ok: true }));
+
+  // --- WebSocket passthrough (see ws-passthrough.ts) ---------------------
+  // Attached to the raw http.Server so upgrade requests never hit the
+  // Fastify router. __resolveContext is consumed by the passthrough for
+  // caller-side upgrades (it re-resolves identity from raw headers).
+  const serverAny = app as unknown as {
+    __resolveContext: (h: Headers, a?: string | null, b?: string | null) => Promise<unknown>;
+  };
+  serverAny.__resolveContext = resolveContext as unknown as typeof serverAny.__resolveContext;
+  registerWsPassthrough(app, (slug) => registry.getApp(slug));
 
   // --- Admin webapp: serve the built SPA when its dist exists (production
   // image builds it; dev uses the Vite dev server on :6500 instead).

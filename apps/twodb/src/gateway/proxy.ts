@@ -4,7 +4,7 @@ import type { AuthContext } from "@twodb/core-platform/auth";
 import type { RegisteredAppRow } from "../db/sqlite.js";
 import { toWebRequest, sendWebResponse } from "./web-request.js";
 
-const GATEWAY_HOST_ID = process.env.TWODB_HOST_ID ?? "local";
+export const GATEWAY_HOST_ID = process.env.TWODB_HOST_ID ?? "local";
 
 /**
  * Forwards a request to a registered app and streams the response straight
@@ -35,8 +35,12 @@ export async function proxyToApp(
   if (ctx.spaceIds.length) headers.set("x-twodb-space-ids", ctx.spaceIds.join(","));
   if (ctx.apiKeyId) headers.set("x-twodb-api-key-id", ctx.apiKeyId);
 
+  // req.url carries the query string (Fastify's req.url is the full URL), so
+  // strip it from the sub-path and append the parsed search exactly once —
+  // historically this double-appended ?a=b?a=b for proxied query strings.
   const search = new URL(req.url, "http://internal").search;
-  const response = await dialer.fetch(subPath + search, {
+  const pathOnly = subPath.split("?")[0];
+  const response = await dialer.fetch(pathOnly + search, {
     method: req.method,
     headers,
     body: webReq.body as any,
