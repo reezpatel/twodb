@@ -46,6 +46,15 @@ export interface ExecResult {
   durationMs: number;
 }
 
+export interface EnrollToken {
+  id: string;
+  name: string;
+  enrollCount: number;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
 export interface Microvm {
   id: string;
   identifier: string;
@@ -180,6 +189,19 @@ export const dispatchClient = {
 
   shutdownMicrovm(identifier: string, archive: boolean): Promise<Microvm> {
     return post(`/microvms/${encodeURIComponent(identifier)}/shutdown${archive ? "?archive=1" : ""}`);
+  },
+
+  // --- enrollment tokens ---------------------------------------------------------
+  createEnrollToken(input: { name?: string; expiresInDays?: number }): Promise<{ token: EnrollToken; key: string }> {
+    return post("/enroll-tokens", input);
+  },
+
+  listEnrollTokens(): Promise<EnrollToken[]> {
+    return fetch(`${BASE}/enroll-tokens`, { credentials: "include" }).then((r) => json(r));
+  },
+
+  deleteEnrollToken(id: string): Promise<{ ok: boolean }> {
+    return fetch(`${BASE}/enroll-tokens/${id}`, { method: "DELETE", credentials: "include" }).then((r) => json(r));
   },
 
   /** Terminal/vscode relay URL — dial with a WebSocket; bytes flow raw. */

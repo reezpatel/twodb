@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { WebSocket } from "ws";
-import { newId, sha256 } from "../db/repository.js";
+import { newId, sha256, friendlyName } from "../db/repository.js";
 import type { RunnerRow } from "../db/schema.js";
 import { readLatestArchive } from "./archive-store.js";
 import type { DispatchHub } from "./hub.js";
@@ -45,39 +45,74 @@ export function registerRunnerWs(app: FastifyInstance, hubArg: DispatchHub, repo
   app.get("/runner-ws", { websocket: true }, (socket: WebSocket, req) => {
     const url = new URL(req.url, "http://internal");
     const key = url.searchParams.get("key");
+    const enroll = url.searchParams.get("enroll");
     // Frames can beat the auth lookup across the wire — queue everything
     // that arrives before the runner row resolves, then replay.
-    let ready = false;
     const early: unknown[] = [];
     const onEarly = (raw: unknown) => early.push(raw);
     socket.on("message", onEarly);
     void (async () => {
-      if (!key) return socket.close(4401, "missing runner key");
-      const runner = await repo.getRunnerByKey(key).catch(() => undefined);
-      if (!runner) return socket.close(4401, "unknown runner key");
+      let runner: RunnerRow | undefined;
+      let enrolledKey: string | null = null;
+
+      if (enroll) {
+        // Enrollment path: a shared token (not a runner key). The runner row
+        // doesn't exist yet — it's minted from the FIRST hello frame (name,
+        // kind), and helloAck returns the new per-runner key exactly once
+        // (the machine persists it and reconnects with ?key= from now on).
+        const token = await repo.getEnrollmentTokenByKey(enroll).catch(() => undefined);
+        if (!token) return socket.close(4401, "unknown or expired enrollment token");
+        const helloFrame = early.find((raw) => {
+          try {
+            const f = JSON.parse(String(raw)) as { type?: string };
+            return f.type === "hello";
+          } catch {
+            return false;
+          }
+        });
+        if (!helloFrame) return socket.close(4400, "expected hello frame");
+        const hello = JSON.parse(String(helloFrame)) as {
+          name?: string; kind?: "host" | "microvm-host"; meta?: Record<string, unknown>;
+        };
+        let name = hello.name?.trim() ?? "";
+        if (name) {
+          const taken = await repo.getRunnerByName(token.workspace_id, name);
+          if (taken) name = `${name}-${newId().slice(-4)}`; // deconflict, same vibe
+        }
+        const created = await repo.createRunner({
+          workspaceId: token.workspace_id,
+          name: name || friendlyName(),
+          kind: hello.kind === "microvm-host" ? "microvm-host" : "host",
+          meta: hello.meta,
+        });
+        await repo.enrollmentTokenUsed(token.id).catch(() => {});
+        runner = created.runner;
+        enrolledKey = created.key;
+      } else if (key) {
+        runner = await repo.getRunnerByKey(key).catch(() => undefined);
+      }
+
+      if (!runner) return socket.close(4401, "missing or unknown runner key");
+      const runner_ = runner;
 
       socket.removeListener("message", onEarly);
-      ready = true;
-      void ready;
       // register the real handler, then replay anything queued during auth
-      const onMessage = (raw: unknown) => handleFrame(socket, runner, raw);
+      const onMessage = (raw: unknown) => handleFrame(socket, runner_, raw, enrolledKey);
       socket.on("message", onMessage);
       for (const raw of early) onMessage(raw);
-
-      await onRunnerConnected(socket, runner);
 
       const pingTimer = setInterval(() => {
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify({ type: "ping" }));
       }, 10_000);
       socket.on("close", () => {
         clearInterval(pingTimer);
-        void hub.dropRunner(runner.id, socket);
-        void hub.failRunnerCalls(runner.id);
+        void hub.dropRunner(runner_.id, socket);
+        void hub.failRunnerCalls(runner_.id);
       });
       socket.on("error", () => {
         clearInterval(pingTimer);
-        void hub.dropRunner(runner.id, socket);
-        void hub.failRunnerCalls(runner.id);
+        void hub.dropRunner(runner_.id, socket);
+        void hub.failRunnerCalls(runner_.id);
       });
     })();
   });
@@ -91,7 +126,7 @@ async function onRunnerConnected(socket: WebSocket, runner: RunnerRow): Promise<
 }
 
 /** One decoded frame from a runner. */
-function handleFrame(socket: WebSocket, runner: RunnerRow, raw: unknown): void {
+function handleFrame(socket: WebSocket, runner: RunnerRow, raw: unknown, enrolledKey: string | null = null): void {
   let frame: any;
   try {
     frame = JSON.parse(String(raw));
@@ -124,7 +159,11 @@ function handleFrame(socket: WebSocket, runner: RunnerRow, raw: unknown): void {
           lastSeen: Date.now(),
         });
         void repo_.runnerSeen(runner.id, meta).catch(() => {});
-        socket.send(JSON.stringify({ type: "helloAck", name: runner.name, workspaceId: runner.workspace_id }));
+        // Enrolled machines get their per-runner key exactly once here;
+        // they persist it and reconnect with ?key= from then on.
+        const ack: Record<string, unknown> = { type: "helloAck", name: runner.name, workspaceId: runner.workspace_id };
+        if (enrolledKey) ack.runnerKey = enrolledKey;
+        socket.send(JSON.stringify(ack));
       })();
       return;
     }

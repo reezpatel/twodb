@@ -78,12 +78,28 @@ export interface MicrovmRow {
   meta_json: string;
 }
 
+/** An enrollment token: a shared bootstrap credential machines present to
+ *  join the workspace. Each enrollment mints a fresh runner row + its own
+ *  per-runner key; the token itself never runs commands. */
+export interface EnrollmentTokenRow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  token_hash: string;
+  /** Number of runners enrolled via this token (informational). */
+  enroll_count: number;
+  last_used_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
 export interface DispatchDb {
   runner: RunnerRow;
   job: JobRow;
   job_log: JobLogRow;
   exec_log: ExecLogRow;
   microvm: MicrovmRow;
+  enrollment_token: EnrollmentTokenRow;
 }
 
 export async function applySchema(db: Kysely<DispatchDb>): Promise<void> {
@@ -164,4 +180,16 @@ export async function applySchema(db: Kysely<DispatchDb>): Promise<void> {
     .addColumn("meta_json", "text", (c) => c.notNull().defaultTo("{}"))
     .execute();
 
+  await db.schema
+    .createTable("enrollment_token")
+    .ifNotExists()
+    .addColumn("id", "text", (c) => c.primaryKey())
+    .addColumn("workspace_id", "text", (c) => c.notNull())
+    .addColumn("name", "text", (c) => c.notNull())
+    .addColumn("token_hash", "text", (c) => c.notNull())
+    .addColumn("enroll_count", "integer", (c) => c.notNull().defaultTo(0))
+    .addColumn("last_used_at", "text")
+    .addColumn("expires_at", "text")
+    .addColumn("created_at", "text", (c) => c.notNull())
+    .execute();
 }

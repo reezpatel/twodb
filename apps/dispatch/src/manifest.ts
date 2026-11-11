@@ -132,6 +132,55 @@ export const dispatchManifest = defineAppManifest({
       request: z.object({ name: z.string() }),
       response: z.object({ ok: z.boolean() }),
     }),
+    // --- enrollment tokens ------------------------------------------------------
+    defineEndpoint({
+      name: "createEnrollToken",
+      method: "POST",
+      path: "/enroll-tokens",
+      auth: "session-or-apiKey",
+      description:
+        "Creates a shared enrollment token (twodbenroll_..., shown exactly once). Any " +
+        "number of machines can present it via two-runner --enroll; each gets its own " +
+        "runner identity + per-runner key. Optional expiresInDays.",
+      request: z.object({ name: z.string().min(1).max(40).optional(), expiresInDays: z.number().int().positive().max(365).optional() }),
+      response: z.object({
+        token: z.object({
+          id: z.string(),
+          name: z.string(),
+          enrollCount: z.number(),
+          lastUsedAt: z.string().nullable(),
+          expiresAt: z.string().nullable(),
+          createdAt: z.string(),
+        }),
+        key: z.string(),
+      }),
+    }),
+    defineEndpoint({
+      name: "listEnrollTokens",
+      method: "GET",
+      path: "/enroll-tokens",
+      auth: "session-or-apiKey",
+      description: "Enrollment tokens with usage counts (never the token values).",
+      response: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          enrollCount: z.number(),
+          lastUsedAt: z.string().nullable(),
+          expiresAt: z.string().nullable(),
+          createdAt: z.string(),
+        }),
+      ),
+    }),
+    defineEndpoint({
+      name: "deleteEnrollToken",
+      method: "DELETE",
+      path: "/enroll-tokens/:id",
+      auth: "session-or-apiKey",
+      description: "Revokes an enrollment token (no new machines can join with it).",
+      request: z.object({ id: z.string() }),
+      response: z.object({ ok: z.boolean() }),
+    }),
     // --- exec / call ---------------------------------------------------------
     defineEndpoint({
       name: "execCommand",

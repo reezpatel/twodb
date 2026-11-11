@@ -12,6 +12,7 @@ import { JobsView } from "./routes/jobs/JobsView.js";
 import { JobDetailView } from "./routes/jobs/JobDetailView.js";
 import { MicrovmsView } from "./routes/microvms/MicrovmsView.js";
 import { MicrovmDetailView } from "./routes/microvms/MicrovmDetailView.js";
+import { EnrollTokensView } from "./routes/enroll/EnrollTokensView.js";
 
 /**
  * Routes:
@@ -42,6 +43,7 @@ function ShellRoutes() {
   const { runners, microvms } = useSharedDispatch();
 
   const title = (() => {
+    if (activeId === "enroll") return "Enroll tokens";
     if (activeId.startsWith("jobs:")) return "Job";
     if (activeId.startsWith("microvms:")) return activeId.split(":").slice(1).join(":");
     if (activeId === "runners") return "Runners";
@@ -71,6 +73,7 @@ function ShellRoutes() {
         <Route path="/jobs/:id" element={<JobDetailView />} />
         <Route path="/microvms" element={<MicrovmsView />} />
         <Route path="/microvms/:identifier" element={<MicrovmDetailView />} />
+        <Route path="/enroll" element={<EnrollTokensView />} />
         <Route path="*" element={<Navigate to="/runners" replace />} />
       </Routes>
     </ShellChrome>

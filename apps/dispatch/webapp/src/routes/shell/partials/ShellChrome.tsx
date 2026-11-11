@@ -1,4 +1,4 @@
-import { ListTree, Cpu, ScrollText, Boxes, Gauge } from "lucide-react";
+import { ListTree, Cpu, ScrollText, Boxes, Gauge, KeyRound } from "lucide-react";
 import {
   AppShell,
   AppShellBody,
@@ -31,6 +31,7 @@ export function ShellChrome(props: ShellChromeProps) {
       items: [
         { id: "runners", title: "Runners", icon: Cpu },
         { id: "jobs", title: "Jobs", icon: ScrollText },
+        { id: "enroll", title: "Enroll tokens", icon: KeyRound },
       ],
     },
     {

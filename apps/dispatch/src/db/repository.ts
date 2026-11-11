@@ -1,7 +1,8 @@
 import type { Kysely } from "kysely";
+import { sql } from "kysely";
 import { createHash, randomBytes } from "node:crypto";
 import { ulid } from "ulid";
-import type { DispatchDb, JobRow, MicrovmRow, RunnerRow } from "./schema.js";
+import type { DispatchDb, EnrollmentTokenRow, JobRow, MicrovmRow, RunnerRow } from "./schema.js";
 
 export function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
@@ -11,6 +12,12 @@ export function sha256(s: string): string {
  *  app registration tokens (`twodbreg_`). Only the hash is stored. */
 export function generateRunnerKey(): string {
   return `twodbrun_${randomBytes(24).toString("hex")}`;
+}
+
+/** `twodbenroll_<hex>` — shared enrollment credentials; machines present
+ *  these to mint their own per-runner key (never used to run commands). */
+export function generateEnrollmentKey(): string {
+  return `twodbenroll_${randomBytes(24).toString("hex")}`;
 }
 
 export function newId(): string {
@@ -131,6 +138,66 @@ export function createDispatchRepo(db: Kysely<DispatchDb>) {
 
     async touchRunnerKind(id: string, kind: "host" | "microvm-host"): Promise<void> {
       await db.updateTable("runner").set({ kind }).where("id", "=", id).execute();
+    },
+
+    // ---- enrollment tokens -----------------------------------------------------
+    // A shared bootstrap credential: any machine presenting it gets a fresh
+    // runner row + its own per-runner key (see ws/runner-ws.ts). Only the
+    // hash is stored; the plaintext shows once at creation.
+
+    async createEnrollmentToken(input: {
+      workspaceId: string;
+      name: string;
+      key: string;
+      expiresInDays?: number;
+    }): Promise<EnrollmentTokenRow> {
+      const row: EnrollmentTokenRow = {
+        id: newId(),
+        workspace_id: input.workspaceId,
+        name: input.name,
+        token_hash: sha256(input.key),
+        enroll_count: 0,
+        last_used_at: null,
+        expires_at: input.expiresInDays
+          ? new Date(Date.now() + input.expiresInDays * 86_400_000).toISOString()
+          : null,
+        created_at: new Date().toISOString(),
+      };
+      await db.insertInto("enrollment_token").values(row).execute();
+      return row;
+    },
+
+    async listEnrollmentTokens(workspaceId: string): Promise<EnrollmentTokenRow[]> {
+      return db
+        .selectFrom("enrollment_token")
+        .where("workspace_id", "=", workspaceId)
+        .orderBy("created_at")
+        .selectAll()
+        .execute();
+    },
+
+    async getEnrollmentTokenByKey(key: string): Promise<EnrollmentTokenRow | undefined> {
+      const row = await db
+        .selectFrom("enrollment_token")
+        .where("token_hash", "=", sha256(key))
+        .selectAll()
+        .executeTakeFirst();
+      if (!row) return undefined;
+      if (row.expires_at && Date.parse(row.expires_at) < Date.now()) return undefined;
+      return row;
+    },
+
+    async enrollmentTokenUsed(id: string): Promise<void> {
+      await sql`update enrollment_token set enroll_count = enroll_count + 1, last_used_at = ${new Date().toISOString()} where id = ${id}`.execute(db);
+    },
+
+    async deleteEnrollmentToken(workspaceId: string, id: string): Promise<boolean> {
+      const res = await db
+        .deleteFrom("enrollment_token")
+        .where("workspace_id", "=", workspaceId)
+        .where("id", "=", id)
+        .execute();
+      return Number(res[0]?.numDeletedRows ?? 0) > 0;
     },
 
     // ---- jobs ---------------------------------------------------------------

@@ -12,7 +12,7 @@
     "core-platform"
   ],
   "basePath": "/apps/dispatch",
-  "generatedAt": "2026-11-11T10:18:19.207Z",
+  "generatedAt": "2026-11-11T10:31:01.495Z",
   "endpoints": [
     {
       "name": "createRunner",
@@ -190,6 +190,164 @@
         },
         "required": [
           "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createEnrollToken",
+      "method": "POST",
+      "path": "/enroll-tokens",
+      "auth": "session-or-apiKey",
+      "description": "Creates a shared enrollment token (twodbenroll_..., shown exactly once). Any number of machines can present it via two-runner --enroll; each gets its own runner identity + per-runner key. Optional expiresInDays.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "expiresInDays": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 365
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "enrollCount": {
+                "type": "number"
+              },
+              "lastUsedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expiresAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "enrollCount",
+              "lastUsedAt",
+              "expiresAt",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "key"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listEnrollTokens",
+      "method": "GET",
+      "path": "/enroll-tokens",
+      "auth": "session-or-apiKey",
+      "description": "Enrollment tokens with usage counts (never the token values).",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "enrollCount": {
+              "type": "number"
+            },
+            "lastUsedAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "expiresAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "enrollCount",
+            "lastUsedAt",
+            "expiresAt",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "deleteEnrollToken",
+      "method": "DELETE",
+      "path": "/enroll-tokens/:id",
+      "auth": "session-or-apiKey",
+      "description": "Revokes an enrollment token (no new machines can join with it).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
         ],
         "additionalProperties": false
       },

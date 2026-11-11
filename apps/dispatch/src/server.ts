@@ -9,7 +9,7 @@ import {
 import { dispatchManifest } from "./manifest.js";
 import type { DispatchConfig } from "./config.js";
 import { applySchema, type DispatchDb, type JobRow, type MicrovmRow } from "./db/schema.js";
-import { createDispatchRepo, newId } from "./db/repository.js";
+import { createDispatchRepo, generateEnrollmentKey, newId } from "./db/repository.js";
 import type { DispatchRepo } from "./db/repository.js";
 import { readForwardedContext } from "./gateway-context.js";
 import { DispatchHub } from "./ws/hub.js";
@@ -146,6 +146,56 @@ export async function buildServer(config: DispatchConfig) {
     }
     return online;
   }
+
+  // --- enrollment tokens -------------------------------------------------------
+  // Shared bootstrap credentials: mint a token once, any number of machines
+  // can enroll with it (each gets its own runner row + key). The token
+  // itself never executes anything.
+  app.post("/enroll-tokens", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const body = (req.body ?? {}) as { name?: string; expiresInDays?: number };
+    const key = generateEnrollmentKey();
+    const row = await repo.createEnrollmentToken({
+      workspaceId: ctx.workspaceId,
+      name: body.name?.trim() || `enroll-${newId().slice(-4)}`,
+      key,
+      expiresInDays: body.expiresInDays,
+    });
+    return {
+      token: {
+        id: row.id,
+        name: row.name,
+        enrollCount: row.enroll_count,
+        lastUsedAt: row.last_used_at,
+        expiresAt: row.expires_at,
+        createdAt: row.created_at,
+      },
+      key,
+    };
+  });
+
+  app.get("/enroll-tokens", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const rows = await repo.listEnrollmentTokens(ctx.workspaceId);
+    return rows.map((t) => ({
+      id: t.id,
+      name: t.name,
+      enrollCount: t.enroll_count,
+      lastUsedAt: t.last_used_at,
+      expiresAt: t.expires_at,
+      createdAt: t.created_at,
+    }));
+  });
+
+  app.delete("/enroll-tokens/:id", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const ok = await repo.deleteEnrollmentToken(ctx.workspaceId, id);
+    return { ok };
+  });
 
   // --- exec (one-shot) -------------------------------------------------------
   app.post("/exec", async (req, reply) => {

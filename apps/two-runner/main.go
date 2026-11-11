@@ -18,6 +18,7 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 	"flag"
 	"fmt"
 	"log"
@@ -32,16 +33,13 @@ type frame map[string]any
 func main() {
 	gateway := flag.String("gateway", "http://localhost:6400", "TwoDB gateway URL")
 	key := flag.String("key", "", "runner key (twodbrun_...)")
+	enroll := flag.String("enroll", "", "enrollment token (twodbenroll_...) — first connect mints a runner key, persisted and reused")
 	name := flag.String("name", "", "friendly runner name (defaults to hostname)")
 	vmHost := flag.Bool("microvm", false, "also host Firecracker microvms (needs /dev/kvm)")
 	stateDir := flag.String("state", "", "state dir for microvms (default ~/.two-runner)")
 	flag.Parse()
 
-	if *key == "" {
-		fmt.Fprintln(os.Stderr, "two-runner: --key is required")
-		flag.Usage()
-		os.Exit(2)
-	}
+	keyVal := *key
 
 	if *name == "" {
 		h, _ := os.Hostname()
@@ -57,9 +55,26 @@ func main() {
 		dir = home + "/.two-runner"
 	}
 
+	// Runner key resolution: explicit --key > persisted key from a previous
+	// --enroll > nothing (then --enroll must be given).
+	persisted := dir + "/runner.key"
+	if keyVal == "" {
+		if b, err := os.ReadFile(persisted); err == nil {
+			keyVal = strings.TrimSpace(string(b))
+			log.Printf("using persisted runner key from %s", persisted)
+		}
+	}
+	if keyVal == "" && *enroll == "" {
+		fmt.Fprintln(os.Stderr, "two-runner: --key or --enroll is required")
+		flag.Usage()
+		os.Exit(2)
+	}
+
 	r := &runner{
 		gateway:       *gateway,
-		key:           *key,
+		key:           keyVal,
+		enrollToken:   *enroll,
+		keyPath:       persisted,
 		name:          *name,
 		microvm:       *vmHost,
 		stateDir:      dir,

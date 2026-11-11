@@ -9,7 +9,7 @@ Runner manager: remote command exec (one-shot + streamed), long-running jobs wit
 - **Capabilities**: exec
 - **Core deps**: core-data, core-platform
 
-_Generated: 2026-11-11T10:18:19.211Z_
+_Generated: 2026-11-11T10:31:01.499Z_
 
 ## Endpoints
 
@@ -201,6 +201,181 @@ Removes a runner and revokes its key (its WS is dropped if online).
   },
   "required": [
     "name"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /enroll-tokens` — createEnrollToken
+
+Creates a shared enrollment token (twodbenroll_..., shown exactly once). Any number of machines can present it via two-runner --enroll; each gets its own runner identity + per-runner key. Optional expiresInDays.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "expiresInDays": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 365
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "token": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "enrollCount": {
+          "type": "number"
+        },
+        "lastUsedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expiresAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "enrollCount",
+        "lastUsedAt",
+        "expiresAt",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    },
+    "key": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "token",
+    "key"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /enroll-tokens` — listEnrollTokens
+
+Enrollment tokens with usage counts (never the token values).
+
+- **Auth**: `session-or-apiKey`
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "enrollCount": {
+        "type": "number"
+      },
+      "lastUsedAt": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "expiresAt": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "enrollCount",
+      "lastUsedAt",
+      "expiresAt",
+      "createdAt"
+    ],
+    "additionalProperties": false
+  }
+}
+```
+
+### `DELETE /enroll-tokens/:id` — deleteEnrollToken
+
+Revokes an enrollment token (no new machines can join with it).
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
   ],
   "additionalProperties": false
 }

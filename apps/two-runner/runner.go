@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"os/exec"
 	"strings"
 	"sync"
@@ -40,6 +41,10 @@ type runner struct {
 	name     string
 	microvm  bool
 	stateDir string
+	// Enrollment (first boot with --enroll): set until helloAck returns the
+	// minted runner key, which is persisted to keyPath and used from then on.
+	enrollToken string
+	keyPath     string
 
 	conn  *websocket.Conn
 	write sync.Mutex
@@ -79,7 +84,13 @@ func (r *runner) connect() error {
 	if u.Scheme == "https" {
 		scheme = "wss"
 	}
-	wsURL := fmt.Sprintf("%s://%s/apps/dispatch/runner-ws?key=%s", scheme, u.Host, url.QueryEscape(r.key))
+	// Enrollment (first ever connect): present the shared token; dispatch
+	// mints a per-runner key and returns it in helloAck — persisted below.
+	query := "key=" + url.QueryEscape(r.key)
+	if r.enrollToken != "" {
+		query = "enroll=" + url.QueryEscape(r.enrollToken)
+	}
+	wsURL := fmt.Sprintf("%s://%s/apps/dispatch/runner-ws?%s", scheme, u.Host, query)
 
 	dialer := &websocket.Dialer{
 		HandshakeTimeout: 15 * time.Second,
@@ -122,6 +133,19 @@ func (r *runner) connect() error {
 		}
 		if f.str("type") == "helloAck" {
 			r.workspaceID = f.str("workspaceId")
+			if minted := f.str("runnerKey"); minted != "" {
+				r.key = minted
+				r.enrollToken = ""
+				if r.keyPath != "" {
+					if err := os.MkdirAll(filepath.Dir(r.keyPath), 0o755); err == nil {
+					}
+					if err := os.WriteFile(r.keyPath, []byte(minted+"\n"), 0o600); err != nil {
+						log.Printf("persisting runner key to %s: %v (re-enroll will mint another)", r.keyPath, err)
+					} else {
+						log.Printf("runner key persisted to %s — future connects use it directly", r.keyPath)
+					}
+				}
+			}
 			log.Printf("registered as %q (workspace %s)", f.str("name"), r.workspaceID)
 			continue
 		}

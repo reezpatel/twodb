@@ -2,7 +2,7 @@
 
 > **Generated file — do not hand-edit.** Source of truth is `src/messages.ts` (Zod schemas via `@twodb/core-async/registry`). Regenerate with `pnpm gen:docs`.
 
-_Generated: 2026-11-11T10:18:19.213Z_
+_Generated: 2026-11-11T10:31:01.502Z_
 
 ## Queue jobs
 
