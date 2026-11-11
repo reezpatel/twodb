@@ -2,7 +2,7 @@
   "name": "Dispatch",
   "slug": "dispatch",
   "version": "0.1.0",
-  "shape": "backend",
+  "shape": "backend+webapp",
   "description": "Runner manager: remote command exec (one-shot + streamed), long-running jobs with tail/SSE follow, and ephemeral Firecracker microvms with a persistent /app that survives shutdown (zipped to S3 on shutdown, restored on resume, archived after a configurable inactivity window). Runners connect over a long-lived WebSocket and carry a friendly, workspace-unique identifier.",
   "capabilities": [
     "exec"
@@ -12,7 +12,7 @@
     "core-platform"
   ],
   "basePath": "/apps/dispatch",
-  "generatedAt": "2026-11-11T07:17:14.810Z",
+  "generatedAt": "2026-11-11T08:27:11.964Z",
   "endpoints": [
     {
       "name": "createRunner",

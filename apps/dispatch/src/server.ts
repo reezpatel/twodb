@@ -8,7 +8,7 @@ import {
 } from "@twodb/core-platform/manifest";
 import { dispatchManifest } from "./manifest.js";
 import type { DispatchConfig } from "./config.js";
-import { applySchema, type DispatchDb } from "./db/schema.js";
+import { applySchema, type DispatchDb, type JobRow, type MicrovmRow } from "./db/schema.js";
 import { createDispatchRepo, newId } from "./db/repository.js";
 import type { DispatchRepo } from "./db/repository.js";
 import { readForwardedContext } from "./gateway-context.js";
@@ -16,6 +16,8 @@ import { DispatchHub } from "./ws/hub.js";
 import { registerRunnerWs } from "./ws/runner-ws.js";
 import { registerArchiveStore, readLatestArchive, archiveExists } from "./ws/archive-store.js";
 import * as fs from "node:fs/promises";
+import { existsSync } from "node:fs";
+import fastifyStatic from "@fastify/static";
 import * as path from "node:path";
 
 /** In-memory replay buffers per callId — bounded; enough for slow SSE joiners
@@ -257,11 +259,22 @@ export async function buildServer(config: DispatchConfig) {
       cwd: body.cwd,
       env: body.env,
     }, { reply: false });
-    return { ...job, runnerName: runner.name };
+    return jobOut(job, new Map([[runner.runnerId, runner.name]]));
   });
 
-  async function jobOut(ctx: { workspaceId: string }, job: any, hubNames: Map<string, string>) {
-    return { ...job, runnerName: hubNames.get(job.runner_id) ?? null };
+  /** Raw job row -> the API shape (camelCase, runner resolved by name). */
+  function jobOut(job: JobRow, hubNames: Map<string, string>) {
+    return {
+      id: job.id,
+      runnerId: job.runner_id,
+      runnerName: hubNames.get(job.runner_id) ?? null,
+      resourceId: job.resource_id,
+      command: job.command,
+      status: job.status,
+      exitCode: job.exit_code,
+      startedAt: job.started_at,
+      endedAt: job.ended_at,
+    };
   }
 
   app.get("/jobs", async (req, reply) => {
@@ -275,7 +288,7 @@ export async function buildServer(config: DispatchConfig) {
       limit: q.limit ? Number(q.limit) : undefined,
     });
     const hubNames = new Map(hub.listOnline(ctx.workspaceId).map((r) => [r.runnerId, r.name]));
-    return Promise.all(jobs.map((j) => jobOut(ctx, j, hubNames)));
+    return jobs.map((j) => jobOut(j, hubNames));
   });
 
   app.get("/jobs/:id", async (req, reply) => {
@@ -285,7 +298,7 @@ export async function buildServer(config: DispatchConfig) {
     const job = await repo.getJob(ctx.workspaceId, id);
     if (!job) return reply.code(404).send({ error: "not found" });
     const hubNames = new Map(hub.listOnline(ctx.workspaceId).map((r) => [r.runnerId, r.name]));
-    return jobOut(ctx, job, hubNames);
+    return jobOut(job, hubNames);
   });
 
   app.post("/jobs/:id/terminate", async (req, reply) => {
@@ -299,7 +312,7 @@ export async function buildServer(config: DispatchConfig) {
     if (!runner) return reply.code(409).send({ error: "runner is offline" });
     await hub.sendToRunner(runner, { type: "jobSignal", jobId: id, signal: "terminate" }, { reply: false });
     const updated = await repo.getJob(ctx.workspaceId, id);
-    return updated ? { ...updated, runnerName: runner.name } : { ok: true };
+    return updated ? jobOut(updated, new Map([[runner.runnerId, runner.name]])) : { ok: true };
   });
 
   /** Feed stdin to a running job (interactive programs: REPLs, prompts,
@@ -393,6 +406,22 @@ export async function buildServer(config: DispatchConfig) {
   const DEFAULT_IDLE_SEC = Number(process.env.DISPATCH_VM_IDLE_SEC ?? 900);
   const DEFAULT_ARCHIVE_DAYS = Number(process.env.DISPATCH_VM_ARCHIVE_DAYS ?? 7);
 
+  /** Raw microvm row -> the API shape (camelCase). */
+  function vmOut(vm: MicrovmRow, hubNames: Map<string, string>) {
+    return {
+      id: vm.id,
+      identifier: vm.identifier,
+      runnerId: vm.runner_id,
+      runnerName: hubNames.get(vm.runner_id) ?? null,
+      status: vm.status,
+      cid: vm.cid,
+      bootCount: vm.boot_count,
+      lastActiveAt: vm.last_active_at,
+      createdAt: vm.created_at,
+      archivedAt: vm.archived_at,
+    };
+  }
+
   app.post("/microvms/boot", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
@@ -442,7 +471,7 @@ export async function buildServer(config: DispatchConfig) {
       });
       vm = await repo.getMicrovm(ctx.workspaceId, body.identifier);
     }
-    return { ...vm, runnerName: runner.name };
+    return vmOut(vm!, new Map([[runner.runnerId, runner.name]]));
   });
 
   app.post("/microvms/exec", async (req, reply) => {
@@ -478,12 +507,7 @@ export async function buildServer(config: DispatchConfig) {
     if (!ctx) return reply;
     const vms = await repo.listMicrovms(ctx.workspaceId);
     const hubNames = new Map(hub.listOnline(ctx.workspaceId).map((r) => [r.runnerId, r.name]));
-    return vms.map((vm) => ({
-      id: vm.id, identifier: vm.identifier, runnerId: vm.runner_id,
-      runnerName: hubNames.get(vm.runner_id) ?? null, status: vm.status, cid: vm.cid,
-      bootCount: vm.boot_count, lastActiveAt: vm.last_active_at, createdAt: vm.created_at,
-      archivedAt: vm.archived_at,
-    }));
+    return vms.map((vm) => vmOut(vm, hubNames));
   });
 
   app.post("/microvms/:identifier/shutdown", async (req, reply) => {
@@ -505,7 +529,8 @@ export async function buildServer(config: DispatchConfig) {
       status: q.archive === "1" ? "archived" : "idle-stopped",
       archived_at: q.archive === "1" ? new Date().toISOString() : null,
     });
-    return { ...vm, status: q.archive === "1" ? "archived" : "idle-stopped" };
+    const patched = await repo.getMicrovm(ctx.workspaceId, identifier);
+    return vmOut(patched ?? vm, new Map([[runner.runnerId, runner.name]]));
   });
 
   // --- terminal / vscode relay (WS bridging caller <-> runner <-> vsock) ----
@@ -575,6 +600,19 @@ export async function buildServer(config: DispatchConfig) {
   });
 
   app.get("/healthz", async () => ({ ok: true }));
+
+  // --- Admin webapp: serve the built SPA when its dist exists (the release
+  // image builds it; dev uses the Vite dev server on :6514 instead).
+  const webappDist = path.join(import.meta.dirname, "../webapp/dist");
+  if (existsSync(path.join(webappDist, "index.html"))) {
+    await app.register(fastifyStatic, { root: webappDist, wildcard: false, index: false });
+    app.setNotFoundHandler((req, reply) => {
+      const pathname = new URL(req.url, "http://internal").pathname;
+      const isApi = /^\/(runners|jobs|calls|exec|microvms|vm-archive|runner-ws|internal|healthz)(\/|$)/.test(pathname);
+      if (req.method === "GET" && !isApi) return reply.sendFile("index.html");
+      return reply.code(404).send({ error: "not found" });
+    });
+  }
 
   return app;
 }

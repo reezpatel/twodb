@@ -83,7 +83,7 @@ export const dispatchManifest = defineAppManifest({
   name: "Dispatch",
   slug: "dispatch",
   version: "0.1.0",
-  shape: "backend",
+  shape: "backend+webapp",
   description:
     "Runner manager: remote command exec (one-shot + streamed), long-running jobs with tail/SSE follow, " +
     "and ephemeral Firecracker microvms with a persistent /app that survives shutdown (zipped to S3 on " +
