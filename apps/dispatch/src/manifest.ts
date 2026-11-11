@@ -70,6 +70,7 @@ const vmRequest = z.object({
 
 const vmExecRequest = vmRequest.extend({
   command: z.string(),
+  cwd: z.string().optional(),
   timeoutMs: z.number().int().positive().max(600_000).optional(),
 });
 

@@ -12,7 +12,7 @@
     "core-platform"
   ],
   "basePath": "/apps/dispatch",
-  "generatedAt": "2026-11-11T10:31:01.495Z",
+  "generatedAt": "2026-11-11T11:06:26.789Z",
   "endpoints": [
     {
       "name": "createRunner",
@@ -1081,6 +1081,9 @@
             "type": "string"
           },
           "command": {
+            "type": "string"
+          },
+          "cwd": {
             "type": "string"
           },
           "timeoutMs": {

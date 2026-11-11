@@ -131,8 +131,15 @@ function Console(props: ReturnType<typeof useVmConsole>) {
     <div className="space-y-2">
       <div className="flex gap-2">
         <Input
+          value={props.cwd}
+          placeholder="/app"
+          aria-label="Working directory"
+          className="w-40 shrink-0 font-mono text-[12px]"
+          onChange={(e) => props.setCwd(e.target.value)}
+        />
+        <Input
           value={command}
-          placeholder="exec inside the microvm (e.g. ls /app)"
+          placeholder="exec inside the microvm (e.g. ls)"
           className="font-mono text-[12px]"
           onChange={(e) => setCommand(e.target.value)}
           onKeyDown={(e) => {

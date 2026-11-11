@@ -26,7 +26,7 @@ export function useJobs(filter: { runnerId?: string; resourceId?: string; status
   }, [refresh]);
 
   const create = useCallback(
-    async (input: { runnerId: string; resourceId?: string; command: string }) => {
+    async (input: { runnerId: string; resourceId?: string; cwd?: string; command: string }) => {
       setBusy(true);
       try {
         return await dispatchClient.createJob(input);

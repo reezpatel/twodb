@@ -544,7 +544,7 @@ export async function buildServer(config: DispatchConfig) {
   app.post("/microvms/exec", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
-    const body = (req.body ?? {}) as { runnerId: string; identifier: string; command: string; timeoutMs?: number };
+    const body = (req.body ?? {}) as { runnerId: string; identifier: string; command: string; cwd?: string; timeoutMs?: number };
     if (!body?.runnerId || !body?.identifier || !body?.command) {
       return reply.code(400).send({ error: "runnerId, identifier and command are required" });
     }
@@ -556,6 +556,7 @@ export async function buildServer(config: DispatchConfig) {
       callId: newId(),
       identifier: body.identifier,
       command: body.command,
+      cwd: body.cwd,
       timeoutMs: body.timeoutMs,
     }, { timeoutMs: (body.timeoutMs ?? 30_000) + 30_000 });
     if (!res || res.error) return reply.code(422).send({ error: (res as any)?.error ?? "vm exec failed" });

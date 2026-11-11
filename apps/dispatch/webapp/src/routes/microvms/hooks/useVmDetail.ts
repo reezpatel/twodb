@@ -31,6 +31,7 @@ export function useVmDetail(identifier: string) {
 export function useVmConsole(runnerName: string | null, identifier: string) {
   const [entries, setEntries] = useState<{ command: string; result: ExecResult | null; error: string | null }[]>([]);
   const [busy, setBusy] = useState(false);
+  const [cwd, setCwd] = useState("/app");
 
   const run = useCallback(
     async (command: string) => {
@@ -38,7 +39,7 @@ export function useVmConsole(runnerName: string | null, identifier: string) {
       setEntries((prev) => [...prev, { command, result: null, error: null }]);
       setBusy(true);
       try {
-        const result = await dispatchClient.vmExec({ runnerId: runnerName, identifier, command });
+        const result = await dispatchClient.vmExec({ runnerId: runnerName, identifier, command, cwd: cwd.trim() || undefined });
         setEntries((prev) => prev.map((e, i) => (i === prev.length - 1 ? { ...e, result } : e)));
       } catch (e) {
         setEntries((prev) => prev.map((en, i) => (i === prev.length - 1 ? { ...en, error: (e as Error).message } : en)));
@@ -49,7 +50,7 @@ export function useVmConsole(runnerName: string | null, identifier: string) {
     [runnerName, identifier],
   );
 
-  return { entries, busy, run };
+  return { entries, busy, run, cwd, setCwd };
 }
 
 /** Terminal relay: a WebSocket streaming base64 frames both ways. Returns

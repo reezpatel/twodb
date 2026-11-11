@@ -178,6 +178,17 @@ func doExec(conn net.Conn, req map[string]any) {
 		return
 	}
 	timeoutMs, _ := req["timeoutMs"].(float64)
+	// /app is the VM's persistent workspace — commands default to it.
+	if err := os.Chdir("/app"); err != nil {
+		_ = os.MkdirAll("/app", 0o755)
+		_ = os.Chdir("/app")
+	}
+	if cwd, _ := req["cwd"].(string); cwd != "" {
+		if err := os.Chdir(cwd); err != nil {
+			_ = writeFrame(conn, map[string]any{"error": err.Error()})
+			return
+		}
+	}
 	cmd := exec.Command("sh", "-c", cmdline)
 	var out, errBuf bytes.Buffer
 	cmd.Stdout = &out

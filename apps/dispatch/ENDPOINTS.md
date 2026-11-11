@@ -9,7 +9,7 @@ Runner manager: remote command exec (one-shot + streamed), long-running jobs wit
 - **Capabilities**: exec
 - **Core deps**: core-data, core-platform
 
-_Generated: 2026-11-11T10:31:01.499Z_
+_Generated: 2026-11-11T11:06:26.793Z_
 
 ## Endpoints
 
@@ -1186,6 +1186,9 @@ Runs a command inside a microvm (booting/resuming it if needed) over vsock and r
       "type": "string"
     },
     "command": {
+      "type": "string"
+    },
+    "cwd": {
       "type": "string"
     },
     "timeoutMs": {

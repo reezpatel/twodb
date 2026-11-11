@@ -502,6 +502,7 @@ func (r *runner) doVmExec(f frame) {
 	rep, err := vm.agentCall(map[string]any{
 		"op":         "exec",
 		"command":    f.str("command"),
+		"cwd":        f.str("cwd"),
 		"timeoutMs": timeoutMs,
 	}, time.Duration(timeoutMs)*time.Millisecond+10*time.Second)
 	if err != nil {

@@ -6,7 +6,7 @@ export interface NewJobDialogProps {
   runners: Runner[];
   busy: boolean;
   onClose: () => void;
-  onCreate: (input: { runnerId: string; resourceId?: string; command: string }) => Promise<void>;
+  onCreate: (input: { runnerId: string; resourceId?: string; cwd?: string; command: string }) => Promise<void>;
 }
 
 /** Job launcher: pick an online runner, command, optional resourceId. */
@@ -14,13 +14,14 @@ export function NewJobDialog(props: NewJobDialogProps) {
   const online = props.runners.filter((r) => r.status === "online");
   const [runnerId, setRunnerId] = useState(online[0]?.name ?? "");
   const [resourceId, setResourceId] = useState("");
+  const [cwd, setCwd] = useState("");
   const [command, setCommand] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
     if (!runnerId || !command.trim()) return;
     try {
-      await props.onCreate({ runnerId, resourceId: resourceId.trim() || undefined, command });
+      await props.onCreate({ runnerId, resourceId: resourceId.trim() || undefined, cwd: cwd.trim() || undefined, command });
     } catch (e) {
       setError((e as Error).message);
     }
@@ -49,6 +50,10 @@ export function NewJobDialog(props: NewJobDialogProps) {
           <div className="space-y-1.5">
             <Label htmlFor="job-resource">Resource ID (optional)</Label>
             <Input id="job-resource" value={resourceId} placeholder="batch-7" onChange={(e) => setResourceId(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="job-cwd">Working directory (optional)</Label>
+            <Input id="job-cwd" value={cwd} placeholder="/srv/app" className="font-mono text-[12px]" onChange={(e) => setCwd(e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="job-cmd">Command</Label>

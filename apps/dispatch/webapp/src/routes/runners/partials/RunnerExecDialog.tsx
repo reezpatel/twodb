@@ -10,6 +10,7 @@ export interface RunnerExecDialogProps {
 /** One-shot exec on a runner: type a command, get buffered output back. */
 export function RunnerExecDialog(props: RunnerExecDialogProps) {
   const [command, setCommand] = useState("");
+  const [cwd, setCwd] = useState("");
   const [result, setResult] = useState<ExecResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -19,7 +20,7 @@ export function RunnerExecDialog(props: RunnerExecDialogProps) {
     setError(null);
     setResult(null);
     try {
-      setResult(await dispatchClient.exec({ runnerId: props.runner.name, command }));
+      setResult(await dispatchClient.exec({ runnerId: props.runner.name, command, cwd: cwd.trim() || undefined }));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -34,6 +35,10 @@ export function RunnerExecDialog(props: RunnerExecDialogProps) {
           <DialogTitle>Exec on {props.runner.name}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="exec-cwd">Working directory (optional)</Label>
+            <Input id="exec-cwd" value={cwd} placeholder="/home/user/project" className="font-mono text-[12px]" onChange={(e) => setCwd(e.target.value)} />
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="exec-cmd">Command</Label>
             <div className="flex gap-2">

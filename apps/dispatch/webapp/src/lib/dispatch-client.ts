@@ -183,7 +183,7 @@ export const dispatchClient = {
     return fetch(`${BASE}/microvms`, { credentials: "include" }).then((r) => json(r));
   },
 
-  vmExec(input: { runnerId: string; identifier: string; command: string; timeoutMs?: number }): Promise<ExecResult> {
+  vmExec(input: { runnerId: string; identifier: string; command: string; cwd?: string; timeoutMs?: number }): Promise<ExecResult> {
     return post("/microvms/exec", input);
   },
 
