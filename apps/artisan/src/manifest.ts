@@ -23,6 +23,7 @@ export const artisanManifest = defineAppManifest({
   shape: "backend+webapp",
   description: "Coding agent harness — sessions on runner directories, threads, subagents, skills.",
   capabilities: ["ws"],
+  websocketPaths: ["/ws"],
   coreDeps: ["core-data", "core-platform", "core-async"],
   basePath: "/apps/artisan",
   endpoints: [

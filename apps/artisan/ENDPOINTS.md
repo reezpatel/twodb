@@ -9,7 +9,7 @@ Coding agent harness — sessions on runner directories, threads, subagents, ski
 - **Capabilities**: ws
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-11T19:21:02.633Z_
+_Generated: 2026-11-12T03:54:51.315Z_
 
 ## Endpoints
 

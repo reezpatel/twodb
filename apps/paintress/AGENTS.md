@@ -1,7 +1,17 @@
 # AGENTS.md — Paintress
 
-Canvas/board. **This app is scaffolded, not implemented.** Read `README.md`
-first.
+Miro-like boards (diagram canvas + markdown/mermaid docs) edited by a human
+and LLM agents at once. **Implemented in Phase 1** — read `README.md` first.
+
+## Invariants (don't break these)
+- **Every item write goes through `store.applyBatch()`** — it is what makes
+  undo (stored inverse ops), the event log and live WebSocket fan-out work.
+  Never `update items` from a route.
+- `src/shared/` is imported by the webapp: keep it free of node/DB imports.
+- Positions are **relative to the parent item**; `pinned` means "a human placed
+  this" and builders must not move it (unless `relayout`).
+- New agent-facing endpoints: manifest entry first, then the route, then
+  `pnpm gen:docs`. Run `pnpm test`, `scripts/smoke.ts` and `scripts/ui-check.mjs`.
 
 ## Before writing any route
 - Add a `defineEndpoint(...)` to `src/manifest.ts` first (request/response

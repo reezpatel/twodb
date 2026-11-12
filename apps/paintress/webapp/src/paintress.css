@@ -1,0 +1,44 @@
+/* Paintress: canvas chrome that Tailwind tokens don't cover. */
+.react-flow { --xy-background-color: var(--paper); --xy-background-pattern-dots-color-default: var(--paper-grid); }
+.react-flow__node { font-family: inherit; }
+.react-flow__node.selected > div { outline: 0; }
+.react-flow__attribution { display: none; }
+
+/* connection points: hidden until hover/selection/connecting */
+.pa-handle { width: 9px; height: 9px; background: #4f63ad; border: 2px solid #fff; opacity: 0; transition: opacity .12s; }
+.pa-handle-target { background: #4f63ad; pointer-events: none; }
+.react-flow__node:hover .pa-handle, .react-flow__node.selected .pa-handle, .react-flow.connecting .pa-handle { opacity: 1; }
+.react-flow__node:hover .pa-handle-target, .react-flow__node.selected .pa-handle-target { pointer-events: all; }
+
+.pa-resize-line { border-color: #4f63ad !important; }
+.pa-resize-handle { width: 9px !important; height: 9px !important; background: #fff !important; border: 1.5px solid #4f63ad !important; border-radius: 2px !important; }
+
+/* selection ring on the node box (nodes draw their own shapes, so ring the wrapper) */
+.react-flow__node.selected { filter: drop-shadow(0 0 0 #4f63ad) drop-shadow(0 0 2px rgba(79, 99, 173, .9)); }
+
+/* an AI edit just landed here */
+@keyframes pa-pulse { 0% { box-shadow: 0 0 0 0 rgba(79, 99, 173, .65); } 100% { box-shadow: 0 0 0 18px rgba(79, 99, 173, 0); } }
+.pa-flash { animation: pa-pulse 1.4s ease-out 1; border-radius: 8px; }
+
+.pa-vertical { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; }
+
+/* markdown preview */
+.pa-prose { color: #1f2937; font-size: 15px; line-height: 1.7; }
+.pa-prose h1 { font-size: 2em; font-weight: 700; margin: 1.2em 0 .5em; border-bottom: 1px solid #e5e7eb; padding-bottom: .25em; }
+.pa-prose h2 { font-size: 1.5em; font-weight: 700; margin: 1.2em 0 .5em; border-bottom: 1px solid #eef0f3; padding-bottom: .2em; }
+.pa-prose h3 { font-size: 1.2em; font-weight: 700; margin: 1em 0 .4em; }
+.pa-prose p, .pa-prose ul, .pa-prose ol, .pa-prose blockquote, .pa-prose table, .pa-prose pre { margin: .8em 0; }
+.pa-prose ul { list-style: disc; padding-left: 1.5em; }
+.pa-prose ol { list-style: decimal; padding-left: 1.5em; }
+.pa-prose li > ul, .pa-prose li > ol { margin: .2em 0; }
+.pa-prose a { color: #2563eb; text-decoration: underline; }
+.pa-prose code { background: #f1f5f9; padding: .1em .35em; border-radius: 4px; font-size: .9em; }
+.pa-prose pre { background: #0f172a; color: #e2e8f0; padding: 1em; border-radius: 8px; overflow: auto; }
+.pa-prose pre code { background: transparent; padding: 0; color: inherit; }
+.pa-prose blockquote { border-left: 4px solid #cbd5e1; padding-left: 1em; color: #475569; }
+.pa-prose table { border-collapse: collapse; }
+.pa-prose th, .pa-prose td { border: 1px solid #e2e8f0; padding: .4em .8em; }
+.pa-prose th { background: #f8fafc; }
+.pa-prose hr { border: 0; border-top: 1px solid #e5e7eb; margin: 1.5em 0; }
+.pa-prose img { max-width: 100%; }
+.pa-mermaid svg { max-width: 100%; height: auto; }

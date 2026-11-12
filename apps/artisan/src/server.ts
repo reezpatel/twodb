@@ -1,4 +1,7 @@
 import Fastify from "fastify";
+import fastifyStatic from "@fastify/static";
+import { existsSync } from "node:fs";
+import * as path from "node:path";
 import websocket from "@fastify/websocket";
 import { createPgDb } from "@twodb/core-data/db";
 import { INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER, handleManifestRequest } from "@twodb/core-platform/manifest";
@@ -134,7 +137,11 @@ export async function buildServer(config: ArtisanConfig) {
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
     const messages = await repo.listSessionMessages(id);
-    const usage = await repo.getUsage(id);
+    const usageRow = await repo.getUsage(id);
+    const usage = usageRow ? {
+      inputTokens: usageRow.input_tokens, outputTokens: usageRow.output_tokens,
+      cachedTokens: usageRow.cached_tokens, calls: usageRow.calls, costUsd: usageRow.cost_usd,
+    } : null;
     const plan = session.plan_json ? JSON.parse(session.plan_json) : null;
     return { ...sessionOut(session), plan, running: isSessionRunning(id), usage, messages: messages.map(messageOut) };
   });
@@ -350,6 +357,21 @@ export async function buildServer(config: ArtisanConfig) {
 
   // --- workspace WS -------------------------------------------------------------
   registerWorkspaceWs(app, hub, repo, { repo, hub, tworoute: new TworouteClient(config, process.env.WORKSPACE_API_KEY ?? ""), dispatch: new DispatchClient(config, process.env.WORKSPACE_API_KEY ?? "") });
+
+  app.get("/healthz", async () => ({ ok: true }));
+
+  // --- webapp: serve the built SPA when its dist exists (release images build
+  // it; dev uses the Vite dev server on :6515).
+  const webappDist = path.join(import.meta.dirname, "../webapp/dist");
+  if (existsSync(path.join(webappDist, "index.html"))) {
+    await app.register(fastifyStatic, { root: webappDist, wildcard: false, index: false });
+    app.setNotFoundHandler((req, reply) => {
+      const pathname = new URL(req.url, "http://internal").pathname;
+      const isApi = /^\/(sessions|agents|skills|directories|models|runners|ws|internal|healthz)(\/|$)/.test(pathname);
+      if (req.method === "GET" && !isApi) return reply.sendFile("index.html");
+      return reply.code(404).send({ error: "not found" });
+    });
+  }
 
   await applySchema(db as never);
 

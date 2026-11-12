@@ -1,14 +1,12 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "@twodb/blocks/styles.css";
-
-// Starter feature-area skeleton lives at src/feature-x — replace with this
-// app's first real pane. Follows the partials/hooks convention from day
-// one: see blocks/CONVENTIONS.md.
-import { FeatureX } from "./feature-x/FeatureX.js";
+import "@xyflow/react/dist/style.css";
+import "./paintress.css";
+import { App } from "./App";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <FeatureX />
+    <App />
   </StrictMode>,
 );

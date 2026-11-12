@@ -8,16 +8,20 @@
     "build": "tsc --noEmit",
     "start": "tsx src/index.ts",
     "gen:docs": "tsx scripts/gen-docs.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1149.0",
+    "@aws-sdk/s3-request-presigner": "^3.1149.0",
     "@fastify/multipart": "^10.1.8",
     "@fastify/websocket": "^11.3.7",
     "@hono/node-server": "^1.19.18",
     "@iconify-json/carbon": "^1.2.30",
+    "@iconify-json/gcp": "^1.2.3",
     "@iconify-json/logos": "^1.2.19",
     "@iconify-json/mdi": "^1.2.3",
+    "@iconify/types": "^2.0.0",
     "@iconify/utils": "^3.1.7",
     "@twodb/core-async": "workspace:*",
     "@twodb/core-data": "workspace:*",
