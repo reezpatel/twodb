@@ -2,15 +2,6615 @@
 
 > **Generated file — do not hand-edit.** Source of truth is `src/manifest.ts` (Zod schemas). Regenerate with `pnpm gen:docs`.
 
-Notes/PKMS — not yet implemented. See AGENTS.md before building it out.
+Knowledge base: nested notes with a block editor (TipTap) and Notion-style databases backed by real Postgres tables — table/kanban/list/gallery/calendar views, filters, sorts, relations, rollups and formulas.
 
 - **Shape**: backend+webapp
 - **Base path (via Gateway)**: `/apps/garden`
-- **Capabilities**: none
+- **Capabilities**: search
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-09T12:16:47.280Z_
+_Generated: 2026-11-12T15:35:09.341Z_
 
 ## Endpoints
 
-_No endpoints declared yet._
+### `GET /tree` — getTree
+
+Sidebar tree of the active space (header `x-garden-space`, defaults to the caller's first space): top-level pages, sub-pages and databases, plus favorites. Database rows are left out (load them with listChildren). Also returns the id of the space's default "Notes" database (All docs).
+
+- **Auth**: `session-or-apiKey`
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "databaseId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "isFavorite": {
+            "type": "boolean"
+          },
+          "inline": {
+            "type": "boolean"
+          },
+          "childCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon",
+          "parentId",
+          "databaseId",
+          "position",
+          "isFavorite",
+          "inline",
+          "childCount"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "favorites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "databaseId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "isFavorite": {
+            "type": "boolean"
+          },
+          "inline": {
+            "type": "boolean"
+          },
+          "childCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon",
+          "parentId",
+          "databaseId",
+          "position",
+          "isFavorite",
+          "inline",
+          "childCount"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "defaultDatabaseId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "nodes",
+    "favorites",
+    "defaultDatabaseId"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /records/:id/children` — listChildren
+
+Direct children (pages/databases, or a database's rows) of a record, for lazy sidebar expansion.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "databaseId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "isFavorite": {
+            "type": "boolean"
+          },
+          "inline": {
+            "type": "boolean"
+          },
+          "childCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon",
+          "parentId",
+          "databaseId",
+          "position",
+          "isFavorite",
+          "inline",
+          "childCount"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "nodes"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /pages` — createPage
+
+Creates a page (note). Under a database it becomes a row of that database; anywhere else it lives in the space's default Notes database. Optional `values` sets properties (fieldId → value). `content` is a TipTap JSON doc.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "parentId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "icon": {
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 500
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "content": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "values": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "position": {
+      "type": "number"
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "page",
+        "database"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "icon": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parentId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "databaseId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cover": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "content": {
+      "anyOf": [
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "config": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "isFavorite": {
+      "type": "boolean"
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "createdBy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "deletedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ancestors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "databaseId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "options": {
+                "maxItems": 500,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "color": {
+                      "type": "string",
+                      "enum": [
+                        "gray",
+                        "brown",
+                        "orange",
+                        "yellow",
+                        "green",
+                        "blue",
+                        "purple",
+                        "pink",
+                        "red"
+                      ]
+                    },
+                    "group": {
+                      "type": "string",
+                      "enum": [
+                        "todo",
+                        "in_progress",
+                        "complete"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "color"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "number": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "number",
+                      "integer",
+                      "percent",
+                      "currency"
+                    ]
+                  },
+                  "currency": {
+                    "type": "string",
+                    "maxLength": 8
+                  }
+                },
+                "required": [
+                  "format"
+                ],
+                "additionalProperties": false
+              },
+              "date": {
+                "type": "object",
+                "properties": {
+                  "includeTime": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "relation": {
+                "type": "object",
+                "properties": {
+                  "databaseId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "reverseFieldId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "limitOne": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "databaseId"
+                ],
+                "additionalProperties": false
+              },
+              "rollup": {
+                "type": "object",
+                "properties": {
+                  "relationFieldId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "targetFieldId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fn": {
+                    "type": "string",
+                    "enum": [
+                      "show_original",
+                      "count",
+                      "count_values",
+                      "count_unique",
+                      "count_empty",
+                      "count_not_empty",
+                      "percent_empty",
+                      "percent_not_empty",
+                      "sum",
+                      "average",
+                      "min",
+                      "max",
+                      "range",
+                      "checked",
+                      "unchecked",
+                      "percent_checked",
+                      "earliest",
+                      "latest"
+                    ]
+                  }
+                },
+                "required": [
+                  "relationFieldId",
+                  "targetFieldId",
+                  "fn"
+                ],
+                "additionalProperties": false
+              },
+              "formula": {
+                "type": "object",
+                "properties": {
+                  "expression": {
+                    "type": "string",
+                    "maxLength": 10000
+                  }
+                },
+                "required": [
+                  "expression"
+                ],
+                "additionalProperties": false
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 2000
+              }
+            },
+            "additionalProperties": false
+          },
+          "position": {
+            "type": "number"
+          },
+          "system": {
+            "type": "boolean"
+          },
+          "valueType": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "databaseId",
+          "name",
+          "type",
+          "config",
+          "position",
+          "system",
+          "valueType"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "values": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "relations": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "isDefaultDatabase": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "title",
+    "icon",
+    "parentId",
+    "databaseId",
+    "cover",
+    "content",
+    "config",
+    "isFavorite",
+    "createdAt",
+    "updatedAt",
+    "createdBy",
+    "deletedAt",
+    "ancestors"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /databases` — createDatabase
+
+Creates a database (a real Postgres table) with a Tags field and a Table view. `inline: true` marks it as embedded in its parent page's content.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "parentId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "icon": {
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 500
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "inline": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "database": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "page",
+            "database"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "icon": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "databaseId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cover": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "content": {
+          "anyOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "config": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "isFavorite": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "createdBy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "deletedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ancestors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "page",
+                  "database"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "icon": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title",
+              "icon"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "databaseId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "options": {
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "color": {
+                          "type": "string",
+                          "enum": [
+                            "gray",
+                            "brown",
+                            "orange",
+                            "yellow",
+                            "green",
+                            "blue",
+                            "purple",
+                            "pink",
+                            "red"
+                          ]
+                        },
+                        "group": {
+                          "type": "string",
+                          "enum": [
+                            "todo",
+                            "in_progress",
+                            "complete"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "color"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "number": {
+                    "type": "object",
+                    "properties": {
+                      "format": {
+                        "type": "string",
+                        "enum": [
+                          "number",
+                          "integer",
+                          "percent",
+                          "currency"
+                        ]
+                      },
+                      "currency": {
+                        "type": "string",
+                        "maxLength": 8
+                      }
+                    },
+                    "required": [
+                      "format"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "date": {
+                    "type": "object",
+                    "properties": {
+                      "includeTime": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "relation": {
+                    "type": "object",
+                    "properties": {
+                      "databaseId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "reverseFieldId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "limitOne": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "databaseId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "rollup": {
+                    "type": "object",
+                    "properties": {
+                      "relationFieldId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "targetFieldId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "fn": {
+                        "type": "string",
+                        "enum": [
+                          "show_original",
+                          "count",
+                          "count_values",
+                          "count_unique",
+                          "count_empty",
+                          "count_not_empty",
+                          "percent_empty",
+                          "percent_not_empty",
+                          "sum",
+                          "average",
+                          "min",
+                          "max",
+                          "range",
+                          "checked",
+                          "unchecked",
+                          "percent_checked",
+                          "earliest",
+                          "latest"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "relationFieldId",
+                      "targetFieldId",
+                      "fn"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "formula": {
+                    "type": "object",
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                        "maxLength": 10000
+                      }
+                    },
+                    "required": [
+                      "expression"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "additionalProperties": false
+              },
+              "position": {
+                "type": "number"
+              },
+              "system": {
+                "type": "boolean"
+              },
+              "valueType": {
+                "type": "string"
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "databaseId",
+              "name",
+              "type",
+              "config",
+              "position",
+              "system",
+              "valueType"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "values": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "relations": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "page",
+                  "database"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "icon": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title",
+              "icon"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "isDefaultDatabase": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "title",
+        "icon",
+        "parentId",
+        "databaseId",
+        "cover",
+        "content",
+        "config",
+        "isFavorite",
+        "createdAt",
+        "updatedAt",
+        "createdBy",
+        "deletedAt",
+        "ancestors"
+      ],
+      "additionalProperties": false
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "databaseId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "options": {
+                "maxItems": 500,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "color": {
+                      "type": "string",
+                      "enum": [
+                        "gray",
+                        "brown",
+                        "orange",
+                        "yellow",
+                        "green",
+                        "blue",
+                        "purple",
+                        "pink",
+                        "red"
+                      ]
+                    },
+                    "group": {
+                      "type": "string",
+                      "enum": [
+                        "todo",
+                        "in_progress",
+                        "complete"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "color"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "number": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "number",
+                      "integer",
+                      "percent",
+                      "currency"
+                    ]
+                  },
+                  "currency": {
+                    "type": "string",
+                    "maxLength": 8
+                  }
+                },
+                "required": [
+                  "format"
+                ],
+                "additionalProperties": false
+              },
+              "date": {
+                "type": "object",
+                "properties": {
+                  "includeTime": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "relation": {
+                "type": "object",
+                "properties": {
+                  "databaseId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "reverseFieldId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "limitOne": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "databaseId"
+                ],
+                "additionalProperties": false
+              },
+              "rollup": {
+                "type": "object",
+                "properties": {
+                  "relationFieldId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "targetFieldId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fn": {
+                    "type": "string",
+                    "enum": [
+                      "show_original",
+                      "count",
+                      "count_values",
+                      "count_unique",
+                      "count_empty",
+                      "count_not_empty",
+                      "percent_empty",
+                      "percent_not_empty",
+                      "sum",
+                      "average",
+                      "min",
+                      "max",
+                      "range",
+                      "checked",
+                      "unchecked",
+                      "percent_checked",
+                      "earliest",
+                      "latest"
+                    ]
+                  }
+                },
+                "required": [
+                  "relationFieldId",
+                  "targetFieldId",
+                  "fn"
+                ],
+                "additionalProperties": false
+              },
+              "formula": {
+                "type": "object",
+                "properties": {
+                  "expression": {
+                    "type": "string",
+                    "maxLength": 10000
+                  }
+                },
+                "required": [
+                  "expression"
+                ],
+                "additionalProperties": false
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 2000
+              }
+            },
+            "additionalProperties": false
+          },
+          "position": {
+            "type": "number"
+          },
+          "system": {
+            "type": "boolean"
+          },
+          "valueType": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "databaseId",
+          "name",
+          "type",
+          "config",
+          "position",
+          "system",
+          "valueType"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "views": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "databaseId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "table",
+              "kanban",
+              "list",
+              "gallery",
+              "calendar"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "filter": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/__schema0"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sorts": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "fieldId": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "asc",
+                        "desc"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "fieldId",
+                    "direction"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "groupBy": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "fieldId": {
+                        "type": "string"
+                      },
+                      "hideEmpty": {
+                        "type": "boolean"
+                      },
+                      "collapsed": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "fieldId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "fieldId": {
+                      "type": "string"
+                    },
+                    "hidden": {
+                      "type": "boolean"
+                    },
+                    "width": {
+                      "type": "number",
+                      "minimum": 40,
+                      "maximum": 2000
+                    }
+                  },
+                  "required": [
+                    "fieldId"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "calendar": {
+                "type": "object",
+                "properties": {
+                  "dateFieldId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "gallery": {
+                "type": "object",
+                "properties": {
+                  "cover": {
+                    "type": "string",
+                    "enum": [
+                      "page",
+                      "none"
+                    ]
+                  },
+                  "size": {
+                    "type": "string",
+                    "enum": [
+                      "small",
+                      "medium",
+                      "large"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "wrap": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "databaseId",
+          "name",
+          "type",
+          "position",
+          "config"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "database",
+    "fields",
+    "views"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "conjunction": {
+          "type": "string",
+          "enum": [
+            "and",
+            "or"
+          ]
+        },
+        "conditions": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "fieldId": {
+                    "type": "string"
+                  },
+                  "operator": {
+                    "type": "string",
+                    "enum": [
+                      "is",
+                      "is_not",
+                      "contains",
+                      "not_contains",
+                      "starts_with",
+                      "ends_with",
+                      "is_empty",
+                      "is_not_empty",
+                      "eq",
+                      "neq",
+                      "gt",
+                      "gte",
+                      "lt",
+                      "lte",
+                      "before",
+                      "after",
+                      "on_or_before",
+                      "on_or_after",
+                      "is_checked",
+                      "is_unchecked",
+                      "has_any",
+                      "has_all",
+                      "has_none"
+                    ]
+                  },
+                  "value": {}
+                },
+                "required": [
+                  "id",
+                  "fieldId",
+                  "operator"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "$ref": "#/definitions/__schema0"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "conjunction",
+        "conditions"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+### `GET /records/:id` — getRecord
+
+A page (content + its database's fields + property values) or a database (metadata). Trashed records stay readable.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "page",
+        "database"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "icon": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parentId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "databaseId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cover": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "content": {
+      "anyOf": [
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "config": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "isFavorite": {
+      "type": "boolean"
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "createdBy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "deletedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ancestors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "databaseId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "options": {
+                "maxItems": 500,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "color": {
+                      "type": "string",
+                      "enum": [
+                        "gray",
+                        "brown",
+                        "orange",
+                        "yellow",
+                        "green",
+                        "blue",
+                        "purple",
+                        "pink",
+                        "red"
+                      ]
+                    },
+                    "group": {
+                      "type": "string",
+                      "enum": [
+                        "todo",
+                        "in_progress",
+                        "complete"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "color"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "number": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "number",
+                      "integer",
+                      "percent",
+                      "currency"
+                    ]
+                  },
+                  "currency": {
+                    "type": "string",
+                    "maxLength": 8
+                  }
+                },
+                "required": [
+                  "format"
+                ],
+                "additionalProperties": false
+              },
+              "date": {
+                "type": "object",
+                "properties": {
+                  "includeTime": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "relation": {
+                "type": "object",
+                "properties": {
+                  "databaseId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "reverseFieldId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "limitOne": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "databaseId"
+                ],
+                "additionalProperties": false
+              },
+              "rollup": {
+                "type": "object",
+                "properties": {
+                  "relationFieldId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "targetFieldId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fn": {
+                    "type": "string",
+                    "enum": [
+                      "show_original",
+                      "count",
+                      "count_values",
+                      "count_unique",
+                      "count_empty",
+                      "count_not_empty",
+                      "percent_empty",
+                      "percent_not_empty",
+                      "sum",
+                      "average",
+                      "min",
+                      "max",
+                      "range",
+                      "checked",
+                      "unchecked",
+                      "percent_checked",
+                      "earliest",
+                      "latest"
+                    ]
+                  }
+                },
+                "required": [
+                  "relationFieldId",
+                  "targetFieldId",
+                  "fn"
+                ],
+                "additionalProperties": false
+              },
+              "formula": {
+                "type": "object",
+                "properties": {
+                  "expression": {
+                    "type": "string",
+                    "maxLength": 10000
+                  }
+                },
+                "required": [
+                  "expression"
+                ],
+                "additionalProperties": false
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 2000
+              }
+            },
+            "additionalProperties": false
+          },
+          "position": {
+            "type": "number"
+          },
+          "system": {
+            "type": "boolean"
+          },
+          "valueType": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "databaseId",
+          "name",
+          "type",
+          "config",
+          "position",
+          "system",
+          "valueType"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "values": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "relations": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "isDefaultDatabase": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "title",
+    "icon",
+    "parentId",
+    "databaseId",
+    "cover",
+    "content",
+    "config",
+    "isFavorite",
+    "createdAt",
+    "updatedAt",
+    "createdBy",
+    "deletedAt",
+    "ancestors"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `PATCH /records/:id` — updateRecord
+
+Updates title/icon/cover/content/config/favorite, or moves the record (parentId/position). Moving a page into or out of a database changes the database holding its properties (old properties are dropped).
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "icon": {
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 2000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cover": {
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 2000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "content": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "fullWidth": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "isFavorite": {
+      "type": "boolean"
+    },
+    "parentId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "position": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `PATCH /records/:id/values` — updateValues
+
+Sets property values of a page (fieldId → value; null clears). `title` is accepted as a key. Two-way relations are kept in sync.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "values": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "id",
+    "values"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "page",
+        "database"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "icon": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parentId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "databaseId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cover": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "content": {
+      "anyOf": [
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "config": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "isFavorite": {
+      "type": "boolean"
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "createdBy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "deletedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ancestors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "databaseId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "options": {
+                "maxItems": 500,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "color": {
+                      "type": "string",
+                      "enum": [
+                        "gray",
+                        "brown",
+                        "orange",
+                        "yellow",
+                        "green",
+                        "blue",
+                        "purple",
+                        "pink",
+                        "red"
+                      ]
+                    },
+                    "group": {
+                      "type": "string",
+                      "enum": [
+                        "todo",
+                        "in_progress",
+                        "complete"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "color"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "number": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "number",
+                      "integer",
+                      "percent",
+                      "currency"
+                    ]
+                  },
+                  "currency": {
+                    "type": "string",
+                    "maxLength": 8
+                  }
+                },
+                "required": [
+                  "format"
+                ],
+                "additionalProperties": false
+              },
+              "date": {
+                "type": "object",
+                "properties": {
+                  "includeTime": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "relation": {
+                "type": "object",
+                "properties": {
+                  "databaseId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "reverseFieldId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "limitOne": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "databaseId"
+                ],
+                "additionalProperties": false
+              },
+              "rollup": {
+                "type": "object",
+                "properties": {
+                  "relationFieldId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "targetFieldId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fn": {
+                    "type": "string",
+                    "enum": [
+                      "show_original",
+                      "count",
+                      "count_values",
+                      "count_unique",
+                      "count_empty",
+                      "count_not_empty",
+                      "percent_empty",
+                      "percent_not_empty",
+                      "sum",
+                      "average",
+                      "min",
+                      "max",
+                      "range",
+                      "checked",
+                      "unchecked",
+                      "percent_checked",
+                      "earliest",
+                      "latest"
+                    ]
+                  }
+                },
+                "required": [
+                  "relationFieldId",
+                  "targetFieldId",
+                  "fn"
+                ],
+                "additionalProperties": false
+              },
+              "formula": {
+                "type": "object",
+                "properties": {
+                  "expression": {
+                    "type": "string",
+                    "maxLength": 10000
+                  }
+                },
+                "required": [
+                  "expression"
+                ],
+                "additionalProperties": false
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 2000
+              }
+            },
+            "additionalProperties": false
+          },
+          "position": {
+            "type": "number"
+          },
+          "system": {
+            "type": "boolean"
+          },
+          "valueType": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "databaseId",
+          "name",
+          "type",
+          "config",
+          "position",
+          "system",
+          "valueType"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "values": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "relations": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "isDefaultDatabase": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "title",
+    "icon",
+    "parentId",
+    "databaseId",
+    "cover",
+    "content",
+    "config",
+    "isFavorite",
+    "createdAt",
+    "updatedAt",
+    "createdBy",
+    "deletedAt",
+    "ancestors"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `DELETE /records/:id` — trashRecord
+
+Moves a page/database and everything under it to trash.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /records/:id/restore` — restoreRecord
+
+Restores a trashed batch.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `DELETE /records/:id/permanent` — deleteRecordPermanently
+
+Permanently deletes a trashed record and its subtree (drops database tables).
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /records/:id/backlinks` — getBacklinks
+
+Pages that mention this record.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "backlinks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "snippet": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon",
+          "snippet"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "backlinks"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /databases/:id` — getDatabase
+
+Database metadata, fields (system + user, with computed value types) and views.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "database": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "page",
+            "database"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "icon": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "databaseId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cover": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "content": {
+          "anyOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "config": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "isFavorite": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "createdBy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "deletedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ancestors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "page",
+                  "database"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "icon": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title",
+              "icon"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "databaseId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "options": {
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "color": {
+                          "type": "string",
+                          "enum": [
+                            "gray",
+                            "brown",
+                            "orange",
+                            "yellow",
+                            "green",
+                            "blue",
+                            "purple",
+                            "pink",
+                            "red"
+                          ]
+                        },
+                        "group": {
+                          "type": "string",
+                          "enum": [
+                            "todo",
+                            "in_progress",
+                            "complete"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "color"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "number": {
+                    "type": "object",
+                    "properties": {
+                      "format": {
+                        "type": "string",
+                        "enum": [
+                          "number",
+                          "integer",
+                          "percent",
+                          "currency"
+                        ]
+                      },
+                      "currency": {
+                        "type": "string",
+                        "maxLength": 8
+                      }
+                    },
+                    "required": [
+                      "format"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "date": {
+                    "type": "object",
+                    "properties": {
+                      "includeTime": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "relation": {
+                    "type": "object",
+                    "properties": {
+                      "databaseId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "reverseFieldId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "limitOne": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "databaseId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "rollup": {
+                    "type": "object",
+                    "properties": {
+                      "relationFieldId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "targetFieldId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "fn": {
+                        "type": "string",
+                        "enum": [
+                          "show_original",
+                          "count",
+                          "count_values",
+                          "count_unique",
+                          "count_empty",
+                          "count_not_empty",
+                          "percent_empty",
+                          "percent_not_empty",
+                          "sum",
+                          "average",
+                          "min",
+                          "max",
+                          "range",
+                          "checked",
+                          "unchecked",
+                          "percent_checked",
+                          "earliest",
+                          "latest"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "relationFieldId",
+                      "targetFieldId",
+                      "fn"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "formula": {
+                    "type": "object",
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                        "maxLength": 10000
+                      }
+                    },
+                    "required": [
+                      "expression"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "additionalProperties": false
+              },
+              "position": {
+                "type": "number"
+              },
+              "system": {
+                "type": "boolean"
+              },
+              "valueType": {
+                "type": "string"
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "databaseId",
+              "name",
+              "type",
+              "config",
+              "position",
+              "system",
+              "valueType"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "values": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "relations": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "page",
+                  "database"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "icon": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title",
+              "icon"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "isDefaultDatabase": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "title",
+        "icon",
+        "parentId",
+        "databaseId",
+        "cover",
+        "content",
+        "config",
+        "isFavorite",
+        "createdAt",
+        "updatedAt",
+        "createdBy",
+        "deletedAt",
+        "ancestors"
+      ],
+      "additionalProperties": false
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "databaseId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "options": {
+                "maxItems": 500,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "color": {
+                      "type": "string",
+                      "enum": [
+                        "gray",
+                        "brown",
+                        "orange",
+                        "yellow",
+                        "green",
+                        "blue",
+                        "purple",
+                        "pink",
+                        "red"
+                      ]
+                    },
+                    "group": {
+                      "type": "string",
+                      "enum": [
+                        "todo",
+                        "in_progress",
+                        "complete"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "color"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "number": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "number",
+                      "integer",
+                      "percent",
+                      "currency"
+                    ]
+                  },
+                  "currency": {
+                    "type": "string",
+                    "maxLength": 8
+                  }
+                },
+                "required": [
+                  "format"
+                ],
+                "additionalProperties": false
+              },
+              "date": {
+                "type": "object",
+                "properties": {
+                  "includeTime": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "relation": {
+                "type": "object",
+                "properties": {
+                  "databaseId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "reverseFieldId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "limitOne": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "databaseId"
+                ],
+                "additionalProperties": false
+              },
+              "rollup": {
+                "type": "object",
+                "properties": {
+                  "relationFieldId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "targetFieldId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fn": {
+                    "type": "string",
+                    "enum": [
+                      "show_original",
+                      "count",
+                      "count_values",
+                      "count_unique",
+                      "count_empty",
+                      "count_not_empty",
+                      "percent_empty",
+                      "percent_not_empty",
+                      "sum",
+                      "average",
+                      "min",
+                      "max",
+                      "range",
+                      "checked",
+                      "unchecked",
+                      "percent_checked",
+                      "earliest",
+                      "latest"
+                    ]
+                  }
+                },
+                "required": [
+                  "relationFieldId",
+                  "targetFieldId",
+                  "fn"
+                ],
+                "additionalProperties": false
+              },
+              "formula": {
+                "type": "object",
+                "properties": {
+                  "expression": {
+                    "type": "string",
+                    "maxLength": 10000
+                  }
+                },
+                "required": [
+                  "expression"
+                ],
+                "additionalProperties": false
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 2000
+              }
+            },
+            "additionalProperties": false
+          },
+          "position": {
+            "type": "number"
+          },
+          "system": {
+            "type": "boolean"
+          },
+          "valueType": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "databaseId",
+          "name",
+          "type",
+          "config",
+          "position",
+          "system",
+          "valueType"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "views": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "databaseId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "table",
+              "kanban",
+              "list",
+              "gallery",
+              "calendar"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "filter": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/__schema0"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sorts": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "fieldId": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "asc",
+                        "desc"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "fieldId",
+                    "direction"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "groupBy": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "fieldId": {
+                        "type": "string"
+                      },
+                      "hideEmpty": {
+                        "type": "boolean"
+                      },
+                      "collapsed": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "fieldId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "fieldId": {
+                      "type": "string"
+                    },
+                    "hidden": {
+                      "type": "boolean"
+                    },
+                    "width": {
+                      "type": "number",
+                      "minimum": 40,
+                      "maximum": 2000
+                    }
+                  },
+                  "required": [
+                    "fieldId"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "calendar": {
+                "type": "object",
+                "properties": {
+                  "dateFieldId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "gallery": {
+                "type": "object",
+                "properties": {
+                  "cover": {
+                    "type": "string",
+                    "enum": [
+                      "page",
+                      "none"
+                    ]
+                  },
+                  "size": {
+                    "type": "string",
+                    "enum": [
+                      "small",
+                      "medium",
+                      "large"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "wrap": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "databaseId",
+          "name",
+          "type",
+          "position",
+          "config"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "database",
+    "fields",
+    "views"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "conjunction": {
+          "type": "string",
+          "enum": [
+            "and",
+            "or"
+          ]
+        },
+        "conditions": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "fieldId": {
+                    "type": "string"
+                  },
+                  "operator": {
+                    "type": "string",
+                    "enum": [
+                      "is",
+                      "is_not",
+                      "contains",
+                      "not_contains",
+                      "starts_with",
+                      "ends_with",
+                      "is_empty",
+                      "is_not_empty",
+                      "eq",
+                      "neq",
+                      "gt",
+                      "gte",
+                      "lt",
+                      "lte",
+                      "before",
+                      "after",
+                      "on_or_before",
+                      "on_or_after",
+                      "is_checked",
+                      "is_unchecked",
+                      "has_any",
+                      "has_all",
+                      "has_none"
+                    ]
+                  },
+                  "value": {}
+                },
+                "required": [
+                  "id",
+                  "fieldId",
+                  "operator"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "$ref": "#/definitions/__schema0"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "conjunction",
+        "conditions"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+### `POST /databases/:id/query` — queryRows
+
+Rows of a database. With `viewId` the view's filter/sorts apply; explicit `filter`/`sorts` override them. Every field — incl. rollup and formula — is filterable and sortable (compiled to SQL).
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "viewId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "filter": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/__schema0"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sorts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "fieldId": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          }
+        },
+        "required": [
+          "fieldId",
+          "direction"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "search": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000
+    },
+    "offset": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "conjunction": {
+          "type": "string",
+          "enum": [
+            "and",
+            "or"
+          ]
+        },
+        "conditions": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "fieldId": {
+                    "type": "string"
+                  },
+                  "operator": {
+                    "type": "string",
+                    "enum": [
+                      "is",
+                      "is_not",
+                      "contains",
+                      "not_contains",
+                      "starts_with",
+                      "ends_with",
+                      "is_empty",
+                      "is_not_empty",
+                      "eq",
+                      "neq",
+                      "gt",
+                      "gte",
+                      "lt",
+                      "lte",
+                      "before",
+                      "after",
+                      "on_or_before",
+                      "on_or_after",
+                      "is_checked",
+                      "is_unchecked",
+                      "has_any",
+                      "has_all",
+                      "has_none"
+                    ]
+                  },
+                  "value": {}
+                },
+                "required": [
+                  "id",
+                  "fieldId",
+                  "operator"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "$ref": "#/definitions/__schema0"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "conjunction",
+        "conditions"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cover": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preview": {
+            "type": "string"
+          },
+          "isFavorite": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "values": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "icon",
+          "cover",
+          "preview",
+          "isFavorite",
+          "createdAt",
+          "updatedAt",
+          "createdBy",
+          "values"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "total": {
+      "type": "number"
+    },
+    "relations": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "rows",
+    "total",
+    "relations"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /databases/:id/fields` — createField
+
+Adds a field (a column named by its uuid in the database table). Relation: set config.relation.databaseId, `twoWay` creates the reverse field. Rollup: config.rollup. Formula: config.formula.expression, e.g. prop("Price") * prop("Qty").
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "number",
+        "select",
+        "multi_select",
+        "status",
+        "date",
+        "checkbox",
+        "url",
+        "email",
+        "phone",
+        "person",
+        "relation",
+        "rollup",
+        "formula"
+      ]
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "color": {
+                "type": "string",
+                "enum": [
+                  "gray",
+                  "brown",
+                  "orange",
+                  "yellow",
+                  "green",
+                  "blue",
+                  "purple",
+                  "pink",
+                  "red"
+                ]
+              },
+              "group": {
+                "type": "string",
+                "enum": [
+                  "todo",
+                  "in_progress",
+                  "complete"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "color"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "number": {
+          "type": "object",
+          "properties": {
+            "format": {
+              "type": "string",
+              "enum": [
+                "number",
+                "integer",
+                "percent",
+                "currency"
+              ]
+            },
+            "currency": {
+              "type": "string",
+              "maxLength": 8
+            }
+          },
+          "required": [
+            "format"
+          ],
+          "additionalProperties": false
+        },
+        "date": {
+          "type": "object",
+          "properties": {
+            "includeTime": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "relation": {
+          "type": "object",
+          "properties": {
+            "databaseId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "reverseFieldId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "limitOne": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "databaseId"
+          ],
+          "additionalProperties": false
+        },
+        "rollup": {
+          "type": "object",
+          "properties": {
+            "relationFieldId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "targetFieldId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fn": {
+              "type": "string",
+              "enum": [
+                "show_original",
+                "count",
+                "count_values",
+                "count_unique",
+                "count_empty",
+                "count_not_empty",
+                "percent_empty",
+                "percent_not_empty",
+                "sum",
+                "average",
+                "min",
+                "max",
+                "range",
+                "checked",
+                "unchecked",
+                "percent_checked",
+                "earliest",
+                "latest"
+              ]
+            }
+          },
+          "required": [
+            "relationFieldId",
+            "targetFieldId",
+            "fn"
+          ],
+          "additionalProperties": false
+        },
+        "formula": {
+          "type": "object",
+          "properties": {
+            "expression": {
+              "type": "string",
+              "maxLength": 10000
+            }
+          },
+          "required": [
+            "expression"
+          ],
+          "additionalProperties": false
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "additionalProperties": false
+    },
+    "position": {
+      "type": "number"
+    },
+    "twoWay": {
+      "type": "boolean"
+    },
+    "reverseName": {
+      "type": "string",
+      "maxLength": 200
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "type"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "databaseId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "color": {
+                "type": "string",
+                "enum": [
+                  "gray",
+                  "brown",
+                  "orange",
+                  "yellow",
+                  "green",
+                  "blue",
+                  "purple",
+                  "pink",
+                  "red"
+                ]
+              },
+              "group": {
+                "type": "string",
+                "enum": [
+                  "todo",
+                  "in_progress",
+                  "complete"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "color"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "number": {
+          "type": "object",
+          "properties": {
+            "format": {
+              "type": "string",
+              "enum": [
+                "number",
+                "integer",
+                "percent",
+                "currency"
+              ]
+            },
+            "currency": {
+              "type": "string",
+              "maxLength": 8
+            }
+          },
+          "required": [
+            "format"
+          ],
+          "additionalProperties": false
+        },
+        "date": {
+          "type": "object",
+          "properties": {
+            "includeTime": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "relation": {
+          "type": "object",
+          "properties": {
+            "databaseId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "reverseFieldId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "limitOne": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "databaseId"
+          ],
+          "additionalProperties": false
+        },
+        "rollup": {
+          "type": "object",
+          "properties": {
+            "relationFieldId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "targetFieldId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fn": {
+              "type": "string",
+              "enum": [
+                "show_original",
+                "count",
+                "count_values",
+                "count_unique",
+                "count_empty",
+                "count_not_empty",
+                "percent_empty",
+                "percent_not_empty",
+                "sum",
+                "average",
+                "min",
+                "max",
+                "range",
+                "checked",
+                "unchecked",
+                "percent_checked",
+                "earliest",
+                "latest"
+              ]
+            }
+          },
+          "required": [
+            "relationFieldId",
+            "targetFieldId",
+            "fn"
+          ],
+          "additionalProperties": false
+        },
+        "formula": {
+          "type": "object",
+          "properties": {
+            "expression": {
+              "type": "string",
+              "maxLength": 10000
+            }
+          },
+          "required": [
+            "expression"
+          ],
+          "additionalProperties": false
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "additionalProperties": false
+    },
+    "position": {
+      "type": "number"
+    },
+    "system": {
+      "type": "boolean"
+    },
+    "valueType": {
+      "type": "string"
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "databaseId",
+    "name",
+    "type",
+    "config",
+    "position",
+    "system",
+    "valueType"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `PATCH /fields/:id` — updateField
+
+Renames, reconfigures or changes the type of a field. Type changes convert existing values (ALTER through a temp column).
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "number",
+        "select",
+        "multi_select",
+        "status",
+        "date",
+        "checkbox",
+        "url",
+        "email",
+        "phone",
+        "person",
+        "relation",
+        "rollup",
+        "formula"
+      ]
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "color": {
+                "type": "string",
+                "enum": [
+                  "gray",
+                  "brown",
+                  "orange",
+                  "yellow",
+                  "green",
+                  "blue",
+                  "purple",
+                  "pink",
+                  "red"
+                ]
+              },
+              "group": {
+                "type": "string",
+                "enum": [
+                  "todo",
+                  "in_progress",
+                  "complete"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "color"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "number": {
+          "type": "object",
+          "properties": {
+            "format": {
+              "type": "string",
+              "enum": [
+                "number",
+                "integer",
+                "percent",
+                "currency"
+              ]
+            },
+            "currency": {
+              "type": "string",
+              "maxLength": 8
+            }
+          },
+          "required": [
+            "format"
+          ],
+          "additionalProperties": false
+        },
+        "date": {
+          "type": "object",
+          "properties": {
+            "includeTime": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "relation": {
+          "type": "object",
+          "properties": {
+            "databaseId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "reverseFieldId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "limitOne": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "databaseId"
+          ],
+          "additionalProperties": false
+        },
+        "rollup": {
+          "type": "object",
+          "properties": {
+            "relationFieldId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "targetFieldId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fn": {
+              "type": "string",
+              "enum": [
+                "show_original",
+                "count",
+                "count_values",
+                "count_unique",
+                "count_empty",
+                "count_not_empty",
+                "percent_empty",
+                "percent_not_empty",
+                "sum",
+                "average",
+                "min",
+                "max",
+                "range",
+                "checked",
+                "unchecked",
+                "percent_checked",
+                "earliest",
+                "latest"
+              ]
+            }
+          },
+          "required": [
+            "relationFieldId",
+            "targetFieldId",
+            "fn"
+          ],
+          "additionalProperties": false
+        },
+        "formula": {
+          "type": "object",
+          "properties": {
+            "expression": {
+              "type": "string",
+              "maxLength": 10000
+            }
+          },
+          "required": [
+            "expression"
+          ],
+          "additionalProperties": false
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "additionalProperties": false
+    },
+    "position": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "databaseId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "color": {
+                "type": "string",
+                "enum": [
+                  "gray",
+                  "brown",
+                  "orange",
+                  "yellow",
+                  "green",
+                  "blue",
+                  "purple",
+                  "pink",
+                  "red"
+                ]
+              },
+              "group": {
+                "type": "string",
+                "enum": [
+                  "todo",
+                  "in_progress",
+                  "complete"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "color"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "number": {
+          "type": "object",
+          "properties": {
+            "format": {
+              "type": "string",
+              "enum": [
+                "number",
+                "integer",
+                "percent",
+                "currency"
+              ]
+            },
+            "currency": {
+              "type": "string",
+              "maxLength": 8
+            }
+          },
+          "required": [
+            "format"
+          ],
+          "additionalProperties": false
+        },
+        "date": {
+          "type": "object",
+          "properties": {
+            "includeTime": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "relation": {
+          "type": "object",
+          "properties": {
+            "databaseId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "reverseFieldId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "limitOne": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "databaseId"
+          ],
+          "additionalProperties": false
+        },
+        "rollup": {
+          "type": "object",
+          "properties": {
+            "relationFieldId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "targetFieldId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fn": {
+              "type": "string",
+              "enum": [
+                "show_original",
+                "count",
+                "count_values",
+                "count_unique",
+                "count_empty",
+                "count_not_empty",
+                "percent_empty",
+                "percent_not_empty",
+                "sum",
+                "average",
+                "min",
+                "max",
+                "range",
+                "checked",
+                "unchecked",
+                "percent_checked",
+                "earliest",
+                "latest"
+              ]
+            }
+          },
+          "required": [
+            "relationFieldId",
+            "targetFieldId",
+            "fn"
+          ],
+          "additionalProperties": false
+        },
+        "formula": {
+          "type": "object",
+          "properties": {
+            "expression": {
+              "type": "string",
+              "maxLength": 10000
+            }
+          },
+          "required": [
+            "expression"
+          ],
+          "additionalProperties": false
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "additionalProperties": false
+    },
+    "position": {
+      "type": "number"
+    },
+    "system": {
+      "type": "boolean"
+    },
+    "valueType": {
+      "type": "string"
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "databaseId",
+    "name",
+    "type",
+    "config",
+    "position",
+    "system",
+    "valueType"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `DELETE /fields/:id` — deleteField
+
+Deletes a field and drops its column.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /databases/:id/views` — createView
+
+Adds a view (table, kanban, list, gallery, calendar).
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "table",
+        "kanban",
+        "list",
+        "gallery",
+        "calendar"
+      ]
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "filter": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/__schema0"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sorts": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldId": {
+                "type": "string"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ]
+              }
+            },
+            "required": [
+              "fieldId",
+              "direction"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "groupBy": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "fieldId": {
+                  "type": "string"
+                },
+                "hideEmpty": {
+                  "type": "boolean"
+                },
+                "collapsed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "fieldId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldId": {
+                "type": "string"
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 40,
+                "maximum": 2000
+              }
+            },
+            "required": [
+              "fieldId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "calendar": {
+          "type": "object",
+          "properties": {
+            "dateFieldId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "gallery": {
+          "type": "object",
+          "properties": {
+            "cover": {
+              "type": "string",
+              "enum": [
+                "page",
+                "none"
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "small",
+                "medium",
+                "large"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "wrap": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "type"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "conjunction": {
+          "type": "string",
+          "enum": [
+            "and",
+            "or"
+          ]
+        },
+        "conditions": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "fieldId": {
+                    "type": "string"
+                  },
+                  "operator": {
+                    "type": "string",
+                    "enum": [
+                      "is",
+                      "is_not",
+                      "contains",
+                      "not_contains",
+                      "starts_with",
+                      "ends_with",
+                      "is_empty",
+                      "is_not_empty",
+                      "eq",
+                      "neq",
+                      "gt",
+                      "gte",
+                      "lt",
+                      "lte",
+                      "before",
+                      "after",
+                      "on_or_before",
+                      "on_or_after",
+                      "is_checked",
+                      "is_unchecked",
+                      "has_any",
+                      "has_all",
+                      "has_none"
+                    ]
+                  },
+                  "value": {}
+                },
+                "required": [
+                  "id",
+                  "fieldId",
+                  "operator"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "$ref": "#/definitions/__schema0"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "conjunction",
+        "conditions"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "databaseId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "table",
+        "kanban",
+        "list",
+        "gallery",
+        "calendar"
+      ]
+    },
+    "position": {
+      "type": "number"
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "filter": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/__schema0"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sorts": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldId": {
+                "type": "string"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ]
+              }
+            },
+            "required": [
+              "fieldId",
+              "direction"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "groupBy": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "fieldId": {
+                  "type": "string"
+                },
+                "hideEmpty": {
+                  "type": "boolean"
+                },
+                "collapsed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "fieldId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldId": {
+                "type": "string"
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 40,
+                "maximum": 2000
+              }
+            },
+            "required": [
+              "fieldId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "calendar": {
+          "type": "object",
+          "properties": {
+            "dateFieldId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "gallery": {
+          "type": "object",
+          "properties": {
+            "cover": {
+              "type": "string",
+              "enum": [
+                "page",
+                "none"
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "small",
+                "medium",
+                "large"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "wrap": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "databaseId",
+    "name",
+    "type",
+    "position",
+    "config"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "conjunction": {
+          "type": "string",
+          "enum": [
+            "and",
+            "or"
+          ]
+        },
+        "conditions": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "fieldId": {
+                    "type": "string"
+                  },
+                  "operator": {
+                    "type": "string",
+                    "enum": [
+                      "is",
+                      "is_not",
+                      "contains",
+                      "not_contains",
+                      "starts_with",
+                      "ends_with",
+                      "is_empty",
+                      "is_not_empty",
+                      "eq",
+                      "neq",
+                      "gt",
+                      "gte",
+                      "lt",
+                      "lte",
+                      "before",
+                      "after",
+                      "on_or_before",
+                      "on_or_after",
+                      "is_checked",
+                      "is_unchecked",
+                      "has_any",
+                      "has_all",
+                      "has_none"
+                    ]
+                  },
+                  "value": {}
+                },
+                "required": [
+                  "id",
+                  "fieldId",
+                  "operator"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "$ref": "#/definitions/__schema0"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "conjunction",
+        "conditions"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+### `PATCH /views/:id` — updateView
+
+Updates a view's name, type or config (filter, sorts, groupBy, fields…).
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "table",
+        "kanban",
+        "list",
+        "gallery",
+        "calendar"
+      ]
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "filter": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/__schema0"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sorts": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldId": {
+                "type": "string"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ]
+              }
+            },
+            "required": [
+              "fieldId",
+              "direction"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "groupBy": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "fieldId": {
+                  "type": "string"
+                },
+                "hideEmpty": {
+                  "type": "boolean"
+                },
+                "collapsed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "fieldId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldId": {
+                "type": "string"
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 40,
+                "maximum": 2000
+              }
+            },
+            "required": [
+              "fieldId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "calendar": {
+          "type": "object",
+          "properties": {
+            "dateFieldId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "gallery": {
+          "type": "object",
+          "properties": {
+            "cover": {
+              "type": "string",
+              "enum": [
+                "page",
+                "none"
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "small",
+                "medium",
+                "large"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "wrap": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "position": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "conjunction": {
+          "type": "string",
+          "enum": [
+            "and",
+            "or"
+          ]
+        },
+        "conditions": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "fieldId": {
+                    "type": "string"
+                  },
+                  "operator": {
+                    "type": "string",
+                    "enum": [
+                      "is",
+                      "is_not",
+                      "contains",
+                      "not_contains",
+                      "starts_with",
+                      "ends_with",
+                      "is_empty",
+                      "is_not_empty",
+                      "eq",
+                      "neq",
+                      "gt",
+                      "gte",
+                      "lt",
+                      "lte",
+                      "before",
+                      "after",
+                      "on_or_before",
+                      "on_or_after",
+                      "is_checked",
+                      "is_unchecked",
+                      "has_any",
+                      "has_all",
+                      "has_none"
+                    ]
+                  },
+                  "value": {}
+                },
+                "required": [
+                  "id",
+                  "fieldId",
+                  "operator"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "$ref": "#/definitions/__schema0"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "conjunction",
+        "conditions"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "databaseId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "table",
+        "kanban",
+        "list",
+        "gallery",
+        "calendar"
+      ]
+    },
+    "position": {
+      "type": "number"
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "filter": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/__schema0"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sorts": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldId": {
+                "type": "string"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ]
+              }
+            },
+            "required": [
+              "fieldId",
+              "direction"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "groupBy": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "fieldId": {
+                  "type": "string"
+                },
+                "hideEmpty": {
+                  "type": "boolean"
+                },
+                "collapsed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "fieldId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldId": {
+                "type": "string"
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 40,
+                "maximum": 2000
+              }
+            },
+            "required": [
+              "fieldId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "calendar": {
+          "type": "object",
+          "properties": {
+            "dateFieldId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "gallery": {
+          "type": "object",
+          "properties": {
+            "cover": {
+              "type": "string",
+              "enum": [
+                "page",
+                "none"
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "small",
+                "medium",
+                "large"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "wrap": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "databaseId",
+    "name",
+    "type",
+    "position",
+    "config"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "conjunction": {
+          "type": "string",
+          "enum": [
+            "and",
+            "or"
+          ]
+        },
+        "conditions": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "fieldId": {
+                    "type": "string"
+                  },
+                  "operator": {
+                    "type": "string",
+                    "enum": [
+                      "is",
+                      "is_not",
+                      "contains",
+                      "not_contains",
+                      "starts_with",
+                      "ends_with",
+                      "is_empty",
+                      "is_not_empty",
+                      "eq",
+                      "neq",
+                      "gt",
+                      "gte",
+                      "lt",
+                      "lte",
+                      "before",
+                      "after",
+                      "on_or_before",
+                      "on_or_after",
+                      "is_checked",
+                      "is_unchecked",
+                      "has_any",
+                      "has_all",
+                      "has_none"
+                    ]
+                  },
+                  "value": {}
+                },
+                "required": [
+                  "id",
+                  "fieldId",
+                  "operator"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "$ref": "#/definitions/__schema0"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "conjunction",
+        "conditions"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+### `POST /views/:id/duplicate` — duplicateView
+
+Duplicates a view.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "databaseId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "table",
+        "kanban",
+        "list",
+        "gallery",
+        "calendar"
+      ]
+    },
+    "position": {
+      "type": "number"
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "filter": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/__schema0"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sorts": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldId": {
+                "type": "string"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ]
+              }
+            },
+            "required": [
+              "fieldId",
+              "direction"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "groupBy": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "fieldId": {
+                  "type": "string"
+                },
+                "hideEmpty": {
+                  "type": "boolean"
+                },
+                "collapsed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "fieldId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldId": {
+                "type": "string"
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 40,
+                "maximum": 2000
+              }
+            },
+            "required": [
+              "fieldId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "calendar": {
+          "type": "object",
+          "properties": {
+            "dateFieldId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "gallery": {
+          "type": "object",
+          "properties": {
+            "cover": {
+              "type": "string",
+              "enum": [
+                "page",
+                "none"
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "small",
+                "medium",
+                "large"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "wrap": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "databaseId",
+    "name",
+    "type",
+    "position",
+    "config"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "conjunction": {
+          "type": "string",
+          "enum": [
+            "and",
+            "or"
+          ]
+        },
+        "conditions": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "fieldId": {
+                    "type": "string"
+                  },
+                  "operator": {
+                    "type": "string",
+                    "enum": [
+                      "is",
+                      "is_not",
+                      "contains",
+                      "not_contains",
+                      "starts_with",
+                      "ends_with",
+                      "is_empty",
+                      "is_not_empty",
+                      "eq",
+                      "neq",
+                      "gt",
+                      "gte",
+                      "lt",
+                      "lte",
+                      "before",
+                      "after",
+                      "on_or_before",
+                      "on_or_after",
+                      "is_checked",
+                      "is_unchecked",
+                      "has_any",
+                      "has_all",
+                      "has_none"
+                    ]
+                  },
+                  "value": {}
+                },
+                "required": [
+                  "id",
+                  "fieldId",
+                  "operator"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "$ref": "#/definitions/__schema0"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "conjunction",
+        "conditions"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+### `DELETE /views/:id` — deleteView
+
+Deletes a view (not the last one).
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /search` — search
+
+Full-text search over titles and note content in the active space. `databaseId` limits to that database's rows (relation pickers).
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "q": {
+      "default": "",
+      "type": "string",
+      "maxLength": 200
+    },
+    "databaseId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "page",
+        "database"
+      ]
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    }
+  },
+  "required": [
+    "q"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "hits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "databaseId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parentTitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "snippet": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon",
+          "databaseId",
+          "parentTitle",
+          "snippet"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "hits"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /federated-search` — federatedSearch
+
+Gateway federated search: searches notes and databases across all of the caller's spaces.
+
+- **Auth**: `session-or-apiKey`
+- **Capability**: `search`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "query"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "snippet": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "snippet",
+          "spaceId",
+          "url"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "results"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /trash` — listTrash
+
+Trashed pages/databases (batch roots).
+
+- **Auth**: `session-or-apiKey`
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "database"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deletedAt": {
+            "type": "string"
+          },
+          "parentTitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "icon",
+          "deletedAt",
+          "parentTitle"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `DELETE /trash` — emptyTrash
+
+Permanently deletes everything in trash.
+
+- **Auth**: `session-or-apiKey`
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /assets` — uploadAsset
+
+Uploads an image (raw body, image/* content type, ≤10 MB; optional `x-file-name` header and `recordId` query). Returns its URL.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "recordId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "url": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "url"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /assets/:id` — getAsset
+
+Serves an uploaded image (workspace-checked).
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```

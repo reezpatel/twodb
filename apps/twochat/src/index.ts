@@ -1,30 +1,42 @@
-// Scaffolded stub server — the app is not implemented yet (see AGENTS.md).
-// It still runs a real HTTP server so `pnpm local` can boot the whole
-// ecosystem and TwoDB's pull-registration can fetch a live manifest:
-// /healthz always answers, /internal/manifest is served only when the
-// orchestrator injected a TWODB_PROVISION_TOKEN (docker-install flow).
-import { serve } from "@hono/node-server";
-import { handleManifestRequest, INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER } from "@twodb/core-platform/manifest";
-import { manifest } from "./manifest.js";
+import { registerWithGateway, fetchDatabaseCredentials } from "@twodb/core-platform/manifest";
+import { loadTwoChatConfig } from "./config.js";
+import { buildServer } from "./server.js";
+import { twochatManifest } from "./manifest.js";
 
-const port = Number(process.env.PORT ?? 6405);
-const registrationToken = process.env.TWODB_PROVISION_TOKEN;
+async function main() {
+  const config = loadTwoChatConfig();
 
-serve({
-  port,
-  fetch: (req) => {
-    const url = new URL(req.url);
-    if (url.pathname === "/healthz") return Response.json({ ok: true, app: manifest.slug, scaffolded: true });
-    if (url.pathname === "" && registrationToken) {
-      const res = handleManifestRequest(
-        { ...manifest, version: "0.1.0" },
-        { registrationToken, httpUrl: process.env.HTTP_URL ?? `http://localhost:${port}` },
-        req.headers.get(REGISTRATION_TOKEN_HEADER) ?? undefined,
-      );
-      return Response.json(res.body, { status: res.status });
+  // Dev on the host: no DATABASE_URL env — ask TwoDB for the credentials it
+  // provisioned (token-guarded). Docker installs inject DATABASE_URL
+  // directly and skip this (fetch fails fast on a rejected token; falls
+  // back to the config default only when the gateway is simply absent).
+  let dbUrl = config.DATABASE_URL;
+  if (!process.env.DATABASE_URL && !process.env.TWOCHAT_DATABASE_URL) {
+    try {
+      const creds = await fetchDatabaseCredentials({
+        gatewayUrl: config.TWODB_GATEWAY_URL,
+        registrationToken: config.TWODB_PROVISION_TOKEN,
+        slug: "twochat",
+      });
+      dbUrl = creds.connectionString;
+      console.log(`[twochat] using gateway-provisioned DB credentials (schema "${creds.schema}")`);
+    } catch (err) {
+      console.warn(`[twochat] gateway credentials unavailable (${(err as Error).message}); falling back to config default`);
     }
-    return new Response("not found", { status: 404 });
-  },
-});
+  }
 
-console.log(`${manifest.name} (scaffolded) listening on :${port}`);
+  const server = await buildServer({ ...config, DATABASE_URL: dbUrl });
+  await server.listen({ port: config.PORT, host: "0.0.0.0" });
+  server.log.info(`TwoChat listening on :${config.PORT} (storage: ${config.TWOCHAT_STORAGE_BACKEND})`);
+
+  await registerWithGateway(twochatManifest, {
+    gatewayUrl: config.TWODB_GATEWAY_URL,
+    registrationToken: config.TWODB_PROVISION_TOKEN,
+    httpUrl: config.HTTP_URL,
+  }).catch((err) => server.log.warn({ err }, "self-registration with TwoDB failed (gateway unreachable after retries, or token rejected — non-fatal)"));
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});

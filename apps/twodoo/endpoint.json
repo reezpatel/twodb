@@ -3,7 +3,7 @@
   "slug": "twodoo",
   "version": "0.1.0",
   "shape": "backend+webapp",
-  "description": "Tasks/checklists — not yet implemented. See AGENTS.md before building it out.",
+  "description": "Tasks & habits — TickTick-style boards, lists, smart lists, quick-add, recurrence, habit tracking. Implemented (v1).",
   "capabilities": [],
   "coreDeps": [
     "core-data",
@@ -11,6 +11,3516 @@
     "core-async"
   ],
   "basePath": "/apps/twodoo",
-  "generatedAt": "2026-11-09T12:16:48.715Z",
-  "endpoints": []
+  "generatedAt": "2026-11-12T17:41:01.436Z",
+  "endpoints": [
+    {
+      "name": "listBoards",
+      "method": "GET",
+      "path": "/boards",
+      "auth": "session",
+      "description": "Full board forest for the caller's active spaces: root boards with nested children, each with lists and rollup open/due-today counts.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/__schema0"
+        },
+        "definitions": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "color": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "icon": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "position": {
+                "type": "number"
+              },
+              "collapsed": {
+                "type": "boolean"
+              },
+              "spaceId": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "lists": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "boardId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "color": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "icon": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "position": {
+                      "type": "number"
+                    },
+                    "openCount": {
+                      "type": "number"
+                    },
+                    "dueTodayCount": {
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "boardId",
+                    "name",
+                    "color",
+                    "icon",
+                    "position",
+                    "openCount",
+                    "dueTodayCount",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "children": {
+                "type": "array",
+                "items": {
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/__schema0"
+                    }
+                  ]
+                }
+              },
+              "openCount": {
+                "type": "number"
+              },
+              "dueTodayCount": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "parentId",
+              "name",
+              "position",
+              "collapsed",
+              "spaceId",
+              "createdAt",
+              "updatedAt",
+              "lists",
+              "children",
+              "openCount",
+              "dueTodayCount"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "name": "createBoard",
+      "method": "POST",
+      "path": "/boards",
+      "auth": "session",
+      "description": "Creates a board in a space, optionally nested under a parent board (same space).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "spaceId",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "collapsed": {
+            "type": "boolean"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "lists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "boardId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "position": {
+                  "type": "number"
+                },
+                "openCount": {
+                  "type": "number"
+                },
+                "dueTodayCount": {
+                  "type": "number"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "boardId",
+                "name",
+                "color",
+                "icon",
+                "position",
+                "openCount",
+                "dueTodayCount",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#"
+                }
+              ]
+            }
+          },
+          "openCount": {
+            "type": "number"
+          },
+          "dueTodayCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "parentId",
+          "name",
+          "position",
+          "collapsed",
+          "spaceId",
+          "createdAt",
+          "updatedAt",
+          "lists",
+          "children",
+          "openCount",
+          "dueTodayCount"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateBoard",
+      "method": "PATCH",
+      "path": "/boards/:id",
+      "auth": "session",
+      "description": "Rename / recolor / re-parent (cycle-guarded) / reorder / collapse a board.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "collapsed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "collapsed": {
+            "type": "boolean"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "lists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "boardId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "position": {
+                  "type": "number"
+                },
+                "openCount": {
+                  "type": "number"
+                },
+                "dueTodayCount": {
+                  "type": "number"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "boardId",
+                "name",
+                "color",
+                "icon",
+                "position",
+                "openCount",
+                "dueTodayCount",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#"
+                }
+              ]
+            }
+          },
+          "openCount": {
+            "type": "number"
+          },
+          "dueTodayCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "parentId",
+          "name",
+          "position",
+          "collapsed",
+          "spaceId",
+          "createdAt",
+          "updatedAt",
+          "lists",
+          "children",
+          "openCount",
+          "dueTodayCount"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteBoard",
+      "method": "DELETE",
+      "path": "/boards/:id",
+      "auth": "session",
+      "description": "Deletes a board with every descendant board, list, task, checklist and tag link.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createList",
+      "method": "POST",
+      "path": "/lists",
+      "auth": "session",
+      "description": "Creates a task list inside a board.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "boardId",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "boardId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "openCount": {
+            "type": "number"
+          },
+          "dueTodayCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "boardId",
+          "name",
+          "color",
+          "icon",
+          "position",
+          "openCount",
+          "dueTodayCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateList",
+      "method": "PATCH",
+      "path": "/lists/:id",
+      "auth": "session",
+      "description": "Rename / recolor / move-to-board / reorder a list.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "boardId": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "boardId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "openCount": {
+            "type": "number"
+          },
+          "dueTodayCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "boardId",
+          "name",
+          "color",
+          "icon",
+          "position",
+          "openCount",
+          "dueTodayCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteList",
+      "method": "DELETE",
+      "path": "/lists/:id",
+      "auth": "session",
+      "description": "Deletes a list and all its tasks (hard delete).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listTasks",
+      "method": "GET",
+      "path": "/tasks",
+      "auth": "session",
+      "description": "Task query endpoint. One of listId / boardId / smart selects the set; filters compose. `smart` ∈ today|tomorrow|week|month|all|completed (today/week/month include overdue open tasks).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string"
+          },
+          "boardId": {
+            "type": "string"
+          },
+          "smart": {
+            "type": "string",
+            "enum": [
+              "today",
+              "tomorrow",
+              "week",
+              "month",
+              "all",
+              "completed"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "done",
+              "trashed",
+              "any"
+            ]
+          },
+          "tagId": {
+            "type": "string"
+          },
+          "q": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "listId": {
+              "type": "string"
+            },
+            "parentId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "descriptionHtml": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "open",
+                "done",
+                "trashed"
+              ]
+            },
+            "priority": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "urgent"
+              ]
+            },
+            "startAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "endAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "allDay": {
+              "type": "boolean"
+            },
+            "recurrenceRule": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "recurrenceNextAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "habitId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "completedAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "assigneeUserId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "position": {
+              "type": "number"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "color",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "checklist": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "taskId": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "position": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "id",
+                  "taskId",
+                  "content",
+                  "checked",
+                  "position"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "checklistTotal": {
+              "type": "number"
+            },
+            "checklistDone": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "listId",
+            "parentId",
+            "title",
+            "descriptionHtml",
+            "status",
+            "priority",
+            "startAt",
+            "endAt",
+            "allDay",
+            "recurrenceRule",
+            "recurrenceNextAt",
+            "habitId",
+            "completedAt",
+            "assigneeUserId",
+            "position",
+            "createdAt",
+            "updatedAt",
+            "tags",
+            "checklist",
+            "checklistTotal",
+            "checklistDone"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createTask",
+      "method": "POST",
+      "path": "/tasks",
+      "auth": "session",
+      "description": "Creates a task. `tagNames` auto-creates missing tags in the task's space (quick-add path); `tagIds` links existing ones. Recurring tasks compute recurrence_next_at from startAt.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "descriptionHtml": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ]
+          },
+          "startAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "recurrenceRule": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "habitId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tagNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "listId",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "listId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "descriptionHtml": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "done",
+              "trashed"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ]
+          },
+          "startAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "recurrenceRule": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recurrenceNextAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "habitId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "color",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "taskId": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "checked": {
+                  "type": "boolean"
+                },
+                "position": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "taskId",
+                "content",
+                "checked",
+                "position"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "checklistTotal": {
+            "type": "number"
+          },
+          "checklistDone": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "listId",
+          "parentId",
+          "title",
+          "descriptionHtml",
+          "status",
+          "priority",
+          "startAt",
+          "endAt",
+          "allDay",
+          "recurrenceRule",
+          "recurrenceNextAt",
+          "habitId",
+          "completedAt",
+          "assigneeUserId",
+          "position",
+          "createdAt",
+          "updatedAt",
+          "tags",
+          "checklist",
+          "checklistTotal",
+          "checklistDone"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getTask",
+      "method": "GET",
+      "path": "/tasks/:id",
+      "auth": "session",
+      "description": "One task with tags + checklist.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "listId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "descriptionHtml": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "done",
+              "trashed"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ]
+          },
+          "startAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "recurrenceRule": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recurrenceNextAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "habitId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "color",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "taskId": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "checked": {
+                  "type": "boolean"
+                },
+                "position": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "taskId",
+                "content",
+                "checked",
+                "position"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "checklistTotal": {
+            "type": "number"
+          },
+          "checklistDone": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "listId",
+          "parentId",
+          "title",
+          "descriptionHtml",
+          "status",
+          "priority",
+          "startAt",
+          "endAt",
+          "allDay",
+          "recurrenceRule",
+          "recurrenceNextAt",
+          "habitId",
+          "completedAt",
+          "assigneeUserId",
+          "position",
+          "createdAt",
+          "updatedAt",
+          "tags",
+          "checklist",
+          "checklistTotal",
+          "checklistDone"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateTask",
+      "method": "PATCH",
+      "path": "/tasks/:id",
+      "auth": "session",
+      "description": "Patch any task field; tagIds replaces the tag set.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "listId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "descriptionHtml": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "done",
+              "trashed"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ]
+          },
+          "startAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "recurrenceRule": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "habitId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "listId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "descriptionHtml": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "done",
+              "trashed"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ]
+          },
+          "startAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "recurrenceRule": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recurrenceNextAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "habitId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "color",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "taskId": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "checked": {
+                  "type": "boolean"
+                },
+                "position": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "taskId",
+                "content",
+                "checked",
+                "position"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "checklistTotal": {
+            "type": "number"
+          },
+          "checklistDone": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "listId",
+          "parentId",
+          "title",
+          "descriptionHtml",
+          "status",
+          "priority",
+          "startAt",
+          "endAt",
+          "allDay",
+          "recurrenceRule",
+          "recurrenceNextAt",
+          "habitId",
+          "completedAt",
+          "assigneeUserId",
+          "position",
+          "createdAt",
+          "updatedAt",
+          "tags",
+          "checklist",
+          "checklistTotal",
+          "checklistDone"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteTask",
+      "method": "DELETE",
+      "path": "/tasks/:id",
+      "auth": "session",
+      "description": "Hard-deletes a task with subtasks, checklist items and tag links. (Soft path = PATCH status=trashed.)",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "completeTask",
+      "method": "POST",
+      "path": "/tasks/:id/complete",
+      "auth": "session",
+      "description": "Toggle completion, TickTick-style: completing a recurring task spawns the next occurrence (shifted dates, fresh unchecked checklist, copied tags) and returns it as `spawned`.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "done": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "done"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "listId": {
+                "type": "string"
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "descriptionHtml": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "done",
+                  "trashed"
+                ]
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "urgent"
+                ]
+              },
+              "startAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "endAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "allDay": {
+                "type": "boolean"
+              },
+              "recurrenceRule": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "recurrenceNextAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "habitId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "completedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "assigneeUserId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "position": {
+                "type": "number"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "color": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "color",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "checklist": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "taskId": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "checked": {
+                      "type": "boolean"
+                    },
+                    "position": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "taskId",
+                    "content",
+                    "checked",
+                    "position"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "checklistTotal": {
+                "type": "number"
+              },
+              "checklistDone": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "listId",
+              "parentId",
+              "title",
+              "descriptionHtml",
+              "status",
+              "priority",
+              "startAt",
+              "endAt",
+              "allDay",
+              "recurrenceRule",
+              "recurrenceNextAt",
+              "habitId",
+              "completedAt",
+              "assigneeUserId",
+              "position",
+              "createdAt",
+              "updatedAt",
+              "tags",
+              "checklist",
+              "checklistTotal",
+              "checklistDone"
+            ],
+            "additionalProperties": false
+          },
+          "spawned": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "listId": {
+                    "type": "string"
+                  },
+                  "parentId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "descriptionHtml": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "done",
+                      "trashed"
+                    ]
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "low",
+                      "medium",
+                      "high",
+                      "urgent"
+                    ]
+                  },
+                  "startAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "endAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "allDay": {
+                    "type": "boolean"
+                  },
+                  "recurrenceRule": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "recurrenceNextAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "habitId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "completedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "assigneeUserId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "position": {
+                    "type": "number"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "updatedAt": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "color": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "color",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "checklist": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "taskId": {
+                          "type": "string"
+                        },
+                        "content": {
+                          "type": "string"
+                        },
+                        "checked": {
+                          "type": "boolean"
+                        },
+                        "position": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "taskId",
+                        "content",
+                        "checked",
+                        "position"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "checklistTotal": {
+                    "type": "number"
+                  },
+                  "checklistDone": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "id",
+                  "listId",
+                  "parentId",
+                  "title",
+                  "descriptionHtml",
+                  "status",
+                  "priority",
+                  "startAt",
+                  "endAt",
+                  "allDay",
+                  "recurrenceRule",
+                  "recurrenceNextAt",
+                  "habitId",
+                  "completedAt",
+                  "assigneeUserId",
+                  "position",
+                  "createdAt",
+                  "updatedAt",
+                  "tags",
+                  "checklist",
+                  "checklistTotal",
+                  "checklistDone"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "task",
+          "spawned"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "reorderTasks",
+      "method": "POST",
+      "path": "/tasks/reorder",
+      "auth": "session",
+      "description": "Manual ordering: place a task between two neighbors (fractional position computed server-side); optionally move it to another list.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "beforeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "afterId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "listId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "addChecklistItem",
+      "method": "POST",
+      "path": "/tasks/:id/checklist",
+      "auth": "session",
+      "description": "Appends a checklist (subtask) item to a task.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "checked": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "content",
+          "checked",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateChecklistItem",
+      "method": "PATCH",
+      "path": "/checklist/:id",
+      "auth": "session",
+      "description": "Edit / toggle / reorder a checklist item.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "checked": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "checked": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "content",
+          "checked",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteChecklistItem",
+      "method": "DELETE",
+      "path": "/checklist/:id",
+      "auth": "session",
+      "description": "Removes a checklist item.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listTags",
+      "method": "GET",
+      "path": "/tags",
+      "auth": "session",
+      "description": "All tags across the caller's active spaces.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "color": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "color",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createTag",
+      "method": "POST",
+      "path": "/tags",
+      "auth": "session",
+      "description": "Creates a tag in a space (name unique per space).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "spaceId",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateTag",
+      "method": "PATCH",
+      "path": "/tags/:id",
+      "auth": "session",
+      "description": "Rename / recolor a tag.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteTag",
+      "method": "DELETE",
+      "path": "/tags/:id",
+      "auth": "session",
+      "description": "Deletes a tag and its task links.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getOverview",
+      "method": "GET",
+      "path": "/overview",
+      "auth": "session",
+      "description": "Home-page bootstrap: board forest + smart-list counts in one call. Seeds a default board/list when the space is empty (first use).",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "boards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/__schema0"
+            }
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "today": {
+                "type": "number"
+              },
+              "tomorrow": {
+                "type": "number"
+              },
+              "week": {
+                "type": "number"
+              },
+              "month": {
+                "type": "number"
+              },
+              "all": {
+                "type": "number"
+              },
+              "completed": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "today",
+              "tomorrow",
+              "week",
+              "month",
+              "all",
+              "completed"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "boards",
+          "counts"
+        ],
+        "additionalProperties": false,
+        "definitions": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "color": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "icon": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "position": {
+                "type": "number"
+              },
+              "collapsed": {
+                "type": "boolean"
+              },
+              "spaceId": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "lists": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "boardId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "color": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "icon": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "position": {
+                      "type": "number"
+                    },
+                    "openCount": {
+                      "type": "number"
+                    },
+                    "dueTodayCount": {
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "boardId",
+                    "name",
+                    "color",
+                    "icon",
+                    "position",
+                    "openCount",
+                    "dueTodayCount",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "children": {
+                "type": "array",
+                "items": {
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/__schema0"
+                    }
+                  ]
+                }
+              },
+              "openCount": {
+                "type": "number"
+              },
+              "dueTodayCount": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "parentId",
+              "name",
+              "position",
+              "collapsed",
+              "spaceId",
+              "createdAt",
+              "updatedAt",
+              "lists",
+              "children",
+              "openCount",
+              "dueTodayCount"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "name": "listHabits",
+      "method": "GET",
+      "path": "/habits",
+      "auth": "session",
+      "description": "Habits with logs (optionally bounded by date range) and computed streaks.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "color": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "icon": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "schedule": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly",
+                "interval",
+                "monthly"
+              ]
+            },
+            "intervalDays": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "byWeekday": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "targetCount": {
+              "type": "number"
+            },
+            "goalStreak": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "build",
+                "quit"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            },
+            "logs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "habitId": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "count": {
+                    "type": "number"
+                  },
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "habitId",
+                  "date",
+                  "count",
+                  "note"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "streak": {
+              "type": "number"
+            },
+            "bestStreak": {
+              "type": "number"
+            },
+            "totalCheckIns": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "color",
+            "icon",
+            "schedule",
+            "intervalDays",
+            "byWeekday",
+            "targetCount",
+            "goalStreak",
+            "direction",
+            "createdAt",
+            "updatedAt",
+            "logs",
+            "streak",
+            "bestStreak",
+            "totalCheckIns"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createHabit",
+      "method": "POST",
+      "path": "/habits",
+      "auth": "session",
+      "description": "Creates a habit tracker.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "interval",
+              "monthly"
+            ]
+          },
+          "intervalDays": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "byWeekday": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "targetCount": {
+            "type": "number"
+          },
+          "goalStreak": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "build",
+              "quit"
+            ]
+          }
+        },
+        "required": [
+          "spaceId",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "interval",
+              "monthly"
+            ]
+          },
+          "intervalDays": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "byWeekday": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "targetCount": {
+            "type": "number"
+          },
+          "goalStreak": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "build",
+              "quit"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "habitId": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "habitId",
+                "date",
+                "count",
+                "note"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "streak": {
+            "type": "number"
+          },
+          "bestStreak": {
+            "type": "number"
+          },
+          "totalCheckIns": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "icon",
+          "schedule",
+          "intervalDays",
+          "byWeekday",
+          "targetCount",
+          "goalStreak",
+          "direction",
+          "createdAt",
+          "updatedAt",
+          "logs",
+          "streak",
+          "bestStreak",
+          "totalCheckIns"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateHabit",
+      "method": "PATCH",
+      "path": "/habits/:id",
+      "auth": "session",
+      "description": "Edit a habit (name, schedule, goal, archive…).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "interval",
+              "monthly"
+            ]
+          },
+          "intervalDays": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "byWeekday": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "targetCount": {
+            "type": "number"
+          },
+          "goalStreak": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "build",
+              "quit"
+            ]
+          },
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "interval",
+              "monthly"
+            ]
+          },
+          "intervalDays": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "byWeekday": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "targetCount": {
+            "type": "number"
+          },
+          "goalStreak": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "build",
+              "quit"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "habitId": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "habitId",
+                "date",
+                "count",
+                "note"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "streak": {
+            "type": "number"
+          },
+          "bestStreak": {
+            "type": "number"
+          },
+          "totalCheckIns": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "icon",
+          "schedule",
+          "intervalDays",
+          "byWeekday",
+          "targetCount",
+          "goalStreak",
+          "direction",
+          "createdAt",
+          "updatedAt",
+          "logs",
+          "streak",
+          "bestStreak",
+          "totalCheckIns"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteHabit",
+      "method": "DELETE",
+      "path": "/habits/:id",
+      "auth": "session",
+      "description": "Deletes a habit and its logs.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "logHabit",
+      "method": "POST",
+      "path": "/habits/:id/logs",
+      "auth": "session",
+      "description": "Check in a habit for a day (delta +1/-1; the day's row is upserted, removed at zero).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "delta": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "delta"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "habitId": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "count": {
+                "type": "number"
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "habitId",
+              "date",
+              "count",
+              "note"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    }
+  ]
 }

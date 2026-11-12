@@ -3,14 +3,2142 @@
   "slug": "twodrive",
   "version": "0.1.0",
   "shape": "backend+webapp",
-  "description": "Drive/file management — not yet implemented. See AGENTS.md before building it out.",
-  "capabilities": [],
+  "description": "Drive/file explorer over multiple storage backends (S3-compatible or local). Virtual storages act as soft buckets with an S3-compatible API, plus an internal app-file API with per-app folders.",
+  "capabilities": [
+    "files",
+    "storage"
+  ],
   "coreDeps": [
     "core-data",
     "core-platform",
     "core-async"
   ],
   "basePath": "/apps/twodrive",
-  "generatedAt": "2026-11-09T12:16:48.952Z",
-  "endpoints": []
+  "generatedAt": "2026-11-12T13:40:08.836Z",
+  "endpoints": [
+    {
+      "name": "listBackends",
+      "method": "GET",
+      "path": "/backends",
+      "auth": "session-or-apiKey",
+      "description": "Lists registered storage backends. Secrets inside config are never returned.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "backends": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "s3",
+                    "local"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "type",
+                "enabled",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "storages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "backendId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "prefix": {
+                  "type": "string"
+                },
+                "usage": {
+                  "type": "object",
+                  "properties": {
+                    "used": {
+                      "type": "number"
+                    },
+                    "files": {
+                      "type": "number"
+                    },
+                    "folders": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "used",
+                    "files",
+                    "folders"
+                  ],
+                  "additionalProperties": false
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "backendId",
+                "name",
+                "prefix",
+                "usage",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "backends",
+          "storages"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createBackend",
+      "method": "POST",
+      "path": "/backends",
+      "auth": "session-or-apiKey",
+      "description": "Registers a storage backend. type 's3' needs {endpoint, region, bucket, accessKeyId, secretAccessKey, forcePathStyle}; type 'local' needs {rootPath}. The S3 secret is encrypted at rest. Set test=true to verify reachability before saving (the call fails and nothing is stored if the backend is unreachable).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "s3",
+              "local"
+            ]
+          },
+          "config": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "test": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "config"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "s3",
+              "local"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "enabled",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateBackend",
+      "method": "PATCH",
+      "path": "/backends/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a backend — rename, enable/disable, or replace config. Omitted config fields keep their current values; a present-but-empty secretAccessKey keeps the stored secret.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "s3",
+              "local"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "enabled",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteBackend",
+      "method": "DELETE",
+      "path": "/backends/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a backend registration. Fails while virtual storages still live on it (delete or move them first). Files on the backend itself are never deleted.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "testBackend",
+      "method": "POST",
+      "path": "/backends/:id/test",
+      "auth": "session-or-apiKey",
+      "description": "Verifies the backend is reachable (S3 HeadBucket / local stat of the root path).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createVirtualStorage",
+      "method": "POST",
+      "path": "/storages",
+      "auth": "session-or-apiKey",
+      "description": "Creates a virtual storage on a backend. `prefix` is its location inside the backend (auto-derived from the name if omitted). Optionally marks it as the default virtual storage for app files.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "backendId": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "setAsDefault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "backendId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "backendId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "used": {
+                "type": "number"
+              },
+              "files": {
+                "type": "number"
+              },
+              "folders": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "used",
+              "files",
+              "folders"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "backendId",
+          "name",
+          "prefix",
+          "usage",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateVirtualStorage",
+      "method": "PATCH",
+      "path": "/storages/:id",
+      "auth": "session-or-apiKey",
+      "description": "Renames a virtual storage (prefix on the backend never moves — existing files keep working).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "setAsDefault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "backendId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "used": {
+                "type": "number"
+              },
+              "files": {
+                "type": "number"
+              },
+              "folders": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "used",
+              "files",
+              "folders"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "backendId",
+          "name",
+          "prefix",
+          "usage",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteVirtualStorage",
+      "method": "DELETE",
+      "path": "/storages/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a virtual storage registration (with confirm=true, hard-deletes its files from the backend too). The default-virtual-storage setting is cleared if it pointed here; apps inserting files will error until a new default is set.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean"
+          },
+          "hardDelete": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getDefaultStorage",
+      "method": "GET",
+      "path": "/storages/default",
+      "auth": "session-or-apiKey",
+      "description": "The workspace's default virtual storage — where app folders live when an app has no override. Null when none is set (app file APIs return errors in that state).",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "virtualStorageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "virtualStorageId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "setDefaultStorage",
+      "method": "PUT",
+      "path": "/storages/default",
+      "auth": "session-or-apiKey",
+      "description": "Sets (or clears, with null) the default virtual storage for app files.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "virtualStorageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "virtualStorageId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "virtualStorageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "virtualStorageId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listEntries",
+      "method": "GET",
+      "path": "/storages/:storageId/entries",
+      "auth": "session-or-apiKey",
+      "description": "Lists direct children of a folder. ?path= selects the folder (root by default); ?trash=true lists trashed entries.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "trash": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "storageId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "file",
+                    "folder"
+                  ]
+                },
+                "size": {
+                  "type": "number"
+                },
+                "mimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "previewType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "image",
+                        "video",
+                        "audio",
+                        "pdf",
+                        "text",
+                        "archive",
+                        "other"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "deleted": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "path",
+                "name",
+                "type",
+                "size",
+                "mimeType",
+                "previewType",
+                "deleted",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createFolder",
+      "method": "POST",
+      "path": "/storages/:storageId/folders",
+      "auth": "session-or-apiKey",
+      "description": "Creates a folder (intermediate folders are created too).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "folder"
+            ]
+          },
+          "size": {
+            "type": "number"
+          },
+          "mimeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "previewType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "video",
+                  "audio",
+                  "pdf",
+                  "text",
+                  "archive",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "path",
+          "name",
+          "type",
+          "size",
+          "mimeType",
+          "previewType",
+          "deleted",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "uploadFile",
+      "method": "POST",
+      "path": "/storages/:storageId/files",
+      "auth": "session-or-apiKey",
+      "description": "Uploads a file. Raw body (any content type) with ?path=target.ext — the path includes the file name. Parent folders are tracked automatically.",
+      "streaming": false,
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "folder"
+            ]
+          },
+          "size": {
+            "type": "number"
+          },
+          "mimeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "previewType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "video",
+                  "audio",
+                  "pdf",
+                  "text",
+                  "archive",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "path",
+          "name",
+          "type",
+          "size",
+          "mimeType",
+          "previewType",
+          "deleted",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "downloadFile",
+      "method": "GET",
+      "path": "/storages/:storageId/files/*",
+      "auth": "session-or-apiKey",
+      "description": "Downloads a file. ?download=1 forces a download attachment; streams with range support.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "renameEntry",
+      "method": "PATCH",
+      "path": "/storages/:storageId/entries/rename",
+      "auth": "session-or-apiKey",
+      "description": "Renames a file or folder within its parent folder.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "newName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId",
+          "path",
+          "newName"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "folder"
+            ]
+          },
+          "size": {
+            "type": "number"
+          },
+          "mimeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "previewType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "video",
+                  "audio",
+                  "pdf",
+                  "text",
+                  "archive",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "path",
+          "name",
+          "type",
+          "size",
+          "mimeType",
+          "previewType",
+          "deleted",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "moveEntry",
+      "method": "PATCH",
+      "path": "/storages/:storageId/entries/move",
+      "auth": "session-or-apiKey",
+      "description": "Moves a file or folder to a new path inside the same virtual storage.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId",
+          "from",
+          "to"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "copyEntry",
+      "method": "POST",
+      "path": "/storages/:storageId/entries/copy",
+      "auth": "session-or-apiKey",
+      "description": "Copies a file or folder to a new path inside the same virtual storage.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId",
+          "from",
+          "to"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "trashEntries",
+      "method": "POST",
+      "path": "/storages/:storageId/entries/trash",
+      "auth": "session-or-apiKey",
+      "description": "Moves files/folders to trash (soft delete — restore is possible).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "storageId",
+          "paths"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "restoreEntries",
+      "method": "POST",
+      "path": "/storages/:storageId/entries/restore",
+      "auth": "session-or-apiKey",
+      "description": "Restores trashed entries by id.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "entryIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "storageId",
+          "entryIds"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "purgeEntries",
+      "method": "POST",
+      "path": "/storages/:storageId/entries/purge",
+      "auth": "session-or-apiKey",
+      "description": "Permanently deletes trashed entries by path from the table and the backend. Irreversible.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "storageId",
+          "paths"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "deleted": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ok",
+          "deleted"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "emptyTrash",
+      "method": "POST",
+      "path": "/storages/:storageId/trash/empty",
+      "auth": "session-or-apiKey",
+      "description": "Permanently deletes everything in this virtual storage's trash.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "deleted": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ok",
+          "deleted"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "searchFiles",
+      "method": "GET",
+      "path": "/storages/:storageId/search",
+      "auth": "session-or-apiKey",
+      "description": "Full-tree search by path substring, case-insensitive.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "storageId",
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "file",
+                    "folder"
+                  ]
+                },
+                "size": {
+                  "type": "number"
+                },
+                "mimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "previewType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "image",
+                        "video",
+                        "audio",
+                        "pdf",
+                        "text",
+                        "archive",
+                        "other"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "deleted": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "path",
+                "name",
+                "type",
+                "size",
+                "mimeType",
+                "previewType",
+                "deleted",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "recentFiles",
+      "method": "GET",
+      "path": "/storages/:storageId/recent",
+      "auth": "session-or-apiKey",
+      "description": "Most recently updated live files in this virtual storage.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "storageId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "file",
+                    "folder"
+                  ]
+                },
+                "size": {
+                  "type": "number"
+                },
+                "mimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "previewType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "image",
+                        "video",
+                        "audio",
+                        "pdf",
+                        "text",
+                        "archive",
+                        "other"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "deleted": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "path",
+                "name",
+                "type",
+                "size",
+                "mimeType",
+                "previewType",
+                "deleted",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createShareLink",
+      "method": "POST",
+      "path": "/storages/:storageId/shares",
+      "auth": "session-or-apiKey",
+      "description": "Creates a public share link for a file (or a folder — folder shares download as a zip later).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "storageId",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "token",
+          "url",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listShareLinks",
+      "method": "GET",
+      "path": "/storages/:storageId/shares",
+      "auth": "session-or-apiKey",
+      "description": "Lists active share links for a virtual storage.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "shares": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "token": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "entryId": {
+                  "type": "string"
+                },
+                "expiresAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "token",
+                "path",
+                "entryId",
+                "expiresAt",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "shares"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "revokeShareLink",
+      "method": "DELETE",
+      "path": "/storages/:storageId/shares/:token",
+      "auth": "session-or-apiKey",
+      "description": "Revokes a share link.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId",
+          "token"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getSharedFile",
+      "method": "GET",
+      "path": "/shares/:token",
+      "auth": "public",
+      "description": "Public (no auth) download of a shared file. 404s when revoked or expired.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "appPutFile",
+      "method": "PUT",
+      "path": "/app/objects/*",
+      "auth": "session-or-apiKey",
+      "description": "Inserts (or overwrites) an object for the calling app. Path is relative to the app's folder inside its virtual storage. Requires the x-twodb-app header; errors with 409 no_default_storage when no default virtual storage is set and the app has no override.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "fullPath": {
+            "type": "string"
+          },
+          "storageId": {
+            "type": "string"
+          },
+          "size": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "path",
+          "fullPath",
+          "storageId",
+          "size"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "appGetFile",
+      "method": "GET",
+      "path": "/app/objects/*",
+      "auth": "session-or-apiKey",
+      "description": "Fetches an object by app-relative path (raw bytes). Requires the x-twodb-app header.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "appPatchFile",
+      "method": "PATCH",
+      "path": "/app/objects/*",
+      "auth": "session-or-apiKey",
+      "description": "Moves/renames an app object. Body: {to: 'new/relative/path'} — relative to the app folder. Requires the x-twodb-app header.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "to"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "fullPath": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "fullPath"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "appDeleteFile",
+      "method": "DELETE",
+      "path": "/app/objects/*",
+      "auth": "session-or-apiKey",
+      "description": "Trashes an app object by app-relative path. Requires the x-twodb-app header.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "appListFiles",
+      "method": "GET",
+      "path": "/app/objects",
+      "auth": "session-or-apiKey",
+      "description": "Lists the calling app's folder (recursive, or one level with ?flat=false). Requires the x-twodb-app header.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "prefix": {
+            "type": "string"
+          },
+          "recursive": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "file",
+                    "folder"
+                  ]
+                },
+                "size": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "type",
+                "size",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listAppOverrides",
+      "method": "GET",
+      "path": "/app-overrides",
+      "auth": "session-or-apiKey",
+      "description": "Lists per-app virtual storage overrides (app identifier → virtual storage).",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "overrides": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "appId": {
+                  "type": "string"
+                },
+                "virtualStorageId": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "appId",
+                "virtualStorageId",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "overrides"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "setAppOverride",
+      "method": "PUT",
+      "path": "/app-overrides/:appId",
+      "auth": "session-or-apiKey",
+      "description": "Points an app's file folder at a specific virtual storage. With virtualStorageId=null, clears the override (the app falls back to the default).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "virtualStorageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "appId",
+          "virtualStorageId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listAccessKeys",
+      "method": "GET",
+      "path": "/storages/:storageId/keys",
+      "auth": "session-or-apiKey",
+      "description": "Lists access keys for a virtual storage's S3-compatible endpoint (secrets never returned).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "accessKeyId": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "lastUsedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "accessKeyId",
+                "label",
+                "createdAt",
+                "lastUsedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "keys"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createAccessKey",
+      "method": "POST",
+      "path": "/storages/:storageId/keys",
+      "auth": "session-or-apiKey",
+      "description": "Creates an access key pair for the S3-compatible endpoint. The secret is returned once, stored only as a hash.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "accessKeyId": {
+            "type": "string"
+          },
+          "secretAccessKey": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "accessKeyId",
+          "secretAccessKey",
+          "label"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteAccessKey",
+      "method": "DELETE",
+      "path": "/storages/:storageId/keys/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes an access key (S3 API calls with it start failing immediately).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "s3Api",
+      "method": "GET",
+      "path": "/s3/:storageId/*",
+      "auth": "public",
+      "description": "S3-compatible surface for a virtual storage (GET/HEAD/PUT/DELETE object, GET bucket list-objects). Simplified auth: accessKeyId + x-amz-secret (or Authorization: AWS <accessKeyId>:<secret>) headers — no SigV4. Paths map directly inside the virtual storage.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    }
+  ]
 }

@@ -199,6 +199,21 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     return { spaces: spaces.map((s) => ({ id: s.id, name: s.name, createdAt: (s as any).created_at ?? null })) };
   });
 
+  // --- Members: users of the caller's workspace (id + display fields), so apps can
+  // render assignee pickers/avatars without owning user data. Session-only. ---
+  app.get("/registry/members", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    const rows = await (db as any)
+      .selectFrom("workspace_member")
+      .innerJoin("user", "user.id", "workspace_member.user_id")
+      .select(["user.id as id", "user.name as name", "user.email as email", "user.image as image", "workspace_member.role as role"])
+      .where("workspace_member.workspace_id", "=", ctx.workspaceId)
+      .orderBy("user.name")
+      .execute();
+    return { members: rows, me: ctx.userId };
+  });
+
   app.post("/registry/spaces", async (req, reply) => {
     const ctx = await resolveContext(new Headers(req.headers as any));
     if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
@@ -403,9 +418,13 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
       (req.headers["x-twodb-workspace-id"] as string) ?? null,
       (req.headers["x-twodb-space-ids"] as string) ?? null,
     );
-    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
-
     const subPath = req.url.replace(new RegExp(`^/apps/${slug}`), "") || "/";
+    // Anonymous read-only exception: GET /apps/<slug>/public/* (share links etc.) is proxied
+    // WITHOUT identity — the app declares such endpoints auth:"public" and validates its own token.
+    if (!ctx) {
+      if (req.method === "GET" && /^\/public\/[A-Za-z0-9_-]+(\?.*)?$/.test(subPath)) return proxyToApp(req, reply, app_, subPath, null);
+      return reply.code(401).send({ error: "unauthorized" });
+    }
     await proxyToApp(req, reply, app_, subPath, ctx);
   });
 

@@ -1,15 +1,33 @@
 # TwoPin
 
-Bookmarks/link aggregator. **Status: scaffolded only** — not yet implemented (see the
-ecosystem roadmap, Phase 7+). This folder has the doc-generation pipeline
-(`src/manifest.ts`, `src/messages.ts`, `scripts/gen-docs.ts`) wired up and
-ready; the actual routes/UI are not written yet.
+Pinterest-style link boards. **Status: implemented (v1).** Save URLs to boards;
+TwoPin fetches each link's metadata server-side — title, description, site name,
+preview image (og:image) and favicon — and stores the image bytes in its own
+Postgres schema so the UI never hotlinks third-party origins.
 
 Shape: `backend+webapp`
 
-## Before building this out
-1. Read `AGENTS.md` in this folder.
-2. Look at `apps/twodb` (backend+webapp) or `apps/tworoute` (backend-only)
-   as fully worked examples of the same pipeline.
-3. Write real `defineEndpoint(...)` entries in `src/manifest.ts`, implement
-   them in a fastify server under `src/`, then run `pnpm gen:docs`.
+## Backend (`src/`)
+- Fastify server; every route (except `/healthz` + the internal manifest
+  endpoint) requires the Gateway-forwarded `x-twodb-*` identity headers.
+- `src/lib/link-metadata.ts` — the fetcher: bounded fetch (timeouts, byte caps,
+  max 5 redirects), SSRF guard (http/https only, private/loopback IPs refused,
+  redirect hops re-validated), cheerio-based OG/Twitter/meta extraction,
+  best-effort image + favicon download.
+- `src/db/schema.ts` — `board` and `pin` tables (pins cascade-delete with their
+  board; image/favicon stored as bytea, served via `/pins/:id/image` and
+  `/pins/:id/favicon`).
+- Endpoints are declared in `src/manifest.ts` (source of truth) — run
+  `pnpm gen:docs` after changing them.
+
+## Webapp (`webapp/`)
+Boards sidebar + masonry pin grid, add-pin dialog with live URL preview
+(`POST /metadata/preview`), edit/move/refresh/delete per pin. Follows
+`blocks/CONVENTIONS.md` (partials/hooks split).
+
+## Dev
+```sh
+pnpm --filter @twodb/app-twodb provision:dev twopin   # one-time: DB creds → .env
+pnpm --filter @twodb/app-twopin dev                   # backend on :6415
+pnpm --filter @twodb/app-twopin-webapp dev            # webapp on :6510 (proxies /apps/twopin → gateway)
+```

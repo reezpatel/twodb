@@ -1,9 +1,9 @@
 {
   "name": "TwoThing",
   "slug": "twothing",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "shape": "backend+webapp",
-  "description": "Inventory management — not yet implemented. See AGENTS.md before building it out.",
+  "description": "Personal inventory: nested places (room › shelf › box), items with specs/images/stock levels, bulk-printed random QR label codes, and camera scanning for labels and manufacturer barcodes.",
   "capabilities": [],
   "coreDeps": [
     "core-data",
@@ -11,6 +11,3832 @@
     "core-async"
   ],
   "basePath": "/apps/twothing",
-  "generatedAt": "2026-11-09T12:16:50.146Z",
-  "endpoints": []
+  "generatedAt": "2026-11-12T15:54:57.787Z",
+  "endpoints": [
+    {
+      "name": "listItems",
+      "method": "GET",
+      "path": "/items",
+      "auth": "session-or-apiKey",
+      "description": "Search/filter items. `q` matches every term across name, label, specs, tags, part number and barcodes. `locationId` includes sub-places unless recursive=false.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "recursive": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "low": {
+            "type": "string"
+          },
+          "unplaced": {
+            "type": "string"
+          },
+          "favorite": {
+            "type": "string"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "name",
+              "updated",
+              "created",
+              "quantity"
+            ]
+          },
+          "limit": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "code": {
+                  "description": "Our printed label code (canonical, e.g. K7QM2X)",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "codeDisplay": {
+                  "description": "Display form, e.g. K7Q-M2X",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "minQuantity": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "low": {
+                  "type": "boolean"
+                },
+                "locationId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "locationPath": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "barcodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Manufacturer EAN/UPC/QR payloads found on the product"
+                },
+                "specs": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "imageIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "mpn": {
+                  "type": "string"
+                },
+                "manufacturer": {
+                  "type": "string"
+                },
+                "supplier": {
+                  "type": "string"
+                },
+                "unitCost": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "purchaseUrl": {
+                  "type": "string"
+                },
+                "datasheetUrl": {
+                  "type": "string"
+                },
+                "notes": {
+                  "type": "string"
+                },
+                "favorite": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "codeDisplay",
+                "name",
+                "description",
+                "category",
+                "quantity",
+                "unit",
+                "minQuantity",
+                "low",
+                "locationId",
+                "locationPath",
+                "tags",
+                "barcodes",
+                "specs",
+                "imageIds",
+                "mpn",
+                "manufacturer",
+                "supplier",
+                "unitCost",
+                "purchaseUrl",
+                "datasheetUrl",
+                "notes",
+                "favorite",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createItem",
+      "method": "POST",
+      "path": "/items",
+      "auth": "session-or-apiKey",
+      "description": "Creates an item. 409 code_in_use if the label is already on something.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "minQuantity": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "locationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "description": "Label code (scanned/typed); must not be on another item or place",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "autoCode": {
+            "description": "Allocate a fresh pool code when `code` is empty",
+            "type": "boolean"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "barcodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "specs": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "imageIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mpn": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "supplier": {
+            "type": "string"
+          },
+          "unitCost": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "purchaseUrl": {
+            "type": "string"
+          },
+          "datasheetUrl": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "favorite": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "description": "Our printed label code (canonical, e.g. K7QM2X)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "codeDisplay": {
+            "description": "Display form, e.g. K7Q-M2X",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "minQuantity": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "low": {
+            "type": "boolean"
+          },
+          "locationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locationPath": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "barcodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Manufacturer EAN/UPC/QR payloads found on the product"
+          },
+          "specs": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "imageIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mpn": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "supplier": {
+            "type": "string"
+          },
+          "unitCost": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "purchaseUrl": {
+            "type": "string"
+          },
+          "datasheetUrl": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "favorite": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "codeDisplay",
+          "name",
+          "description",
+          "category",
+          "quantity",
+          "unit",
+          "minQuantity",
+          "low",
+          "locationId",
+          "locationPath",
+          "tags",
+          "barcodes",
+          "specs",
+          "imageIds",
+          "mpn",
+          "manufacturer",
+          "supplier",
+          "unitCost",
+          "purchaseUrl",
+          "datasheetUrl",
+          "notes",
+          "favorite",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getItem",
+      "method": "GET",
+      "path": "/items/:id",
+      "auth": "session-or-apiKey",
+      "description": "One item plus its recent activity.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "code": {
+                "description": "Our printed label code (canonical, e.g. K7QM2X)",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "codeDisplay": {
+                "description": "Display form, e.g. K7Q-M2X",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "number"
+              },
+              "unit": {
+                "type": "string"
+              },
+              "minQuantity": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "low": {
+                "type": "boolean"
+              },
+              "locationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "locationPath": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "barcodes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Manufacturer EAN/UPC/QR payloads found on the product"
+              },
+              "specs": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "imageIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "mpn": {
+                "type": "string"
+              },
+              "manufacturer": {
+                "type": "string"
+              },
+              "supplier": {
+                "type": "string"
+              },
+              "unitCost": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "purchaseUrl": {
+                "type": "string"
+              },
+              "datasheetUrl": {
+                "type": "string"
+              },
+              "notes": {
+                "type": "string"
+              },
+              "favorite": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "codeDisplay",
+              "name",
+              "description",
+              "category",
+              "quantity",
+              "unit",
+              "minQuantity",
+              "low",
+              "locationId",
+              "locationPath",
+              "tags",
+              "barcodes",
+              "specs",
+              "imageIds",
+              "mpn",
+              "manufacturer",
+              "supplier",
+              "unitCost",
+              "purchaseUrl",
+              "datasheetUrl",
+              "notes",
+              "favorite",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "activity": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "targetKind": {
+                  "type": "string"
+                },
+                "targetId": {
+                  "type": "string"
+                },
+                "targetName": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "created",
+                    "updated",
+                    "quantity",
+                    "moved",
+                    "labeled",
+                    "deleted",
+                    "imported"
+                  ]
+                },
+                "detail": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "userId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "targetKind",
+                "targetId",
+                "targetName",
+                "action",
+                "detail",
+                "userId",
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "item",
+          "activity"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateItem",
+      "method": "PATCH",
+      "path": "/items/:id",
+      "auth": "session-or-apiKey",
+      "description": "Partial update; changes are diffed into the activity log.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "minQuantity": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "locationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "description": "Label code (scanned/typed); must not be on another item or place",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "autoCode": {
+            "description": "Allocate a fresh pool code when `code` is empty",
+            "type": "boolean"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "barcodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "specs": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "imageIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mpn": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "supplier": {
+            "type": "string"
+          },
+          "unitCost": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "purchaseUrl": {
+            "type": "string"
+          },
+          "datasheetUrl": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "favorite": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "description": "Our printed label code (canonical, e.g. K7QM2X)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "codeDisplay": {
+            "description": "Display form, e.g. K7Q-M2X",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "minQuantity": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "low": {
+            "type": "boolean"
+          },
+          "locationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locationPath": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "barcodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Manufacturer EAN/UPC/QR payloads found on the product"
+          },
+          "specs": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "imageIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mpn": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "supplier": {
+            "type": "string"
+          },
+          "unitCost": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "purchaseUrl": {
+            "type": "string"
+          },
+          "datasheetUrl": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "favorite": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "codeDisplay",
+          "name",
+          "description",
+          "category",
+          "quantity",
+          "unit",
+          "minQuantity",
+          "low",
+          "locationId",
+          "locationPath",
+          "tags",
+          "barcodes",
+          "specs",
+          "imageIds",
+          "mpn",
+          "manufacturer",
+          "supplier",
+          "unitCost",
+          "purchaseUrl",
+          "datasheetUrl",
+          "notes",
+          "favorite",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteItem",
+      "method": "DELETE",
+      "path": "/items/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes an item (its label code becomes free again after the re-issue window).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "adjustQuantity",
+      "method": "POST",
+      "path": "/items/:id/adjust",
+      "auth": "session-or-apiKey",
+      "description": "Stock in/out: `delta` (+/-) or absolute `set`. Clamped at 0.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "delta": {
+            "type": "number"
+          },
+          "set": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "description": "Our printed label code (canonical, e.g. K7QM2X)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "codeDisplay": {
+            "description": "Display form, e.g. K7Q-M2X",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "minQuantity": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "low": {
+            "type": "boolean"
+          },
+          "locationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locationPath": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "barcodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Manufacturer EAN/UPC/QR payloads found on the product"
+          },
+          "specs": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "imageIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mpn": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "supplier": {
+            "type": "string"
+          },
+          "unitCost": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "purchaseUrl": {
+            "type": "string"
+          },
+          "datasheetUrl": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "favorite": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "codeDisplay",
+          "name",
+          "description",
+          "category",
+          "quantity",
+          "unit",
+          "minQuantity",
+          "low",
+          "locationId",
+          "locationPath",
+          "tags",
+          "barcodes",
+          "specs",
+          "imageIds",
+          "mpn",
+          "manufacturer",
+          "supplier",
+          "unitCost",
+          "purchaseUrl",
+          "datasheetUrl",
+          "notes",
+          "favorite",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "moveItems",
+      "method": "POST",
+      "path": "/items/move",
+      "auth": "session-or-apiKey",
+      "description": "Moves items into a place (null = unplaced). Used by scan put-away mode.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "itemIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "locationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "itemIds",
+          "locationId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "moved": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "moved"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listTags",
+      "method": "GET",
+      "path": "/tags",
+      "auth": "session-or-apiKey",
+      "description": "All tags with usage counts.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tag": {
+                  "type": "string"
+                },
+                "n": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "tag",
+                "n"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "tags"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listLocations",
+      "method": "GET",
+      "path": "/locations",
+      "auth": "session-or-apiKey",
+      "description": "Every place in tree (depth-first) order with direct + recursive item counts.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "codeDisplay": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "parentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "imageId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "path": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "depth": {
+                  "type": "number"
+                },
+                "itemCount": {
+                  "type": "number"
+                },
+                "totalItemCount": {
+                  "type": "number"
+                },
+                "childCount": {
+                  "type": "number"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "codeDisplay",
+                "name",
+                "kind",
+                "parentId",
+                "description",
+                "color",
+                "imageId",
+                "path",
+                "depth",
+                "itemCount",
+                "totalItemCount",
+                "childCount",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "unplacedCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "locations",
+          "unplacedCount"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createLocation",
+      "method": "POST",
+      "path": "/locations",
+      "auth": "session-or-apiKey",
+      "description": "Creates a place (room/shelf/box…).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "room | cabinet | shelf | rack | drawer | bin | box | organizer | bag | other",
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "imageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "autoCode": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "codeDisplay": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "imageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "depth": {
+            "type": "number"
+          },
+          "itemCount": {
+            "type": "number"
+          },
+          "totalItemCount": {
+            "type": "number"
+          },
+          "childCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "codeDisplay",
+          "name",
+          "kind",
+          "parentId",
+          "description",
+          "color",
+          "imageId",
+          "path",
+          "depth",
+          "itemCount",
+          "totalItemCount",
+          "childCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getLocation",
+      "method": "GET",
+      "path": "/locations/:id",
+      "auth": "session-or-apiKey",
+      "description": "A place with its direct children, direct items and activity.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "codeDisplay": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": {
+                "type": "string"
+              },
+              "color": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "imageId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "path": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "depth": {
+                "type": "number"
+              },
+              "itemCount": {
+                "type": "number"
+              },
+              "totalItemCount": {
+                "type": "number"
+              },
+              "childCount": {
+                "type": "number"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "codeDisplay",
+              "name",
+              "kind",
+              "parentId",
+              "description",
+              "color",
+              "imageId",
+              "path",
+              "depth",
+              "itemCount",
+              "totalItemCount",
+              "childCount",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "codeDisplay": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "parentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "imageId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "path": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "depth": {
+                  "type": "number"
+                },
+                "itemCount": {
+                  "type": "number"
+                },
+                "totalItemCount": {
+                  "type": "number"
+                },
+                "childCount": {
+                  "type": "number"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "codeDisplay",
+                "name",
+                "kind",
+                "parentId",
+                "description",
+                "color",
+                "imageId",
+                "path",
+                "depth",
+                "itemCount",
+                "totalItemCount",
+                "childCount",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "code": {
+                  "description": "Our printed label code (canonical, e.g. K7QM2X)",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "codeDisplay": {
+                  "description": "Display form, e.g. K7Q-M2X",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "minQuantity": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "low": {
+                  "type": "boolean"
+                },
+                "locationId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "locationPath": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "barcodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Manufacturer EAN/UPC/QR payloads found on the product"
+                },
+                "specs": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "imageIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "mpn": {
+                  "type": "string"
+                },
+                "manufacturer": {
+                  "type": "string"
+                },
+                "supplier": {
+                  "type": "string"
+                },
+                "unitCost": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "purchaseUrl": {
+                  "type": "string"
+                },
+                "datasheetUrl": {
+                  "type": "string"
+                },
+                "notes": {
+                  "type": "string"
+                },
+                "favorite": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "codeDisplay",
+                "name",
+                "description",
+                "category",
+                "quantity",
+                "unit",
+                "minQuantity",
+                "low",
+                "locationId",
+                "locationPath",
+                "tags",
+                "barcodes",
+                "specs",
+                "imageIds",
+                "mpn",
+                "manufacturer",
+                "supplier",
+                "unitCost",
+                "purchaseUrl",
+                "datasheetUrl",
+                "notes",
+                "favorite",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "activity": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "targetKind": {
+                  "type": "string"
+                },
+                "targetId": {
+                  "type": "string"
+                },
+                "targetName": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "created",
+                    "updated",
+                    "quantity",
+                    "moved",
+                    "labeled",
+                    "deleted",
+                    "imported"
+                  ]
+                },
+                "detail": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "userId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "targetKind",
+                "targetId",
+                "targetName",
+                "action",
+                "detail",
+                "userId",
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "location",
+          "children",
+          "items",
+          "activity"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateLocation",
+      "method": "PATCH",
+      "path": "/locations/:id",
+      "auth": "session-or-apiKey",
+      "description": "Partial update. Re-parenting into own subtree → 400 cycle.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "room | cabinet | shelf | rack | drawer | bin | box | organizer | bag | other",
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "imageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "autoCode": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "codeDisplay": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "imageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "depth": {
+            "type": "number"
+          },
+          "itemCount": {
+            "type": "number"
+          },
+          "totalItemCount": {
+            "type": "number"
+          },
+          "childCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "codeDisplay",
+          "name",
+          "kind",
+          "parentId",
+          "description",
+          "color",
+          "imageId",
+          "path",
+          "depth",
+          "itemCount",
+          "totalItemCount",
+          "childCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteLocation",
+      "method": "DELETE",
+      "path": "/locations/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a place. Non-empty → 409 location_not_empty unless contents=parent (children + items move one level up).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "contents": {
+            "type": "string",
+            "enum": [
+              "parent"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "generateCodes",
+      "method": "POST",
+      "path": "/codes/generate",
+      "auth": "session-or-apiKey",
+      "description": "Bulk-generates random (non-sequential) 6-char label codes for printing. A code is never handed out if it was generated in the last 7 days or is on any item/place.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "display": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "display"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "reissueWindowDays": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "batchId",
+          "codes",
+          "reissueWindowDays"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "nextCode",
+      "method": "POST",
+      "path": "/codes/next",
+      "auth": "session-or-apiKey",
+      "description": "Allocates a single fresh code (same uniqueness rules), not tied to a print batch.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "display": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "display"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listCodeBatches",
+      "method": "GET",
+      "path": "/codes/batches",
+      "auth": "session-or-apiKey",
+      "description": "Print batches with how many of their codes are in use, plus pool totals.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "batches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                },
+                "note": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "live": {
+                  "type": "number"
+                },
+                "used": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "count",
+                "note",
+                "createdAt",
+                "live",
+                "used"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "pool": {
+            "type": "object",
+            "properties": {
+              "free": {
+                "type": "number"
+              },
+              "fresh": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "free",
+              "fresh"
+            ],
+            "additionalProperties": false
+          },
+          "reissueWindowDays": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "batches",
+          "pool",
+          "reissueWindowDays"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getCodeBatch",
+      "method": "GET",
+      "path": "/codes/batches/:id",
+      "auth": "session-or-apiKey",
+      "description": "Codes in a batch (for re-printing) and what each is used by.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "batch": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "count": {
+                "type": "number"
+              },
+              "note": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "count",
+              "note",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "display": {
+                  "type": "string"
+                },
+                "usedBy": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "id",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "code",
+                "display",
+                "usedBy"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "batch",
+          "codes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "resolveCode",
+      "method": "GET",
+      "path": "/resolve",
+      "auth": "session-or-apiKey",
+      "description": "Resolves anything scanned: our label (bare, dashed, TT: prefixed or a /c/CODE deep link) → item/location, a free label → free_code, a manufacturer barcode/QR → items carrying it.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "raw": {
+            "type": "string"
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "item"
+                    },
+                    "via": {
+                      "type": "string",
+                      "enum": [
+                        "label",
+                        "barcode"
+                      ]
+                    },
+                    "item": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "description": "Our printed label code (canonical, e.g. K7QM2X)",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "codeDisplay": {
+                          "description": "Display form, e.g. K7Q-M2X",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "category": {
+                          "type": "string"
+                        },
+                        "quantity": {
+                          "type": "number"
+                        },
+                        "unit": {
+                          "type": "string"
+                        },
+                        "minQuantity": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "low": {
+                          "type": "boolean"
+                        },
+                        "locationId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "locationPath": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "barcodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Manufacturer EAN/UPC/QR payloads found on the product"
+                        },
+                        "specs": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "imageIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "mpn": {
+                          "type": "string"
+                        },
+                        "manufacturer": {
+                          "type": "string"
+                        },
+                        "supplier": {
+                          "type": "string"
+                        },
+                        "unitCost": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "purchaseUrl": {
+                          "type": "string"
+                        },
+                        "datasheetUrl": {
+                          "type": "string"
+                        },
+                        "notes": {
+                          "type": "string"
+                        },
+                        "favorite": {
+                          "type": "boolean"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "code",
+                        "codeDisplay",
+                        "name",
+                        "description",
+                        "category",
+                        "quantity",
+                        "unit",
+                        "minQuantity",
+                        "low",
+                        "locationId",
+                        "locationPath",
+                        "tags",
+                        "barcodes",
+                        "specs",
+                        "imageIds",
+                        "mpn",
+                        "manufacturer",
+                        "supplier",
+                        "unitCost",
+                        "purchaseUrl",
+                        "datasheetUrl",
+                        "notes",
+                        "favorite",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "via",
+                    "item"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "location"
+                    },
+                    "location": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "codeDisplay": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        },
+                        "parentId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "color": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "imageId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "path": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "depth": {
+                          "type": "number"
+                        },
+                        "itemCount": {
+                          "type": "number"
+                        },
+                        "totalItemCount": {
+                          "type": "number"
+                        },
+                        "childCount": {
+                          "type": "number"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "code",
+                        "codeDisplay",
+                        "name",
+                        "kind",
+                        "parentId",
+                        "description",
+                        "color",
+                        "imageId",
+                        "path",
+                        "depth",
+                        "itemCount",
+                        "totalItemCount",
+                        "childCount",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "location"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "free_code"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "display": {
+                      "type": "string"
+                    },
+                    "inPool": {
+                      "type": "boolean"
+                    },
+                    "generatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "display",
+                    "inPool",
+                    "generatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "raw",
+          "code",
+          "matches"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "stats",
+      "method": "GET",
+      "path": "/stats",
+      "auth": "session-or-apiKey",
+      "description": "Dashboard: totals, per-category counts/value, low stock, recently added, favorites, recent activity.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "totals": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "number"
+              },
+              "units": {
+                "type": "number"
+              },
+              "value": {
+                "type": "number"
+              },
+              "low": {
+                "type": "number"
+              },
+              "unplaced": {
+                "type": "number"
+              },
+              "unlabeled": {
+                "type": "number"
+              },
+              "locations": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "items",
+              "units",
+              "value",
+              "low",
+              "unplaced",
+              "unlabeled",
+              "locations"
+            ],
+            "additionalProperties": false
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string"
+                },
+                "n": {
+                  "type": "number"
+                },
+                "value": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "category",
+                "n",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "lowStock": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "code": {
+                  "description": "Our printed label code (canonical, e.g. K7QM2X)",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "codeDisplay": {
+                  "description": "Display form, e.g. K7Q-M2X",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "minQuantity": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "low": {
+                  "type": "boolean"
+                },
+                "locationId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "locationPath": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "barcodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Manufacturer EAN/UPC/QR payloads found on the product"
+                },
+                "specs": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "imageIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "mpn": {
+                  "type": "string"
+                },
+                "manufacturer": {
+                  "type": "string"
+                },
+                "supplier": {
+                  "type": "string"
+                },
+                "unitCost": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "purchaseUrl": {
+                  "type": "string"
+                },
+                "datasheetUrl": {
+                  "type": "string"
+                },
+                "notes": {
+                  "type": "string"
+                },
+                "favorite": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "codeDisplay",
+                "name",
+                "description",
+                "category",
+                "quantity",
+                "unit",
+                "minQuantity",
+                "low",
+                "locationId",
+                "locationPath",
+                "tags",
+                "barcodes",
+                "specs",
+                "imageIds",
+                "mpn",
+                "manufacturer",
+                "supplier",
+                "unitCost",
+                "purchaseUrl",
+                "datasheetUrl",
+                "notes",
+                "favorite",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "recent": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "code": {
+                  "description": "Our printed label code (canonical, e.g. K7QM2X)",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "codeDisplay": {
+                  "description": "Display form, e.g. K7Q-M2X",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "minQuantity": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "low": {
+                  "type": "boolean"
+                },
+                "locationId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "locationPath": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "barcodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Manufacturer EAN/UPC/QR payloads found on the product"
+                },
+                "specs": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "imageIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "mpn": {
+                  "type": "string"
+                },
+                "manufacturer": {
+                  "type": "string"
+                },
+                "supplier": {
+                  "type": "string"
+                },
+                "unitCost": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "purchaseUrl": {
+                  "type": "string"
+                },
+                "datasheetUrl": {
+                  "type": "string"
+                },
+                "notes": {
+                  "type": "string"
+                },
+                "favorite": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "codeDisplay",
+                "name",
+                "description",
+                "category",
+                "quantity",
+                "unit",
+                "minQuantity",
+                "low",
+                "locationId",
+                "locationPath",
+                "tags",
+                "barcodes",
+                "specs",
+                "imageIds",
+                "mpn",
+                "manufacturer",
+                "supplier",
+                "unitCost",
+                "purchaseUrl",
+                "datasheetUrl",
+                "notes",
+                "favorite",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "favorites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "code": {
+                  "description": "Our printed label code (canonical, e.g. K7QM2X)",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "codeDisplay": {
+                  "description": "Display form, e.g. K7Q-M2X",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "minQuantity": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "low": {
+                  "type": "boolean"
+                },
+                "locationId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "locationPath": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "barcodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Manufacturer EAN/UPC/QR payloads found on the product"
+                },
+                "specs": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "imageIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "mpn": {
+                  "type": "string"
+                },
+                "manufacturer": {
+                  "type": "string"
+                },
+                "supplier": {
+                  "type": "string"
+                },
+                "unitCost": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "purchaseUrl": {
+                  "type": "string"
+                },
+                "datasheetUrl": {
+                  "type": "string"
+                },
+                "notes": {
+                  "type": "string"
+                },
+                "favorite": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "codeDisplay",
+                "name",
+                "description",
+                "category",
+                "quantity",
+                "unit",
+                "minQuantity",
+                "low",
+                "locationId",
+                "locationPath",
+                "tags",
+                "barcodes",
+                "specs",
+                "imageIds",
+                "mpn",
+                "manufacturer",
+                "supplier",
+                "unitCost",
+                "purchaseUrl",
+                "datasheetUrl",
+                "notes",
+                "favorite",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "activity": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "targetKind": {
+                  "type": "string"
+                },
+                "targetId": {
+                  "type": "string"
+                },
+                "targetName": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "created",
+                    "updated",
+                    "quantity",
+                    "moved",
+                    "labeled",
+                    "deleted",
+                    "imported"
+                  ]
+                },
+                "detail": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "userId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "targetKind",
+                "targetId",
+                "targetName",
+                "action",
+                "detail",
+                "userId",
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "totals",
+          "categories",
+          "lowStock",
+          "recent",
+          "favorites",
+          "activity"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listActivity",
+      "method": "GET",
+      "path": "/activity",
+      "auth": "session-or-apiKey",
+      "description": "Activity log, newest first; `before` = id cursor.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "targetKind": {
+                  "type": "string"
+                },
+                "targetId": {
+                  "type": "string"
+                },
+                "targetName": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "created",
+                    "updated",
+                    "quantity",
+                    "moved",
+                    "labeled",
+                    "deleted",
+                    "imported"
+                  ]
+                },
+                "detail": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "userId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "targetKind",
+                "targetId",
+                "targetName",
+                "action",
+                "detail",
+                "userId",
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "uploadImage",
+      "method": "POST",
+      "path": "/images",
+      "auth": "session-or-apiKey",
+      "description": "Raw image body (content-type image/*, ≤ 8 MB). Returns the id to put in imageIds/imageId.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getImage",
+      "method": "GET",
+      "path": "/images/:id",
+      "auth": "session-or-apiKey",
+      "description": "Image bytes (immutable cache).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "exportCsv",
+      "method": "GET",
+      "path": "/export.csv",
+      "auth": "session-or-apiKey",
+      "description": "All items as CSV (location as 'A > B > C' path, specs as k=v; pairs)."
+    },
+    {
+      "name": "importCsv",
+      "method": "POST",
+      "path": "/import",
+      "auth": "session-or-apiKey",
+      "description": "Imports items from CSV (headers auto-mapped; missing location paths are created). dryRun validates only.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "csv": {
+            "type": "string"
+          },
+          "dryRun": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "csv"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "number"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "row": {
+                  "type": "number"
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "row",
+                "error"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "dryRun": {
+            "type": "boolean"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "required": [
+          "created",
+          "errors",
+          "dryRun",
+          "columns"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
 }

@@ -3,14 +3,1057 @@
   "slug": "twopin",
   "version": "0.1.0",
   "shape": "backend+webapp",
-  "description": "Bookmarks/link aggregator — not yet implemented. See AGENTS.md before building it out.",
-  "capabilities": [],
+  "description": "Pinterest-style link boards: save URLs to boards; metadata (title, description, preview image, favicon) is fetched and stored server-side. See AGENTS.md.",
+  "capabilities": [
+    "boards",
+    "pins",
+    "link-metadata"
+  ],
   "coreDeps": [
     "core-data",
     "core-platform",
     "core-async"
   ],
   "basePath": "/apps/twopin",
-  "generatedAt": "2026-11-09T12:16:49.665Z",
-  "endpoints": []
+  "generatedAt": "2026-11-12T15:23:54.142Z",
+  "endpoints": [
+    {
+      "name": "listBoards",
+      "method": "GET",
+      "path": "/boards",
+      "auth": "session-or-apiKey",
+      "description": "Lists the caller's workspace boards with pin counts, oldest first.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "spaceId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "pinCount": {
+              "type": "number"
+            },
+            "createdBy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "spaceId",
+            "name",
+            "description",
+            "pinCount",
+            "createdBy",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createBoard",
+      "method": "POST",
+      "path": "/boards",
+      "auth": "session-or-apiKey",
+      "description": "Creates a board. `spaceId` is optional (boards can be workspace-wide).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pinCount": {
+            "type": "number"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "spaceId",
+          "name",
+          "description",
+          "pinCount",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateBoard",
+      "method": "PATCH",
+      "path": "/boards/:id",
+      "auth": "session-or-apiKey",
+      "description": "Renames a board, edits its description, or moves it to a space. Only fields present are changed.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "spaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pinCount": {
+            "type": "number"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "spaceId",
+          "name",
+          "description",
+          "pinCount",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteBoard",
+      "method": "DELETE",
+      "path": "/boards/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a board and all its pins (cascade).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listPins",
+      "method": "GET",
+      "path": "/pins",
+      "auth": "session-or-apiKey",
+      "description": "Lists pins in the workspace, newest first; pass `?boardId=` to scope to one board. Binary assets are never inlined — use hasImage/hasFavicon with the /pins/:id/image and /pins/:id/favicon endpoints.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "boardId": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "finalUrl": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "siteName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "ok",
+                "error"
+              ]
+            },
+            "fetchError": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "fetchedAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hasImage": {
+              "type": "boolean"
+            },
+            "hasFavicon": {
+              "type": "boolean"
+            },
+            "createdBy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "boardId",
+            "url",
+            "finalUrl",
+            "title",
+            "description",
+            "note",
+            "siteName",
+            "status",
+            "fetchError",
+            "fetchedAt",
+            "hasImage",
+            "hasFavicon",
+            "createdBy",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "getPin",
+      "method": "GET",
+      "path": "/pins/:id",
+      "auth": "session-or-apiKey",
+      "description": "Fetches one pin.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "boardId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "finalUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "siteName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "ok",
+              "error"
+            ]
+          },
+          "fetchError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fetchedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasImage": {
+            "type": "boolean"
+          },
+          "hasFavicon": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "boardId",
+          "url",
+          "finalUrl",
+          "title",
+          "description",
+          "note",
+          "siteName",
+          "status",
+          "fetchError",
+          "fetchedAt",
+          "hasImage",
+          "hasFavicon",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createPin",
+      "method": "POST",
+      "path": "/pins",
+      "auth": "session-or-apiKey",
+      "description": "Adds a link to a board and immediately fetches its metadata server-side (Open Graph/Twitter Card/meta fallbacks; redirects followed; private IPs refused). The preview image and favicon are downloaded and stored so clients never hotlink. A missing scheme is assumed to be https://. The returned pin carries status ok/error with fetchError detail — the pin is saved either way.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "boardId",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "boardId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "finalUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "siteName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "ok",
+              "error"
+            ]
+          },
+          "fetchError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fetchedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasImage": {
+            "type": "boolean"
+          },
+          "hasFavicon": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "boardId",
+          "url",
+          "finalUrl",
+          "title",
+          "description",
+          "note",
+          "siteName",
+          "status",
+          "fetchError",
+          "fetchedAt",
+          "hasImage",
+          "hasFavicon",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updatePin",
+      "method": "PATCH",
+      "path": "/pins/:id",
+      "auth": "session-or-apiKey",
+      "description": "Edits a pin: move boards, override title/description, edit the note, or change the URL. Changing the URL re-fetches metadata (overwriting title/description with fresh values).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "boardId": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "boardId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "finalUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "siteName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "ok",
+              "error"
+            ]
+          },
+          "fetchError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fetchedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasImage": {
+            "type": "boolean"
+          },
+          "hasFavicon": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "boardId",
+          "url",
+          "finalUrl",
+          "title",
+          "description",
+          "note",
+          "siteName",
+          "status",
+          "fetchError",
+          "fetchedAt",
+          "hasImage",
+          "hasFavicon",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "refreshPin",
+      "method": "POST",
+      "path": "/pins/:id/refresh",
+      "auth": "session-or-apiKey",
+      "description": "Re-fetches a pin's metadata from its URL, overwriting title/description/image/favicon with fresh values.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "boardId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "finalUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "siteName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "ok",
+              "error"
+            ]
+          },
+          "fetchError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fetchedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasImage": {
+            "type": "boolean"
+          },
+          "hasFavicon": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "boardId",
+          "url",
+          "finalUrl",
+          "title",
+          "description",
+          "note",
+          "siteName",
+          "status",
+          "fetchError",
+          "fetchedAt",
+          "hasImage",
+          "hasFavicon",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deletePin",
+      "method": "DELETE",
+      "path": "/pins/:id",
+      "auth": "session-or-apiKey",
+      "description": "Removes a pin from its board (stored image/favicon go with it).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "pinImage",
+      "method": "GET",
+      "path": "/pins/:id/image",
+      "auth": "session-or-apiKey",
+      "description": "Serves the pin's stored preview image bytes (content-type preserved, 24h private cache). 404 when none was fetched.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "pinFavicon",
+      "method": "GET",
+      "path": "/pins/:id/favicon",
+      "auth": "session-or-apiKey",
+      "description": "Serves the pin's stored favicon bytes (content-type preserved, 24h private cache). 404 when none was fetched.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "previewMetadata",
+      "method": "POST",
+      "path": "/metadata/preview",
+      "auth": "session-or-apiKey",
+      "description": "Fetches a URL's metadata WITHOUT saving anything — powers the add-pin dialog's live preview. Images come back as base64 data URIs (byte-capped). 422 with {ok:false, error} when the URL can't be fetched.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean",
+                "const": true
+              },
+              "finalUrl": {
+                "type": "string"
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "siteName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "imageDataUri": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "faviconDataUri": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "ok",
+              "finalUrl",
+              "title",
+              "description",
+              "siteName",
+              "imageDataUri",
+              "faviconDataUri"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean",
+                "const": false
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ok",
+              "error"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  ]
 }

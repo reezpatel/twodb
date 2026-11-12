@@ -2,8 +2,8 @@
   "name": "TwoContacts",
   "slug": "twocontacts",
   "version": "0.1.0",
-  "shape": "backend",
-  "description": "Contacts (embeddable) — not yet implemented. See AGENTS.md before building it out.",
+  "shape": "backend+webapp",
+  "description": "Space-scoped address books and contacts with search and recipient suggestions.",
   "capabilities": [],
   "coreDeps": [
     "core-data",
@@ -11,6 +11,172 @@
     "core-async"
   ],
   "basePath": "/apps/twocontacts",
-  "generatedAt": "2026-11-09T12:16:48.232Z",
-  "endpoints": []
+  "generatedAt": "2026-11-12T17:48:54.761Z",
+  "endpoints": [
+    {
+      "name": "listBooks",
+      "method": "GET",
+      "path": "/books",
+      "auth": "session-or-apiKey",
+      "description": "List address books in accessible spaces.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "spaceId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "id": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "spaceId",
+            "name",
+            "id",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createBook",
+      "method": "POST",
+      "path": "/books",
+      "auth": "session-or-apiKey",
+      "description": "Create an address book in an accessible space.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "spaceId",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "spaceId",
+          "name",
+          "id",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listContacts",
+      "method": "GET",
+      "path": "/contacts",
+      "auth": "session-or-apiKey",
+      "description": "Search accessible contacts; query: bookId, q, limit (1–200), offset.",
+      "response": {
+        "note": "could not convert schema to JSON Schema",
+        "error": "Error: Transforms cannot be represented in JSON Schema"
+      }
+    },
+    {
+      "name": "suggestContacts",
+      "method": "GET",
+      "path": "/contacts/suggest",
+      "auth": "session-or-apiKey",
+      "description": "Recipient suggestions using q and optional bookId; pinned contacts first, maximum 10.",
+      "response": {
+        "note": "could not convert schema to JSON Schema",
+        "error": "Error: Transforms cannot be represented in JSON Schema"
+      }
+    },
+    {
+      "name": "createContact",
+      "method": "POST",
+      "path": "/contacts",
+      "auth": "session-or-apiKey",
+      "description": "Create a contact; normalized email must be unique in its book.",
+      "request": {
+        "note": "could not convert schema to JSON Schema",
+        "error": "Error: Transforms cannot be represented in JSON Schema"
+      },
+      "response": {
+        "note": "could not convert schema to JSON Schema",
+        "error": "Error: Transforms cannot be represented in JSON Schema"
+      }
+    },
+    {
+      "name": "updateContact",
+      "method": "PATCH",
+      "path": "/contacts/:id",
+      "auth": "session-or-apiKey",
+      "description": "Edit a contact in an accessible address book.",
+      "request": {
+        "note": "could not convert schema to JSON Schema",
+        "error": "Error: Transforms cannot be represented in JSON Schema"
+      },
+      "response": {
+        "note": "could not convert schema to JSON Schema",
+        "error": "Error: Transforms cannot be represented in JSON Schema"
+      }
+    },
+    {
+      "name": "deleteContact",
+      "method": "DELETE",
+      "path": "/contacts/:id",
+      "auth": "session-or-apiKey",
+      "description": "Permanently delete a contact in an accessible address book.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
 }

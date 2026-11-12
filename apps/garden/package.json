@@ -8,7 +8,9 @@
     "build": "tsc --noEmit",
     "start": "tsx src/index.ts",
     "gen:docs": "tsx scripts/gen-docs.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "dev:shim": "tsx scripts/dev-shim.ts",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.18",

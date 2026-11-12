@@ -1,25 +1,27 @@
 #!/usr/bin/env tsx
 /**
- * Dev-mode database wiring: run the REAL TwoDB provisioning logic against
- * your local Postgres cluster (from .env's TWODB_PG_ADMIN_URL) and print
- * the exact per-app connection strings to put in .env. This is the same
- * `provisionAppDatabase()` the orchestrator uses when you docker-install an
- * app — per-app schema + least-privilege role on the shared database — so
- * dev matches production. It is idempotent and ONLY ever creates/alters
- * that app's own schema and role; it never touches anything else on the
- * cluster.
+ * Dev-mode provisioning: runs the REAL TwoDB provisioning logic against
+ * your local Postgres cluster (from .env's TWODB_PG_ADMIN_URL) — the same
+ * `provisionAppDatabase()` the orchestrator uses on docker installs:
+ * per-app schema + least-privilege role on the shared database. It also
+ * issues a fresh per-app registration token (same as
+ * `POST /orchestrator/apps/:slug/issue-token`) and stores the CURRENT
+ * encrypted credentials in the control-plane registry, so host-run dev
+ * apps can fetch them at boot via POST /registry/credentials.
  *
  * Usage:
  *   pnpm --filter @twodb/app-twodb provision:dev            # default set (tworoute)
- *   pnpm --filter @twodb/app-twodb provision:dev tworoute twodoo
+ *   pnpm --filter @twodb/app-twodb provision:dev tworoute twochat
  *
- * Then paste the printed DATABASE_URL line(s) into the repo-root .env.
+ * Then paste the printed <SLUG>_PROVISION_TOKEN line(s) into .env — that's
+ * the only secret the app needs (db credentials come from the gateway).
  */
-import { provisionAppDatabase } from "../src/db/provisioning.js";
+import { provisionAppDatabase, encryptSecret } from "../src/db/provisioning.js";
 import { createRegistryRepo } from "../src/db/registry.js";
 import { openControlPlaneDb, bootstrapControlPlaneDb } from "../src/db/sqlite.js";
 import { generateRegistrationToken } from "../src/orchestrator/tokens.js";
 import { readFileSync, existsSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import * as path from "node:path";
 
 function env(key: string): string | undefined {
@@ -39,12 +41,8 @@ async function main() {
   if (!adminUrl) throw new Error("TWODB_PG_ADMIN_URL not set (env or .env)");
   const containerHost = env("TWODB_PG_CONTAINER_HOST") ?? "twodb-postgres";
   const sqliteFile = env("TWODB_SQLITE_FILE") ?? "./.data/twodb-control-plane.sqlite";
+  const authSecret = env("AUTH_SECRET") ?? "smoketest-secret-0123456789abcdef";
 
-  // Registration tokens live in the control-plane SQLite registry, so the
-  // dev script opens the same DB the gateway uses and stores a fresh
-  // per-app token — same trust model as `POST /orchestrator/apps/:slug/
-  // issue-token`, but runnable from the CLI without a session. Re-running
-  // rotates the token (installs rotate too).
   const db = openControlPlaneDb(sqliteFile);
   await bootstrapControlPlaneDb(db);
   const registry = createRegistryRepo(db);
@@ -66,19 +64,21 @@ async function main() {
       },
       registrationToken,
     );
-    console.log(`\n# ${slug} — schema "${r.schema}", role "${r.role}" (same db as the admin URL)`);
-    console.log(`${slug.toUpperCase()}_DATABASE_URL=${r.connectionString}`);
+    // provisionAppDatabase ROTATED the role password — persist the new
+    // encrypted connection string so the token-guarded
+    // POST /registry/credentials serves CURRENT credentials, not whatever
+    // an older run/install happened to store.
+    await registry.setProvisioning(slug, r.schema, r.role, encryptSecret(r.containerConnectionString, authSecret));
+    const existing = await registry.getApp(slug);
+    if (!existing?.data_key_encrypted) {
+      await registry.setDataKey(slug, encryptSecret(randomBytes(32).toString("hex"), authSecret));
+    }
+    console.log(`\n# ${slug} — schema "${r.schema}", role "${r.role}"`);
     console.log(`${slug.toUpperCase()}_PROVISION_TOKEN=${registrationToken}`);
-    console.log(`# (docker installs instead inject: ${r.containerConnectionString})`);
+    console.log(`# (db credentials are fetched at boot via POST /registry/credentials — nothing else to paste)`);
   }
   process.exit(0);
 }
-
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
-
 
 main().catch((err) => {
   console.error(err);

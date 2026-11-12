@@ -1,0 +1,35 @@
+/* TwoThing-specific global styles (theme tokens come from @twodb/blocks). */
+
+@keyframes tt-laser {
+  0% { top: 12%; opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { top: 88%; opacity: 0.2; }
+}
+.tt-laser { animation: tt-laser 1.6s ease-in-out infinite alternate; }
+
+@keyframes tt-hit {
+  0% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 0; transform: scale(1); }
+}
+.tt-hit { animation: tt-hit 0.6s ease-out forwards; }
+
+/* Subtle drafting-paper grid behind page content. */
+.tt-grid-bg {
+  background-image: linear-gradient(var(--paper-grid) 1px, transparent 1px), linear-gradient(90deg, var(--paper-grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: -1px -1px;
+}
+
+.tt-safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* ---------------------------------------------------------------- printing
+   The label sheet renders into #tt-print-root; everything else hides. */
+#tt-print-root { display: none; }
+@media print {
+  html, body, #root { height: auto !important; background: #fff !important; }
+  body > *:not(#tt-print-root) { display: none !important; }
+  #tt-print-root { display: block !important; }
+  .tt-page { break-after: page; page-break-after: always; }
+  .tt-page:last-child { break-after: auto; page-break-after: auto; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: normal !important; }
+}

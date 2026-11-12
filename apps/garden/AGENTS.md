@@ -1,34 +1,13 @@
 # AGENTS.md — Garden
 
-Notes/PKMS. **This app is scaffolded, not implemented.** Read `README.md`
-first.
+Knowledge base (notes + Notion-style databases). Read `README.md` for the data model first.
 
-## Before writing any route
-- Add a `defineEndpoint(...)` to `src/manifest.ts` first (request/response
-  Zod schemas + description) — this is the single source of truth
-  `ENDPOINTS.md`/`endpoint.json` are generated from. Write the Fastify
-  route to match it, not the other way around.
-- This app only ever talks to other apps **through the Gateway**
-  (`apps/twodb`) — never import `@twodb/core-platform/transport` or dial
-  another app's URL directly.
-- Identity arrives pre-resolved as `x-twodb-*` headers forwarded by the
-  Gateway (see `apps/tworoute/src/gateway-context.ts` for the read-side
-  pattern) — never talk to better-auth or the org/workspace/space tables
-  yourself.
-- One Postgres schema, named `garden`, provisioned by TwoDB
-  (`POST /registry/apps/garden/provision`) — access it only via
-  `@twodb/core-data/db`'s `createPgDb()`.
-- Call `registerWithGateway(manifest, opts)` from
-  `@twodb/core-platform/manifest` on boot (see `apps/tworoute/src/index.ts`).
-
-## Frontend (if this app has a webapp)
-Follow `blocks/CONVENTIONS.md` exactly: one component per file,
-`partials/` = dumb UI only, `hooks/` = all business logic with one holding
-hook per component. Don't add anything to `blocks/` speculatively — only
-once a second app needs the same component.
-
-## Messaging
-If this app needs background jobs or cross-app notifications, declare them
-in `src/messages.ts` via `@twodb/core-async/registry`'s `defineJob`/
-`defineBroadcastEvent` — don't reach for Redis/NATS (v1 is Postgres-backed
-only, see the architecture decision log).
+## Rules
+- Endpoints: add/change the Zod schema in `src/schemas.ts` + `defineEndpoint` in `src/manifest.ts` first, then the route; run `pnpm gen:docs`. Never hand-edit `ENDPOINTS.md`/`endpoint.json`.
+- Identity comes only from gateway `x-twodb-*` headers (`src/gateway-context.ts`); the active space from `x-garden-space` (validated against `x-twodb-space-ids`). Every query must be scoped by `workspace_id` + `space_id` (`store/base.ts` helpers).
+- Dynamic SQL identifiers (`db_<uuid>` tables, `"<field uuid>"` columns) are only ever built through `domain/dynamic-table.ts` (`tableRef`, `columnRef`), which validate uuids. Never interpolate user strings into SQL; formula literals become bind parameters.
+- New field types need: `shared/model.ts` (types, labels, operators), `SQL_TYPES` (if physical), `coerceValue` + `convertValues`, `fieldExpr`, filter semantics in `domain/filters.ts`, and UI in `webapp/src/database/fields/` (display, editor, icon).
+- Keep the invariant: a page's `database_id` is its parent database, else the space's default Notes database.
+- Run `pnpm smoke` (backend) and the Playwright scripts (`scripts/ui-check.mjs`, `scripts/ui-deep.mjs`) after behavioural changes.
+- Webapp follows `blocks/CONVENTIONS.md`: one component per file, `partials/` presentational, `hooks/` logic. Styling uses `@twodb/blocks` tokens only (paper/stone/ink/outline/ion-deep…); floating surfaces use `.garden-float`.
+- Talk to other apps only through the Gateway.

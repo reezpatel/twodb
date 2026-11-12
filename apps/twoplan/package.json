@@ -1,0 +1,30 @@
+{
+  "name": "@twodb/app-twoplan",
+  "private": true,
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "PORT=${PORT:-6417} tsx watch --env-file=../../.env src/index.ts",
+    "build": "tsc --noEmit",
+    "start": "tsx src/index.ts",
+    "gen:docs": "tsx scripts/gen-docs.ts",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@twodb/core-async": "workspace:*",
+    "@twodb/core-data": "workspace:*",
+    "@twodb/core-platform": "workspace:*",
+    "fastify": "^5.11.2",
+    "kysely": "^0.29.5",
+    "pg": "^8.23.0",
+    "ulid": "^3.0.2",
+    "zod": "^4.5.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.21.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

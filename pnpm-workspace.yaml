@@ -3,6 +3,7 @@ packages:
   - "apps/*/webapp"
   - "core/*"
   - "blocks"
+  - "editor"
   - "tools/*"
 
 onlyBuiltDependencies:

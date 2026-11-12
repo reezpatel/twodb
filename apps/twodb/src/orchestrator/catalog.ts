@@ -39,6 +39,7 @@ export const APP_CATALOG: CatalogEntry[] = [
   { slug: "paintress", name: "Paintress", pkgName: "@twodb/app-paintress", containerPort: 6414, hostPort: 6414 },
   { slug: "twopin", name: "TwoPin", pkgName: "@twodb/app-twopin", containerPort: 6415, hostPort: 6415 },
   { slug: "twodoo", name: "TwoDoo", pkgName: "@twodb/app-twodoo", containerPort: 6416, hostPort: 6416 },
+  { slug: "twoplan", name: "TwoPlan", pkgName: "@twodb/app-twoplan", containerPort: 6417, hostPort: 6417 },
 ];
 
 export function getCatalogEntry(slug: string): CatalogEntry | undefined {

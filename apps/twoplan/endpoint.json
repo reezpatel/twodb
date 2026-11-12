@@ -1,0 +1,7413 @@
+{
+  "name": "TwoPlan",
+  "slug": "twoplan",
+  "version": "0.1.0",
+  "shape": "backend+webapp",
+  "description": "Project management: Space → Project (KEY) → epics, milestones and tickets. Kanban/table/timeline views, sub-tasks, checklists, links, custom fields, saved views, docs, dashboards, inbox, CSV/Linear import. Workspace-level access.",
+  "capabilities": [
+    "projects",
+    "tickets"
+  ],
+  "coreDeps": [
+    "core-data",
+    "core-platform",
+    "core-async"
+  ],
+  "basePath": "/apps/twoplan",
+  "generatedAt": "2026-11-12T13:19:06.972Z",
+  "endpoints": [
+    {
+      "name": "listProjects",
+      "method": "GET",
+      "path": "/projects",
+      "auth": "session-or-apiKey",
+      "description": "Lists projects in the workspace (optionally one space). Workspace members see every space and project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string"
+          },
+          "includeArchived": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "workspaceId": {
+              "type": "string"
+            },
+            "spaceId": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "icon": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "pointsEstimateEnabled": {
+              "type": "boolean"
+            },
+            "timeEstimateEnabled": {
+              "type": "boolean"
+            },
+            "subtasksEnabled": {
+              "type": "boolean"
+            },
+            "checklistsEnabled": {
+              "type": "boolean"
+            },
+            "archivedAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            },
+            "ticketCount": {
+              "type": "number"
+            },
+            "openTicketCount": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "workspaceId",
+            "spaceId",
+            "key",
+            "name",
+            "description",
+            "icon",
+            "pointsEstimateEnabled",
+            "timeEstimateEnabled",
+            "subtasksEnabled",
+            "checklistsEnabled",
+            "archivedAt",
+            "createdAt",
+            "updatedAt",
+            "ticketCount",
+            "openTicketCount"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createProject",
+      "method": "POST",
+      "path": "/projects",
+      "auth": "session-or-apiKey",
+      "description": "Creates a project inside a space with a unique key (tickets become KEY-1, KEY-2, …). Seeds the default workflow, or copies a project template's configuration.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9]{1,9}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "templateId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "spaceId",
+          "key",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pointsEstimateEnabled": {
+            "type": "boolean"
+          },
+          "timeEstimateEnabled": {
+            "type": "boolean"
+          },
+          "subtasksEnabled": {
+            "type": "boolean"
+          },
+          "checklistsEnabled": {
+            "type": "boolean"
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "spaceId",
+          "key",
+          "name",
+          "description",
+          "icon",
+          "pointsEstimateEnabled",
+          "timeEstimateEnabled",
+          "subtasksEnabled",
+          "checklistsEnabled",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getProject",
+      "method": "GET",
+      "path": "/projects/:projectId",
+      "auth": "session-or-apiKey",
+      "description": "One project by id or key.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pointsEstimateEnabled": {
+            "type": "boolean"
+          },
+          "timeEstimateEnabled": {
+            "type": "boolean"
+          },
+          "subtasksEnabled": {
+            "type": "boolean"
+          },
+          "checklistsEnabled": {
+            "type": "boolean"
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "spaceId",
+          "key",
+          "name",
+          "description",
+          "icon",
+          "pointsEstimateEnabled",
+          "timeEstimateEnabled",
+          "subtasksEnabled",
+          "checklistsEnabled",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateProject",
+      "method": "PATCH",
+      "path": "/projects/:projectId",
+      "auth": "session-or-apiKey",
+      "description": "Renames or reconfigures a project (feature toggles, estimate kinds). The key is immutable.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "pointsEstimateEnabled": {
+            "type": "boolean"
+          },
+          "timeEstimateEnabled": {
+            "type": "boolean"
+          },
+          "subtasksEnabled": {
+            "type": "boolean"
+          },
+          "checklistsEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pointsEstimateEnabled": {
+            "type": "boolean"
+          },
+          "timeEstimateEnabled": {
+            "type": "boolean"
+          },
+          "subtasksEnabled": {
+            "type": "boolean"
+          },
+          "checklistsEnabled": {
+            "type": "boolean"
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "spaceId",
+          "key",
+          "name",
+          "description",
+          "icon",
+          "pointsEstimateEnabled",
+          "timeEstimateEnabled",
+          "subtasksEnabled",
+          "checklistsEnabled",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "archiveProject",
+      "method": "POST",
+      "path": "/projects/:projectId/archive",
+      "auth": "session-or-apiKey",
+      "description": "Archives (or restores, with restore=true) a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "restore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pointsEstimateEnabled": {
+            "type": "boolean"
+          },
+          "timeEstimateEnabled": {
+            "type": "boolean"
+          },
+          "subtasksEnabled": {
+            "type": "boolean"
+          },
+          "checklistsEnabled": {
+            "type": "boolean"
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "spaceId",
+          "key",
+          "name",
+          "description",
+          "icon",
+          "pointsEstimateEnabled",
+          "timeEstimateEnabled",
+          "subtasksEnabled",
+          "checklistsEnabled",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteProject",
+      "method": "DELETE",
+      "path": "/projects/:projectId",
+      "auth": "session-or-apiKey",
+      "description": "Permanently deletes a project and everything in it.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listProjectTemplates",
+      "method": "GET",
+      "path": "/project-templates",
+      "auth": "session-or-apiKey",
+      "description": "Project templates of the workspace.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "workspaceId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "workspaceId",
+            "name",
+            "description",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "saveProjectAsTemplate",
+      "method": "POST",
+      "path": "/projects/:projectId/save-as-template",
+      "auth": "session-or-apiKey",
+      "description": "Snapshots a project's statuses, types, labels, custom fields, settings and ticket templates into a reusable project template.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "name",
+          "description",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteProjectTemplate",
+      "method": "DELETE",
+      "path": "/project-templates/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a project template (projects created from it are unaffected).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getProjectStats",
+      "method": "GET",
+      "path": "/projects/:projectId/stats",
+      "auth": "session-or-apiKey",
+      "description": "Aggregates for dashboards: tickets by status / priority / assignee / type / epic and recent created-vs-completed counts.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "listStatuses",
+      "method": "GET",
+      "path": "/projects/:projectId/statuses",
+      "auth": "session-or-apiKey",
+      "description": "Lists statuses of a project, ordered by position.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "backlog",
+                "todo",
+                "in_progress",
+                "done",
+                "canceled"
+              ]
+            },
+            "position": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "projectId",
+            "name",
+            "color",
+            "category",
+            "position"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createStatus",
+      "method": "POST",
+      "path": "/projects/:projectId/statuses",
+      "auth": "session-or-apiKey",
+      "description": "Creates a status in a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "backlog",
+              "todo",
+              "in_progress",
+              "done",
+              "canceled"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "category",
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "backlog",
+              "todo",
+              "in_progress",
+              "done",
+              "canceled"
+            ]
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "color",
+          "category",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateStatus",
+      "method": "PATCH",
+      "path": "/projects/:projectId/statuses/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a status.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "backlog",
+              "todo",
+              "in_progress",
+              "done",
+              "canceled"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "backlog",
+              "todo",
+              "in_progress",
+              "done",
+              "canceled"
+            ]
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "color",
+          "category",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteStatus",
+      "method": "DELETE",
+      "path": "/projects/:projectId/statuses/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a status.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listTicketTypes",
+      "method": "GET",
+      "path": "/projects/:projectId/ticket-types",
+      "auth": "session-or-apiKey",
+      "description": "Lists tickettypes of a project, ordered by position.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "icon": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            },
+            "position": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "projectId",
+            "name",
+            "icon",
+            "color",
+            "position"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createTicketType",
+      "method": "POST",
+      "path": "/projects/:projectId/ticket-types",
+      "auth": "session-or-apiKey",
+      "description": "Creates a tickettype in a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "icon": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "icon",
+          "color",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateTicketType",
+      "method": "PATCH",
+      "path": "/projects/:projectId/ticket-types/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a tickettype.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "icon": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "icon",
+          "color",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteTicketType",
+      "method": "DELETE",
+      "path": "/projects/:projectId/ticket-types/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a tickettype.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listLabelGroups",
+      "method": "GET",
+      "path": "/projects/:projectId/label-groups",
+      "auth": "session-or-apiKey",
+      "description": "Lists labelgroups of a project, ordered by position.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "position": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "projectId",
+            "name",
+            "position"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createLabelGroup",
+      "method": "POST",
+      "path": "/projects/:projectId/label-groups",
+      "auth": "session-or-apiKey",
+      "description": "Creates a labelgroup in a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateLabelGroup",
+      "method": "PATCH",
+      "path": "/projects/:projectId/label-groups/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a labelgroup.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteLabelGroup",
+      "method": "DELETE",
+      "path": "/projects/:projectId/label-groups/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a labelgroup.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listLabels",
+      "method": "GET",
+      "path": "/projects/:projectId/labels",
+      "auth": "session-or-apiKey",
+      "description": "Lists labels of a project, ordered by name.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "groupId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "projectId",
+            "groupId",
+            "name",
+            "color"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createLabel",
+      "method": "POST",
+      "path": "/projects/:projectId/labels",
+      "auth": "session-or-apiKey",
+      "description": "Creates a label in a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "groupId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "groupId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "groupId",
+          "name",
+          "color"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateLabel",
+      "method": "PATCH",
+      "path": "/projects/:projectId/labels/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a label.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "groupId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "groupId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "groupId",
+          "name",
+          "color"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteLabel",
+      "method": "DELETE",
+      "path": "/projects/:projectId/labels/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a label.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listCustomFields",
+      "method": "GET",
+      "path": "/projects/:projectId/custom-fields",
+      "auth": "session-or-apiKey",
+      "description": "Lists customfields of a project, ordered by position.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "text",
+                "number",
+                "date",
+                "select",
+                "checkbox",
+                "url"
+              ]
+            },
+            "position": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "projectId",
+            "name",
+            "type",
+            "position"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createCustomField",
+      "method": "POST",
+      "path": "/projects/:projectId/custom-fields",
+      "auth": "session-or-apiKey",
+      "description": "Creates a customfield in a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "date",
+              "select",
+              "checkbox",
+              "url"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "date",
+              "select",
+              "checkbox",
+              "url"
+            ]
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "type",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateCustomField",
+      "method": "PATCH",
+      "path": "/projects/:projectId/custom-fields/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a customfield.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "date",
+              "select",
+              "checkbox",
+              "url"
+            ]
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "type",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteCustomField",
+      "method": "DELETE",
+      "path": "/projects/:projectId/custom-fields/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a customfield.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listCustomFieldOptions",
+      "method": "GET",
+      "path": "/projects/:projectId/custom-fields/:fieldId/options",
+      "auth": "session-or-apiKey",
+      "description": "Options of a `select` custom field.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "fieldId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "fieldId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "fieldId": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            },
+            "position": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "fieldId",
+            "label",
+            "color",
+            "position"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createCustomFieldOption",
+      "method": "POST",
+      "path": "/projects/:projectId/custom-fields/:fieldId/options",
+      "auth": "session-or-apiKey",
+      "description": "Adds an option to a `select` custom field.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "fieldId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        },
+        "required": [
+          "projectId",
+          "fieldId",
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fieldId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "fieldId",
+          "label",
+          "color",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateCustomFieldOption",
+      "method": "PATCH",
+      "path": "/projects/:projectId/custom-fields/:fieldId/options/:id",
+      "auth": "session-or-apiKey",
+      "description": "Renames / recolors / reorders a custom-field option.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "fieldId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "projectId",
+          "fieldId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fieldId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "fieldId",
+          "label",
+          "color",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteCustomFieldOption",
+      "method": "DELETE",
+      "path": "/projects/:projectId/custom-fields/:fieldId/options/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a custom-field option.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "fieldId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "fieldId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getProjectConfig",
+      "method": "GET",
+      "path": "/projects/:projectId/config",
+      "auth": "session-or-apiKey",
+      "description": "Everything the UI needs to render a project in one round trip: statuses, ticket types, label groups, labels, custom fields with options.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "listTickets",
+      "method": "GET",
+      "path": "/projects/:projectId/tickets",
+      "auth": "session-or-apiKey",
+      "description": "Lists tickets of a project with filters, sorting and pagination. Sub-tasks are included unless parentId=none.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "statusId": {
+            "description": "comma-separated status ids",
+            "type": "string"
+          },
+          "statusCategory": {
+            "description": "comma-separated: backlog,todo,in_progress,done,canceled",
+            "type": "string"
+          },
+          "assigneeUserId": {
+            "description": "user id, comma-separated, or 'none'",
+            "type": "string"
+          },
+          "priority": {
+            "description": "comma-separated, or 'none'",
+            "type": "string"
+          },
+          "typeId": {
+            "type": "string"
+          },
+          "epicId": {
+            "description": "epic id or 'none'",
+            "type": "string"
+          },
+          "milestoneId": {
+            "description": "milestone id or 'none'",
+            "type": "string"
+          },
+          "labelId": {
+            "description": "comma-separated; ticket must have ANY",
+            "type": "string"
+          },
+          "parentId": {
+            "description": "parent ticket id or 'none' for top-level only",
+            "type": "string"
+          },
+          "q": {
+            "description": "title substring or identifier like PLAN-12",
+            "type": "string"
+          },
+          "dueBefore": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "dueAfter": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "position",
+              "createdAt",
+              "updatedAt",
+              "dueDate",
+              "priority",
+              "title",
+              "sequence"
+            ]
+          },
+          "dir": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "projectId": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string"
+                },
+                "sequenceNumber": {
+                  "type": "number"
+                },
+                "typeId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "epicId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "milestoneId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "statusId": {
+                  "type": "string"
+                },
+                "parentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "assigneeUserId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "priority": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "urgent",
+                        "high",
+                        "medium",
+                        "low"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "estimatePoints": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "estimateMinutes": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "startDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dueDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "position": {
+                  "type": "number"
+                },
+                "archivedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "labelIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "subtaskCount": {
+                  "type": "number"
+                },
+                "subtaskDoneCount": {
+                  "type": "number"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "projectId",
+                "identifier",
+                "sequenceNumber",
+                "typeId",
+                "epicId",
+                "milestoneId",
+                "statusId",
+                "parentId",
+                "assigneeUserId",
+                "title",
+                "description",
+                "priority",
+                "estimatePoints",
+                "estimateMinutes",
+                "startDate",
+                "dueDate",
+                "position",
+                "archivedAt",
+                "labelIds",
+                "subtaskCount",
+                "subtaskDoneCount",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createTicket",
+      "method": "POST",
+      "path": "/projects/:projectId/tickets",
+      "auth": "session-or-apiKey",
+      "description": "Creates a ticket (identifier KEY-n from the project's atomic counter). Defaults to the project's first backlog/todo status. Sub-tasks are one level deep. `templateId` pre-fills from a ticket template.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "statusId": {
+            "type": "string"
+          },
+          "typeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "epicId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "milestoneId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "estimatePoints": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "estimateMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dueDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "templateId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "sequenceNumber": {
+            "type": "number"
+          },
+          "typeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "epicId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "milestoneId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "statusId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "estimatePoints": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "estimateMinutes": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dueDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subtaskCount": {
+            "type": "number"
+          },
+          "subtaskDoneCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "identifier",
+          "sequenceNumber",
+          "typeId",
+          "epicId",
+          "milestoneId",
+          "statusId",
+          "parentId",
+          "assigneeUserId",
+          "title",
+          "description",
+          "priority",
+          "estimatePoints",
+          "estimateMinutes",
+          "startDate",
+          "dueDate",
+          "position",
+          "archivedAt",
+          "labelIds",
+          "subtaskCount",
+          "subtaskDoneCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getTicket",
+      "method": "GET",
+      "path": "/tickets/:ticketId",
+      "auth": "session-or-apiKey",
+      "description": "Full ticket detail by id or identifier (PLAN-12): relations (epic, milestone, parent, sub-tasks), labels, custom-field values, links, dev links, checklists, watchers, attachments and comments.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticketId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateTicket",
+      "method": "PATCH",
+      "path": "/tickets/:ticketId",
+      "auth": "session-or-apiKey",
+      "description": "Updates any ticket field (including labels, status, epic, milestone, parent). Every change is written to the activity feed and notifies watchers.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "statusId": {
+            "type": "string"
+          },
+          "typeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "epicId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "milestoneId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "estimatePoints": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "estimateMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dueDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ticketId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticketId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "sequenceNumber": {
+            "type": "number"
+          },
+          "typeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "epicId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "milestoneId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "statusId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "estimatePoints": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "estimateMinutes": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dueDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subtaskCount": {
+            "type": "number"
+          },
+          "subtaskDoneCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "identifier",
+          "sequenceNumber",
+          "typeId",
+          "epicId",
+          "milestoneId",
+          "statusId",
+          "parentId",
+          "assigneeUserId",
+          "title",
+          "description",
+          "priority",
+          "estimatePoints",
+          "estimateMinutes",
+          "startDate",
+          "dueDate",
+          "position",
+          "archivedAt",
+          "labelIds",
+          "subtaskCount",
+          "subtaskDoneCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "archiveTicket",
+      "method": "POST",
+      "path": "/tickets/:ticketId/archive",
+      "auth": "session-or-apiKey",
+      "description": "Archives (or restores, restore=true) a ticket; archived tickets are hidden from boards and lists.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "restore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ticketId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteTicket",
+      "method": "DELETE",
+      "path": "/tickets/:ticketId",
+      "auth": "session-or-apiKey",
+      "description": "Permanently deletes a ticket. Its sub-tasks are detached (become top-level), not deleted.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticketId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "bulkUpdateTickets",
+      "method": "POST",
+      "path": "/projects/:projectId/tickets/bulk",
+      "auth": "session-or-apiKey",
+      "description": "Applies one patch (status, assignee, priority, epic, milestone, labels to add/remove) or archive/delete to many tickets at once.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "ticketIds": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "action": {
+            "default": "update",
+            "type": "string",
+            "enum": [
+              "update",
+              "archive",
+              "delete"
+            ]
+          },
+          "patch": {
+            "type": "object",
+            "properties": {
+              "statusId": {
+                "type": "string"
+              },
+              "assigneeUserId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priority": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "urgent",
+                      "high",
+                      "medium",
+                      "low"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "epicId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "milestoneId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "typeId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "addLabelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removeLabelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "projectId",
+          "ticketIds",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ok",
+          "count"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createComment",
+      "method": "POST",
+      "path": "/tickets/:ticketId/comments",
+      "auth": "session-or-apiKey",
+      "description": "Adds a comment (markdown/HTML from the editor). The author auto-watches the ticket; watchers are notified.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "ticketId",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateComment",
+      "method": "PATCH",
+      "path": "/tickets/:ticketId/comments/:id",
+      "auth": "session-or-apiKey",
+      "description": "Edits your own comment.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "ticketId",
+          "id",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteComment",
+      "method": "DELETE",
+      "path": "/tickets/:ticketId/comments/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes your own comment.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticketId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listTicketActivity",
+      "method": "GET",
+      "path": "/tickets/:ticketId/activity",
+      "auth": "session-or-apiKey",
+      "description": "Chronological activity feed (field changes, comments, created/archived).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticketId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    {
+      "name": "watchTicket",
+      "method": "PUT",
+      "path": "/tickets/:ticketId/watch",
+      "auth": "session-or-apiKey",
+      "description": "Subscribes (watching=true) or unsubscribes the caller to a ticket's notifications.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "watching": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ticketId",
+          "watching"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createChecklist",
+      "method": "POST",
+      "path": "/tickets/:ticketId/checklists",
+      "auth": "session-or-apiKey",
+      "description": "Adds a checklist to a ticket.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "ticketId",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateChecklist",
+      "method": "PATCH",
+      "path": "/tickets/:ticketId/checklists/:id",
+      "auth": "session-or-apiKey",
+      "description": "Renames or reorders a checklist.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ticketId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteChecklist",
+      "method": "DELETE",
+      "path": "/tickets/:ticketId/checklists/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a checklist and its items.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticketId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createChecklistItem",
+      "method": "POST",
+      "path": "/tickets/:ticketId/checklists/:checklistId/items",
+      "auth": "session-or-apiKey",
+      "description": "Adds an item to a checklist.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "checklistId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "ticketId",
+          "checklistId",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateChecklistItem",
+      "method": "PATCH",
+      "path": "/tickets/:ticketId/checklist-items/:id",
+      "auth": "session-or-apiKey",
+      "description": "Edits, toggles (done) or reorders a checklist item.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "done": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ticketId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteChecklistItem",
+      "method": "DELETE",
+      "path": "/tickets/:ticketId/checklist-items/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a checklist item.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticketId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createTicketLink",
+      "method": "POST",
+      "path": "/tickets/:ticketId/links",
+      "auth": "session-or-apiKey",
+      "description": "Links this ticket to another one in the same workspace: blocks (this blocks target), relates_to, duplicates (this duplicates target).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "targetTicketId": {
+            "type": "string"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "blocks",
+              "relates_to",
+              "duplicates"
+            ]
+          }
+        },
+        "required": [
+          "ticketId",
+          "targetTicketId",
+          "relation"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteTicketLink",
+      "method": "DELETE",
+      "path": "/tickets/:ticketId/links/:id",
+      "auth": "session-or-apiKey",
+      "description": "Removes a ticket link.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticketId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "setTicketFieldValue",
+      "method": "PUT",
+      "path": "/tickets/:ticketId/fields/:fieldId",
+      "auth": "session-or-apiKey",
+      "description": "Sets (or clears with value=null) a custom-field value. Validated against the field type; select values must be an option id.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "fieldId": {
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ticketId",
+          "fieldId",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createDevLink",
+      "method": "POST",
+      "path": "/tickets/:ticketId/dev-links",
+      "auth": "session-or-apiKey",
+      "description": "Attaches a pull request / branch / commit URL with its state and CI status (set manually or by an external caller).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "pull_request",
+              "branch",
+              "commit"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "draft",
+              "merged",
+              "closed"
+            ]
+          },
+          "ciState": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "success",
+                  "failure"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ticketId",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateDevLink",
+      "method": "PATCH",
+      "path": "/tickets/:ticketId/dev-links/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a dev link's title, state or CI status.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "draft",
+              "merged",
+              "closed"
+            ]
+          },
+          "ciState": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "success",
+                  "failure"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ticketId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteDevLink",
+      "method": "DELETE",
+      "path": "/tickets/:ticketId/dev-links/:id",
+      "auth": "session-or-apiKey",
+      "description": "Removes a dev link.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticketId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "uploadAttachment",
+      "method": "POST",
+      "path": "/tickets/:ticketId/attachments",
+      "auth": "session-or-apiKey",
+      "description": "Uploads a file as the raw request body (Content-Type = file type). Query: ?fileName=<name>. Max 25 MB."
+    },
+    {
+      "name": "downloadAttachment",
+      "method": "GET",
+      "path": "/tickets/:ticketId/attachments/:id",
+      "auth": "session-or-apiKey",
+      "description": "Downloads an attachment (binary)."
+    },
+    {
+      "name": "deleteAttachment",
+      "method": "DELETE",
+      "path": "/tickets/:ticketId/attachments/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes an attachment and its blob.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticketId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createEpic",
+      "method": "POST",
+      "path": "/projects/:projectId/epics",
+      "auth": "session-or-apiKey",
+      "description": "Creates a epic in a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "planned",
+              "active",
+              "completed",
+              "canceled"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "targetDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "planned",
+              "active",
+              "completed",
+              "canceled"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "title",
+          "description",
+          "status",
+          "ownerUserId",
+          "priority",
+          "startDate",
+          "targetDate",
+          "position",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateEpic",
+      "method": "PATCH",
+      "path": "/projects/:projectId/epics/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a epic.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "planned",
+              "active",
+              "completed",
+              "canceled"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "targetDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "planned",
+              "active",
+              "completed",
+              "canceled"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "title",
+          "description",
+          "status",
+          "ownerUserId",
+          "priority",
+          "startDate",
+          "targetDate",
+          "position",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteEpic",
+      "method": "DELETE",
+      "path": "/projects/:projectId/epics/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a epic.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listEpics",
+      "method": "GET",
+      "path": "/projects/:projectId/epics",
+      "auth": "session-or-apiKey",
+      "description": "Epics of a project with ticket progress rollups and labels.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "proposed",
+                "planned",
+                "active",
+                "completed",
+                "canceled"
+              ]
+            },
+            "ownerUserId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "priority": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "urgent",
+                    "high",
+                    "medium",
+                    "low"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "startDate": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "targetDate": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "position": {
+              "type": "number"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            },
+            "progress": {
+              "type": "object",
+              "properties": {
+                "total": {
+                  "type": "number"
+                },
+                "done": {
+                  "type": "number"
+                },
+                "canceled": {
+                  "type": "number"
+                },
+                "inProgress": {
+                  "type": "number"
+                },
+                "points": {
+                  "type": "number"
+                },
+                "donePoints": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "total",
+                "done",
+                "canceled",
+                "inProgress",
+                "points",
+                "donePoints"
+              ],
+              "additionalProperties": false
+            },
+            "labelIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "projectId",
+            "title",
+            "description",
+            "status",
+            "ownerUserId",
+            "priority",
+            "startDate",
+            "targetDate",
+            "position",
+            "createdAt",
+            "updatedAt",
+            "progress",
+            "labelIds"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createMilestone",
+      "method": "POST",
+      "path": "/projects/:projectId/milestones",
+      "auth": "session-or-apiKey",
+      "description": "Creates a milestone in a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "goal": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "endDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "startDate",
+          "endDate",
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "goal",
+          "startDate",
+          "endDate",
+          "completedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateMilestone",
+      "method": "PATCH",
+      "path": "/projects/:projectId/milestones/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a milestone.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "goal": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "endDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "goal",
+          "startDate",
+          "endDate",
+          "completedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteMilestone",
+      "method": "DELETE",
+      "path": "/projects/:projectId/milestones/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a milestone.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listMilestones",
+      "method": "GET",
+      "path": "/projects/:projectId/milestones",
+      "auth": "session-or-apiKey",
+      "description": "Milestones (sprint-like, time-boxed) with progress and a derived state: upcoming | active | completed.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "goal": {
+              "type": "string"
+            },
+            "startDate": {
+              "type": "string"
+            },
+            "endDate": {
+              "type": "string"
+            },
+            "completedAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            },
+            "progress": {
+              "type": "object",
+              "properties": {
+                "total": {
+                  "type": "number"
+                },
+                "done": {
+                  "type": "number"
+                },
+                "canceled": {
+                  "type": "number"
+                },
+                "inProgress": {
+                  "type": "number"
+                },
+                "points": {
+                  "type": "number"
+                },
+                "donePoints": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "total",
+                "done",
+                "canceled",
+                "inProgress",
+                "points",
+                "donePoints"
+              ],
+              "additionalProperties": false
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "upcoming",
+                "active",
+                "completed"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "projectId",
+            "name",
+            "goal",
+            "startDate",
+            "endDate",
+            "completedAt",
+            "createdAt",
+            "updatedAt",
+            "progress",
+            "state"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "getEpic",
+      "method": "GET",
+      "path": "/projects/:projectId/epics/:id",
+      "auth": "session-or-apiKey",
+      "description": "One epic with progress and labels.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "planned",
+              "active",
+              "completed",
+              "canceled"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number"
+              },
+              "done": {
+                "type": "number"
+              },
+              "canceled": {
+                "type": "number"
+              },
+              "inProgress": {
+                "type": "number"
+              },
+              "points": {
+                "type": "number"
+              },
+              "donePoints": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "total",
+              "done",
+              "canceled",
+              "inProgress",
+              "points",
+              "donePoints"
+            ],
+            "additionalProperties": false
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "title",
+          "description",
+          "status",
+          "ownerUserId",
+          "priority",
+          "startDate",
+          "targetDate",
+          "position",
+          "createdAt",
+          "updatedAt",
+          "progress",
+          "labelIds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "setEpicLabels",
+      "method": "PUT",
+      "path": "/projects/:projectId/epics/:id/labels",
+      "auth": "session-or-apiKey",
+      "description": "Replaces an epic's labels.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "projectId",
+          "id",
+          "labelIds"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "completeMilestone",
+      "method": "POST",
+      "path": "/projects/:projectId/milestones/:id/complete",
+      "auth": "session-or-apiKey",
+      "description": "Finishes a milestone early (sets completedAt; endDate stays the planned date). With moveOpenTo, unfinished tickets roll over to another milestone (or to none with moveOpenTo=null). reopen=true clears completion.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "reopen": {
+            "type": "boolean"
+          },
+          "moveOpenTo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "goal",
+          "startDate",
+          "endDate",
+          "completedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getTimeline",
+      "method": "GET",
+      "path": "/projects/:projectId/timeline",
+      "auth": "session-or-apiKey",
+      "description": "Data for the timeline (gantt) view: epics, milestones and dated tickets with their date ranges, grouped by epic. Tickets without any date are omitted.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "epics": {
+            "type": "array",
+            "items": {}
+          },
+          "milestones": {
+            "type": "array",
+            "items": {}
+          },
+          "tickets": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "required": [
+          "epics",
+          "milestones",
+          "tickets"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listViews",
+      "method": "GET",
+      "path": "/projects/:projectId/views",
+      "auth": "session-or-apiKey",
+      "description": "Lists views of a project, ordered by position.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "layout": {
+              "type": "string"
+            },
+            "filters": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            },
+            "sortBy": {
+              "type": "string"
+            },
+            "sortDir": {
+              "type": "string"
+            },
+            "groupBy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ownerUserId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "shared": {
+              "type": "boolean"
+            },
+            "position": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "projectId",
+            "name",
+            "layout",
+            "filters",
+            "sortBy",
+            "sortDir",
+            "groupBy",
+            "ownerUserId",
+            "shared",
+            "position"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createView",
+      "method": "POST",
+      "path": "/projects/:projectId/views",
+      "auth": "session-or-apiKey",
+      "description": "Creates a view in a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "layout": {
+            "type": "string",
+            "enum": [
+              "table",
+              "board",
+              "timeline"
+            ]
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "statusId": {
+                "description": "comma-separated status ids",
+                "type": "string"
+              },
+              "statusCategory": {
+                "description": "comma-separated: backlog,todo,in_progress,done,canceled",
+                "type": "string"
+              },
+              "assigneeUserId": {
+                "description": "user id, comma-separated, or 'none'",
+                "type": "string"
+              },
+              "priority": {
+                "description": "comma-separated, or 'none'",
+                "type": "string"
+              },
+              "typeId": {
+                "type": "string"
+              },
+              "epicId": {
+                "description": "epic id or 'none'",
+                "type": "string"
+              },
+              "milestoneId": {
+                "description": "milestone id or 'none'",
+                "type": "string"
+              },
+              "labelId": {
+                "description": "comma-separated; ticket must have ANY",
+                "type": "string"
+              },
+              "parentId": {
+                "description": "parent ticket id or 'none' for top-level only",
+                "type": "string"
+              },
+              "q": {
+                "description": "title substring or identifier like PLAN-12",
+                "type": "string"
+              },
+              "dueBefore": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "dueAfter": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "archived": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "position",
+              "createdAt",
+              "updatedAt",
+              "dueDate",
+              "priority",
+              "title",
+              "sequence"
+            ]
+          },
+          "sortDir": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          },
+          "groupBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "status",
+                  "assignee",
+                  "priority",
+                  "epic",
+                  "milestone",
+                  "type"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "layout": {
+            "type": "string"
+          },
+          "filters": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "sortBy": {
+            "type": "string"
+          },
+          "sortDir": {
+            "type": "string"
+          },
+          "groupBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "layout",
+          "filters",
+          "sortBy",
+          "sortDir",
+          "groupBy",
+          "ownerUserId",
+          "shared",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateView",
+      "method": "PATCH",
+      "path": "/projects/:projectId/views/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a view.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "layout": {
+            "type": "string",
+            "enum": [
+              "table",
+              "board",
+              "timeline"
+            ]
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "statusId": {
+                "description": "comma-separated status ids",
+                "type": "string"
+              },
+              "statusCategory": {
+                "description": "comma-separated: backlog,todo,in_progress,done,canceled",
+                "type": "string"
+              },
+              "assigneeUserId": {
+                "description": "user id, comma-separated, or 'none'",
+                "type": "string"
+              },
+              "priority": {
+                "description": "comma-separated, or 'none'",
+                "type": "string"
+              },
+              "typeId": {
+                "type": "string"
+              },
+              "epicId": {
+                "description": "epic id or 'none'",
+                "type": "string"
+              },
+              "milestoneId": {
+                "description": "milestone id or 'none'",
+                "type": "string"
+              },
+              "labelId": {
+                "description": "comma-separated; ticket must have ANY",
+                "type": "string"
+              },
+              "parentId": {
+                "description": "parent ticket id or 'none' for top-level only",
+                "type": "string"
+              },
+              "q": {
+                "description": "title substring or identifier like PLAN-12",
+                "type": "string"
+              },
+              "dueBefore": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "dueAfter": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "archived": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "position",
+              "createdAt",
+              "updatedAt",
+              "dueDate",
+              "priority",
+              "title",
+              "sequence"
+            ]
+          },
+          "sortDir": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          },
+          "groupBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "status",
+                  "assignee",
+                  "priority",
+                  "epic",
+                  "milestone",
+                  "type"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "layout": {
+            "type": "string"
+          },
+          "filters": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "sortBy": {
+            "type": "string"
+          },
+          "sortDir": {
+            "type": "string"
+          },
+          "groupBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "layout",
+          "filters",
+          "sortBy",
+          "sortDir",
+          "groupBy",
+          "ownerUserId",
+          "shared",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteView",
+      "method": "DELETE",
+      "path": "/projects/:projectId/views/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a view.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listDocuments",
+      "method": "GET",
+      "path": "/projects/:projectId/documents",
+      "auth": "session-or-apiKey",
+      "description": "Lists documents of a project, ordered by position.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "parentId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "createdBy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "position": {
+              "type": "number"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "projectId",
+            "kind",
+            "parentId",
+            "title",
+            "content",
+            "createdBy",
+            "position",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createDocument",
+      "method": "POST",
+      "path": "/projects/:projectId/documents",
+      "auth": "session-or-apiKey",
+      "description": "Creates a document in a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "doc",
+              "note"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "kind",
+          "parentId",
+          "title",
+          "content",
+          "createdBy",
+          "position",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateDocument",
+      "method": "PATCH",
+      "path": "/projects/:projectId/documents/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a document.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "doc",
+              "note"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "kind",
+          "parentId",
+          "title",
+          "content",
+          "createdBy",
+          "position",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteDocument",
+      "method": "DELETE",
+      "path": "/projects/:projectId/documents/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a document.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listDashboards",
+      "method": "GET",
+      "path": "/projects/:projectId/dashboards",
+      "auth": "session-or-apiKey",
+      "description": "Lists dashboards of a project, ordered by position.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "widgets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "by_status",
+                      "by_priority",
+                      "by_assignee",
+                      "by_type",
+                      "by_epic",
+                      "by_milestone",
+                      "created_vs_completed",
+                      "overdue",
+                      "milestone_progress"
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string",
+                    "enum": [
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "position": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "projectId",
+            "name",
+            "widgets",
+            "position"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createDashboard",
+      "method": "POST",
+      "path": "/projects/:projectId/dashboards",
+      "auth": "session-or-apiKey",
+      "description": "Creates a dashboard in a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "widgets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "by_status",
+                    "by_priority",
+                    "by_assignee",
+                    "by_type",
+                    "by_epic",
+                    "by_milestone",
+                    "created_vs_completed",
+                    "overdue",
+                    "milestone_progress"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "string",
+                  "enum": [
+                    "sm",
+                    "md",
+                    "lg"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "widgets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "by_status",
+                    "by_priority",
+                    "by_assignee",
+                    "by_type",
+                    "by_epic",
+                    "by_milestone",
+                    "created_vs_completed",
+                    "overdue",
+                    "milestone_progress"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "string",
+                  "enum": [
+                    "sm",
+                    "md",
+                    "lg"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "widgets",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateDashboard",
+      "method": "PATCH",
+      "path": "/projects/:projectId/dashboards/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a dashboard.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "widgets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "by_status",
+                    "by_priority",
+                    "by_assignee",
+                    "by_type",
+                    "by_epic",
+                    "by_milestone",
+                    "created_vs_completed",
+                    "overdue",
+                    "milestone_progress"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "string",
+                  "enum": [
+                    "sm",
+                    "md",
+                    "lg"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "widgets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "by_status",
+                    "by_priority",
+                    "by_assignee",
+                    "by_type",
+                    "by_epic",
+                    "by_milestone",
+                    "created_vs_completed",
+                    "overdue",
+                    "milestone_progress"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "string",
+                  "enum": [
+                    "sm",
+                    "md",
+                    "lg"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "widgets",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteDashboard",
+      "method": "DELETE",
+      "path": "/projects/:projectId/dashboards/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a dashboard.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listTicketTemplates",
+      "method": "GET",
+      "path": "/projects/:projectId/ticket-templates",
+      "auth": "session-or-apiKey",
+      "description": "Lists tickettemplates of a project, ordered by position.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "typeId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "priority": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "labelIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "checklist": {
+              "type": "array",
+              "items": {}
+            },
+            "position": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "projectId",
+            "name",
+            "title",
+            "description",
+            "typeId",
+            "priority",
+            "labelIds",
+            "checklist",
+            "position"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createTicketTemplate",
+      "method": "POST",
+      "path": "/projects/:projectId/ticket-templates",
+      "auth": "session-or-apiKey",
+      "description": "Creates a tickettemplate in a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "typeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "title",
+                "items"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "typeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "checklist": {
+            "type": "array",
+            "items": {}
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "title",
+          "description",
+          "typeId",
+          "priority",
+          "labelIds",
+          "checklist",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateTicketTemplate",
+      "method": "PATCH",
+      "path": "/projects/:projectId/ticket-templates/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates a tickettemplate.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "typeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "title",
+                "items"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "position": {
+            "type": "number"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "typeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "checklist": {
+            "type": "array",
+            "items": {}
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "name",
+          "title",
+          "description",
+          "typeId",
+          "priority",
+          "labelIds",
+          "checklist",
+          "position"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteTicketTemplate",
+      "method": "DELETE",
+      "path": "/projects/:projectId/ticket-templates/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a tickettemplate.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "setDocumentTickets",
+      "method": "PUT",
+      "path": "/projects/:projectId/documents/:id/tickets",
+      "auth": "session-or-apiKey",
+      "description": "Replaces the tickets a document is linked to.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ticketIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "projectId",
+          "id",
+          "ticketIds"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listTicketDocuments",
+      "method": "GET",
+      "path": "/tickets/:ticketId/documents",
+      "auth": "session-or-apiKey",
+      "description": "Documents/notes linked to a ticket.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticketId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    {
+      "name": "getDocumentTickets",
+      "method": "GET",
+      "path": "/projects/:projectId/documents/:id/tickets",
+      "auth": "session-or-apiKey",
+      "description": "Ticket ids a document is linked to.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ticketIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ticketIds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listNotifications",
+      "method": "GET",
+      "path": "/notifications",
+      "auth": "session-or-apiKey",
+      "description": "Caller's inbox, newest first. unread=true filters to unread.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "unread": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "unreadCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "unreadCount"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "markNotificationsRead",
+      "method": "POST",
+      "path": "/notifications/read",
+      "auth": "session-or-apiKey",
+      "description": "Marks the given notifications (or all, with all=true) as read.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "all": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listMyTickets",
+      "method": "GET",
+      "path": "/my/tickets",
+      "auth": "session-or-apiKey",
+      "description": "Open tickets assigned to the caller across all projects in the workspace (or tickets they watch, with scope=watching).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "assigned",
+              "watching",
+              "created"
+            ]
+          },
+          "includeDone": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    {
+      "name": "searchWorkspace",
+      "method": "GET",
+      "path": "/search",
+      "auth": "session-or-apiKey",
+      "description": "Command-palette search: projects (name/key), tickets (title or identifier) and epics (title) across the whole workspace.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "q"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "epics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "projects",
+          "tickets",
+          "epics"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getPreference",
+      "method": "GET",
+      "path": "/preferences/:key",
+      "auth": "session-or-apiKey",
+      "description": "Reads a per-user UI preference (opaque JSON).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "setPreference",
+      "method": "PUT",
+      "path": "/preferences/:key",
+      "auth": "session-or-apiKey",
+      "description": "Writes a per-user UI preference.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createShareLink",
+      "method": "POST",
+      "path": "/projects/:projectId/share",
+      "auth": "session-or-apiKey",
+      "description": "Creates a read-only public link for a project board, or for a single ticket (ticketId). The token is the only credential.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "ticketId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "listShareLinks",
+      "method": "GET",
+      "path": "/projects/:projectId/share",
+      "auth": "session-or-apiKey",
+      "description": "Active share links of a project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    {
+      "name": "revokeShareLink",
+      "method": "DELETE",
+      "path": "/projects/:projectId/share/:id",
+      "auth": "session-or-apiKey",
+      "description": "Revokes a share link immediately.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getPublicShare",
+      "method": "GET",
+      "path": "/public/:token",
+      "auth": "public",
+      "description": "Public, unauthenticated, read-only view for a share token: project board (statuses + tickets) or a single ticket with comments and checklists. No user ids are exposed.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "exportTickets",
+      "method": "GET",
+      "path": "/projects/:projectId/export",
+      "auth": "session-or-apiKey",
+      "description": "Exports a project's tickets (honouring the listTickets filters) as CSV (default) or JSON. Names, not ids, so the file round-trips through importTicketsCsv."
+    },
+    {
+      "name": "importTicketsCsv",
+      "method": "POST",
+      "path": "/projects/:projectId/import/csv",
+      "auth": "session-or-apiKey",
+      "description": "Imports tickets from CSV text. Header row required; recognised columns: title (required), description, status, type, priority, assignee, epic, milestone, labels (| separated), points, estimateMinutes, startDate, dueDate. Status/type/epic/milestone are matched by name; unknown labels and epics are created. Rows that fail are reported, the rest import.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "csv": {
+            "type": "string",
+            "minLength": 1
+          },
+          "createMissing": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "projectId",
+          "csv",
+          "createMissing"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "imported": {
+            "type": "number"
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "row": {
+                  "type": "number"
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "row",
+                "error"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "imported",
+          "failed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "importFromLinear",
+      "method": "POST",
+      "path": "/projects/:projectId/import/linear",
+      "auth": "session-or-apiKey",
+      "description": "One-shot import of a Linear team: workflow states -> statuses (by name, created if missing), labels, issues (priority/estimate/dates/parent), Linear cycles -> milestones, Linear projects -> epics. The API key is used for this request only and never stored. Re-running skips nothing, so import into a fresh project.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "apiKey": {
+            "type": "string",
+            "minLength": 10
+          },
+          "teamKey": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "projectId",
+          "apiKey",
+          "teamKey"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "number"
+          },
+          "epics": {
+            "type": "number"
+          },
+          "milestones": {
+            "type": "number"
+          },
+          "labels": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "tickets",
+          "epics",
+          "milestones",
+          "labels"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "internalManifest",
+      "method": "GET",
+      "path": "/internal/manifest",
+      "auth": "public",
+      "description": "Pull-registration endpoint TwoDB's orchestrator polls on this app's published port. Guarded by the per-app registration token (`x-registration-token`) — not callable through the Gateway.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "httpUrl": {
+            "type": "string"
+          },
+          "manifest": {}
+        },
+        "required": [
+          "slug",
+          "httpUrl",
+          "manifest"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

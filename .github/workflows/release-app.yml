@@ -50,7 +50,7 @@ jobs:
 
           # All releasable apps — keep in sync with
           # apps/twodb/src/orchestrator/catalog.ts.
-          apps="twodb tworoute twomail twoday twocontacts twochat twodrive artisan dispatch tworing garden twothing twoloop membrain paintress twopin twodoo"
+          apps="twodb tworoute twomail twoday twocontacts twochat twodrive artisan dispatch tworing garden twothing twoloop membrain paintress twopin twodoo twoplan"
 
           prev="$(git tag --list 'v*.*.*' --sort=-v:refname | grep -vx "$tag" | head -1 || true)"
 

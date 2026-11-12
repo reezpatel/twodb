@@ -1,7 +1,7 @@
 # AGENTS.md — TwoPin
 
-Bookmarks/link aggregator. **This app is scaffolded, not implemented.** Read `README.md`
-first.
+Pinterest-style link boards (implemented v1). Read `README.md` first; the API
+surface is documented in the generated `ENDPOINTS.md`.
 
 ## Before writing any route
 - Add a `defineEndpoint(...)` to `src/manifest.ts` first (request/response

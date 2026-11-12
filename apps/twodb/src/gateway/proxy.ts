@@ -17,7 +17,7 @@ export async function proxyToApp(
   reply: FastifyReply,
   app: RegisteredAppRow,
   subPath: string,
-  ctx: AuthContext,
+  ctx: AuthContext | null,
 ): Promise<void> {
   const target = pickTransport({
     gatewayHostId: GATEWAY_HOST_ID,
@@ -29,11 +29,15 @@ export async function proxyToApp(
 
   const webReq = toWebRequest(req);
   const headers = new Headers(webReq.headers);
-  headers.set("x-twodb-auth-kind", ctx.kind);
-  if (ctx.userId) headers.set("x-twodb-user-id", ctx.userId);
-  headers.set("x-twodb-workspace-id", ctx.workspaceId);
-  if (ctx.spaceIds.length) headers.set("x-twodb-space-ids", ctx.spaceIds.join(","));
-  if (ctx.apiKeyId) headers.set("x-twodb-api-key-id", ctx.apiKeyId);
+  // Never trust identity headers from the caller: always drop them, then (re)set from the resolved context.
+  for (const h of [...headers.keys()]) if (h.startsWith("x-twodb-")) headers.delete(h);
+  if (ctx) {
+    headers.set("x-twodb-auth-kind", ctx.kind);
+    if (ctx.userId) headers.set("x-twodb-user-id", ctx.userId);
+    headers.set("x-twodb-workspace-id", ctx.workspaceId);
+    if (ctx.spaceIds.length) headers.set("x-twodb-space-ids", ctx.spaceIds.join(","));
+    if (ctx.apiKeyId) headers.set("x-twodb-api-key-id", ctx.apiKeyId);
+  }
 
   // req.url carries the query string (Fastify's req.url is the full URL), so
   // strip it from the sub-path and append the parsed search exactly once —

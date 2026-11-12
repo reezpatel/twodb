@@ -1,7 +1,20 @@
 # AGENTS.md — TwoThing
 
-Inventory management. **This app is scaffolded, not implemented.** Read `README.md`
-first.
+Personal inventory management. **Implemented** — read `README.md` first for the
+feature map and file layout.
+
+## Invariants (don't break these)
+- Label codes are allocated ONLY through `src/lib/code-pool.ts`
+  (`generateCodes` / `autoCode`). Never insert into `tt_code` with a code that
+  is on an item/place or was generated within `REISSUE_WINDOW_DAYS`. Tests in
+  `src/lib/code-pool.test.ts` must stay green.
+- Every user-typed/scanned code goes through `normalizeCode()` before lookup
+  or storage; non-matching input is a foreign (manufacturer) barcode.
+- All stock/location changes write `tt_activity` (see `src/lib/activity.ts`).
+- Webapp: anything that changes data calls `refreshAll()` (or `invalidate`)
+  from `webapp/src/lib/actions.ts` / `query.ts` so every open view updates.
+- `TWOTHING_DEV_WORKSPACE` is a dev-only identity fallback; the server refuses
+  to boot with it in production.
 
 ## Before writing any route
 - Add a `defineEndpoint(...)` to `src/manifest.ts` first (request/response

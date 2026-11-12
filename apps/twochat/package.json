@@ -11,6 +11,8 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@fastify/multipart": "^10.1.8",
+    "@fastify/websocket": "^11.0.1",
     "@hono/node-server": "^1.19.18",
     "@twodb/core-async": "workspace:*",
     "@twodb/core-data": "workspace:*",
@@ -20,11 +22,13 @@
     "kysely": "^0.29.5",
     "pg": "^8.23.0",
     "ulid": "^3.0.2",
+    "ws": "^8.21.3",
     "zod": "^4.5.2"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/pg": "^8.21.0",
+    "@types/ws": "^8.5.10",
     "tsx": "^4.20.0",
     "typescript": "^5.8.0"
   }

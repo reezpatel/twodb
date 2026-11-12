@@ -13,7 +13,11 @@
     "@twodb/blocks": "workspace:*",
     "@twodb/core-runtime": "workspace:*",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "@twodb/editor": "workspace:*",
+    "better-auth": "^1.7.5",
+    "@better-auth/passkey": "^1.7.5",
+    "lucide-react": "^1.29.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.5.0",

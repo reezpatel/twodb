@@ -1,0 +1,12 @@
+/* Garden-specific global styles. Tokens come from @twodb/blocks. */
+
+/* Floating surfaces (popovers, menus, peek) are the only things that get a shadow. */
+.garden-float {
+  box-shadow: 0 10px 32px -8px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.garden-float[data-state="open"] { animation: garden-pop 0.12s ease-out; }
+@keyframes garden-pop { from { opacity: 0; transform: translateY(-2px) scale(0.99); } to { opacity: 1; transform: none; } }
+
+html, body, #root { letter-spacing: 0; }
+select { appearance: auto; }
+::selection { background: color-mix(in oklab, var(--ion) 55%, transparent); }

@@ -1,7 +1,7 @@
 # AGENTS.md — TwoChat
 
-Chat/messenger. **This app is scaffolded, not implemented.** Read `README.md`
-first.
+Slack-style workspace chat with channels, DMs, realtime events, notifications,
+attachments, and bot/agent block messages. Read `README.md` first.
 
 ## Before writing any route
 - Add a `defineEndpoint(...)` to `src/manifest.ts` first (request/response
