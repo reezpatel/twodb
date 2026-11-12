@@ -1,0 +1,55 @@
+import { cn } from "../../../lib/cn.js";
+
+/** Usage stat row under the composer (legacy code-chat-usage). */
+export function ChatUsage({ className, ...props }: React.ComponentProps<"div">) {
+  return <div data-slot="chat-usage" className={cn("flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-sm text-ink-muted", className)} {...props} />;
+}
+
+export function ChatUsageStat({ className, ...props }: React.ComponentProps<"span">) {
+  return <span data-slot="chat-usage-stat" className={cn("font-mono text-xs tabular-nums", className)} {...props} />;
+}
+
+const RING_VIEWBOX = 32;
+const RING_CENTER = RING_VIEWBOX / 2;
+const RING_RADIUS = 13;
+const RING_STROKE = 3;
+
+/** Context-window ring: 0–100% used; hue shifts past warn/danger. */
+export function ChatUsageContext({ percent, label, warnAt = 80, dangerAt = 95, className, ...props }: React.ComponentProps<"span"> & {
+  percent: number | null;
+  label: string;
+  warnAt?: number;
+  dangerAt?: number;
+}) {
+  const fraction = percent === null ? 0 : Math.min(1, Math.max(0, percent / 100));
+  const tone = percent === null ? "" : percent >= dangerAt ? "text-destructive" : percent >= warnAt ? "text-warning" : "";
+  return (
+    <span
+      data-slot="chat-usage-context"
+      role="img"
+      aria-label={percent === null ? `Context ${label}` : `Context window ${Math.round(percent)}% used, ${label}`}
+      className={cn("flex items-center gap-1.5 px-0.5 py-0.5", className)}
+      {...props}
+    >
+      <svg aria-hidden="true" className={cn("size-4 -rotate-90", tone)} viewBox={`0 0 ${RING_VIEWBOX} ${RING_VIEWBOX}`}>
+        <circle cx={RING_CENTER} cy={RING_CENTER} r={RING_RADIUS} fill="none" stroke="currentColor" strokeOpacity={0.2} strokeWidth={RING_STROKE} />
+        <circle
+          cx={RING_CENTER}
+          cy={RING_CENTER}
+          r={RING_RADIUS}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={RING_STROKE}
+          strokeLinecap="round"
+          strokeDasharray={`${fraction} ${1 - fraction}`}
+          pathLength={1}
+        />
+      </svg>
+      <span className="font-mono text-xs tabular-nums">{label}</span>
+    </span>
+  );
+}
+
+export function ChatUsageSpacer() {
+  return <span data-slot="chat-usage-spacer" className="flex-1" aria-hidden="true" />;
+}

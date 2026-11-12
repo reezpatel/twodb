@@ -1,29 +1,43 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Square, Scissors, Sparkles } from "lucide-react";
-import { Badge, Button } from "@twodb/blocks";
+import { useEffect, useMemo, useState } from "react";
+import { Sparkles, Scissors } from "lucide-react";
+import { Markdown } from "@twodb/blocks";
 import { useSessionChat } from "./hooks/useSessionChat.js";
-import { MessageBubble } from "./partials/MessageBubble.js";
+import { useCatalog } from "../shell/hooks/useCatalog.js";
+import { ChatShell, ChatThread, ChatThreadRow, ChatThreadHeader } from "./partials/ChatShell.js";
+import { ChatHeader, ChatHeaderTitle, ChatHeaderStatus, ChatHeaderActions, ChatHeaderAction } from "./partials/ChatHeader.js";
+import { ChatFooter, ChatFooterNotice, ChatStatusBar } from "./partials/ChatFooter.js";
+import { ChatComposer, ChatComposerInput, ChatComposerActions, ChatComposerSpacer, ChatComposerSend, ChatComposerStop } from "./partials/ChatComposer.js";
+import { ChatUsage, ChatUsageStat, ChatUsageContext, ChatUsageSpacer } from "./partials/ChatUsage.js";
+import { ChatMessage, ChatMessageNote } from "./partials/ChatMessage.js";
 import { ToolCard } from "./partials/ToolCard.js";
 import { AskWidget } from "./partials/AskWidget.js";
+import { ModelPicker, type ModelProvider, type ModelEntry } from "@twodb/blocks";
+
+/** Context chars → tokens estimate → % of the model's window. */
+function contextPercent(usage: { inputTokens: number } | null, contextWindow: number | null): number | null {
+  if (!usage || !contextWindow) return null;
+  return Math.min(100, Math.round((usage.inputTokens / contextWindow) * 100));
+}
 
 /**
- * The full chat view for one session (rendered inside its tab): transcript,
- * streaming bubbles, tool cards, ask_user widget, plan strip, usage footer,
- * and the composer with /-commands.
+ * Legacy-style chat: centered transcript (user = right-shifted tinted
+ * bubble, assistant = open text), bordered composer with Stop/Send, and a
+ * usage status bar (↑ ↓ ⚡ + context ring + model picker).
  */
-export function ChatView(props: { sessionId: string; onFocus?: () => void }) {
+export function ChatView(props: { sessionId: string }) {
   const chat = useSessionChat(props.sessionId);
-  const [input, setInput] = useState("");
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const catalog = useCatalog();
+  const [draft, setDraft] = useState("");
 
   useEffect(() => {
-    inputRef.current?.focus();
+    setDraft("");
   }, [props.sessionId]);
 
   const submit = () => {
-    const text = input.trim();
-    if (!text || chat.running) return;
-    setInput("");
+    const text = draft.trim();
+    if (!text) return;
+    setDraft("");
+    if (chat.running) return; // Stop is the running-state action
     if (text === "/new") void chat.newThread();
     else if (text === "/compact") void chat.compact();
     else void chat.send(text);
@@ -32,105 +46,159 @@ export function ChatView(props: { sessionId: string; onFocus?: () => void }) {
   const detail = chat.detail;
   const plan = detail?.plan ?? null;
 
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      {/* header strip */}
-      <div className="flex items-center gap-2 border-b border-outline px-3 py-2">
-        <span className="truncate text-[13px] font-medium text-ink">{detail?.title ?? props.sessionId.slice(-8)}</span>
-        {detail ? <Badge tone="neutral">{detail.runner}</Badge> : null}
-        {detail ? <span className="truncate font-mono text-[11px] text-ink-muted">{detail.directory}</span> : null}
-        {detail ? <span className="truncate font-mono text-[11px] text-ink-muted">· {detail.model}</span> : null}
-        {chat.running ? <Badge tone="info">running</Badge> : null}
-        <div className="ml-auto flex items-center gap-1.5">
-          <Button size="sm" variant="ghost" onClick={() => void chat.newThread()} title="Start a fresh thread (/new)">
-            <Sparkles className="size-3.5" />
-            New
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => void chat.compact()} title="Summarize the context (/compact)">
-            <Scissors className="size-3.5" />
-            Compact
-          </Button>
-          {chat.running ? (
-            <Button size="sm" variant="danger" onClick={() => void chat.abort()}>
-              <Square className="size-3.5" />
-              Stop
-            </Button>
-          ) : null}
-        </div>
-      </div>
+  // Group models into providers for the picker.
+  const providers = useMemo<ModelProvider[]>(() => {
+    const byConn = new Map<string, ModelEntry[]>();
+    for (const m of catalog.models) {
+      const list = byConn.get(m.connection) ?? [];
+      list.push({ id: m.id, label: m.name, context: m.contextWindow ? `${Math.round(m.contextWindow / 1000)}k` : undefined });
+      byConn.set(m.connection, list);
+    }
+    return [...byConn.entries()].map(([name, models]) => ({ id: name, title: name, models }));
+  }, [catalog.models]);
 
-      {/* plan strip */}
+  const modelInfo = catalog.models.find((m) => m.id === detail?.model);
+  const ctxPct = contextPercent(chat.usage, modelInfo?.contextWindow ?? null);
+
+  return (
+    <ChatShell>
+      <ChatHeader>
+        <ChatHeaderTitle
+          title={detail?.title ?? props.sessionId.slice(-8)}
+          sub={detail ? `${detail.runner}:${detail.directory}` : undefined}
+        />
+        {chat.running ? <span className="ml-2 flex items-center gap-1.5 text-xs text-ink-muted"><span className="size-1.5 animate-pulse rounded-full bg-success" />running</span> : null}
+        <ChatHeaderActions>
+          <ChatHeaderAction icon={<Sparkles className="size-3.5" />} label="New thread (/new)" onClick={() => void chat.newThread()} />
+          <ChatHeaderAction icon={<Scissors className="size-3.5" />} label="Compact context (/compact)" onClick={() => void chat.compact()} />
+        </ChatHeaderActions>
+      </ChatHeader>
+
       {plan && plan.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-outline bg-surface-muted/50 px-3 py-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-outline bg-surface-muted/50 px-4 py-1.5">
           {plan.map((step, i) => (
-            <span key={i} className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
-              step.status === "done" ? "text-ink-muted line-through" : step.status === "in_progress" ? "bg-info/15 text-ink" : "text-ink-muted"
-            }`}>
+            <span
+              key={i}
+              className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
+                step.status === "done" ? "text-ink-muted line-through" : step.status === "in_progress" ? "bg-info/15 text-ink" : "text-ink-muted"
+              }`}
+            >
               {step.status === "done" ? "✓" : step.status === "in_progress" ? "▸" : "·"} {step.description}
             </span>
           ))}
         </div>
       ) : null}
 
-      {/* transcript */}
-      <div ref={chat.scroller} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        {chat.error ? <p className="rounded-md border border-destructive/40 px-3 py-2 text-[12px] text-destructive">{chat.error}</p> : null}
-        {chat.messages.map((m) => <MessageBubble key={m.id} message={m} />)}
-        {chat.thinking && chat.running ? (
-          <details className="my-1 text-[11px] text-ink-muted">
-            <summary className="cursor-pointer">thinking…</summary>
-            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono">{chat.thinking}</pre>
-          </details>
+      <ChatThread className="overflow-y-auto" ref={chat.scroller}>
+        {chat.messages.map((m) => (
+          <ChatThreadRow key={m.id}>
+            {m.role === "user" ? (
+              <ChatMessage variant="user">{m.content}</ChatMessage>
+            ) : m.role === "compaction" || m.role === "system" ? (
+              <ChatThreadHeader>{m.content.slice(0, 240)}</ChatThreadHeader>
+            ) : (
+              <>
+                {(m.meta?.toolCalls as Array<{ name: string }> | undefined)?.length ? (
+                  <ChatMessageNote>tools: {((m.meta?.toolCalls as Array<{ name: string }>) ?? []).map((t) => t.name).join(", ")}</ChatMessageNote>
+                ) : null}
+                {m.content ? (
+                  m.meta?.error ? (
+                    <ChatMessage variant="assistant">
+                      <p className="text-destructive">{m.content}</p>
+                    </ChatMessage>
+                  ) : (
+                    <ChatMessage variant="assistant">
+                      <Markdown text={m.content} />
+                    </ChatMessage>
+                  )
+                ) : null}
+              </>
+            )}
+          </ChatThreadRow>
+        ))}
+
+        {/* live run: thinking, tools, streaming text */}
+        {chat.running || chat.toolEvents.length > 0 || chat.streamText ? (
+          <ChatThreadRow>
+            {chat.thinking ? (
+              <details className="text-[11px] text-ink-muted">
+                <summary className="cursor-pointer select-none">thinking…</summary>
+                <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[11px]">{chat.thinking}</pre>
+              </details>
+            ) : null}
+            {chat.toolEvents.map((t) => (
+              <ToolCard key={t.id} event={t} />
+            ))}
+            {chat.streamText ? (
+              <ChatMessage variant="assistant">
+                <span className="whitespace-pre-wrap text-sm">{chat.streamText}</span>
+                <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-ink align-middle" />
+              </ChatMessage>
+            ) : null}
+            {chat.status ? <p className="px-1 text-[11px] text-ink-muted">{chat.status}</p> : null}
+          </ChatThreadRow>
         ) : null}
-        {chat.toolEvents.map((t) => <ToolCard key={t.id} event={t} />)}
-        {chat.streamText ? (
-          <div className="my-2 inline-block max-w-[92%] rounded-lg border border-outline px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap">
-            {chat.streamText}
-            <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-ink align-middle" />
-          </div>
-        ) : null}
-        {chat.status ? <p className="my-1 text-[11px] text-ink-muted">{chat.status}</p> : null}
+      </ChatThread>
+
+      <ChatFooter>
+        {chat.error ? <ChatFooterNotice>{chat.error}</ChatFooterNotice> : null}
         {chat.ask ? (
           <AskWidget questions={chat.ask.questions} onAnswer={(answers) => chat.answer(chat.ask!.askId, answers)} onCancel={() => chat.cancelAsk(chat.ask!.askId)} />
-        ) : null}
-      </div>
-
-      {/* usage footer */}
-      <div className="flex items-center gap-3 border-t border-outline px-3 py-1 font-mono text-[10px] text-ink-muted">
-        {chat.usage ? (
-          <>
-            <span>↑{chat.usage.inputTokens.toLocaleString()}</span>
-            <span>↓{chat.usage.outputTokens.toLocaleString()}</span>
-            {chat.usage.cachedTokens ? <span>cached {chat.usage.cachedTokens.toLocaleString()}</span> : null}
-            <span>{chat.usage.calls} calls</span>
-          </>
         ) : (
-          <span>no usage yet</span>
+          <ChatComposer busy={chat.running}>
+            <ChatComposerInput
+              value={draft}
+              placeholder={detail ? `Message ${detail.title}…  (/new, /compact)` : "Message…"}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submit();
+                }
+                if (e.key === "Escape" && chat.running) void chat.abort();
+              }}
+            />
+            <ChatComposerActions>
+              <ChatComposerSpacer />
+              {chat.running ? <ChatComposerStop onClick={() => void chat.abort()} /> : null}
+              <ChatComposerSend disabled={!draft.trim() || chat.running} aria-label="Send" onClick={submit} />
+            </ChatComposerActions>
+          </ChatComposer>
         )}
-      </div>
 
-      {/* composer */}
-      <div className="border-t border-outline p-2.5">
-        <div className="flex items-end gap-2 rounded-lg border border-outline bg-paper px-2.5 py-2">
-          <textarea
-            ref={inputRef}
-            value={input}
-            rows={1}
-            placeholder={detail ? `Message ${detail.title}… (/new, /compact)` : "Message…"}
-            className="max-h-40 min-h-6 flex-1 resize-none bg-transparent text-[13px] outline-none placeholder:text-ink-muted"
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submit();
-              }
-            }}
-          />
-          <Button size="sm" variant={chat.running ? "secondary" : "primary"} disabled={!input.trim() || chat.running} onClick={submit}>
-            {chat.running ? <Square className="size-3.5" /> : <ArrowUp className="size-3.5" />}
-          </Button>
-        </div>
-      </div>
-    </div>
+        <ChatStatusBar>
+          <ChatUsage>
+            {chat.usage ? (
+              <>
+                <ChatUsageStat title="Input tokens (incl. cached)">↑ {(chat.usage.inputTokens + chat.usage.cachedTokens).toLocaleString()}</ChatUsageStat>
+                <ChatUsageStat title="Output tokens">↓ {chat.usage.outputTokens.toLocaleString()}</ChatUsageStat>
+                {chat.usage.cachedTokens ? (
+                  <ChatUsageStat title="Cached input tokens">⚡ {chat.usage.cachedTokens.toLocaleString()}</ChatUsageStat>
+                ) : null}
+                <ChatUsageStat title="Model calls">{chat.usage.calls} calls</ChatUsageStat>
+                <ChatUsageContext percent={ctxPct} label={ctxPct === null ? "context ?" : `${ctxPct}%`} />
+              </>
+            ) : (
+              <ChatUsageStat>no usage yet</ChatUsageStat>
+            )}
+            <ChatUsageSpacer />
+            {providers.length > 0 && detail ? (
+              <ModelPicker
+                providers={providers}
+                value={detail.model}
+                onChange={(id) => {
+                  void fetch(`/artisan-api/sessions/${detail.id}`, {
+                    method: "PATCH",
+                    credentials: "include",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ model: id }),
+                  }).then(() => chat.refresh());
+                }}
+              />
+            ) : null}
+          </ChatUsage>
+        </ChatStatusBar>
+      </ChatFooter>
+    </ChatShell>
   );
 }
