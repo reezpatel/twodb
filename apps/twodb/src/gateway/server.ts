@@ -4,11 +4,13 @@ import fastifyStatic from "@fastify/static";
 import * as fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 import type { Kysely } from "kysely";
 import type { ControlPlaneDb } from "../db/sqlite.js";
 import { createRegistryRepo } from "../db/registry.js";
 import { setupAuth } from "../auth/index.js";
 import type { TwoDbConfig } from "../config.js";
+import { decryptSecret } from "../db/provisioning.js";
 import { toWebRequest, sendWebResponse } from "./web-request.js";
 import { proxyToApp } from "./proxy.js";
 import { registerWsPassthrough } from "./ws-passthrough.js";
@@ -71,6 +73,36 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
 
     if (!result.ok) return reply.code(401).send({ error: result.reason });
     return { ok: true };
+  });
+
+  /**
+   * Boot-time DB credential bootstrap for apps running outside a TwoDB
+   * container (dev on the host): present the registration token, get the
+   * credentials TwoDB provisioned for your slug. Only secret an app needs
+   * in dev is its token — no per-app DATABASE_URL in .env. The stored
+   * string is the CONTAINER form; rewrite the host for the caller (a
+   * host-run dev process reaches Postgres on localhost).
+   */
+  app.post("/registry/credentials", async (req, reply) => {
+    const body = req.body as { slug?: string; registrationToken?: string };
+    if (!body?.slug || !body?.registrationToken) return reply.code(400).send({ error: "slug and registrationToken are required" });
+
+    const row = await registry.getApp(body.slug);
+    if (!row || !row.registration_token_hash) return reply.code(404).send({ error: `"${body.slug}" was never installed` });
+    const hash = createHash("sha256").update(body.registrationToken).digest("hex");
+    if (hash !== row.registration_token_hash) return reply.code(401).send({ error: "invalid registration token" });
+
+    if (!row.pg_connection_string_encrypted || !row.pg_schema || !row.pg_role) {
+      return reply.code(409).send({ error: `"${body.slug}" has no provisioned database — install it first` });
+    }
+
+    const containerUrl = decryptSecret(row.pg_connection_string_encrypted, config.AUTH_SECRET);
+    const hostUrl = new URL(containerUrl);
+    hostUrl.hostname = "localhost";
+    hostUrl.port = "5432";
+
+    const dataKey = row.data_key_encrypted ? decryptSecret(row.data_key_encrypted, config.AUTH_SECRET) : undefined;
+    return { connectionString: hostUrl.toString(), schema: row.pg_schema, role: row.pg_role, ...(dataKey ? { dataKey } : {}) };
   });
 
   app.get("/registry/apps", async (req, reply) => {
