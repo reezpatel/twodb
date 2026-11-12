@@ -96,12 +96,35 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
       return reply.code(409).send({ error: `"${body.slug}" has no provisioned database — install it first` });
     }
 
-    const containerUrl = decryptSecret(row.pg_connection_string_encrypted, config.AUTH_SECRET);
+    // Decrypt the stored (container-form) connection string. If it fails,
+    // the ciphertext predates a secret change (or came from another
+    // machine) — self-heal by re-provisioning the app's schema+role and
+    // storing fresh ciphertext instead of 500ing forever.
+    let containerUrl: string;
+    try {
+      containerUrl = decryptSecret(row.pg_connection_string_encrypted, config.AUTH_SECRET);
+    } catch {
+      app.log.warn({ slug: body.slug }, "stored credentials failed to decrypt — re-provisioning");
+      const provisioned = await provisionDatabase(body.slug, { registry, config });
+      containerUrl = provisioned.containerConnectionString;
+    }
+
     const hostUrl = new URL(containerUrl);
     hostUrl.hostname = "localhost";
     hostUrl.port = "5432";
 
-    const dataKey = row.data_key_encrypted ? decryptSecret(row.data_key_encrypted, config.AUTH_SECRET) : undefined;
+    // Data key decrypt can fail on the same stale-secret history; it's
+    // optional for apps (they fall back to dev defaults) — warn and omit
+    // rather than 500. provisionDatabase above already healed the
+    // connection string; the key regenerates on next clean install.
+    let dataKey: string | undefined;
+    if (row.data_key_encrypted) {
+      try {
+        dataKey = decryptSecret(row.data_key_encrypted, config.AUTH_SECRET);
+      } catch {
+        app.log.warn({ slug: body.slug }, "stored data key failed to decrypt — serving credentials without it");
+      }
+    }
     return { connectionString: hostUrl.toString(), schema: row.pg_schema, role: row.pg_role, ...(dataKey ? { dataKey } : {}) };
   });
 
