@@ -276,6 +276,11 @@ export async function runAgentLoop(opts: {
 
     let round = 0;
     const roundUsage = { input: 0, output: 0, cached: 0 };
+    // Per-round display trace: thinking text + tool results, persisted on the
+    // assistant message meta so the UI can replay tool accordions later.
+    let roundThinking = "";
+    const toolResults = new Map<string, { output: string; ok: boolean; durationMs: number }>();
+    const toolStartedAt = new Map<string, number>();
 
     loop:
     while (round < MAX_ROUNDS) {
@@ -300,7 +305,10 @@ export async function runAgentLoop(opts: {
           signal: ctrl.signal,
         })) {
           const think = chunk.delta?.reasoning ?? chunk.delta?.reasoning_content;
-          if (think) emit({ type: "thinking_delta", text: think });
+          if (think) {
+            roundThinking += think;
+            emit({ type: "thinking_delta", text: think });
+          }
           if (chunk.delta?.content) {
             content += chunk.delta.content;
             emit({ type: "delta", messageId: assistantId, text: chunk.delta.content });
@@ -348,8 +356,14 @@ export async function runAgentLoop(opts: {
       const assistantRow = await deps.repo.addMessage({
         threadId: thread.id, sessionId: session.id, role: "assistant",
         content,
-        meta: { toolCalls: toolCalls.map((tc) => ({ id: tc.id, name: tc.name, args: tc.args })), usage: usage ?? null, round },
+        meta: {
+          toolCalls: toolCalls.map((tc) => ({ id: tc.id, name: tc.name, args: tc.args })),
+          thinking: roundThinking.trim() ? [{ text: roundThinking, durationMs: null }] : [],
+          usage: usage ?? null,
+          round,
+        },
       });
+      roundThinking = "";
       emit({ type: "message_done", messageId: assistantId });
 
       // Feed back into context.
@@ -371,6 +385,7 @@ export async function runAgentLoop(opts: {
       // Execute tools.
       for (const tc of toolCalls) {
         const tool = visible.find((t) => t.name === tc.name);
+        toolStartedAt.set(tc.id, Date.now());
         emit({ type: "tool_start", id: tc.id, name: tc.name, args: safeParse(tc.args) });
         if (!tool) {
           const out = `unknown tool ${tc.name}`;
@@ -393,13 +408,36 @@ export async function runAgentLoop(opts: {
             },
           };
           const out = await tool.execute(args, toolCtx);
+          toolResults.set(tc.id, { output: out.slice(0, 8_000), ok: true, durationMs: Date.now() - (toolStartedAt.get(tc.id) ?? Date.now()) });
           emit({ type: "tool_result", id: tc.id, name: tc.name, output: out.slice(0, 4_000), ok: true });
           messages.push({ role: "tool", tool_call_id: tc.id, content: out.slice(0, 60_000) });
         } catch (err) {
           const out = `tool error: ${(err as Error).message}`;
+          toolResults.set(tc.id, { output: out, ok: false, durationMs: Date.now() - (toolStartedAt.get(tc.id) ?? Date.now()) });
           emit({ type: "tool_result", id: tc.id, name: tc.name, output: out, ok: false });
           messages.push({ role: "tool", tool_call_id: tc.id, content: out });
         }
+      }
+
+      // Patch tool results/timings into this round's assistant message meta.
+      if (toolCalls.length > 0) {
+        const patched = toolCalls.map((tc) => {
+          const r = toolResults.get(tc.id);
+          const started = toolStartedAt.get(tc.id);
+          return {
+            id: tc.id, name: tc.name, args: tc.args,
+            output: r?.output ?? null, ok: r?.ok ?? null,
+            startedAt: started ?? null, completedAt: r ? started! + r.durationMs : null,
+          };
+        });
+        await deps.repo.updateMessageContent(assistantRow.id, content, {
+          toolCalls: patched,
+          thinking: (parseJson<{ thinking?: unknown[] }>(assistantRow.meta_json, {})).thinking ?? [],
+          usage: usage ?? null,
+          round,
+        }).catch(() => {});
+        toolResults.clear();
+        toolStartedAt.clear();
       }
 
       // Auto-compaction check.

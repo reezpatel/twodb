@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Sparkles, Scissors } from "lucide-react";
-import { Markdown } from "@twodb/blocks";
+import { Markdown, ThinkingState } from "@twodb/blocks";
+import { toolToNode, thinkingToNode, liveToolToNode, type ToolCallMeta, type ThinkingMeta } from "./trace.js";
 import { useSessionChat } from "./hooks/useSessionChat.js";
 import { useCatalog } from "../shell/hooks/useCatalog.js";
 import { ChatShell, ChatThread, ChatThreadRow, ChatThreadHeader } from "./partials/ChatShell.js";
@@ -8,8 +9,7 @@ import { ChatHeader, ChatHeaderTitle, ChatHeaderStatus, ChatHeaderActions, ChatH
 import { ChatFooter, ChatFooterNotice, ChatStatusBar } from "./partials/ChatFooter.js";
 import { ChatComposer, ChatComposerInput, ChatComposerActions, ChatComposerSpacer, ChatComposerSend, ChatComposerStop } from "./partials/ChatComposer.js";
 import { ChatUsage, ChatUsageStat, ChatUsageContext, ChatUsageSpacer } from "./partials/ChatUsage.js";
-import { ChatMessage, ChatMessageNote } from "./partials/ChatMessage.js";
-import { ToolCard } from "./partials/ToolCard.js";
+import { ChatMessage } from "./partials/ChatMessage.js";
 import { AskWidget } from "./partials/AskWidget.js";
 import { ModelPicker, type ModelProvider, type ModelEntry } from "@twodb/blocks";
 
@@ -98,9 +98,16 @@ export function ChatView(props: { sessionId: string }) {
               <ChatThreadHeader>{m.content.slice(0, 240)}</ChatThreadHeader>
             ) : (
               <>
-                {(m.meta?.toolCalls as Array<{ name: string }> | undefined)?.length ? (
-                  <ChatMessageNote>tools: {((m.meta?.toolCalls as Array<{ name: string }>) ?? []).map((t) => t.name).join(", ")}</ChatMessageNote>
-                ) : null}
+                {(() => {
+                  const calls = (m.meta?.toolCalls as ToolCallMeta[] | undefined) ?? [];
+                  const thinking = (m.meta?.thinking as ThinkingMeta[] | undefined) ?? [];
+                  const trace = [
+                    ...thinking.filter((t) => t.text?.trim()).map((t) => thinkingToNode(t)),
+                    ...calls.map((tc) => toolToNode(tc)),
+                  ];
+                  if (trace.length === 0) return null;
+                  return <ThinkingState nodes={trace} autoPlay={false} />;
+                })()}
                 {m.content ? (
                   m.meta?.error ? (
                     <ChatMessage variant="assistant">
@@ -120,18 +127,20 @@ export function ChatView(props: { sessionId: string }) {
         {/* live run: thinking, tools, streaming text */}
         {chat.running || chat.toolEvents.length > 0 || chat.streamText ? (
           <ChatThreadRow>
-            {chat.thinking ? (
-              <details className="text-[11px] text-ink-muted">
-                <summary className="cursor-pointer select-none">thinking…</summary>
-                <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[11px]">{chat.thinking}</pre>
-              </details>
+            {chat.thinking || chat.toolEvents.length > 0 ? (
+              <ThinkingState
+                autoPlay={false}
+                defaultExpanded
+                workingLabel={chat.toolEvents.length > 0 ? "Working…" : "Thinking…"}
+                nodes={[
+                  ...(chat.thinking ? [thinkingToNode({ text: chat.thinking }, true)] : []),
+                  ...chat.toolEvents.map((t) => liveToolToNode(t)),
+                ]}
+              />
             ) : null}
-            {chat.toolEvents.map((t) => (
-              <ToolCard key={t.id} event={t} />
-            ))}
             {chat.streamText ? (
               <ChatMessage variant="assistant">
-                <span className="whitespace-pre-wrap text-sm">{chat.streamText}</span>
+                <Markdown text={chat.streamText} />
                 <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-ink align-middle" />
               </ChatMessage>
             ) : null}
