@@ -18,6 +18,15 @@ export const configSchema = z.object({
 
 export type TwoRouteConfig = z.infer<typeof configSchema>;
 
-export function loadTwoRouteConfig(): TwoRouteConfig {
-  return loadConfig(configSchema);
+export function loadTwoRouteConfig(source: Record<string, string | undefined> = process.env): TwoRouteConfig {
+  // Dev .env: TWOROUTE_* wins over the shared vars (DATABASE_URL/PORT belong
+  // to whichever app the shared block targets; docker installs inject plain
+  // DATABASE_URL/PORT/TWODB_PROVISION_TOKEN and no TWOROUTE_*).
+  return loadConfig(configSchema, {
+    ...source,
+    PORT: source.TWOROUTE_PORT ?? source.PORT,
+    DATABASE_URL: source.TWOROUTE_DATABASE_URL ?? source.DATABASE_URL,
+    HTTP_URL: source.TWOROUTE_HTTP_URL ?? source.HTTP_URL,
+    TWODB_PROVISION_TOKEN: source.TWOROUTE_PROVISION_TOKEN ?? source.TWODB_PROVISION_TOKEN,
+  });
 }

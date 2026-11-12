@@ -26,5 +26,6 @@ export function loadPaintressConfig(source: Record<string, string | undefined> =
     PORT: source.PAINTRESS_PORT ?? source.PORT,
     DATABASE_URL: source.PAINTRESS_DATABASE_URL ?? source.DATABASE_URL,
     HTTP_URL: source.PAINTRESS_HTTP_URL ?? source.HTTP_URL,
+    TWODB_PROVISION_TOKEN: source.PAINTRESS_PROVISION_TOKEN ?? source.TWODB_PROVISION_TOKEN,
   });
 }
