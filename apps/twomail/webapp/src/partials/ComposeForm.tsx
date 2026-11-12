@@ -1,0 +1,4 @@
+import type {Compose} from "../hooks/useMail";
+export function ComposeForm({value,onChange,onSend,onClose,busy,from}:{value:Compose;onChange:(v:Compose)=>void;onSend:()=>void;onClose:()=>void;busy:boolean;from:string}){
+ return <form className="panel" onSubmit={e=>{e.preventDefault();onSend();}}><h2>New message</h2><p>From {from}</p><fieldset disabled={busy}><label>To<input required type="email" value={value.to} onChange={e=>onChange({...value,to:e.target.value})}/></label><label>Subject<input maxLength={998} value={value.subject} onChange={e=>onChange({...value,subject:e.target.value})}/></label><label>Message<textarea required rows={12} maxLength={100000} value={value.text} onChange={e=>onChange({...value,text:e.target.value})}/></label><p>Plain text only. This draft is not saved when the page closes.</p><footer><button className="primary">{busy?'Sending…':'Send'}</button><button type="button" onClick={onClose}>Discard</button></footer></fieldset></form>;
+}

@@ -1,7 +1,8 @@
 # AGENTS.md — TwoMail
 
-Mail. **This app is scaffolded, not implemented.** Read `README.md`
-first.
+Initial IMAP/SMTP mail implementation with encrypted accounts, inbox import, and
+plain-text compose/reader UI. Read `README.md` for security boundaries, setup,
+verification, and outstanding legacy features.
 
 ## Before writing any route
 - Add a `defineEndpoint(...)` to `src/manifest.ts` first (request/response

@@ -3,7 +3,7 @@
   "slug": "twoday",
   "version": "0.1.0",
   "shape": "backend+webapp",
-  "description": "Calendar — not yet implemented. See AGENTS.md before building it out.",
+  "description": "Space-scoped calendars and local events.",
   "capabilities": [],
   "coreDeps": [
     "core-data",
@@ -11,6 +11,179 @@
     "core-async"
   ],
   "basePath": "/apps/twoday",
-  "generatedAt": "2026-11-09T12:16:48.476Z",
-  "endpoints": []
+  "generatedAt": "2026-11-12T17:58:33.743Z",
+  "endpoints": [
+    {
+      "name": "listCalendars",
+      "method": "GET",
+      "path": "/calendars",
+      "auth": "session-or-apiKey",
+      "description": "List calendars in accessible spaces.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "spaceId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "color": {
+              "default": "#235d42",
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "id": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "spaceId",
+            "name",
+            "color",
+            "id",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createCalendar",
+      "method": "POST",
+      "path": "/calendars",
+      "auth": "session-or-apiKey",
+      "description": "Create a calendar in an accessible space.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "color": {
+            "default": "#235d42",
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        },
+        "required": [
+          "spaceId",
+          "name",
+          "color"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "color": {
+            "default": "#235d42",
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "spaceId",
+          "name",
+          "color",
+          "id",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listEvents",
+      "method": "GET",
+      "path": "/events",
+      "auth": "session-or-apiKey",
+      "description": "List overlapping events. Required from/to are YYYY-MM-DD UTC boundaries (to exclusive); optional calendarId, limit (max 500), offset. All-day overlap uses date boundaries.",
+      "response": {
+        "note": "could not convert schema to JSON Schema",
+        "error": "Error: Transforms cannot be represented in JSON Schema"
+      }
+    },
+    {
+      "name": "createEvent",
+      "method": "POST",
+      "path": "/events",
+      "auth": "session-or-apiKey",
+      "description": "Create a local event. No invitations are sent. End is exclusive.",
+      "request": {
+        "note": "could not convert schema to JSON Schema",
+        "error": "Error: Transforms cannot be represented in JSON Schema"
+      },
+      "response": {
+        "note": "could not convert schema to JSON Schema",
+        "error": "Error: Transforms cannot be represented in JSON Schema"
+      }
+    },
+    {
+      "name": "replaceEvent",
+      "method": "PUT",
+      "path": "/events/:id",
+      "auth": "session-or-apiKey",
+      "description": "Replace event fields; calendarId cannot change.",
+      "request": {
+        "note": "could not convert schema to JSON Schema",
+        "error": "Error: Transforms cannot be represented in JSON Schema"
+      },
+      "response": {
+        "note": "could not convert schema to JSON Schema",
+        "error": "Error: Transforms cannot be represented in JSON Schema"
+      }
+    },
+    {
+      "name": "deleteEvent",
+      "method": "DELETE",
+      "path": "/events/:id",
+      "auth": "session-or-apiKey",
+      "description": "Permanently delete a local event.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
 }

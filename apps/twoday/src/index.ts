@@ -1,30 +1,17 @@
-// Scaffolded stub server — the app is not implemented yet (see AGENTS.md).
-// It still runs a real HTTP server so `pnpm local` can boot the whole
-// ecosystem and TwoDB's pull-registration can fetch a live manifest:
-// /healthz always answers, /internal/manifest is served only when the
-// orchestrator injected a TWODB_PROVISION_TOKEN (docker-install flow).
-import { serve } from "@hono/node-server";
-import { handleManifestRequest, INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER } from "@twodb/core-platform/manifest";
+import { fetchDatabaseCredentials, registerWithGateway } from "@twodb/core-platform/manifest";
 import { manifest } from "./manifest.js";
+import { buildServer } from "./server.js";
 
-const port = Number(process.env.PORT ?? 6403);
-const registrationToken = process.env.TWODB_PROVISION_TOKEN;
-
-serve({
-  port,
-  fetch: (req) => {
-    const url = new URL(req.url);
-    if (url.pathname === "/healthz") return Response.json({ ok: true, app: manifest.slug, scaffolded: true });
-    if (url.pathname === "" && registrationToken) {
-      const res = handleManifestRequest(
-        { ...manifest, version: "0.1.0" },
-        { registrationToken, httpUrl: process.env.HTTP_URL ?? `http://localhost:${port}` },
-        req.headers.get(REGISTRATION_TOKEN_HEADER) ?? undefined,
-      );
-      return Response.json(res.body, { status: res.status });
-    }
-    return new Response("not found", { status: 404 });
-  },
-});
-
-console.log(`${manifest.name} (scaffolded) listening on :${port}`);
+async function main() {
+  const port = Number(process.env.PORT ?? 6403);
+  const gatewayUrl = process.env.TWODB_GATEWAY_URL ?? "http://localhost:6400";
+  const registrationToken = process.env.TWODAY_PROVISION_TOKEN ?? process.env.TWODB_PROVISION_TOKEN ?? "";
+  const httpUrl = process.env.HTTP_URL ?? `http://localhost:${port}`;
+  const databaseUrl = process.env.TWODAY_DATABASE_URL ?? process.env.DATABASE_URL ??
+    (await fetchDatabaseCredentials({ gatewayUrl, registrationToken, slug: "twoday" })).connectionString;
+  const app = await buildServer({ databaseUrl, registrationToken, httpUrl });
+  await app.listen({ host: "0.0.0.0", port });
+  for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => { void app.close(); });
+  await registerWithGateway(manifest, { gatewayUrl, registrationToken, httpUrl }).catch(err => app.log.warn({ err }, "Gateway registration failed"));
+}
+main().catch(err => { console.error(err); process.exitCode = 1; });

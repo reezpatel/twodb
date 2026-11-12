@@ -1,7 +1,7 @@
 # AGENTS.md — TwoDay
 
-Calendar. **This app is scaffolded, not implemented.** Read `README.md`
-first.
+Local calendars and events with a standalone agenda webapp. Read `README.md`
+for implemented features, verification commands, and remaining legacy integrations.
 
 ## Before writing any route
 - Add a `defineEndpoint(...)` to `src/manifest.ts` first (request/response

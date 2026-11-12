@@ -3,7 +3,7 @@
   "slug": "twomail",
   "version": "0.1.0",
   "shape": "backend+webapp",
-  "description": "Mail — not yet implemented. See AGENTS.md before building it out.",
+  "description": "IMAP inbox and SMTP mail with encrypted account credentials.",
   "capabilities": [],
   "coreDeps": [
     "core-data",
@@ -11,6 +11,250 @@
     "core-async"
   ],
   "basePath": "/apps/twomail",
-  "generatedAt": "2026-11-09T12:16:49.428Z",
-  "endpoints": []
+  "generatedAt": "2026-11-12T18:05:26.795Z",
+  "endpoints": [
+    {
+      "name": "listAccounts",
+      "method": "GET",
+      "path": "/accounts",
+      "auth": "session-or-apiKey",
+      "description": "List accounts in accessible spaces; secrets never returned.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "spaceId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "address": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "spaceId",
+            "name",
+            "address",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createAccount",
+      "method": "POST",
+      "path": "/accounts",
+      "auth": "session-or-apiKey",
+      "description": "Verify IMAP and SMTP credentials, then save encrypted connection. TLS mandatory.",
+      "request": {
+        "note": "could not convert schema to JSON Schema",
+        "error": "Error: Transforms cannot be represented in JSON Schema"
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "spaceId",
+          "name",
+          "address",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "syncInbox",
+      "method": "POST",
+      "path": "/accounts/:id/sync",
+      "auth": "session-or-apiKey",
+      "description": "Fetch latest 100 INBOX messages (max 2 MB each). Snapshot import, not full mailbox reconciliation.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "imported": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "imported"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listMessages",
+      "method": "GET",
+      "path": "/messages",
+      "auth": "session-or-apiKey",
+      "description": "Query accountId, folder (inbox/sent), limit and offset. Plain text only; attachments omitted.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "accountId": {
+              "type": "string"
+            },
+            "folder": {
+              "type": "string"
+            },
+            "sender": {
+              "type": "string"
+            },
+            "recipient": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "accountId",
+            "folder",
+            "sender",
+            "recipient",
+            "subject",
+            "text",
+            "date",
+            "status"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "sendMail",
+      "method": "POST",
+      "path": "/send",
+      "auth": "session-or-apiKey",
+      "description": "Send plain text to one recipient. requestId prevents duplicate submissions. Unknown delivery is never automatically retried.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "to": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 998
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100000
+          }
+        },
+        "required": [
+          "accountId",
+          "requestId",
+          "to",
+          "subject",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "folder": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "accountId",
+          "folder",
+          "sender",
+          "recipient",
+          "subject",
+          "text",
+          "date",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
 }
