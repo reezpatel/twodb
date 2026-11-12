@@ -1,7 +1,7 @@
 import type { Kysely } from "kysely";
 import { sql } from "kysely";
 import { ulid } from "ulid";
-import type { AgentRow, ArtisanDb, MessageRow, SessionRow, SessionUsageRow, SkillRow, ThreadRow } from "./schema.js";
+import type { AgentRow, ArtisanDb, CheckpointRow, MessageRow, SessionRow, SessionUsageRow, SkillRow, ThreadRow } from "./schema.js";
 
 export function newId(): string {
   return ulid().toLowerCase();
@@ -19,7 +19,9 @@ export interface ArtisanRepo {
     agentId?: string | null; parentSessionId?: string | null; adhocPrompt?: string | null; depth?: number;
   }): Promise<SessionRow>;
   getSession(workspaceId: string, id: string): Promise<SessionRow | undefined>;
-  listSessions(workspaceId: string, filter?: { type?: string; runner?: string; directory?: string; spaceId?: string }): Promise<SessionRow[]>;
+  listSessions(workspaceId: string, filter?: { type?: string; runner?: string; directory?: string; spaceId?: string; parentSessionId?: string }): Promise<SessionRow[]>;
+  /** Unfiltered (every type) — admin/parent views. */
+  listSessionsAll(workspaceId: string, parentSessionId?: string): Promise<SessionRow[]>;
   touchSession(id: string): Promise<void>;
   renameSession(workspaceId: string, id: string, title: string): Promise<void>;
   setSessionModel(workspaceId: string, id: string, model: string): Promise<void>;
@@ -65,6 +67,12 @@ export interface ArtisanRepo {
     name: string; description: string; content: string; directory: string | null; tags: string[];
   }>): Promise<SkillRow | undefined>;
   deleteSkill(workspaceId: string, id: string): Promise<boolean>;
+
+  // checkpoints
+  addCheckpoint(input: { workspaceId: string; sessionId: string; runner: string; directory: string; label: string | null; ref: string; commitSha: string; trigger?: string }): Promise<CheckpointRow>;
+  listCheckpoints(workspaceId: string, sessionId: string): Promise<CheckpointRow[]>;
+  getCheckpoint(workspaceId: string, id: string): Promise<CheckpointRow | undefined>;
+  deleteCheckpoint(workspaceId: string, id: string): Promise<boolean>;
 
   // usage
   incrementUsage(sessionId: string, add: { inputTokens: number; outputTokens: number; cachedTokens: number; costUsd: number | null }): Promise<void>;
@@ -117,6 +125,13 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
       if (filter?.runner) q = q.where("runner", "=", filter.runner);
       if (filter?.directory) q = q.where("directory", "=", filter.directory);
       if (filter?.spaceId) q = q.where("space_id", "=", filter.spaceId);
+      if (filter?.parentSessionId) q = q.where("parent_session_id", "=", filter.parentSessionId);
+      return q.orderBy("updated_at", "desc").execute();
+    },
+
+    async listSessionsAll(workspaceId, parentSessionId) {
+      let q = db.selectFrom("session").selectAll().where("workspace_id", "=", workspaceId);
+      if (parentSessionId) q = q.where("parent_session_id", "=", parentSessionId);
       return q.orderBy("updated_at", "desc").execute();
     },
 
@@ -315,6 +330,37 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
 
     async deleteSkill(workspaceId, id) {
       const rows = await db.deleteFrom("skill").where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
+      const res = Array.isArray(rows) ? rows[0] : rows;
+      return Number(res?.numDeletedRows ?? 0) > 0;
+    },
+
+    async addCheckpoint(input) {
+      const row: CheckpointRow = {
+        id: newId(),
+        workspace_id: input.workspaceId,
+        session_id: input.sessionId,
+        runner: input.runner,
+        directory: input.directory,
+        label: input.label,
+        ref: input.ref,
+        commit_sha: input.commitSha,
+        trigger: input.trigger ?? "manual",
+        created_at: now(),
+      };
+      await db.insertInto("checkpoint").values(row).execute();
+      return row;
+    },
+
+    async listCheckpoints(workspaceId, sessionId) {
+      return db.selectFrom("checkpoint").selectAll().where("workspace_id", "=", workspaceId).where("session_id", "=", sessionId).orderBy("created_at", "desc").execute();
+    },
+
+    async getCheckpoint(workspaceId, id) {
+      return db.selectFrom("checkpoint").selectAll().where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
+    },
+
+    async deleteCheckpoint(workspaceId, id) {
+      const rows = await db.deleteFrom("checkpoint").where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
       const res = Array.isArray(rows) ? rows[0] : rows;
       return Number(res?.numDeletedRows ?? 0) > 0;
     },

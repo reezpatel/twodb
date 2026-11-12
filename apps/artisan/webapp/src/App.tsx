@@ -7,7 +7,7 @@ import { Sidebar } from "./routes/shell/partials/Sidebar.js";
 import { NewSessionDialog } from "./routes/shell/partials/NewSessionDialog.js";
 import { useTabs } from "./routes/shell/hooks/useTabs.js";
 import { useCatalog } from "./routes/shell/hooks/useCatalog.js";
-import { ChatView } from "./routes/chat/ChatView.js";
+import { SessionScreen } from "./routes/chat/SessionScreen.js";
 import { AgentsView } from "./routes/agents/AgentsView.js";
 import { SkillsView } from "./routes/skills/SkillsView.js";
 
@@ -128,7 +128,7 @@ function Shell() {
         ) : null}
         <div className="min-h-0 flex-1">
           <Routes>
-            <Route path="/" element={showTabs && tabs.active ? <ChatView sessionId={tabs.active} /> : <EmptyState onNew={() => setNewOpen(true)} />} />
+            <Route path="/" element={showTabs && tabs.active ? <SessionScreen sessionId={tabs.active} onOpenChild={(id) => tabs.open(id)} title={tabs.tabs.find((t) => t.sessionId === tabs.active)?.label} /> : <EmptyState onNew={() => setNewOpen(true)} />} />
             <Route path="/s/:sessionId" element={<ChatViewRoute tabs={tabs} />} />
             <Route path="/agents" element={<AgentsView />} />
             <Route path="/skills" element={<SkillsView />} />
@@ -157,7 +157,7 @@ function ChatViewRoute(props: { tabs: ReturnType<typeof useTabs> }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, found]);
   if (!sessionId) return null;
-  return <ChatView sessionId={sessionId} />;
+  return <SessionScreen sessionId={sessionId} onOpenChild={(id) => props.tabs.open(id)} title={undefined} />;
 }
 
 function useParams2(): { sessionId?: string } {

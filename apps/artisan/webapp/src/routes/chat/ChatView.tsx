@@ -24,7 +24,7 @@ function contextPercent(usage: { inputTokens: number } | null, contextWindow: nu
  * bubble, assistant = open text), bordered composer with Stop/Send, and a
  * usage status bar (↑ ↓ ⚡ + context ring + model picker).
  */
-export function ChatView(props: { sessionId: string }) {
+export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
   const chat = useSessionChat(props.sessionId);
   const catalog = useCatalog();
   const [draft, setDraft] = useState("");
@@ -62,6 +62,7 @@ export function ChatView(props: { sessionId: string }) {
 
   return (
     <ChatShell>
+      {props.noHeader ? null : (
       <ChatHeader>
         <ChatHeaderTitle
           title={detail?.title ?? props.sessionId.slice(-8)}
@@ -73,6 +74,7 @@ export function ChatView(props: { sessionId: string }) {
           <ChatHeaderAction icon={<Scissors className="size-3.5" />} label="Compact context (/compact)" onClick={() => void chat.compact()} />
         </ChatHeaderActions>
       </ChatHeader>
+      )}
 
       {plan && plan.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-outline bg-surface-muted/50 px-4 py-1.5">

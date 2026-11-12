@@ -112,6 +112,20 @@ export interface SessionUsageRow {
   updated_at: string;
 }
 
+/** Git-ref snapshot of the session directory (hidden ref, HEAD untouched). */
+export interface CheckpointRow {
+  id: string;
+  workspace_id: string;
+  session_id: string;
+  runner: string;
+  directory: string;
+  label: string | null;
+  ref: string;
+  commit_sha: string;
+  trigger: string;
+  created_at: string;
+}
+
 export interface ArtisanDb {
   session: SessionRow;
   thread: ThreadRow;
@@ -119,6 +133,7 @@ export interface ArtisanDb {
   agent: AgentRow;
   skill: SkillRow;
   session_usage: SessionUsageRow;
+  checkpoint: CheckpointRow;
 }
 
 export async function applySchema(db: Kysely<ArtisanDb>): Promise<void> {
@@ -202,6 +217,21 @@ export async function applySchema(db: Kysely<ArtisanDb>): Promise<void> {
     .addColumn("tags_json", "text", (c) => c.notNull().defaultTo('["default"]'))
     .addColumn("created_at", "text", (c) => c.notNull())
     .addColumn("updated_at", "text", (c) => c.notNull())
+    .execute();
+
+  await db.schema
+    .createTable("checkpoint")
+    .ifNotExists()
+    .addColumn("id", "text", (c) => c.primaryKey())
+    .addColumn("workspace_id", "text", (c) => c.notNull())
+    .addColumn("session_id", "text", (c) => c.notNull())
+    .addColumn("runner", "text", (c) => c.notNull())
+    .addColumn("directory", "text", (c) => c.notNull())
+    .addColumn("label", "text")
+    .addColumn("ref", "text", (c) => c.notNull())
+    .addColumn("commit_sha", "text", (c) => c.notNull())
+    .addColumn("trigger", "text", (c) => c.notNull().defaultTo("manual"))
+    .addColumn("created_at", "text", (c) => c.notNull())
     .execute();
 
   await db.schema

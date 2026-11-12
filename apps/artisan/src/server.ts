@@ -339,6 +339,186 @@ export async function buildServer(config: ArtisanConfig) {
     return [...dirs.values()];
   });
 
+  // --- checkpoints (git-ref snapshots on the session directory) -----------------
+  app.get("/sessions/:id/checkpoints", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const rows = await repo.listCheckpoints(ctx.workspaceId, id);
+    return rows.map(checkpointOut);
+  });
+
+  app.post("/sessions/:id/checkpoints", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const body = (req.body ?? {}) as { label?: string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    // Snapshot via a temp GIT_INDEX_FILE — staged state untouched, HEAD stays put.
+    const q = (v: string) => `'${v.replace(/'/g, "'\\''")}'`;
+    const cpId = newId();
+    const script = [
+      "git rev-parse --git-dir >/dev/null 2>&1 || exit 14",
+      "T=$(mktemp) || exit 10",
+      "GIT_INDEX_FILE=$T",
+      "export GIT_INDEX_FILE",
+      "git read-tree HEAD 2>/dev/null",
+      "git add -A",
+      "TREE=$(git write-tree 2>/dev/null) || exit 11",
+      "rm -f $T",
+      "PARENT=$(git rev-parse --verify -q HEAD)",
+      'if [ -n "$PARENT" ]; then',
+      '  C=$(git commit-tree $TREE -p $PARENT -m "artisan checkpoint")',
+      "else",
+      '  C=$(git commit-tree $TREE -m "artisan checkpoint")',
+      "fi",
+      '[ -n "$C" ] || exit 12',
+      `git update-ref refs/artisan/checkpoints/${cpId} $C || exit 13`,
+      "echo $C",
+    ].join("\n");
+    const res = await deps.dispatch.exec(session.runner, script, session.directory, 30_000);
+    if (res.error) return reply.code(503).send({ error: "runner_offline" });
+    if (res.exitCode === 14) return reply.code(409).send({ error: "not_a_git_repo" });
+    if (res.exitCode !== 0) return reply.code(500).send({ error: "checkpoint_failed", detail: res.stderr.slice(0, 300) });
+    const sha = (res.stdout.trim().split("\n").pop() ?? "").trim();
+    if (!/^[0-9a-f]{40,64}$/.test(sha)) return reply.code(500).send({ error: "checkpoint_failed" });
+    const row = await repo.addCheckpoint({
+      workspaceId: ctx.workspaceId, sessionId: id, runner: session.runner, directory: session.directory,
+      label: body.label?.trim().slice(0, 200) || null, ref: `refs/artisan/checkpoints/${cpId}`, commitSha: sha,
+    });
+    return checkpointOut(row);
+  });
+
+  app.post("/checkpoints/:id/restore", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const cp = await repo.getCheckpoint(ctx.workspaceId, id);
+    if (!cp) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    const script = `git restore --source=${cp.ref} --staged --worktree .`;
+    const res = await deps.dispatch.exec(cp.runner, script, cp.directory, 30_000);
+    if (res.error) return reply.code(503).send({ error: "runner_offline" });
+    if (res.exitCode !== 0) return reply.code(500).send({ error: "restore_failed", detail: res.stderr.slice(0, 300) });
+    return { ok: true };
+  });
+
+  app.delete("/checkpoints/:id", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const cp = await repo.getCheckpoint(ctx.workspaceId, id);
+    if (!cp) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    await deps.dispatch.exec(cp.runner, `git update-ref -d ${cp.ref}`, cp.directory, 15_000).catch(() => {});
+    return { ok: await repo.deleteCheckpoint(ctx.workspaceId, id) };
+  });
+
+  // --- git status (session directory) -------------------------------------------
+  app.get("/sessions/:id/git", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    const script = [
+      "git rev-parse --abbrev-ref HEAD 2>/dev/null || exit 14",
+      'A=$(git status --porcelain 2>/dev/null | grep -c "^A\|^M\|^ M\|^MM") || A=0',
+      'D=$(git status --porcelain 2>/dev/null | grep -c "^D\|^ D") || D=0',
+      'echo "$A $D"',
+    ].join("\n");
+    const res = await deps.dispatch.exec(session.runner, script, session.directory, 20_000);
+    if (res.exitCode === 14) return { git: false };
+    if (res.exitCode !== 0) return { git: false, error: res.stderr.slice(0, 200) };
+    const [branch] = res.stdout.trim().split("\n");
+    const last = res.stdout.trim().split("\n").pop() ?? "0 0";
+    const [additions, deletions] = last.split(" ");
+    const porcelain = await deps.dispatch.exec(session.runner, "git status --porcelain", session.directory, 20_000);
+    const files = porcelain.stdout.split("\n").filter(Boolean).slice(0, 50).map((line) => {
+      const status = line.slice(0, 2).trim();
+      const path = line.slice(3).trim();
+      return { path, status };
+    });
+    return { git: true, branch, additions: Number(additions) || 0, deletions: Number(deletions) || 0, files };
+  });
+
+  // --- child sessions (subagents sidebar) -----------------------------------------
+  app.get("/sessions/:id/children", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const rows = await repo.listSessionsAll(ctx.workspaceId, id);
+    return rows.map((r) => ({
+      id: r.id, title: r.title, running: isSessionRunning(r.id),
+      adhoc: r.adhoc_prompt !== null, updatedAt: r.updated_at,
+    }));
+  });
+
+  // --- files (editor tab) -------------------------------------------------------
+  app.get("/sessions/:id/files", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    const res = await deps.dispatch.exec(
+      session.runner,
+      "find . -maxdepth 3 -not -path '*/node_modules*' -not -path '*/.git/*' | head -300",
+      session.directory, 15_000,
+    );
+    const files = res.stdout.split("\n").filter((l) => l.startsWith("./")).map((l) => l.slice(2)).sort();
+    return { files };
+  });
+
+  app.get("/sessions/:id/files/*", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id, "*": rawPath } = req.params as { id: string; "*": string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    const safe = rawPath.replace(/'/g, "'\\''");
+    const res = await deps.dispatch.exec(session.runner, `cat '${safe}'`, session.directory, 15_000);
+    if (res.exitCode !== 0) return reply.code(404).send({ error: res.stderr.slice(0, 200) });
+    return { path: rawPath, content: res.stdout };
+  });
+
+  app.put("/sessions/:id/files/*", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id, "*": rawPath } = req.params as { id: string; "*": string };
+    const body = (req.body ?? {}) as { content?: string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    const safe = rawPath.replace(/'/g, "'\\''");
+    const script = `mkdir -p $(dirname '${safe}') && cat > '${safe}' <<'__ARTISAN_EOF__'
+${body.content ?? ""}
+__ARTISAN_EOF__
+echo saved`;
+    const res = await deps.dispatch.exec(session.runner, script, session.directory, 15_000);
+    if (res.exitCode !== 0) return reply.code(500).send({ error: res.stderr.slice(0, 200) });
+    return { ok: true };
+  });
+
+  // --- console (terminal tab): run a command, get output ------------------------
+  app.post("/sessions/:id/console", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const body = (req.body ?? {}) as { command?: string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    if (!body.command) return reply.code(400).send({ error: "command required" });
+    const deps = depsFor(req);
+    const res = await deps.dispatch.exec(session.runner, body.command, session.directory, 120_000);
+    return { stdout: res.stdout, stderr: res.stderr, exitCode: res.exitCode };
+  });
+
   // --- model + runner proxies ---------------------------------------------------
   app.get("/models", async (req, reply) => {
     const ctx = requireCtx(req, reply);
@@ -380,6 +560,10 @@ export async function buildServer(config: ArtisanConfig) {
 
 function shellQuote(s: string): string {
   return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
+function checkpointOut(c: { id: string; session_id: string; label: string | null; commit_sha: string; ref: string; trigger: string; created_at: string }) {
+  return { id: c.id, sessionId: c.session_id, label: c.label, commitSha: c.commit_sha, ref: c.ref, trigger: c.trigger, createdAt: c.created_at };
 }
 
 function sessionOut(s: { id: string; type: string; title: string; runner: string; directory: string; model: string; interactive: boolean; space_id: string; agent_id: string | null; parent_session_id: string | null; created_at: string; updated_at: string }) {
