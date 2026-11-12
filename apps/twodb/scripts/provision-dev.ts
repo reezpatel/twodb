@@ -16,6 +16,9 @@
  * Then paste the printed DATABASE_URL line(s) into the repo-root .env.
  */
 import { provisionAppDatabase } from "../src/db/provisioning.js";
+import { createRegistryRepo } from "../src/db/registry.js";
+import { openControlPlaneDb, bootstrapControlPlaneDb } from "../src/db/sqlite.js";
+import { generateRegistrationToken } from "../src/orchestrator/tokens.js";
 import { readFileSync, existsSync } from "node:fs";
 import * as path from "node:path";
 
@@ -35,14 +38,47 @@ async function main() {
   const adminUrl = env("TWODB_PG_ADMIN_URL");
   if (!adminUrl) throw new Error("TWODB_PG_ADMIN_URL not set (env or .env)");
   const containerHost = env("TWODB_PG_CONTAINER_HOST") ?? "twodb-postgres";
+  const sqliteFile = env("TWODB_SQLITE_FILE") ?? "./.data/twodb-control-plane.sqlite";
+
+  // Registration tokens live in the control-plane SQLite registry, so the
+  // dev script opens the same DB the gateway uses and stores a fresh
+  // per-app token — same trust model as `POST /orchestrator/apps/:slug/
+  // issue-token`, but runnable from the CLI without a session. Re-running
+  // rotates the token (installs rotate too).
+  const db = openControlPlaneDb(sqliteFile);
+  await bootstrapControlPlaneDb(db);
+  const registry = createRegistryRepo(db);
 
   for (const slug of slugs) {
     const r = await provisionAppDatabase(adminUrl, slug, containerHost);
+    // Always issue a fresh token and print it (installs rotate too; the
+    // plaintext can't be recovered from the stored hash anyway).
+    const registrationToken = generateRegistrationToken();
+    await registry.beginInstall(
+      {
+        slug,
+        name: slug,
+        version: "dev",
+        shape: "backend",
+        basePath: `/apps/${slug}`,
+        hostId: "dev",
+        capabilities: [],
+      },
+      registrationToken,
+    );
     console.log(`\n# ${slug} — schema "${r.schema}", role "${r.role}" (same db as the admin URL)`);
-    console.log(`DATABASE_URL=${r.connectionString}`);
+    console.log(`${slug.toUpperCase()}_DATABASE_URL=${r.connectionString}`);
+    console.log(`${slug.toUpperCase()}_PROVISION_TOKEN=${registrationToken}`);
     console.log(`# (docker installs instead inject: ${r.containerConnectionString})`);
   }
+  process.exit(0);
 }
+
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});
+
 
 main().catch((err) => {
   console.error(err);

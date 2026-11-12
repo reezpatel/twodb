@@ -23,6 +23,7 @@ export function loadArtisanConfig(source: Record<string, string | undefined> = p
   return loadConfig(configSchema, {
     ...source,
     PORT: source.ARTISAN_PORT ?? source.PORT,
+    TWODB_PROVISION_TOKEN: source.ARTISAN_PROVISION_TOKEN ?? source.TWODB_PROVISION_TOKEN,
     DATABASE_URL: source.ARTISAN_DATABASE_URL ?? source.DATABASE_URL,
     HTTP_URL: source.ARTISAN_HTTP_URL ?? source.HTTP_URL,
   });

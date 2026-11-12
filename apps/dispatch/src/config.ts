@@ -18,6 +18,7 @@ export function loadDispatchConfig(source: Record<string, string | undefined> = 
   return loadConfig(configSchema, {
     ...source,
     PORT: source.DISPATCH_PORT ?? source.PORT,
+    TWODB_PROVISION_TOKEN: source.DISPATCH_PROVISION_TOKEN ?? source.TWODB_PROVISION_TOKEN,
     DATABASE_URL: source.DISPATCH_DATABASE_URL ?? source.DATABASE_URL,
     HTTP_URL: source.DISPATCH_HTTP_URL ?? source.HTTP_URL,
   });
