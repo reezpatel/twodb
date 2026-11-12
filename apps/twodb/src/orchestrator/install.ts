@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import type { RegistryRepo } from "../db/registry.js";
 import type { TwoDbConfig } from "../config.js";
 import { getCatalogEntry, type CatalogEntry } from "./catalog.js";
-import { generateRegistrationToken } from "./tokens.js";
+import { generateAppToken } from "./tokens.js";
 import { provisionAppDatabase, encryptSecret, decryptSecret } from "../db/provisioning.js";
 import * as docker from "./docker.js";
 
@@ -40,30 +40,43 @@ export interface InstallOptions {
 }
 
 /**
- * Generates a fresh per-app registration token and records its hash (never
- * the plaintext) against `slug`. Used both by the full Docker install flow
- * below and, standalone, for local dev — run `pnpm dev` directly instead of
- * through a container, with this token in `TWODB_PROVISION_TOKEN` and the
- * connection string from `provisionDatabase()` in `DATABASE_URL`.
+ * Mints the token a TwoDB-managed container uses to talk to the control
+ * plane: non-expiring (`expires_at` null), rotated on every (re)install —
+ * previous managed tokens are revoked. Plaintext is returned once (it goes
+ * straight into the container env); only the hash is stored.
  */
-export async function issueRegistrationToken(slug: string, opts: InstallOptions): Promise<{ registrationToken: string }> {
+export async function issueManagedToken(slug: string, opts: InstallOptions): Promise<{ appToken: string }> {
   const entry = getCatalogEntry(slug);
   if (!entry) throw new Error(`"${slug}" is not in the app catalog`);
 
-  const registrationToken = generateRegistrationToken();
-  await opts.registry.beginInstall(
-    {
-      slug: entry.slug,
-      name: entry.slug,
-      version: workspaceVersion(entry),
-      shape: "backend",
-      basePath: `/apps/${entry.slug}`,
-      hostId: "docker",
-      capabilities: [],
-    },
-    registrationToken,
-  );
-  return { registrationToken };
+  await opts.registry.beginInstall({
+    slug: entry.slug,
+    name: entry.name,
+    version: workspaceVersion(entry),
+    shape: "backend",
+    basePath: `/apps/${entry.slug}`,
+    hostId: "docker",
+    capabilities: [],
+  });
+  await opts.registry.revokeTokens(slug, "managed");
+  const appToken = generateAppToken();
+  await opts.registry.issueToken(slug, "managed", appToken, null);
+  return { appToken };
+}
+
+/**
+ * Mints an expiring (TWODB_APP_TOKEN_TTL_DAYS, default 30) token for any
+ * slug — the API/dev path for apps TwoDB does NOT run. Same token the
+ * `POST /registry/register` secret flow hands out.
+ */
+export async function issueApiToken(slug: string, opts: InstallOptions): Promise<{ appToken: string; expiresAt: string | null }> {
+  const appToken = generateAppToken();
+  const { expiresAt } = await opts.registry.issueToken(slug, "api", appToken, apiTokenTtlMs(opts.config));
+  return { appToken, expiresAt };
+}
+
+export function apiTokenTtlMs(config: TwoDbConfig): number {
+  return config.TWODB_APP_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
 }
 
 /**
@@ -76,20 +89,31 @@ export async function issueRegistrationToken(slug: string, opts: InstallOptions)
  * Only the container forms are persisted (encrypted), since that's what
  * `upgradeApp`/`restartApp` need again.
  */
-export async function provisionDatabase(slug: string, opts: InstallOptions) {
+export async function provisionDatabase(slug: string, opts: InstallOptions, { rotate = false }: { rotate?: boolean } = {}) {
+  // Reuse the stored role password — registering/fetching config must never
+  // change credentials. Only an explicit rotate (or an undecryptable store) does.
+  const current = await opts.registry.getApp(slug);
+  let existingPassword: string | undefined;
+  if (current?.pg_connection_string_encrypted) {
+    try {
+      existingPassword = decodeURIComponent(new URL(decryptSecret(current.pg_connection_string_encrypted, opts.config.AUTH_SECRET)).password);
+    } catch {
+      existingPassword = undefined; // unrecoverable -> heal by resetting once
+    }
+  }
   const provisioned = await provisionAppDatabase(
     opts.config.TWODB_PG_ADMIN_URL,
     slug,
     opts.config.TWODB_PG_CONTAINER_HOST,
+    { existingPassword, rotate },
   );
   const encrypted = encryptSecret(provisioned.containerConnectionString, opts.config.AUTH_SECRET);
   await opts.registry.setProvisioning(slug, provisioned.schema, provisioned.role, encrypted);
 
-  const existing = await opts.registry.getApp(slug);
-  const dataKey = existing?.data_key_encrypted
-    ? decryptSecret(existing.data_key_encrypted, opts.config.AUTH_SECRET)
+  const dataKey = current?.data_key_encrypted
+    ? decryptSecret(current.data_key_encrypted, opts.config.AUTH_SECRET)
     : randomBytes(32).toString("hex");
-  if (!existing?.data_key_encrypted) {
+  if (!current?.data_key_encrypted) {
     await opts.registry.setDataKey(slug, encryptSecret(dataKey, opts.config.AUTH_SECRET));
   }
 
@@ -108,22 +132,19 @@ function appHttpUrl(config: TwoDbConfig, entry: CatalogEntry): string {
     .replaceAll("{containerPort}", String(entry.containerPort));
 }
 
-function buildContainerEnv(
-  entry: CatalogEntry,
-  config: TwoDbConfig,
-  registrationToken: string,
-  dbUrl: string,
-  dataKey: string,
-) {
+function buildContainerEnv(entry: CatalogEntry, config: TwoDbConfig, appToken: string) {
+  // Deliberately NO DATABASE_URL / S3 / data key here: the app presents its
+  // token to the control plane (twodb-core -> GET /registry/config) and gets
+  // its Postgres + S3 config (and stable data key) back at boot.
   return {
     NODE_ENV: "production",
     PORT: String(entry.containerPort),
-    DATABASE_URL: dbUrl,
     TWODB_GATEWAY_URL: config.TWODB_GATEWAY_URL_FOR_CONTAINERS,
-    TWODB_PROVISION_TOKEN: registrationToken,
-    // Stable per-app key for the app's own encryption-at-rest — persists
-    // across upgrades (the registration token above does NOT).
-    TWODB_DATA_KEY: dataKey,
+    // The app's identity: it registers + pings with this and sends it as
+    // x-twodb-token on gateway calls. Non-expiring, rotated on (re)install
+    // or from the UI.
+    TWODB_APP_SLUG: entry.slug,
+    TWODB_APP_TOKEN: appToken,
     TWODB_HOST_ID: "docker",
     // What the app tells TwoDB its reachable URL is at registration time —
     // the gateway proxies to this. See TWODB_APP_HTTP_URL_TEMPLATE.
@@ -132,53 +153,26 @@ function buildContainerEnv(
 }
 
 /**
- * Pull-registration: polls a freshly-started container's published port for
- * `GET /internal/manifest` (token-guarded — see
- * core-platform/src/manifest/serve.ts for why this exists alongside the
- * app's own push registration) and completes registration in-process. A
- * correct manifest response proves the responder is the exact app TwoDB
- * installed: only it holds the registration token injected into its env.
- *
- * Throws if the app never comes up, which the caller's runLifecycle wrapper
- * records as install_status "failed".
+ * Registration is always app-initiated now (the app registers/pings the
+ * gateway with its token). After starting a container the orchestrator just
+ * waits for that to happen: status "active" with a heartbeat newer than
+ * `since`. Throws if the app never shows up (runLifecycle records "failed").
  */
-async function pullRegister(
+async function waitForRegistration(
   entry: CatalogEntry,
-  registrationToken: string,
+  since: number,
   opts: InstallOptions,
-  { attempts = 60, intervalMs = 2000 }: { attempts?: number; intervalMs?: number } = {},
+  { attempts = 90, intervalMs = 2000 }: { attempts?: number; intervalMs?: number } = {},
 ): Promise<void> {
-  const url = `${appHttpUrl(opts.config, entry)}/internal/manifest`;
-  let lastError: unknown = new Error("never attempted");
-
   for (let i = 0; i < attempts; i++) {
-    try {
-      const res = await fetch(url, { headers: { "x-registration-token": registrationToken } });
-      if (res.status === 401) throw new Error(`app at ${url} rejected the registration token`);
-      if (res.ok) {
-        const body = (await res.json()) as { slug: string; httpUrl: string; manifest: unknown };
-        if (body.slug !== entry.slug) {
-          throw new Error(`port ${entry.hostPort} is served by "${body.slug}", expected "${entry.slug}"`);
-        }
-        const result = await opts.registry.completeRegistration({
-          slug: entry.slug,
-          registrationToken,
-          httpUrl: body.httpUrl,
-          manifestJson: body.manifest,
-        });
-        if (!result.ok) throw new Error(`completeRegistration failed: ${result.reason}`);
-        return;
-      }
-      lastError = new Error(`GET ${url} -> ${res.status}`);
-    } catch (err) {
-      lastError = err;
-      // A 401/slug-mismatch is a hard failure — retrying won't fix it.
-      if (err instanceof Error && /rejected the registration token|is served by/.test(err.message)) throw err;
+    const row = await opts.registry.getApp(entry.slug);
+    if (row?.status === "active" && row.last_seen_at && Date.parse(row.last_seen_at) >= since) {
+      await opts.registry.setInstallStatus(entry.slug, "running");
+      return;
     }
     await new Promise((r) => setTimeout(r, intervalMs));
   }
-
-  throw new Error(`app "${entry.slug}" never served /internal/manifest after ${attempts} attempts: ${String(lastError)}`);
+  throw new Error(`app "${entry.slug}" never registered with the gateway after ${attempts * intervalMs / 1000}s`);
 }
 
 /**
@@ -213,16 +207,16 @@ async function resolveImage(
 /**
  * Full, one-click install: issues a token, provisions the DB, resolves the
  * image (registry pull or local build), and starts the container. TwoDB
- * then pull-registers the app via its token-guarded /internal/manifest
- * endpoint — `install_status` goes "installing" -> "running" once the app
- * actually answers. Poll `GET /orchestrator/apps/:slug/status`.
+ * then waits for the app to register itself (token + ping) —
+ * `install_status` goes "installing" -> "running" once it does. Poll `GET /orchestrator/apps/:slug/status`.
  */
 export async function installApp(slug: string, opts: InstallOptions, requestedVersion?: string): Promise<void> {
   const entry = getCatalogEntry(slug);
   if (!entry) throw new Error(`"${slug}" is not in the app catalog`);
 
-  const { registrationToken } = await issueRegistrationToken(slug, opts);
-  const { containerConnectionString, dataKey } = await provisionDatabase(slug, opts);
+  const { appToken } = await issueManagedToken(slug, opts);
+  const startedAt = Date.now();
+  await provisionDatabase(slug, opts); // schema + role (credentials are delivered to the app by the control plane at boot)
 
   const { ref, version } = await resolveImage(entry, opts, requestedVersion);
 
@@ -230,7 +224,7 @@ export async function installApp(slug: string, opts: InstallOptions, requestedVe
   await docker.runContainer({
     name,
     image: ref,
-    env: buildContainerEnv(entry, opts.config, registrationToken, containerConnectionString, dataKey),
+    env: buildContainerEnv(entry, opts.config, appToken),
     hostPort: entry.hostPort,
     containerPort: entry.containerPort,
     publish: opts.config.TWODB_APP_PUBLISH_PORTS,
@@ -238,7 +232,7 @@ export async function installApp(slug: string, opts: InstallOptions, requestedVe
   await opts.registry.setContainerInfo(entry.slug, { imageTag: ref, containerName: name, hostPort: entry.hostPort });
   await opts.registry.setVersion(entry.slug, version);
 
-  await pullRegister(entry, registrationToken, opts);
+  await waitForRegistration(entry, startedAt, opts);
 }
 
 export async function startApp(slug: string, opts: InstallOptions): Promise<void> {
@@ -276,19 +270,8 @@ export async function upgradeApp(slug: string, opts: InstallOptions, targetVersi
   const row = await opts.registry.getApp(slug);
   if (!row?.pg_connection_string_encrypted) throw new Error(`"${slug}" is not installed yet`);
 
-  const dbUrl = decryptSecret(row.pg_connection_string_encrypted, opts.config.AUTH_SECRET);
-  // Installs pre-dating the data-key column have no key on file — generate
-  // one now and persist it so it's stable from here on. (Any data the app
-  // encrypted with a since-rotated registration token is already
-  // unrecoverable; that's the bug this column fixes.)
-  let dataKey: string;
-  if (row.data_key_encrypted) {
-    dataKey = decryptSecret(row.data_key_encrypted, opts.config.AUTH_SECRET);
-  } else {
-    dataKey = randomBytes(32).toString("hex");
-    await opts.registry.setDataKey(slug, encryptSecret(dataKey, opts.config.AUTH_SECRET));
-  }
-  const { registrationToken } = await issueRegistrationToken(slug, opts);
+  const { appToken } = await issueManagedToken(slug, opts);
+  const startedAt = Date.now();
 
   const { ref, version } = await resolveImage(entry, opts, targetVersion);
 
@@ -297,7 +280,7 @@ export async function upgradeApp(slug: string, opts: InstallOptions, targetVersi
   await docker.runContainer({
     name,
     image: ref,
-    env: buildContainerEnv(entry, opts.config, registrationToken, dbUrl, dataKey),
+    env: buildContainerEnv(entry, opts.config, appToken),
     hostPort: entry.hostPort,
     containerPort: entry.containerPort,
     publish: opts.config.TWODB_APP_PUBLISH_PORTS,
@@ -305,7 +288,54 @@ export async function upgradeApp(slug: string, opts: InstallOptions, targetVersi
   await opts.registry.setContainerInfo(entry.slug, { imageTag: ref, containerName: name, hostPort: entry.hostPort });
   await opts.registry.setVersion(entry.slug, version);
 
-  await pullRegister(entry, registrationToken, opts);
+  await waitForRegistration(entry, startedAt, opts);
+}
+
+/**
+ * Rotates an app's token.
+ * - Unmanaged: mints a fresh 30-day token, revokes the old "api" tokens and
+ *   returns the plaintext once (the app must be given the new value; its
+ *   twodb-core client also recovers on its own via TWODB_REGISTRATION_SECRET).
+ * - Managed: mints a fresh non-expiring token, recreates the container with
+ *   it (same image, same DB credentials + data key), waits for the app to
+ *   re-register, then revokes the old token.
+ */
+export async function rotateAppToken(
+  slug: string,
+  opts: InstallOptions,
+): Promise<{ managed: false; appToken: string; expiresAt: string | null } | { managed: true; run: () => Promise<void> }> {
+  const row = await opts.registry.getApp(slug);
+  if (!row) throw new Error(`"${slug}" is not registered`);
+
+  if (!row.managed || !row.container_name || !row.image_tag) {
+    await opts.registry.revokeTokens(slug);
+    const { appToken, expiresAt } = await issueApiToken(slug, opts);
+    return { managed: false, appToken, expiresAt };
+  }
+
+  const entry = getCatalogEntry(slug);
+  if (!entry) throw new Error(`"${slug}" is not in the app catalog`);
+
+  return {
+    managed: true,
+    run: async () => {
+      const appToken = generateAppToken();
+      await opts.registry.issueToken(slug, "managed", appToken, null);
+      const startedAt = Date.now();
+      await docker.removeContainer(row.container_name!);
+      await docker.runContainer({
+        name: row.container_name!,
+        image: row.image_tag!,
+        env: buildContainerEnv(entry, opts.config, appToken),
+        hostPort: entry.hostPort,
+        containerPort: entry.containerPort,
+        publish: opts.config.TWODB_APP_PUBLISH_PORTS,
+      });
+      await waitForRegistration(entry, startedAt, opts);
+      // Only now that the new token demonstrably works, retire the old ones.
+      await opts.registry.revokeTokensExcept(slug, "managed", appToken);
+    },
+  };
 }
 
 export async function removeApp(slug: string, opts: InstallOptions): Promise<void> {

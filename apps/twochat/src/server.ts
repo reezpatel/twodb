@@ -3,11 +3,7 @@ import websocket from "@fastify/websocket";
 import multipart from "@fastify/multipart";
 import { createPgDb } from "@twodb/core-data/db";
 import { createAsyncEngine } from "@twodb/core-async/engine";
-import {
-  INTERNAL_MANIFEST_PATH,
-  REGISTRATION_TOKEN_HEADER,
-  handleManifestRequest,
-} from "@twodb/core-platform/manifest";
+
 import { twochatManifest } from "./manifest.js";
 import type { TwoChatConfig } from "./config.js";
 import { applySchema, type TwoChatDb } from "./db/schema.js";
@@ -188,14 +184,6 @@ export async function buildServer(config: TwoChatConfig) {
 
   // --- pull-registration ------------------------------------------------------
 
-  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => {
-    const res = handleManifestRequest(
-      twochatManifest,
-      { registrationToken: config.TWODB_PROVISION_TOKEN, httpUrl: config.HTTP_URL },
-      req.headers[REGISTRATION_TOKEN_HEADER],
-    );
-    return reply.code(res.status).send(res.body);
-  });
 
   app.get("/healthz", async () => ({ ok: true, app: "twochat", storage: storage.backend, version: twochatManifest.version }));
 

@@ -10,12 +10,11 @@ const db=createPgDb<MailDb>({connectionString:databaseUrl,schema});
 let sent=0,fail=false,verified=0;
 const fake:MailProvider={async verify(){verified++;},async inbox(){return [{providerId:"inbox:1:1",sender:"sender@example.com",recipient:"me@example.com",subject:"Test",text:"Plain text",date:new Date().toISOString()}];},async send(){sent++;if(fail)throw new Error("uncertain");}};
 const key=randomBytes(32).toString("hex"),box=secretBox(key),sealed=box.seal({password:"test-secret"});assert.equal(box.open<{password:string}>(sealed).password,"test-secret");assert.throws(()=>secretBox(randomBytes(32).toString("hex")).open(sealed));
-const app=await buildServer({databaseUrl,registrationToken:"test",httpUrl:"http://localhost:6402",dataKey:key,allowedHosts:["mail.example.com"]},db,fake);
+const app=await buildServer({databaseUrl,dataKey:key,allowedHosts:["mail.example.com"]},db,fake);
 const headers={"x-twodb-auth-kind":"session","x-twodb-workspace-id":"w1","x-twodb-space-ids":"s1"};
 const payload={spaceId:"s1",name:"Mail",address:"me@example.com",connection:{username:"me",password:"test-secret",imapHost:"mail.example.com",smtpHost:"mail.example.com"}};
 try{
  assert.equal((await app.inject({url:"/accounts"})).statusCode,401);
- assert.equal((await app.inject({url:"/internal/manifest"})).statusCode,401);
  assert.equal((await app.inject({method:"POST",url:"/accounts",headers,payload:{...payload,spaceId:"s2"}})).statusCode,403);
  assert.equal((await app.inject({method:"POST",url:"/accounts",headers,payload:{...payload,connection:{...payload.connection,imapHost:"localhost"}}})).statusCode,400);assert.equal(verified,0);
  const created=await app.inject({method:"POST",url:"/accounts",headers,payload});assert.equal(created.statusCode,201);assert.ok(!created.body.includes("secret"));const accountId=created.json().id;

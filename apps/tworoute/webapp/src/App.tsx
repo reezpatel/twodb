@@ -7,6 +7,7 @@ import { BrowserRouter } from "react-router";
 import { ShellChrome } from "./routes/shell/partials/ShellChrome.js";
 import { AppHeader, type AppHeaderProps } from "./routes/shell/partials/AppHeader.js";
 import { useShellSession } from "./routes/shell/hooks/useShellSession.js";
+import { useSidebarToggle } from "./routes/shell/hooks/useSidebarToggle.js";
 import { useShellNav } from "./routes/shell/hooks/useShellNav.js";
 import { ConnectionDetailSidebar } from "./routes/connections/partials/ConnectionDetailSidebar.js";
 import { ConnectionsProvider, useSharedConnections } from "./lib/connections-context.js";
@@ -39,6 +40,7 @@ function ShellRoutes() {
   const conn = useSharedConnections();
   const [quotaSweep, setQuotaSweep] = useState<null | { ok: number; error: number; skipped: number }>(null);
 
+  const { open: navOpen, toggle: toggleNav } = useSidebarToggle("tworoute.nav-open");
   const activeConnection = activeId === "dashboard" ? null : (connections.find((c) => c.name === activeId) ?? null);
   /** Overlay visibility of the detail sidebar below lg. */
   const [detailOpen, setDetailOpen] = useState(true);
@@ -114,6 +116,8 @@ function ShellRoutes() {
       onSelect={onSelect}
       userName={userName}
       onSignOut={signOut}
+      navOpen={navOpen}
+      onToggleNav={toggleNav}
       header={<AppHeader {...headerProps} />}
       sidebar={
         activeConnection ? (

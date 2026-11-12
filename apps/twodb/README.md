@@ -15,35 +15,69 @@ On first run it bootstraps its own control-plane SQLite file
 including better-auth's own tables via `migrateAuthEngine()` — no separate
 `npx @better-auth/cli migrate` step needed.
 
-## How apps get installed (the trust model)
+## How apps register (the trust model)
 
-There is **no shared registration secret**. Apps don't self-install — TwoDB
-(the admin) installs them:
+**Registration is always app-initiated.** There is no pull-registration and
+no `/internal/manifest` anymore. An app (TwoDB-managed container or one you
+run yourself) uses `@twodb/twodb-core`'s `connectTwoDb()` on boot:
 
-1. `POST /orchestrator/apps/:slug/install` (session/API-key auth) kicks off
-   an async lifecycle: provision the app's Postgres schema+role, generate a
-   **unique per-app registration token** (only its sha256 hash is ever
-   stored) plus a **stable per-app data key** (`TWODB_DATA_KEY` — never
-   rotated; apps use it for their own encryption at rest, so it must
-   survive upgrades), build/pull the app's Docker image, and start the
-   container on `twodb-net` with token + connection string + data key
-   injected as env.
-2. TwoDB then **pull-registers**: it polls the container's published port
-   for `GET /internal/manifest` with the token and completes registration
-   in-process. (Containers on firewalled Linux hosts can't reach TwoDB at
-   all — container→host INPUT is dropped — so the app's own push
-   registration via `registerWithGateway()` can't be the only path. Push
-   still works and remains the primary path for apps running directly on
-   the host, i.e. local dev.)
-3. Poll `GET /orchestrator/apps/:slug/status` until `installStatus` is
-   `running` and `registrationStatus` is `active`.
+1. **Authenticate.** Either with an *app token* (`TWODB_APP_TOKEN`) or with
+   the shared `TWODB_REGISTRATION_SECRET`, which mints a token on the fly.
+   - **Managed** (TwoDB runs the container): the orchestrator mints a
+     **non-expiring** token (only its sha256 is stored in `app_token`) and
+     injects `TWODB_APP_TOKEN` + `TWODB_APP_SLUG`. Rotated on every
+     install/upgrade, or from the UI ("Rotate token" on the app card).
+   - **Unmanaged** (you run it): set `TWODB_REGISTRATION_SECRET` (same value
+     the control plane has). `POST /registry/register` returns a **30-day**
+     token (`TWODB_APP_TOKEN_TTL_DAYS`), cached by twodb-core in
+     `.twodb/<slug>.token`; when it expires/is revoked the app re-registers
+     with the secret. `POST /registry/apps/:slug/tokens` (session) mints one
+     by hand.
+2. **Register** — `POST /registry/register` (slug, httpUrl, manifest).
+3. **Heartbeat** — `POST /registry/ping` every **10s**; **30s** of silence
+   (`TWODB_HEARTBEAT_TIMEOUT_MS`) marks the app `inactive`.
+4. **Fetch config** — `GET /registry/config` returns the app's Postgres
+   connection (schema + role, provisioned on first call), its S3 location
+   (global bucket + `<slug>/` prefix) and its stable data key. Apps carry no
+   `DATABASE_URL`/S3 env. Credentials are **stable**: registering or
+   re-fetching never changes them (only `provision-db {rotate:true}` does).
 
-A stolen token only ever impersonates the one slug it was issued for, and
-every install/upgrade rotates it.
+### What the gateway does with callers
+Every request may carry `x-twodb-app: <slug>` + `x-twodb-token: <token>`.
+The gateway validates them against `app_token`, **always strips
+`x-twodb-token`**, and sets `x-gateway-verified: true|false` (an inbound
+value of that header is never trusted); a verified call also forwards
+`x-twodb-app`. `twodb-core`'s `callerApp(headers)` reads this on the app side.
 
-Lifecycle endpoints: `start`, `stop`, `restart`, `upgrade` (re-resolves the
-image, rotates the token, keeps the same DB schema), `DELETE` (removes the
-container + registry row; deliberately does NOT drop the Postgres schema).
+### User vs machine requests
+Any path with an `internal` segment (`/internal/…`, `/apps/<slug>/internal/…`,
+incl. WebSocket upgrades) is **user-session only**: workspace API keys and app
+tokens get `403`, anonymous `401`. Token rotation, token minting and
+storage admin endpoints are session-only too.
+
+### Login with TwoDB
+Webapps use `@twodb/twodb-shared-frontend` (`<TwoDbAuthProvider>` +
+`<RequireTwoDbAuth>` → "Login using TwoDB" button). Flow: authorization code
++ PKCE (S256) — app webapp → TwoDB webapp `/authorize` → one-time code
+(`POST /registry/oauth/authorize`, 60s, hashed, single use) →
+`POST /registry/oauth/token` → a session token the gateway accepts as
+`Authorization: Bearer` (WebSocket/EventSource use `?access_token=`, which the
+gateway promotes to the header and strips). Allowed redirect origins:
+`AUTH_TRUSTED_ORIGINS`, any port 6500–6599 on the same host, plus
+`TWODB_LOGIN_REDIRECT_ORIGINS`.
+
+### Storage (S3)
+One global bucket configured on the control plane via `TWODB_S3_*` (like
+`TWODB_PG_ADMIN_URL`); each app gets its own key prefix and the shared
+credentials from `GET /registry/config`. There is no UI for it.
+
+### Managed lifecycle
+`POST /orchestrator/apps/:slug/install` (async): provision the app's Postgres
+schema+role, mint the managed token, build/pull the image, start the container
+on `twodb-net` with only `TWODB_APP_TOKEN`, `TWODB_APP_SLUG`,
+`TWODB_GATEWAY_URL`, `HTTP_URL`, `PORT` injected — then wait for the app to
+register itself. Also `start`, `stop`, `restart`, `upgrade`, `DELETE` (removes
+container + registry row + tokens; does NOT drop the Postgres schema).
 
 ## Versions & image sources
 

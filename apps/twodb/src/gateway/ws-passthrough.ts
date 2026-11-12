@@ -4,7 +4,7 @@ import * as net from "node:net";
 import type { RegisteredAppRow } from "../db/sqlite.js";
 import { pickTransport, createDialer } from "@twodb/core-platform/transport";
 import { GATEWAY_HOST_ID } from "./proxy.js";
-import { isDeclaredWebsocketPath } from "./ws-paths.js";
+import { isDeclaredWebsocketPath, isInternalPath } from "./ws-paths.js";
 
 
 /**
@@ -36,9 +36,21 @@ function headerValues(v: string | string[] | undefined): string | undefined {
   return v;
 }
 
-export function registerWsPassthrough(app: FastifyInstance, getApp: (slug: string) => Promise<RegisteredAppRow | undefined>): void {
+export function registerWsPassthrough(
+  app: FastifyInstance,
+  getApp: (slug: string) => Promise<RegisteredAppRow | undefined>,
+  verifyToken: (slug: string, token: string) => Promise<unknown>,
+): void {
   app.server.on("upgrade", async (req, socket, head) => {
     const url = new URL(req.url ?? "/", "http://internal");
+    // Browsers can't set headers on WebSocket: the webapp lib passes its session token as
+    // ?access_token=. Promote it to Authorization (unless a real header is present) and never
+    // forward it to the app.
+    const queryToken = url.searchParams.get("access_token");
+    if (queryToken) {
+      url.searchParams.delete("access_token");
+      if (!req.headers.authorization && !req.headers["x-api-key"]) req.headers.authorization = `Bearer ${queryToken}`;
+    }
     const m = url.pathname.match(/^\/apps\/([^/]+)\/(.*)$/);
     if (!m) return; // not an app path — Fastify/other handlers own it
     const [, slug, rest] = m;
@@ -73,6 +85,17 @@ export function registerWsPassthrough(app: FastifyInstance, getApp: (slug: strin
       if (val) fwdHeaders[k] = val;
     }
 
+    // Caller-app identity, same contract as the HTTP proxy: the token never
+    // travels on; x-gateway-verified is only ever set by us.
+    const callerSlug = fwdHeaders["x-twodb-app"];
+    const callerToken = fwdHeaders["x-twodb-token"];
+    delete fwdHeaders["x-twodb-token"];
+    delete fwdHeaders["x-twodb-app"];
+    delete fwdHeaders["x-gateway-verified"];
+    const callerOk = callerSlug && callerToken ? Boolean(await verifyToken(callerSlug, callerToken).catch(() => null)) : false;
+    fwdHeaders["x-gateway-verified"] = callerOk ? "true" : "false";
+    if (callerOk) fwdHeaders["x-twodb-app"] = callerSlug!;
+
     const isRunnerUpgrade = RUNNER_KEY_UPGRADE.test(url.pathname);
     if (!isRunnerUpgrade) {
       // Caller-side upgrades carry the workspace identity — resolve here and
@@ -88,6 +111,11 @@ export function registerWsPassthrough(app: FastifyInstance, getApp: (slug: strin
       ).catch(() => null);
       if (!ctx) {
         socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+        socket.destroy();
+        return;
+      }
+      if (isInternalPath(url.pathname) && ctx.kind !== "session") {
+        socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
         socket.destroy();
         return;
       }

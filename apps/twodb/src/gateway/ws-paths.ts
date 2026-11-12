@@ -18,3 +18,13 @@ export function isDeclaredWebsocketPath(manifestJson: string, subPath: string): 
     return ps.length === segs.length && ps.every((x, i) => x.startsWith(":") || x === segs[i]);
   });
 }
+
+/**
+ * `internal` path segments (`/internal/...`, `/apps/<slug>/internal/...`) are
+ * the human-only surface: reachable with an interactive user session (UI /
+ * bearer session token) and NEVER with a machine credential (workspace API
+ * key, app token). Enforced at the gateway edge for HTTP and WS upgrades.
+ */
+export function isInternalPath(pathname: string): boolean {
+  return /(^|\/)internal(\/|$)/.test(pathname.split("?")[0]);
+}

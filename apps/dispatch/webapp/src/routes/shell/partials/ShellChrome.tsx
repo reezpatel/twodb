@@ -3,8 +3,10 @@ import {
   AppShell,
   AppShellBody,
   AppShellContent,
+  AppShellHeader,
   AppShellMain,
   NavSidebar,
+  NavSidebarToggle,
   type NavGroupData,
 } from "@twodb/blocks";
 import type { ReactNode } from "react";
@@ -17,6 +19,8 @@ export interface ShellChromeProps {
   onSelect: (id: string) => void;
   userName: string;
   onSignOut: () => void;
+  navOpen: boolean;
+  onToggleNav: () => void;
   header: ReactNode;
   sidebar?: ReactNode;
   children: ReactNode;
@@ -47,6 +51,7 @@ export function ShellChrome(props: ShellChromeProps) {
     <AppShell>
       <AppShellBody>
         <NavSidebar
+          open={props.navOpen}
           groups={groups}
           footerItems={[{ id: "logout", title: "Sign out", icon: ListTree }]}
           activeId={props.activeId}
@@ -55,7 +60,10 @@ export function ShellChrome(props: ShellChromeProps) {
           activeWorkspace={props.userName || "Dispatch"}
         />
         <AppShellMain>
-          {props.header}
+          <AppShellHeader className="h-12 gap-3 border-b border-outline px-6">
+            <NavSidebarToggle open={props.navOpen} onToggle={props.onToggleNav} aria-label={props.navOpen ? "Hide navigation" : "Show navigation"} />
+            <div className="min-w-0 flex-1">{props.header}</div>
+          </AppShellHeader>
           <AppShellContent>{props.children}</AppShellContent>
         </AppShellMain>
         {props.sidebar}

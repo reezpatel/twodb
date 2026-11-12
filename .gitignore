@@ -25,3 +25,6 @@ scratch_pad/
 # Go build artifacts (dispatch's runner + guest agent ship as built binaries)
 apps/two-runner/two-runner
 apps/two-runner/two-vm-agent
+
+# twodb-core per-app token cache
+.twodb/

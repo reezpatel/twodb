@@ -47,6 +47,44 @@ export const configSchema = z.object({
     .default("true")
     .transform((v) => v === "true"),
   TWODB_HOST_ID: z.string().default("local"),
+  /**
+   * Shared secret every app presents (header `x-twodb-registration-secret`)
+   * to self-register and mint a 30-day app token. Unset = app-initiated
+   * registration by secret is disabled (managed installs still work: TwoDB
+   * mints a non-expiring token for the container itself).
+   */
+  TWODB_REGISTRATION_SECRET: z.string().min(16).optional(),
+  /** Lifetime of a token minted through the registration-secret / API path. */
+  TWODB_APP_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  /** An app that hasn't pinged for this long is marked inactive (apps ping every 10s). */
+  TWODB_HEARTBEAT_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  /**
+   * Global S3-compatible storage, configured like the Postgres cluster: one
+   * bucket + credentials for the whole install; every app gets its own key
+   * prefix (`<slug>/`). All optional — unset = apps get no `s3` config.
+   */
+  TWODB_S3_BUCKET: z.string().optional(),
+  TWODB_S3_REGION: z.string().optional(),
+  TWODB_S3_ENDPOINT: z.string().url().optional(),
+  TWODB_S3_ACCESS_KEY_ID: z.string().optional(),
+  TWODB_S3_SECRET_ACCESS_KEY: z.string().optional(),
+  TWODB_S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).optional().transform((v) => (v === undefined ? undefined : v === "true")),
+  /**
+   * Passkey sign-up policy. Default (false): only the very first user can
+   * register (first-run bootstrap); afterwards adding a passkey needs a
+   * session. true: anyone may sign up with a new email (new users get a
+   * personal workspace). An email that already has a passkey can never be
+   * re-registered without a session.
+   */
+  /**
+   * Extra origins allowed as "Login with TwoDB" redirect targets (app webapps), comma-separated.
+   * Implicitly allowed: AUTH_TRUSTED_ORIGINS, and any port 6500-6599 on the same host as one of
+   * them (the dev webapp band — see orchestrator/catalog.ts).
+   */
+  TWODB_LOGIN_REDIRECT_ORIGINS: z.string().default("").transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
+  /** Lifetime of the session issued to an app webapp by the login flow, in days. */
+  TWODB_APP_SESSION_DAYS: z.coerce.number().int().positive().default(7),
+  TWODB_OPEN_SIGNUP: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   POCKETID_ISSUER: z.string().url().optional(),

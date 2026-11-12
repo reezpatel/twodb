@@ -12,6 +12,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.107.1",
     "@twodb/blocks": "workspace:*",
+    "@twodb/twodb-shared-frontend": "workspace:*",
     "@twodb/core-runtime": "workspace:*",
     "@twodb/editor": "workspace:*",
     "clsx": "^2.1.1",

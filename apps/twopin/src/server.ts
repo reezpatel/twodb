@@ -1,11 +1,7 @@
 import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
 import type { Selectable } from "kysely";
 import { createPgDb } from "@twodb/core-data/db";
-import {
-  INTERNAL_MANIFEST_PATH,
-  REGISTRATION_TOKEN_HEADER,
-  handleManifestRequest,
-} from "@twodb/core-platform/manifest";
+
 import { manifest } from "./manifest.js";
 import type { TwoPinConfig } from "./config.js";
 import { applySchema, type TwoPinDb, type PinRow, type BoardRow } from "./db/schema.js";
@@ -90,14 +86,6 @@ export async function buildServer(config: TwoPinConfig) {
 
   // Pull-registration endpoint: TwoDB's orchestrator polls this on the
   // container's published port and completes registration itself.
-  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => {
-    const res = handleManifestRequest(
-      manifest,
-      { registrationToken: config.TWODB_PROVISION_TOKEN, httpUrl: config.HTTP_URL },
-      req.headers[REGISTRATION_TOKEN_HEADER],
-    );
-    return reply.code(res.status).send(res.body);
-  });
 
   // --- Boards ---------------------------------------------------------------
   app.get("/boards", async (req, reply) => {

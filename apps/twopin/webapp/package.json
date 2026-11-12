@@ -14,7 +14,8 @@
     "@twodb/core-runtime": "workspace:*",
     "lucide-react": "^1.29.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "@twodb/twodb-shared-frontend": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

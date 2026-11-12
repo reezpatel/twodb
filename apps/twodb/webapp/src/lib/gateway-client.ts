@@ -126,6 +126,11 @@ export const gatewayClient = {
     );
   },
 
+  /** Rotate the app's token. Unmanaged → new token (shown once); managed → container is recreated async. */
+  rotateToken(slug: string): Promise<{ ok: true; managed: boolean; token?: string; expiresAt?: string | null }> {
+    return fetch(`/registry/apps/${slug}/rotate-token`, { method: "POST", credentials: "include" }).then((r) => json(r));
+  },
+
   removeApp(slug: string): Promise<{ ok: true }> {
     return fetch(`/orchestrator/apps/${slug}`, { method: "DELETE", credentials: "include" }).then((r) => json(r));
   },

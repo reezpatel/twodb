@@ -26,10 +26,13 @@ and LLM agents at once. **Implemented in Phase 1** — read `README.md` first.
   pattern) — never talk to better-auth or the org/workspace/space tables
   yourself.
 - One Postgres schema, named `paintress`, provisioned by TwoDB
-  (`POST /registry/apps/paintress/provision`) — access it only via
+  (the control plane (`GET /registry/config`, via twodb-core)) — access it only via
   `@twodb/core-data/db`'s `createPgDb()`.
-- Call `registerWithGateway(manifest, opts)` from
-  `@twodb/core-platform/manifest` on boot (see `apps/tworoute/src/index.ts`).
+- On boot call `connectTwoDb({ manifest, httpUrl })` from `@twodb/twodb-core` (see
+  `apps/twoday/src/index.ts`): it registers with the control plane, pings every 10s
+  (30s of silence = inactive) and returns the app's Postgres/S3 config — never put
+  `DATABASE_URL`/S3 settings in env. Use `twodb.gatewayFetch()` for calls to other
+  apps; requests arriving via the gateway carry `x-gateway-verified`.
 
 ## Frontend (if this app has a webapp)
 Follow `blocks/CONVENTIONS.md` exactly: one component per file,

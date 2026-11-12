@@ -4,7 +4,6 @@ import { loadConfig, commonConfigFields } from "@twodb/core-data/config";
 export const configSchema = z.object({
   ...commonConfigFields,
   DATABASE_URL: z.string().url().default("postgres://app_dispatch:dispatch@localhost:5432/twodb"),
-  TWODB_PROVISION_TOKEN: z.string().default("dev-token"),
   TWODB_DATA_KEY: z.string().optional(),
   HTTP_URL: z.string().url().default("http://localhost:6408"),
 });
@@ -18,7 +17,6 @@ export function loadDispatchConfig(source: Record<string, string | undefined> = 
   return loadConfig(configSchema, {
     ...source,
     PORT: source.DISPATCH_PORT ?? source.PORT,
-    TWODB_PROVISION_TOKEN: source.DISPATCH_PROVISION_TOKEN ?? source.TWODB_PROVISION_TOKEN,
     DATABASE_URL: source.DISPATCH_DATABASE_URL ?? source.DATABASE_URL,
     HTTP_URL: source.DISPATCH_HTTP_URL ?? source.HTTP_URL,
   });

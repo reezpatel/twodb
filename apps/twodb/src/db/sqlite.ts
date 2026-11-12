@@ -48,8 +48,38 @@ export interface RegisteredAppRow {
   status: string;
 }
 
+/**
+ * Per-app tokens (only the sha256 hash is stored). An app presents its token
+ * as `x-twodb-token` (with `x-twodb-app`) on every gateway request.
+ * `expires_at` null = never expires (managed installs); the registration-secret
+ * / API path mints 30-day tokens.
+ */
+export interface AppTokenRow {
+  id: string;
+  slug: string;
+  token_hash: string;
+  /** "managed" = minted by the orchestrator for a container it runs; "api" = minted via registration secret / admin API. */
+  kind: "managed" | "api";
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  last_used_at: string | null;
+}
+
+/** Single-use authorization code of the "Login with TwoDB" flow (hash only). */
+export interface OAuthCodeRow {
+  code_hash: string;
+  user_id: string;
+  code_challenge: string;
+  redirect_uri: string;
+  expires_at: string;
+  used_at: string | null;
+}
+
 export interface ControlPlaneDb extends AuthPlatformDb {
+  oauth_code: OAuthCodeRow;
   registered_app: RegisteredAppRow;
+  app_token: AppTokenRow;
 }
 
 export function openControlPlaneDb(file: string): Kysely<ControlPlaneDb> {

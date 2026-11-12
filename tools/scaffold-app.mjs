@@ -54,6 +54,7 @@ for (const app of apps) {
         dependencies: {
           "@twodb/core-data": "workspace:*",
           "@twodb/core-platform": "workspace:*",
+          "@twodb/twodb-core": "workspace:*",
           "@twodb/core-async": "workspace:*",
           fastify: "^5.11.2",
           hono: "^4",
@@ -158,37 +159,34 @@ main().catch((err) => {
   write(
     path.join(dir, "src", "index.ts"),
     `// Scaffolded stub server — the app is not implemented yet (see AGENTS.md).
-// It still runs a real HTTP server so \`pnpm local\` can boot the whole
-// ecosystem and TwoDB's pull-registration can fetch a live manifest:
-// /healthz always answers, /internal/manifest is served only when the
-// orchestrator injected a TWODB_PROVISION_TOKEN (docker-install flow).
+// It still runs a real HTTP server and registers + heartbeats with the control
+// plane (twodb-core) so \`pnpm local\` can boot the whole ecosystem.
 // Assign the app's fixed port in apps/twodb/src/orchestrator/catalog.ts
-// (6416+) and mirror it as the fallback here.
+// (6416+) and mirror it as the fallback here. Once the app needs a database,
+// switch to \`connectTwoDb()\` (see apps/twoday/src/index.ts).
 import { serve } from "@hono/node-server";
-import { handleManifestRequest, INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER } from "@twodb/core-platform/manifest";
+import { startTwoDbSession } from "@twodb/twodb-core";
 import { manifest } from "./manifest.js";
 
 const port = Number(process.env.PORT ?? 6417 /* TODO: this app's catalog port */);
-const registrationToken = process.env.TWODB_PROVISION_TOKEN;
+const httpUrl = process.env.HTTP_URL ?? \`http://localhost:\${port}\`;
 
 serve({
   port,
   fetch: (req) => {
     const url = new URL(req.url);
     if (url.pathname === "/healthz") return Response.json({ ok: true, app: manifest.slug, scaffolded: true });
-    if (url.pathname === INTERNAL_MANIFEST_PATH && registrationToken) {
-      const res = handleManifestRequest(
-        { ...manifest, version: "0.1.0" },
-        { registrationToken, httpUrl: process.env.HTTP_URL ?? \`http://localhost:\${port}\` },
-        req.headers.get(REGISTRATION_TOKEN_HEADER) ?? undefined,
-      );
-      return Response.json(res.body, { status: res.status });
-    }
     return new Response("not found", { status: 404 });
   },
 });
 
 console.log(\`\${manifest.name} (scaffolded) listening on :\${port}\`);
+
+startTwoDbSession({ manifest: { ...manifest, version: "0.1.0" }, httpUrl })
+  .then((session) => {
+    for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => void session.close());
+  })
+  .catch((err) => console.warn(\`[\${manifest.slug}] registration with TwoDB failed:\`, err.message));
 `,
   );
 
@@ -232,10 +230,13 @@ first.
   pattern) — never talk to better-auth or the org/workspace/space tables
   yourself.
 - One Postgres schema, named \`${app.slug}\`, provisioned by TwoDB
-  (\`POST /registry/apps/${app.slug}/provision\`) — access it only via
-  \`@twodb/core-data/db\`'s \`createPgDb()\`.
-- Call \`registerWithGateway(manifest, opts)\` from
-  \`@twodb/core-platform/manifest\` on boot (see \`apps/tworoute/src/index.ts\`).
+  and delivered at boot — never put DATABASE_URL in env. Call
+  \`connectTwoDb({ manifest, httpUrl })\` from \`@twodb/twodb-core\` on boot (see
+  \`apps/twoday/src/index.ts\`): it registers with the control plane
+  (\`TWODB_APP_TOKEN\` for managed containers, or \`TWODB_REGISTRATION_SECRET\` which
+  mints a 30-day token), pings every 10s (30s of silence = inactive), and returns
+  the app's Postgres/S3 config. Calls to other apps go through
+  \`twodb.gatewayFetch()\`; incoming requests carry \`x-gateway-verified\`.
 
 ## Frontend (if this app has a webapp)
 Follow \`blocks/CONVENTIONS.md\` exactly: one component per file,

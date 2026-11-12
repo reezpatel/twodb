@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router";
 import { Moon, Search, Sun } from "lucide-react";
-import { AppShell, AppShellBody, AppShellContent, AppShellMain, NavSidebar } from "@twodb/blocks";
+import { AppShell, AppShellBody, AppShellContent, AppShellHeader, AppShellMain, NavSidebar, NavSidebarToggle } from "@twodb/blocks";
 import { useShellNav } from "./useShellNav";
 import { CommandPalette } from "./CommandPalette";
 import { getTheme, setTheme } from "../../lib/theme";
 import { authClient } from "../../lib/auth-client";
+import { useSidebarToggle } from "./useSidebarToggle";
 
 export function Shell() {
   const { groups, activeId, onSelect } = useShellNav();
   const nav = useNavigate();
   const { data: session } = authClient.useSession();
   const [palette, setPalette] = useState(false);
+  const { open: navOpen, toggle: toggleNav } = useSidebarToggle("twoplan.nav-open");
   const [dark, setDark] = useState(() => (getTheme() === "system" ? matchMedia("(prefers-color-scheme: dark)").matches : getTheme() === "dark"));
 
   useEffect(() => {
@@ -28,6 +30,7 @@ export function Shell() {
     <AppShell>
       <AppShellBody>
         <NavSidebar
+          open={navOpen}
           groups={[{ items: [{ id: "__search", title: "Search", icon: Search, shortcut: "⌘K" }] }, ...groups]}
           footerItems={[{ id: "__theme", title: dark ? "Light mode" : "Dark mode", icon: dark ? Sun : Moon }, { id: "__signout", title: "Sign out" }]}
           activeId={activeId}
@@ -36,6 +39,9 @@ export function Shell() {
           onSelect={(id) => (id === "__search" ? setPalette(true) : id === "__theme" ? toggleTheme() : id === "__signout" ? void authClient.signOut() : onSelect(id))}
         />
         <AppShellMain>
+          <AppShellHeader className="h-12 gap-3 border-b border-outline px-6 text-sm">
+            <NavSidebarToggle open={navOpen} onToggle={toggleNav} aria-label={navOpen ? "Hide navigation" : "Show navigation"} />
+          </AppShellHeader>
           <AppShellContent><Outlet /></AppShellContent>
         </AppShellMain>
       </AppShellBody>

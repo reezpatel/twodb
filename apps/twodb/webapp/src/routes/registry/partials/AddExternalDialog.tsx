@@ -12,7 +12,7 @@ import {
   Input,
   Label,
 } from "@twodb/blocks";
-import { Globe, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 export interface AddExternalDialogProps {
   onAdd: (input: { slug: string; name: string; httpUrl: string; basePath?: string }) => Promise<void>;
@@ -49,26 +49,21 @@ export function AddExternalDialog(props: AddExternalDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="md">
-          <Plus className="size-4" aria-hidden /> Add external app
+        <Button size="sm" className="shrink-0">
+          <Plus className="size-3.5" aria-hidden /> Add external app
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <span className="flex size-10 items-center justify-center rounded-[10px] border border-outline bg-paper">
-            <Globe className="size-5" aria-hidden />
-          </span>
-          <DialogTitle className="mt-3">Add external app</DialogTitle>
-          <DialogDescription>
-            Register a URL as a gateway entry. TwoDB routes traffic to it but never installs, stops or upgrades it — the app's lifecycle stays wherever it runs.
-          </DialogDescription>
+          <DialogTitle>Add external app</DialogTitle>
+          <DialogDescription>Register a URL into TwoDB stack.</DialogDescription>
         </DialogHeader>
         {props.error ? (
           <p role="alert" className="rounded-md border border-pin/40 bg-pin/10 px-3 py-2 text-sm text-pin">
             {props.error}
           </p>
         ) : null}
-        <div className="grid gap-3">
+        <div className="grid gap-4">
           <div className="grid gap-1.5">
             <Label htmlFor="ext-slug">Slug</Label>
             <Input id="ext-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-legacy-app" />

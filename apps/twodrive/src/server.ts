@@ -1,11 +1,7 @@
 import Fastify from "fastify";
 import { createPgDb } from "@twodb/core-data/db";
 import type { Kysely } from "@twodb/core-data/db";
-import {
-  INTERNAL_MANIFEST_PATH,
-  REGISTRATION_TOKEN_HEADER,
-  handleManifestRequest,
-} from "@twodb/core-platform/manifest";
+
 import { manifest } from "./manifest.js";
 import type { TwoDriveConfig } from "./config.js";
 import { applySchema, type TwoDriveDb } from "./db/schema.js";
@@ -23,7 +19,7 @@ export async function buildServer(config: TwoDriveConfig) {
   const db = createPgDb<TwoDriveDb>({ connectionString: config.DATABASE_URL, schema: "twodrive" });
   await applySchema(db);
 
-  const dataKey = config.TWODB_DATA_KEY ?? config.TWODB_PROVISION_TOKEN;
+  const dataKey = config.TWODB_DATA_KEY ?? "dev-only-data-key";
 
   // The workspace's default virtual storage for app folders is stored as a
   // row in drive_app_override under the reserved app_id "__default__" —
@@ -73,14 +69,6 @@ export async function buildServer(config: TwoDriveConfig) {
   const ctx = { db, config, dataKey, getDefaultVsId, setDefaultVsId };
 
   // Pull-registration endpoint (docker-install flow).
-  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => {
-    const res = handleManifestRequest(
-      manifest,
-      { registrationToken: config.TWODB_PROVISION_TOKEN, httpUrl: config.HTTP_URL },
-      req.headers[REGISTRATION_TOKEN_HEADER],
-    );
-    return reply.code(res.status).send(res.body);
-  });
 
   app.get("/healthz", async () => ({ ok: true, app: manifest.slug }));
 

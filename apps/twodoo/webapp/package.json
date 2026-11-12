@@ -17,7 +17,8 @@
     "@twodb/editor": "workspace:*",
     "better-auth": "^1.7.5",
     "@better-auth/passkey": "^1.7.5",
-    "lucide-react": "^1.29.0"
+    "lucide-react": "^1.29.0",
+    "@twodb/twodb-shared-frontend": "workspace:*"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.5.0",

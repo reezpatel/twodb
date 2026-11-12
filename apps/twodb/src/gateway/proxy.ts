@@ -31,6 +31,11 @@ export async function proxyToApp(
   const headers = new Headers(webReq.headers);
   // Never trust identity headers from the caller: always drop them, then (re)set from the resolved context.
   for (const h of [...headers.keys()]) if (h.startsWith("x-twodb-")) headers.delete(h);
+  headers.delete("x-gateway-verified");
+  // Calling-app identity, as screened by the gateway's onRequest hook
+  // (x-twodb-token never reaches here — it is stripped at the edge).
+  headers.set("x-gateway-verified", req.callerApp?.verified ? "true" : "false");
+  if (req.callerApp?.verified && req.callerApp.slug) headers.set("x-twodb-app", req.callerApp.slug);
   if (ctx) {
     headers.set("x-twodb-auth-kind", ctx.kind);
     if (ctx.userId) headers.set("x-twodb-user-id", ctx.userId);

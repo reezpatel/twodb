@@ -16,7 +16,7 @@ virtual storages, an internal app-file API, and an S3-compatible surface.
   Gateway (see `src/gateway-context.ts`) — never talk to better-auth or the
   org/workspace/space tables yourself.
 - One Postgres schema, named `twodrive`, provisioned by TwoDB
-  (`POST /registry/apps/twodrive/provision`) — access it only via
+  (the control plane (`GET /registry/config`, via twodb-core)) — access it only via
   `@twodb/core-data/db`'s `createPgDb()`.
 - Call `registerWithGateway(manifest, opts)` from
   `@twodb/core-platform/manifest` on boot (see `src/index.ts`).

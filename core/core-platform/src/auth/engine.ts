@@ -51,7 +51,7 @@ function buildOptions(options: AuthEngineOptions): BetterAuthOptions {
               // Once any user WITH a passkey exists, bootstrap is closed —
               // defer to the session the plugin itself resolved.
               if (await options.firstUserBootstrap!.hasUsers()) {
-                throw new Error("session required");
+                throw new Error("Registration is closed — sign in with your passkey (or ask an admin to enable open sign-up).");
               }
               // Zero-user bootstrap: create the real user NOW. The id is
               // baked into the WebAuthn challenge cookie and becomes the

@@ -453,18 +453,6 @@ const openaiCompatModels = defineEndpoint({
   }),
 });
 
-const internalManifest = defineEndpoint({
-  name: "internalManifest",
-  method: "GET",
-  path: "/internal/manifest",
-  auth: "public",
-  description:
-    "Pull-registration endpoint TwoDB's orchestrator polls on this app's published port after starting its " +
-    "container. Guarded by the per-app registration token via the `x-registration-token` header (shared " +
-    "contract in core-platform/src/manifest/serve.ts) — not callable through the Gateway.",
-  response: z.object({ slug: z.string(), httpUrl: z.string(), manifest: z.unknown() }),
-});
-
 void PROVIDERS; // catalog module is self-contained; import kept for locality of the schemas above
 
 export const tworouteManifest = defineAppManifest({
@@ -507,7 +495,6 @@ export const tworouteManifest = defineAppManifest({
     transcriptions,
     openaiCompatChat,
     openaiCompatModels,
-    internalManifest,
   ],
 });
 

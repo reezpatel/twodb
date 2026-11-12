@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import * as path from "node:path";
 import websocket from "@fastify/websocket";
 import { createPgDb } from "@twodb/core-data/db";
-import { INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER, handleManifestRequest } from "@twodb/core-platform/manifest";
+
 import { applySchema } from "./db/schema.js";
 import { createArtisanRepo, newId } from "./db/repository.js";
 import { loadArtisanConfig, type ArtisanConfig } from "./config.js";
@@ -53,14 +53,6 @@ export async function buildServer(config: ArtisanConfig) {
   };
 
   // Pull-registration manifest.
-  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => {
-    const res = handleManifestRequest(
-      { ...artisanManifest, version: "0.1.0" },
-      { registrationToken: config.TWODB_PROVISION_TOKEN, httpUrl: config.HTTP_URL },
-      (req.headers[REGISTRATION_TOKEN_HEADER] as string | undefined) ?? undefined,
-    );
-    return reply.code(res.status).send(res.body);
-  });
 
   // --- sessions --------------------------------------------------------------
   app.post("/sessions", async (req, reply) => {

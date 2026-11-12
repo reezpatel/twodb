@@ -9,7 +9,7 @@ Multi-provider LLM gateway: 24 provider kinds (OAuth for Claude Code & Codex inc
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-10T19:30:06.392Z_
+_Generated: 2026-11-12T19:34:56.942Z_
 
 ## Endpoints
 
@@ -1683,35 +1683,6 @@ OpenAI list-shape model catalog aggregated across ALL visible connections. Each 
   "required": [
     "object",
     "data"
-  ],
-  "additionalProperties": false
-}
-```
-
-### `GET /internal/manifest` — internalManifest
-
-Pull-registration endpoint TwoDB's orchestrator polls on this app's published port after starting its container. Guarded by the per-app registration token via the `x-registration-token` header (shared contract in core-platform/src/manifest/serve.ts) — not callable through the Gateway.
-
-- **Auth**: `public`
-
-**Response**
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "slug": {
-      "type": "string"
-    },
-    "httpUrl": {
-      "type": "string"
-    },
-    "manifest": {}
-  },
-  "required": [
-    "slug",
-    "httpUrl",
-    "manifest"
   ],
   "additionalProperties": false
 }

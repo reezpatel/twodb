@@ -1,7 +1,7 @@
 import Fastify, { type FastifyRequest } from "fastify";
 import { createPgDb, type Kysely } from "@twodb/core-data/db";
 import { ulid } from "ulid";
-import { INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER, handleManifestRequest } from "@twodb/core-platform/manifest";
+
 import { manifest, bookInput, contactInput, contactPatch, listQuery } from "./manifest.js";
 
 interface Book { id: string; workspaceId: string; spaceId: string; name: string; createdAt: string }
@@ -27,7 +27,7 @@ export function context(req: FastifyRequest) {
   const spaces = req.headers["x-twodb-space-ids"];
   return { workspaceId, spaceIds: typeof spaces === "string" ? spaces.split(",").map(s => s.trim()).filter(Boolean) : [] };
 }
-export async function buildServer(config: { databaseUrl: string; registrationToken: string; httpUrl: string }, injectedDb?: Kysely<ContactsDb>) {
+export async function buildServer(config: { databaseUrl: string }, injectedDb?: Kysely<ContactsDb>) {
   const db = injectedDb ?? createPgDb<ContactsDb>({ connectionString: config.databaseUrl, schema: "twocontacts" });
   await applySchema(db);
   const app = Fastify({ logger: !injectedDb });
@@ -39,10 +39,6 @@ export async function buildServer(config: { databaseUrl: string; registrationTok
     return reply.code(error.statusCode ?? 500).send({ error: "Request failed" });
   });
   app.get("/healthz", async () => ({ ok: true, app: "twocontacts" }));
-  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => {
-    const result = handleManifestRequest(manifest, config, req.headers[REGISTRATION_TOKEN_HEADER]);
-    return reply.code(result.status).send(result.body);
-  });
   app.register(async routes => {
     routes.addHook("preHandler", async (req, reply) => { if (!context(req)) return reply.code(401).send({ error: "unauthorized" }); });
     const books = (req: FastifyRequest) => { const ctx = context(req)!; return db.selectFrom("book").selectAll().where("workspaceId", "=", ctx.workspaceId).where("spaceId", "in", ctx.spaceIds.length ? ctx.spaceIds : [""]); };

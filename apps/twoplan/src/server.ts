@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import { createPgDb } from "@twodb/core-data/db";
 import { createLocalStorage } from "@twodb/core-data/storage";
-import { INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER, handleManifestRequest } from "@twodb/core-platform/manifest";
+
 import { manifest } from "./manifest.js";
 import type { TwoPlanConfig } from "./config.js";
 import { applySchema, type Db } from "./db/schema.js";
@@ -27,10 +27,6 @@ export async function buildServer(config: TwoPlanConfig) {
   const storage = createLocalStorage({ rootDir: config.TWOPLAN_BLOB_DIR });
 
   app.get("/healthz", async () => ({ ok: true, app: "twoplan" }));
-  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => {
-    const res = handleManifestRequest(manifest, { registrationToken: config.TWODB_PROVISION_TOKEN, httpUrl: config.HTTP_URL }, req.headers[REGISTRATION_TOKEN_HEADER]);
-    return reply.code(res.status).send(res.body);
-  });
 
   registerRoutes(app, { db, storage }, allRoutes);
   app.addHook("onClose", async () => {

@@ -7,7 +7,7 @@
  * issues a fresh per-app registration token (same as
  * `POST /orchestrator/apps/:slug/issue-token`) and stores the CURRENT
  * encrypted credentials in the control-plane registry, so host-run dev
- * apps can fetch them at boot via POST /registry/credentials.
+ * apps can fetch them at boot via GET /registry/config.
  *
  * Usage:
  *   pnpm --filter @twodb/app-twodb provision:dev            # default set (tworoute)
@@ -16,10 +16,10 @@
  * Then paste the printed <SLUG>_PROVISION_TOKEN line(s) into .env — that's
  * the only secret the app needs (db credentials come from the gateway).
  */
-import { provisionAppDatabase, encryptSecret } from "../src/db/provisioning.js";
+import { provisionAppDatabase, encryptSecret, decryptSecret } from "../src/db/provisioning.js";
 import { createRegistryRepo } from "../src/db/registry.js";
 import { openControlPlaneDb, bootstrapControlPlaneDb } from "../src/db/sqlite.js";
-import { generateRegistrationToken } from "../src/orchestrator/tokens.js";
+import { generateAppToken } from "../src/orchestrator/tokens.js";
 import { readFileSync, existsSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import * as path from "node:path";
@@ -48,10 +48,16 @@ async function main() {
   const registry = createRegistryRepo(db);
 
   for (const slug of slugs) {
-    const r = await provisionAppDatabase(adminUrl, slug, containerHost);
+    // Keep the role's current password (credentials are stable); only set one on first create.
+    const prev = await registry.getApp(slug);
+    let existingPassword: string | undefined;
+    try {
+      if (prev?.pg_connection_string_encrypted) existingPassword = decodeURIComponent(new URL(decryptSecret(prev.pg_connection_string_encrypted, authSecret)).password);
+    } catch {}
+    const r = await provisionAppDatabase(adminUrl, slug, containerHost, { existingPassword });
     // Always issue a fresh token and print it (installs rotate too; the
     // plaintext can't be recovered from the stored hash anyway).
-    const registrationToken = generateRegistrationToken();
+    const appToken = generateAppToken();
     await registry.beginInstall(
       {
         slug,
@@ -62,11 +68,12 @@ async function main() {
         hostId: "dev",
         capabilities: [],
       },
-      registrationToken,
     );
+    await registry.revokeTokens(slug, "api");
+    await registry.issueToken(slug, "api", appToken, 30 * 24 * 60 * 60 * 1000);
     // provisionAppDatabase ROTATED the role password — persist the new
     // encrypted connection string so the token-guarded
-    // POST /registry/credentials serves CURRENT credentials, not whatever
+    // GET /registry/config serves CURRENT credentials, not whatever
     // an older run/install happened to store.
     await registry.setProvisioning(slug, r.schema, r.role, encryptSecret(r.containerConnectionString, authSecret));
     const existing = await registry.getApp(slug);
@@ -74,8 +81,8 @@ async function main() {
       await registry.setDataKey(slug, encryptSecret(randomBytes(32).toString("hex"), authSecret));
     }
     console.log(`\n# ${slug} — schema "${r.schema}", role "${r.role}"`);
-    console.log(`${slug.toUpperCase()}_PROVISION_TOKEN=${registrationToken}`);
-    console.log(`# (db credentials are fetched at boot via POST /registry/credentials — nothing else to paste)`);
+    console.log(`# optional — apps normally self-register using TWODB_REGISTRATION_SECRET; to pin a token: TWODB_APP_TOKEN=${appToken}  (${slug})`);
+    console.log(`# (db credentials are delivered at boot via GET /registry/config — nothing to paste)`);
   }
   process.exit(0);
 }

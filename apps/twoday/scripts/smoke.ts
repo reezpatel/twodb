@@ -7,11 +7,10 @@ const schema = `day_test_${Date.now()}`;
 const admin = createPgDb({connectionString:databaseUrl,schema:"public"});
 await sql`create schema ${sql.id(schema)}`.execute(admin);
 const db = createPgDb<CalendarDb>({connectionString:databaseUrl,schema});
-const app = await buildServer({databaseUrl,registrationToken:"test",httpUrl:"http://localhost:6403"},db);
+const app = await buildServer({databaseUrl},db);
 const headers = {"x-twodb-auth-kind":"session","x-twodb-workspace-id":"w1","x-twodb-space-ids":"s1"};
 try {
   assert.equal((await app.inject({url:"/calendars"})).statusCode,401);
-  assert.equal((await app.inject({url:"/internal/manifest"})).statusCode,401);
   assert.equal((await app.inject({method:"POST",url:"/calendars",headers,payload:{spaceId:"s2",name:"No"}})).statusCode,403);
   const cal = await app.inject({method:"POST",url:"/calendars",headers,payload:{spaceId:"s1",name:"Work"}});
   assert.equal(cal.statusCode,201);

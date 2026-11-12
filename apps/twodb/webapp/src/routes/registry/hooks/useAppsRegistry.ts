@@ -126,5 +126,22 @@ export function useAppLifecycle(slug: string) {
     setBusy(false);
   }, [slug, refresh]);
 
-  return { status, busy, act, remove };
+  /** Rotates the token. Returns the new plaintext token for unmanaged apps (null for managed — their container is recreated). */
+  const rotate = useCallback(async (): Promise<{ token: string; expiresAt: string | null } | null> => {
+    setBusy(true);
+    try {
+      const r = await gatewayClient.rotateToken(slug);
+      if (r.managed) {
+        startPolling();
+        return null;
+      }
+      setBusy(false);
+      return { token: r.token ?? "", expiresAt: r.expiresAt ?? null };
+    } catch (err) {
+      setBusy(false);
+      throw err;
+    }
+  }, [slug, startPolling]);
+
+  return { status, busy, act, remove, rotate };
 }

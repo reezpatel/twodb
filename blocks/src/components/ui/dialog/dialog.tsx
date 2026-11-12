@@ -61,7 +61,7 @@ function DialogContent({ className, children, showClose = true, ...props }: Reac
 }
 
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="dialog-header" className={cn("grid gap-1.5", className)} {...props} />;
+  return <div data-slot="dialog-header" className={cn("grid", className)} {...props} />;
 }
 
 function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
@@ -70,22 +70,12 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
 
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (
-    <DialogPrimitive.Title
-      data-slot="dialog-title"
-      className={cn("font-sans text-[22px] font-bold leading-7 tracking-tight text-ink", className)}
-      {...props}
-    />
+    <DialogPrimitive.Title data-slot="dialog-title" className={cn("font-sans text-md font-medium leading-7 tracking-tight text-ink", className)} {...props} />
   );
 }
 
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
-  return (
-    <DialogPrimitive.Description
-      data-slot="dialog-description"
-      className={cn("font-sans text-[15px] leading-[22px] text-ink-muted", className)}
-      {...props}
-    />
-  );
+  return <DialogPrimitive.Description data-slot="dialog-description" className={cn("font-sans text-sm text-ink-muted", className)} {...props} />;
 }
 
 export { Dialog, DialogTrigger, DialogPortal, DialogClose, DialogOverlay, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription };

@@ -1,11 +1,7 @@
 import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
 import { createPgDb } from "@twodb/core-data/db";
 import { createAsyncEngine } from "@twodb/core-async/engine";
-import {
-  INTERNAL_MANIFEST_PATH,
-  REGISTRATION_TOKEN_HEADER,
-  handleManifestRequest,
-} from "@twodb/core-platform/manifest";
+
 import { tworouteManifest } from "./manifest.js";
 import type { TwoRouteConfig } from "./config.js";
 import { applySchema, type TwoRouteDb } from "./db/schema.js";
@@ -27,8 +23,8 @@ export async function buildServer(config: TwoRouteConfig) {
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
   const db = createPgDb<TwoRouteDb>({ connectionString: config.DATABASE_URL, schema: "tworoute" });
   await applySchema(db);
-  const connections = createConnectionsRepo(db, config.TWODB_DATA_KEY ?? config.TWODB_PROVISION_TOKEN);
-  const quotaCtx = { db, encrypt: (s: string) => encryptSecret(s, config.TWODB_DATA_KEY ?? config.TWODB_PROVISION_TOKEN) };
+  const connections = createConnectionsRepo(db, config.TWODB_DATA_KEY ?? "dev-only-data-key");
+  const quotaCtx = { db, encrypt: (s: string) => encryptSecret(s, config.TWODB_DATA_KEY ?? "dev-only-data-key") };
 
   const asyncEngine = createAsyncEngine({ connectionString: config.DATABASE_URL, schema: "tworoute" });
   await asyncEngine.init();
@@ -36,14 +32,6 @@ export async function buildServer(config: TwoRouteConfig) {
   // Pull-registration endpoint: TwoDB's orchestrator polls this on the
   // container's published port and completes registration itself (see
   // core-platform/src/manifest/serve.ts for why both push and pull exist).
-  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => {
-    const res = handleManifestRequest(
-      tworouteManifest,
-      { registrationToken: config.TWODB_PROVISION_TOKEN, httpUrl: config.HTTP_URL },
-      req.headers[REGISTRATION_TOKEN_HEADER],
-    );
-    return reply.code(res.status).send(res.body);
-  });
 
   // --- Provider catalog (UI builds its forms from this) -------------------
   app.get("/providers", async (req, reply) => {

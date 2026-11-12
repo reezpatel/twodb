@@ -1,7 +1,7 @@
 import Fastify,{type FastifyRequest} from "fastify";
 import {createPgDb,type Kysely} from "@twodb/core-data/db";
 import {ulid} from "ulid";
-import {INTERNAL_MANIFEST_PATH,REGISTRATION_TOKEN_HEADER,handleManifestRequest} from "@twodb/core-platform/manifest";
+
 import {manifest,accountInput,sendInput,messageQuery} from "./manifest.js";
 import {secretBox} from "./crypto.js";
 import {provider,checkHosts,type Connection,type MailProvider} from "./provider.js";
@@ -11,7 +11,7 @@ export interface MailDb {account:Account;message:Message}
 function publicAccount({secret,workspaceId,...row}:Account){return row;}
 function publicMessage({providerId,...row}:Message){return row;}
 function context(req:FastifyRequest){const kind=req.headers["x-twodb-auth-kind"],workspaceId=req.headers["x-twodb-workspace-id"],spaces=req.headers["x-twodb-space-ids"];if((kind!=="session"&&kind!=="apiKey")||typeof workspaceId!=="string"||!workspaceId)return null;return {workspaceId,spaces:typeof spaces==="string"?spaces.split(",").map(s=>s.trim()).filter(Boolean):[]};}
-export async function buildServer(config:{databaseUrl:string;registrationToken:string;httpUrl:string;dataKey:string;allowedHosts:string[]},injectedDb?:Kysely<MailDb>,mail:MailProvider=provider){
+export async function buildServer(config:{databaseUrl:string;dataKey:string;allowedHosts:string[]},injectedDb?:Kysely<MailDb>,mail:MailProvider=provider){
   const box=secretBox(config.dataKey);
   const db=injectedDb??createPgDb<MailDb>({connectionString:config.databaseUrl,schema:"twomail"});
   await db.schema.createTable("account").ifNotExists().addColumn("id","text",c=>c.primaryKey()).addColumn("workspaceId","text",c=>c.notNull()).addColumn("spaceId","text",c=>c.notNull()).addColumn("name","text",c=>c.notNull()).addColumn("address","text",c=>c.notNull()).addColumn("secret","text",c=>c.notNull()).addColumn("createdAt","text",c=>c.notNull()).execute();
@@ -22,7 +22,6 @@ export async function buildServer(config:{databaseUrl:string;registrationToken:s
   app.addHook("onClose",async()=>{if(!injectedDb)await db.destroy();});
   app.setErrorHandler<Error & {statusCode?:number}>((error,_req,reply)=>{ app.log.error({name:error.name},"Mail request failed"); return reply.code(error.statusCode??500).send({error:"Request failed"}); });
   app.get("/healthz",async()=>({ok:true,app:"twomail"}));
-  app.get(INTERNAL_MANIFEST_PATH,async(req,reply)=>{const r=handleManifestRequest(manifest,config,req.headers[REGISTRATION_TOKEN_HEADER]);return reply.code(r.status).send(r.body);});
   app.register(async routes=>{
     routes.addHook("preHandler",async(req,reply)=>{if(!context(req))return reply.code(401).send({error:"unauthorized"});});
     const accounts=(req:FastifyRequest)=>{const ctx=context(req)!;return db.selectFrom("account").selectAll().where("workspaceId","=",ctx.workspaceId).where("spaceId","in",ctx.spaces.length?ctx.spaces:[""]);};

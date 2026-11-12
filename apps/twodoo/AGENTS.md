@@ -15,7 +15,7 @@ Tasks & habits (TickTick-style). **Implemented (v1)** — read `README.md` first
   org/workspace/space tables yourself. Space scoping: repo functions take
   `{ workspaceId, spaceIds }`; empty spaceIds = all spaces.
 - One Postgres schema, named `twodoo`, provisioned by TwoDB
-  (`POST /registry/apps/twodoo/provision`) — access it only via
+  (the control plane (`GET /registry/config`, via twodb-core)) — access it only via
   `@twodb/core-data/db`'s `createPgDb()`.
 - Call `registerWithGateway(manifest, opts)` from `@twodb/core-platform/manifest`
   on boot (see `src/index.ts`).

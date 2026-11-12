@@ -21,26 +21,27 @@ stop — add an endpoint to TwoDB instead and have the new app call it
 through the Gateway like everyone else.
 
 ## The registration trust model (read before touching orchestrator/)
-- There is NO shared registration secret. `POST /registry/register` is
-  guarded by per-app tokens TwoDB generates at install time; only the
-  token's sha256 hash is stored (`registered_app.registration_token_hash`),
-  and the plaintext is injected into the app's env as
-  `TWODB_PROVISION_TOKEN` (or returned once by `issue-token` for dev mode).
-- Two registration paths must BOTH keep working: push (the app calls
-  `registerWithGateway()` — primary for host-run dev apps) and pull (TwoDB
-  polls the container's published port for `GET /internal/manifest` —
-  required for containerized apps, because container→host traffic is
-  firewalled on stock Linux Docker). The shared contract lives in
-  `core-platform/src/manifest/serve.ts`; both paths end in
-  `registry.completeRegistration()`.
-- When a containerized app's boot fails to push-register, that is expected
-  on firewalled hosts and logged as non-fatal — do not "fix" it by making
-  the app crash-retry.
+- Registration is ALWAYS app-initiated (`@twodb/twodb-core` → `POST
+  /registry/register`, then `POST /registry/ping` every 10s). There is no
+  pull-registration and no `/internal/manifest`; the orchestrator only waits
+  for the app to show up (`waitForRegistration`).
+- Auth is the `app_token` table (sha256 only; `kind` managed|api;
+  `expires_at` null = never). Managed containers get a non-expiring token
+  injected as `TWODB_APP_TOKEN`; unmanaged apps present the shared
+  `TWODB_REGISTRATION_SECRET` and get a 30-day token back. Gateway screening
+  lives in the first `onRequest` hook in `gateway/server.ts` (and
+  `ws-passthrough.ts`): always strip `x-twodb-token`, always overwrite
+  `x-gateway-verified`.
+- `/registry/config` is where apps get Postgres/S3/data key. NEVER make
+  provisioning change an existing role password implicitly — `provisionAppDatabase`
+  keeps the stored password unless `rotate` is passed.
+- Anything under an `internal` path segment is user-session only (403 for API
+  keys / app tokens) — keep that hook ahead of routing-dependent logic.
 
 ## Before changing `gateway/server.ts`
 - Every route must resolve an `AuthContext` via `resolveContext()` *unless*
   it's explicitly public (currently only `/registry/register`, which is
-  guarded by the per-app registration token instead).
+  guarded by the app token / registration secret instead).
 - Lifecycle routes that run docker builds (`install`, `upgrade`) must stay
   async via `runLifecycle()` — never hold the HTTP request open for a
   multi-minute build; clients poll `GET /orchestrator/apps/:slug/status`.

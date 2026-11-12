@@ -5,6 +5,7 @@ import { DispatchProvider } from "./lib/dispatch-context.js";
 import { ShellChrome } from "./routes/shell/partials/ShellChrome.js";
 import { AppHeader } from "./routes/shell/partials/AppHeader.js";
 import { useShellSession } from "./routes/shell/hooks/useShellSession.js";
+import { useSidebarToggle } from "./routes/shell/hooks/useSidebarToggle.js";
 import { useShellNav } from "./routes/shell/hooks/useShellNav.js";
 import { useSharedDispatch } from "./lib/dispatch-context.js";
 import { RunnersView } from "./routes/runners/RunnersView.js";
@@ -40,6 +41,7 @@ export function App() {
 function ShellRoutes() {
   const { userName, signOut } = useShellSession();
   const { activeId, onSelect } = useShellNav();
+  const { open: navOpen, toggle: toggleNav } = useSidebarToggle("dispatch.nav-open");
   const { runners, microvms } = useSharedDispatch();
 
   const title = (() => {
@@ -60,6 +62,8 @@ function ShellRoutes() {
       onSelect={onSelect}
       userName={userName}
       onSignOut={signOut}
+      navOpen={navOpen}
+      onToggleNav={toggleNav}
       header={
         <AppHeader
           title={title}

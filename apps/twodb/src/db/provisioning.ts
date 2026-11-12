@@ -26,26 +26,39 @@ function identSafe(slug: string): string {
 
 export { identSafe };
 
+export interface ProvisionOptions {
+  /** Current password of the app's role (from the stored credentials). Kept as-is unless `rotate`. */
+  existingPassword?: string;
+  /** Force a new password even if the current one is known. */
+  rotate?: boolean;
+}
+
 export async function provisionAppDatabase(
   adminConnectionString: string,
   slug: string,
   containerDbHost: string,
+  opts: ProvisionOptions = {},
 ): Promise<ProvisionResult> {
   const name = identSafe(slug);
   const schema = name;
   const role = `app_${name}`;
-  const password = randomBytes(24).toString("hex");
+  // Credentials are STABLE: when the caller knows the role's current password
+  // it is kept and never touched. A new password is only set when the role is
+  // created, when `rotate` is requested explicitly, or when the current one
+  // is unrecoverable (heal).
+  const keep = !opts.rotate && opts.existingPassword ? opts.existingPassword : null;
+  const password = keep ?? randomBytes(24).toString("hex");
 
   const client = new Client({ connectionString: adminConnectionString });
   await client.connect();
   try {
-    await client.query(`DO $$ BEGIN
-      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${role}') THEN
-        CREATE ROLE ${client.escapeIdentifier(role)} WITH LOGIN PASSWORD '${password}';
-      ELSE
-        ALTER ROLE ${client.escapeIdentifier(role)} WITH PASSWORD '${password}';
-      END IF;
-    END $$;`);
+    const exists = (await client.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [role])).rowCount! > 0;
+    const quotedPw = `'${password}'`; // hex only — safe to inline (DDL can't be parameterised)
+    if (!exists) {
+      await client.query(`CREATE ROLE ${client.escapeIdentifier(role)} WITH LOGIN PASSWORD ${quotedPw}`);
+    } else if (!keep) {
+      await client.query(`ALTER ROLE ${client.escapeIdentifier(role)} WITH PASSWORD ${quotedPw}`);
+    }
 
     await client.query(`CREATE SCHEMA IF NOT EXISTS ${client.escapeIdentifier(schema)} AUTHORIZATION ${client.escapeIdentifier(role)}`);
     await client.query(`GRANT ALL ON SCHEMA ${client.escapeIdentifier(schema)} TO ${client.escapeIdentifier(role)}`);

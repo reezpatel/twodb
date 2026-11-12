@@ -1,7 +1,7 @@
 import Fastify, { type FastifyRequest } from "fastify";
 import { createPgDb, type Kysely } from "@twodb/core-data/db";
 import { ulid } from "ulid";
-import { INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER, handleManifestRequest } from "@twodb/core-platform/manifest";
+
 import { manifest, calendarInput, eventInput, rangeQuery } from "./manifest.js";
 interface Calendar { id: string; workspaceId: string; spaceId: string; name: string; color: string; createdAt: string }
 interface Event { id: string; calendarId: string; title: string; description: string; location: string; allDay: boolean; startAt: string | null; endAt: string | null; startDate: string | null; endDate: string | null; createdAt: string; updatedAt: string }
@@ -17,14 +17,13 @@ function context(req: FastifyRequest) {
   if ((kind !== "session" && kind !== "apiKey") || typeof workspaceId !== "string" || !workspaceId) return null;
   return { workspaceId, spaceIds: typeof spaces === "string" ? spaces.split(",").map(s => s.trim()).filter(Boolean) : [] };
 }
-export async function buildServer(config: { databaseUrl: string; registrationToken: string; httpUrl: string }, injectedDb?: Kysely<CalendarDb>) {
+export async function buildServer(config: { databaseUrl: string }, injectedDb?: Kysely<CalendarDb>) {
   const db = injectedDb ?? createPgDb<CalendarDb>({ connectionString: config.databaseUrl, schema: "twoday" });
   await applySchema(db);
   const app = Fastify({ logger: !injectedDb });
   app.addHook("onClose", async () => { if (!injectedDb) await db.destroy(); });
   app.setErrorHandler<Error & { statusCode?: number }>((error, _req, reply) => { app.log.error(error); return reply.code(error.statusCode ?? 500).send({ error: "Request failed" }); });
   app.get("/healthz", async () => ({ ok: true, app: "twoday" }));
-  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => { const result = handleManifestRequest(manifest, config, req.headers[REGISTRATION_TOKEN_HEADER]); return reply.code(result.status).send(result.body); });
   app.register(async routes => {
     routes.addHook("preHandler", async (req, reply) => { if (!context(req)) return reply.code(401).send({ error: "unauthorized" }); });
     const calendars = (req: FastifyRequest) => { const ctx = context(req)!; return db.selectFrom("calendar").selectAll().where("workspaceId", "=", ctx.workspaceId).where("spaceId", "in", ctx.spaceIds.length ? ctx.spaceIds : [""]); };

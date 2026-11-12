@@ -14,16 +14,119 @@ const registerApp = defineEndpoint({
   path: "/registry/register",
   auth: "public",
   description:
-    "An installed app calls this once it boots, presenting the unique per-app registration token TwoDB " +
-    "generated for it at install time (not session/API-key auth — the app has no workspace context yet). " +
-    "There is no shared secret: a token only ever authenticates the one slug it was issued for.",
+    "App-initiated registration — the only way an app becomes known to the gateway. Authenticate with " +
+    "`x-twodb-app` + `x-twodb-token` (re-registration) or the shared `x-twodb-registration-secret` " +
+    "(TWODB_REGISTRATION_SECRET); the secret path mints and returns a 30-day app token. Managed containers " +
+    "use the non-expiring token TwoDB injected (TWODB_APP_TOKEN).",
   request: z.object({
     slug: z.string(),
-    registrationToken: z.string(),
+    name: z.string().optional(),
+    version: z.string().optional(),
     httpUrl: z.string(),
     socketPath: z.string().optional(),
+    capabilities: z.array(z.string()).optional(),
     manifest: z.unknown(),
   }),
+  response: z.object({ ok: z.literal(true), created: z.boolean(), token: z.string().optional(), expiresAt: z.string().nullable().optional() }),
+});
+
+const pingApp = defineEndpoint({
+  name: "pingApp",
+  method: "POST",
+  path: "/registry/ping",
+  auth: "public",
+  description:
+    "Heartbeat (auth: x-twodb-app + x-twodb-token). Apps ping every 10s; after 30s of silence the control plane marks the app inactive.",
+  response: z.object({ ok: z.literal(true), pong: z.literal(true), intervalMs: z.number(), timeoutMs: z.number() }),
+});
+
+const getAppConfig = defineEndpoint({
+  name: "getAppConfig",
+  method: "GET",
+  path: "/registry/config",
+  auth: "public",
+  description:
+    "Runtime config for the calling app (auth: x-twodb-app + x-twodb-token): its Postgres connection/schema/role, " +
+    "its S3 bucket + key prefix + credentials (null when S3 isn't configured), and its stable data key. Consumed by twodb-core.",
+  response: z.object({
+    slug: z.string(),
+    postgres: z.object({ connectionString: z.string(), schema: z.string(), role: z.string() }),
+    s3: z
+      .object({
+        bucket: z.string(),
+        prefix: z.string(),
+        region: z.string().nullable(),
+        endpoint: z.string().nullable(),
+        forcePathStyle: z.boolean(),
+        accessKeyId: z.string(),
+        secretAccessKey: z.string(),
+      })
+      .nullable(),
+    dataKey: z.string().optional(),
+  }),
+});
+
+const oauthAuthorize = defineEndpoint({
+  name: "oauthAuthorize",
+  method: "POST",
+  path: "/registry/oauth/authorize",
+  auth: "session",
+  description:
+    "\"Login with TwoDB\" step 1 (called by the TwoDB webapp /authorize page with the user's own session): issues a " +
+    "one-time 60s authorization code bound to the PKCE challenge and an allowed redirect URI, and returns where to send the browser.",
+  request: z.object({ redirectUri: z.string(), codeChallenge: z.string(), state: z.string().optional() }),
+  response: z.object({ redirectTo: z.string() }),
+});
+
+const oauthToken = defineEndpoint({
+  name: "oauthToken",
+  method: "POST",
+  path: "/registry/oauth/token",
+  auth: "public",
+  description:
+    "\"Login with TwoDB\" step 2 (called by the app webapp): exchanges the code + PKCE verifier for a session token, " +
+    "usable as `Authorization: Bearer <accessToken>` on every gateway route and /api/auth/*.",
+  request: z.object({ code: z.string(), codeVerifier: z.string(), redirectUri: z.string() }),
+  response: z.object({ tokenType: z.literal("Bearer"), accessToken: z.string(), expiresAt: z.string() }),
+});
+
+const createAppToken = defineEndpoint({
+  name: "createAppToken",
+  method: "POST",
+  path: "/registry/apps/:slug/tokens",
+  auth: "session",
+  description: "Mints a 30-day app token for an app TwoDB doesn't run. Plaintext returned once.",
+  request: z.object({ slug: z.string() }),
+  response: z.object({ token: z.string(), expiresAt: z.string().nullable() }),
+});
+
+const listAppTokens = defineEndpoint({
+  name: "listAppTokens",
+  method: "GET",
+  path: "/registry/apps/:slug/tokens",
+  auth: "session",
+  description: "Token metadata for an app (never the token itself).",
+  response: z.object({ tokens: z.array(z.object({ id: z.string(), slug: z.string(), kind: z.string(), created_at: z.string(), expires_at: z.string().nullable(), revoked_at: z.string().nullable(), last_used_at: z.string().nullable() })) }),
+});
+
+const rotateAppTokenEp = defineEndpoint({
+  name: "rotateAppToken",
+  method: "POST",
+  path: "/registry/apps/:slug/rotate-token",
+  auth: "session",
+  description:
+    "Rotates the app's token (user session only). Unmanaged: revokes old tokens and returns a new 30-day token once. " +
+    "Managed: mints a new non-expiring token and recreates the container (async — poll getAppStatus), then revokes the old one.",
+  request: z.object({ slug: z.string() }),
+  response: z.object({ ok: z.literal(true), managed: z.boolean(), token: z.string().optional(), expiresAt: z.string().nullable().optional(), status: z.string().optional() }),
+});
+
+const revokeAppToken = defineEndpoint({
+  name: "revokeAppToken",
+  method: "DELETE",
+  path: "/registry/tokens/:id",
+  auth: "session",
+  description: "Revokes an app token immediately.",
   response: z.object({ ok: z.literal(true) }),
 });
 
@@ -159,7 +262,7 @@ const installApp = defineEndpoint({
   description:
     "Full one-click install: provisions the app's Postgres schema, resolves its Docker image (pulls " +
     "`$TWODB_APP_IMAGE_REGISTRY/app-<slug>:<version ?? latest>` when a registry is configured, otherwise " +
-    "builds locally from the workspace at its package.json version), issues a unique registration token, " +
+    "builds locally from the workspace at its package.json version), mints a non-expiring app token (TWODB_APP_TOKEN), " +
     "and starts the container. Async — poll getAppStatus until installStatus is \"running\" and " +
     "registrationStatus is \"active\".",
   request: z.object({ slug: z.string(), version: z.string().optional() }),
@@ -167,15 +270,15 @@ const installApp = defineEndpoint({
 });
 
 const issueToken = defineEndpoint({
-  name: "issueRegistrationToken",
+  name: "issueAppToken",
   method: "POST",
   path: "/orchestrator/apps/:slug/issue-token",
   auth: "session",
   description:
-    "Issues a registration token without touching Docker — for running an app directly via `pnpm dev` " +
+    "Mints a 30-day app token without touching Docker — for running an app directly via `pnpm dev` " +
     "instead of as a container. Returns the plaintext token exactly once.",
   request: z.object({ slug: z.string() }),
-  response: z.object({ registrationToken: z.string() }),
+  response: z.object({ appToken: z.string(), expiresAt: z.string().nullable() }),
 });
 
 const provisionDb = defineEndpoint({
@@ -184,7 +287,7 @@ const provisionDb = defineEndpoint({
   path: "/orchestrator/apps/:slug/provision-db",
   auth: "session",
   description:
-    "Creates (or rotates) a Postgres role+schema for the named app, independent of Docker, and ensures its " +
+    "Creates (idempotently — credentials are NOT changed on repeat calls unless `rotate: true`) a Postgres role+schema for the named app, independent of Docker, and ensures its " +
     "stable per-app data key exists (TWODB_DATA_KEY — never rotated, unlike registration tokens). Returns " +
     "both connection-string forms + the data key exactly once.",
   request: z.object({ slug: z.string() }),
@@ -303,6 +406,14 @@ export const twodbManifest = defineAppManifest({
   basePath: "/",
   endpoints: [
     registerApp,
+    pingApp,
+    getAppConfig,
+    oauthAuthorize,
+    oauthToken,
+    createAppToken,
+    listAppTokens,
+    rotateAppTokenEp,
+    revokeAppToken,
     listApps,
     getAppManifest,
     getAppMessages,

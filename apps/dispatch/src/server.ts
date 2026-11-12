@@ -1,11 +1,7 @@
 import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
 import websocket from "@fastify/websocket";
 import { createPgDb } from "@twodb/core-data/db";
-import {
-  INTERNAL_MANIFEST_PATH,
-  REGISTRATION_TOKEN_HEADER,
-  handleManifestRequest,
-} from "@twodb/core-platform/manifest";
+
 import { dispatchManifest } from "./manifest.js";
 import type { DispatchConfig } from "./config.js";
 import { applySchema, type DispatchDb, type JobRow, type MicrovmRow } from "./db/schema.js";
@@ -76,14 +72,6 @@ export async function buildServer(config: DispatchConfig) {
   registerArchiveStore(hub, repo);
 
   // Pull-registration (docker-install flow).
-  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => {
-    const res = handleManifestRequest(
-      { ...dispatchManifest, version: "0.1.0" },
-      { registrationToken: config.TWODB_PROVISION_TOKEN, httpUrl: config.HTTP_URL },
-      (req.headers[REGISTRATION_TOKEN_HEADER] as string | undefined) ?? undefined,
-    );
-    return reply.code(res.status).send(res.body);
-  });
 
   // --- runner WS (auth = runner key, not session) --------------------------
   registerRunnerWs(app, hub, repo);

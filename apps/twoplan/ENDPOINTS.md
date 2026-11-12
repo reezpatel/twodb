@@ -9,7 +9,7 @@ Project management: Space → Project (KEY) → epics, milestones and tickets. K
 - **Capabilities**: projects, tickets
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T13:19:06.980Z_
+_Generated: 2026-11-12T19:34:58.910Z_
 
 ## Endpoints
 
@@ -8089,35 +8089,6 @@ One-shot import of a Linear team: workflow states -> statuses (by name, created 
     "epics",
     "milestones",
     "labels"
-  ],
-  "additionalProperties": false
-}
-```
-
-### `GET /internal/manifest` — internalManifest
-
-Pull-registration endpoint TwoDB's orchestrator polls on this app's published port. Guarded by the per-app registration token (`x-registration-token`) — not callable through the Gateway.
-
-- **Auth**: `public`
-
-**Response**
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "slug": {
-      "type": "string"
-    },
-    "httpUrl": {
-      "type": "string"
-    },
-    "manifest": {}
-  },
-  "required": [
-    "slug",
-    "httpUrl",
-    "manifest"
   ],
   "additionalProperties": false
 }

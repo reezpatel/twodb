@@ -1,4 +1,4 @@
-import { registerWithGateway, fetchDatabaseCredentials } from "@twodb/core-platform/manifest";
+import { connectTwoDb } from "@twodb/twodb-core";
 import { loadTwoPlanConfig } from "./config.js";
 import { buildServer } from "./server.js";
 import { manifest } from "./manifest.js";
@@ -6,25 +6,13 @@ import { manifest } from "./manifest.js";
 async function main() {
   const config = loadTwoPlanConfig();
 
-  // Dev on the host: no DATABASE_URL in env — ask TwoDB for the credentials it provisioned.
-  let dbUrl = config.DATABASE_URL;
-  if (!process.env.DATABASE_URL && !process.env.TWOPLAN_DATABASE_URL) {
-    try {
-      const creds = await fetchDatabaseCredentials({ gatewayUrl: config.TWODB_GATEWAY_URL, registrationToken: config.TWODB_PROVISION_TOKEN, slug: "twoplan" });
-      dbUrl = creds.connectionString;
-      console.log(`[twoplan] using gateway-provisioned DB credentials (schema "${creds.schema}")`);
-    } catch (err) {
-      console.warn(`[twoplan] gateway credentials unavailable (${(err as Error).message}); falling back to config default`);
-    }
-  }
+  // Register with the control plane (token / TWODB_REGISTRATION_SECRET), start the
+  // 10s heartbeat, and receive this app's Postgres config from it — no DATABASE_URL in env.
+  const twodb = await connectTwoDb({ manifest, httpUrl: config.HTTP_URL, gatewayUrl: config.TWODB_GATEWAY_URL, skipConnections: true });
 
-  const server = await buildServer({ ...config, DATABASE_URL: dbUrl });
+  const server = await buildServer({ ...config, DATABASE_URL: twodb.config.postgres.connectionString, TWODB_DATA_KEY: twodb.dataKey ?? config.TWODB_DATA_KEY });
   await server.listen({ port: config.PORT, host: "0.0.0.0" });
   server.log.info(`TwoPlan listening on :${config.PORT}`);
-
-  await registerWithGateway(manifest, { gatewayUrl: config.TWODB_GATEWAY_URL, registrationToken: config.TWODB_PROVISION_TOKEN, httpUrl: config.HTTP_URL }).catch((err) =>
-    server.log.warn({ err }, "self-registration with TwoDB failed (non-fatal)"),
-  );
 }
 
 main().catch((err) => {

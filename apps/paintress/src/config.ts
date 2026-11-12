@@ -5,14 +5,10 @@ export const configSchema = z.object({
   ...commonConfigFields,
   PORT: z.coerce.number().int().positive().default(6414),
   DATABASE_URL: z.string().default("postgres://twodb:twodb@localhost:5432/twodb"),
-  TWODB_PROVISION_TOKEN: z.string().default("dev-token"),
+  /** Stable per-app key — delivered by the control plane at boot (twodb-core), never set by hand. */
+  TWODB_DATA_KEY: z.string().optional(),
   HTTP_URL: z.string().url().default("http://localhost:6414"),
-  /** Blob storage: "s3" (MinIO bucket from the db compose) or "local" (dev fallback). */
-  STORAGE: z.enum(["s3", "local"]).default("local"),
-  S3_ENDPOINT: z.string().default("http://localhost:9000"),
-  S3_BUCKET: z.string().default("twodb"),
-  S3_ACCESS_KEY_ID: z.string().default("twodb"),
-  S3_SECRET_ACCESS_KEY: z.string().default("twodb-secret"),
+  /** Local blob dir — only used when the control plane has no S3 configured (TWODB_S3_* on TwoDB). */
   LOCAL_STORAGE_DIR: z.string().default("./.data/blobs"),
 });
 
@@ -26,6 +22,5 @@ export function loadPaintressConfig(source: Record<string, string | undefined> =
     PORT: source.PAINTRESS_PORT ?? source.PORT,
     DATABASE_URL: source.PAINTRESS_DATABASE_URL ?? source.DATABASE_URL,
     HTTP_URL: source.PAINTRESS_HTTP_URL ?? source.HTTP_URL,
-    TWODB_PROVISION_TOKEN: source.PAINTRESS_PROVISION_TOKEN ?? source.TWODB_PROVISION_TOKEN,
   });
 }

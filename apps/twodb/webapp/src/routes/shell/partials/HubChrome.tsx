@@ -1,12 +1,18 @@
-import { AppShell, AppShellBody, AppShellMain, AppShellContent, NavSidebar, type NavGroupData, type NavItemData } from "@twodb/blocks";
-import { Compass, KeyRound, LayoutGrid, LogOut, Boxes } from "lucide-react";
+import { AppShell, AppShellBody, AppShellMain, AppShellHeader, AppShellContent, NavSidebar, type NavGroupData, type NavItemData } from "@twodb/blocks";
+import { KeyRound, LayoutGrid, LogOut, Boxes } from "lucide-react";
+import { NavSidebarToggle } from "@twodb/blocks";
 import type { ReactNode } from "react";
+import type { Crumb } from "../hooks/useBreadcrumbs.js";
+import { Breadcrumbs } from "./Breadcrumbs.js";
 
 export interface HubChromeProps {
   activeId: string;
+  navOpen: boolean;
+  onToggleNav: () => void;
   onNavSelect: (id: string) => void;
   userEmail: string;
   userName: string;
+  crumbs: Crumb[];
   children: ReactNode;
 }
 
@@ -16,7 +22,6 @@ export function HubChrome(props: HubChromeProps) {
     {
       heading: "Platform",
       items: [
-        { id: "explorer", title: "Gateway explorer", icon: Compass },
         { id: "apps", title: "Apps", icon: LayoutGrid },
         { id: "keys", title: "API keys", icon: KeyRound },
         { id: "spaces", title: "Spaces", icon: Boxes },
@@ -34,10 +39,15 @@ export function HubChrome(props: HubChromeProps) {
           footerItems={footerItems}
           activeId={props.activeId}
           onSelect={props.onNavSelect}
+          open={props.navOpen}
           workspaces={[]}
           activeWorkspace={props.userName || "TwoDB"}
         />
         <AppShellMain>
+          <AppShellHeader className="h-12 gap-3 border-b border-outline px-6 text-sm font-normal">
+            <NavSidebarToggle open={props.navOpen} onToggle={props.onToggleNav} aria-label={props.navOpen ? "Hide navigation" : "Show navigation"} />
+            <Breadcrumbs crumbs={props.crumbs} />
+          </AppShellHeader>
           <AppShellContent>{props.children}</AppShellContent>
         </AppShellMain>
       </AppShellBody>

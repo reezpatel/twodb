@@ -1,6 +1,7 @@
 import type { Kysely } from "kysely";
 import { createHash } from "node:crypto";
-import type { ControlPlaneDb, RegisteredAppRow, InstallStatus } from "./sqlite.js";
+import { ulid } from "ulid";
+import type { ControlPlaneDb, RegisteredAppRow, InstallStatus, AppTokenRow } from "./sqlite.js";
 import { getCatalogEntry } from "../orchestrator/catalog.js";
 
 export interface CreateInstallInput {
@@ -32,12 +33,11 @@ function hashToken(token: string): string {
 export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
   return {
     /**
-     * Creates (or resets) a row for an app TwoDB is about to install, with a
-     * unique per-app registration token. Returns the plaintext token exactly
-     * once — it's never persisted, only its hash — to be injected into the
-     * container's env as `TWODB_REGISTRATION_TOKEN`.
+     * Creates (or resets) a row for an app TwoDB is about to install. Tokens
+     * are separate (see issueToken) — the orchestrator mints a non-expiring
+     * "managed" token and injects it into the container's env.
      */
-    async beginInstall(input: CreateInstallInput, registrationToken: string): Promise<void> {
+    async beginInstall(input: CreateInstallInput): Promise<void> {
       const existing = await db
         .selectFrom("registered_app")
         .select("slug")
@@ -51,7 +51,6 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
         base_path: input.basePath,
         host_id: input.hostId,
         capabilities: JSON.stringify(input.capabilities),
-        registration_token_hash: hashToken(registrationToken),
         install_status: "installing" as InstallStatus,
         installed_at: new Date().toISOString(),
         status: "unknown",
@@ -120,46 +119,176 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
       await db.updateTable("registered_app").set({ install_status: status }).where("slug", "=", slug).execute();
     },
 
+    // --- App tokens (gateway validates x-twodb-app + x-twodb-token) -------
+
+    /** Mints a token for `slug`; plaintext is returned once, only the hash is stored. `ttlMs` null = never expires. */
+    async issueToken(slug: string, kind: AppTokenRow["kind"], token: string, ttlMs: number | null) {
+      const now = Date.now();
+      const expiresAt = ttlMs === null ? null : new Date(now + ttlMs).toISOString();
+      await db
+        .insertInto("app_token")
+        .values({
+          id: ulid(),
+          slug,
+          token_hash: hashToken(token),
+          kind,
+          created_at: new Date(now).toISOString(),
+          expires_at: expiresAt,
+          revoked_at: null,
+          last_used_at: null,
+        })
+        .execute();
+      return { expiresAt };
+    },
+
+    /** Returns the token's kind iff it is live (unrevoked, unexpired) and was issued for exactly `slug`; otherwise null. */
+    async verifyToken(slug: string, token: string): Promise<{ kind: AppTokenRow["kind"] } | null> {
+      const row = await db
+        .selectFrom("app_token")
+        .selectAll()
+        .where("token_hash", "=", hashToken(token))
+        .executeTakeFirst();
+      if (!row || row.slug !== slug || row.revoked_at) return null;
+      if (row.expires_at && Date.parse(row.expires_at) <= Date.now()) return null;
+      // Best-effort usage stamp, throttled to once a minute to keep the hot path read-only.
+      if (!row.last_used_at || Date.now() - Date.parse(row.last_used_at) > 60_000) {
+        void db
+          .updateTable("app_token")
+          .set({ last_used_at: new Date().toISOString() })
+          .where("id", "=", row.id)
+          .execute()
+          .catch(() => {});
+      }
+      return { kind: row.kind };
+    },
+
+    async revokeTokens(slug: string, kind?: AppTokenRow["kind"]) {
+      let q = db
+        .updateTable("app_token")
+        .set({ revoked_at: new Date().toISOString() })
+        .where("slug", "=", slug)
+        .where("revoked_at", "is", null);
+      if (kind) q = q.where("kind", "=", kind);
+      await q.execute();
+    },
+
+    /** Revokes every live token of `kind` for `slug` except the one whose plaintext is `keepToken`. */
+    async revokeTokensExcept(slug: string, kind: AppTokenRow["kind"], keepToken: string) {
+      await db
+        .updateTable("app_token")
+        .set({ revoked_at: new Date().toISOString() })
+        .where("slug", "=", slug)
+        .where("kind", "=", kind)
+        .where("revoked_at", "is", null)
+        .where("token_hash", "!=", hashToken(keepToken))
+        .execute();
+    },
+
+    async revokeTokenById(id: string) {
+      await db.updateTable("app_token").set({ revoked_at: new Date().toISOString() }).where("id", "=", id).execute();
+    },
+
+    /** Token metadata only — never the hash. */
+    async listTokens(slug: string) {
+      return db
+        .selectFrom("app_token")
+        .select(["id", "slug", "kind", "created_at", "expires_at", "revoked_at", "last_used_at"])
+        .where("slug", "=", slug)
+        .orderBy("created_at", "desc")
+        .execute();
+    },
+
+    // --- App-initiated registration + liveness -----------------------------
+
     /**
-     * Called from `POST /registry/register` once the newly-started
-     * container boots and calls home. Verifies the token the app presents
-     * hashes to what TwoDB generated at install time for that exact slug —
-     * replacing the old shared-secret guard with a per-app, revocable one.
+     * Upserts the registry row for an app that has authenticated (by a live
+     * token or the registration secret) and announces itself. Existing rows
+     * (e.g. a managed install) keep their lifecycle fields; brand-new apps
+     * become unmanaged entries. Marks the app active.
      */
-    async completeRegistration(input: {
+    async registerApp(input: {
       slug: string;
-      registrationToken: string;
+      name?: string;
+      version?: string;
       httpUrl: string;
       socketPath?: string;
+      capabilities?: string[];
       manifestJson: unknown;
-    }): Promise<{ ok: true } | { ok: false; reason: string }> {
-      const row = await db
-        .selectFrom("registered_app")
-        .selectAll()
-        .where("slug", "=", input.slug)
-        .executeTakeFirst();
-
-      if (!row) return { ok: false, reason: `"${input.slug}" was never installed` };
-      if (!row.registration_token_hash) return { ok: false, reason: "app has no registration token on file" };
-      if (hashToken(input.registrationToken) !== row.registration_token_hash) {
-        return { ok: false, reason: "invalid registration token" };
+      hostId: string;
+    }): Promise<{ created: boolean }> {
+      const now = new Date().toISOString();
+      const existing = await db.selectFrom("registered_app").select(["slug", "managed"]).where("slug", "=", input.slug).executeTakeFirst();
+      const common = {
+        http_url: input.httpUrl.replace(/\/+$/, ""),
+        socket_path: input.socketPath ?? null,
+        manifest_json: JSON.stringify(input.manifestJson ?? {}),
+        status: "active",
+        registered_at: now,
+        last_seen_at: now,
+      };
+      if (existing) {
+        await db
+          .updateTable("registered_app")
+          .set({
+            ...common,
+            // A self-reported name (manifest.name) wins over whatever the install seeded (the slug).
+            ...(input.name ? { name: input.name } : {}),
+            ...(input.version ? { version: input.version } : {}),
+            ...(input.capabilities ? { capabilities: JSON.stringify(input.capabilities) } : {}),
+            // A managed app that has come up is "running"; unmanaged stay "external".
+            ...(existing.managed === 1 ? { install_status: "running" as InstallStatus } : {}),
+          })
+          .where("slug", "=", input.slug)
+          .execute();
+        return { created: false };
       }
-
       await db
-        .updateTable("registered_app")
-        .set({
-          http_url: input.httpUrl,
-          socket_path: input.socketPath ?? null,
-          manifest_json: JSON.stringify(input.manifestJson),
-          install_status: "running",
-          status: "active",
-          registered_at: new Date().toISOString(),
-          last_seen_at: new Date().toISOString(),
+        .insertInto("registered_app")
+        .values({
+          ...common,
+          slug: input.slug,
+          name: input.name ?? input.slug,
+          version: input.version ?? "unknown",
+          shape: "backend",
+          base_path: `/apps/${input.slug}`,
+          host_id: input.hostId,
+          capabilities: JSON.stringify(input.capabilities ?? []),
+          pg_schema: null,
+          pg_role: null,
+          pg_connection_string_encrypted: null,
+          data_key_encrypted: null,
+          registration_token_hash: null,
+          image_tag: null,
+          container_name: null,
+          host_port: null,
+          install_status: "external",
+          managed: 0,
+          installed_at: null,
         })
-        .where("slug", "=", input.slug)
         .execute();
+      return { created: true };
+    },
 
-      return { ok: true };
+    /** Heartbeat. Returns false if the slug is unknown. */
+    async ping(slug: string): Promise<boolean> {
+      const res = await db
+        .updateTable("registered_app")
+        .set({ last_seen_at: new Date().toISOString(), status: "active" })
+        .where("slug", "=", slug)
+        .executeTakeFirst();
+      return Number(res.numUpdatedRows) > 0;
+    },
+
+    /** Marks apps that stopped pinging as inactive. TwoDB's own row and manually-added external entries are exempt. */
+    async markStale(cutoffIso: string): Promise<number> {
+      const res = await db
+        .updateTable("registered_app")
+        .set({ status: "inactive" })
+        .where("status", "=", "active")
+        .where("slug", "!=", "twodb")
+        .where("last_seen_at", "<", cutoffIso)
+        .executeTakeFirst();
+      return Number(res.numUpdatedRows);
     },
 
     async listApps(): Promise<RegisteredAppRow[]> {
@@ -312,6 +441,7 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
     },
 
     async remove(slug: string) {
+      await db.deleteFrom("app_token").where("slug", "=", slug).execute();
       await db.deleteFrom("registered_app").where("slug", "=", slug).execute();
     },
   };

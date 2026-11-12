@@ -127,7 +127,7 @@ export function LoginCard(props: LoginCardProps) {
 
         <figure style={stagger(4)} className={cn(ENTER, "relative z-10 mt-auto flex flex-col gap-3")}>
           <blockquote className="text-2xl leading-[1.25] tracking-tight text-ink md:text-3xl">
-            One passkey, one tap — and the whole platform is <span className="italic">ours to bend</span>. One gateway, seventeen apps, zero lock-in.
+            TwoDB is the control plane for your whole app stack — install apps, route every request through one gateway, and keep <span className="italic">your data and your infrastructure</span> in your own hands.
           </blockquote>
           <figcaption className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
             <span>Control plane</span>

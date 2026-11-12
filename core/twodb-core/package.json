@@ -1,0 +1,25 @@
+{
+  "name": "@twodb/twodb-core",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Backend library every TwoDB app imports: register with the control plane, heartbeat, fetch Postgres/S3 config, call the gateway as a verified app.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "tsx --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@twodb/core-data": "workspace:*",
+    "@twodb/core-platform": "workspace:*",
+    "kysely": "^0.29.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

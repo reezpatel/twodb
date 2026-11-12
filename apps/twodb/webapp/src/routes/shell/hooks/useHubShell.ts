@@ -12,14 +12,23 @@ export function useHubShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const [signingOut, setSigningOut] = useState(false);
+  /** Side nav visibility — the toggle button in the header owns this, and it's remembered. */
+  const [navOpen, setNavOpen] = useState(() => {
+    try {
+      return localStorage.getItem("twodb.nav-open") !== "false";
+    } catch {
+      return true;
+    }
+  });
 
-  const activeId = location.pathname.startsWith("/apps")
+  // An app's details page (/app/:slug/…) belongs to the Apps section.
+  const activeId = location.pathname.startsWith("/apps") || location.pathname.startsWith("/app/")
     ? "apps"
     : location.pathname.startsWith("/keys")
       ? "keys"
       : location.pathname.startsWith("/spaces")
         ? "spaces"
-        : "explorer";
+        : "apps";
 
   const signOut = useCallback(async () => {
     setSigningOut(true);
@@ -36,13 +45,25 @@ export function useHubShell() {
       if (id === "apps") navigate("/apps");
       else if (id === "keys") navigate("/keys");
       else if (id === "spaces") navigate("/spaces");
-      else if (id === "explorer") navigate("/hub");
     },
     [navigate, signOut],
   );
 
+  const toggleNav = useCallback(() => {
+    setNavOpen((open) => {
+      try {
+        localStorage.setItem("twodb.nav-open", String(!open));
+      } catch {
+        // ignore — persistence is best-effort
+      }
+      return !open;
+    });
+  }, []);
+
   return {
     activeId,
+    navOpen,
+    toggleNav,
     signingOut,
     onNavSelect,
     userEmail: session?.user?.email ?? "",

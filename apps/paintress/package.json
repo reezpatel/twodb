@@ -26,6 +26,7 @@
     "@twodb/core-async": "workspace:*",
     "@twodb/core-data": "workspace:*",
     "@twodb/core-platform": "workspace:*",
+    "@twodb/twodb-core": "workspace:*",
     "elkjs": "^0.12.1",
     "fastify": "^5.11.2",
     "hono": "^4.13.17",

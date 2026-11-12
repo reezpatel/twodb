@@ -4,7 +4,7 @@ import { Slot } from "radix-ui";
 import { cn } from "../../../lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-full border font-sans font-semibold tracking-normal whitespace-nowrap transition-colors outline-none active:translate-y-px focus-visible:outline-2 focus-visible:outline-ion-deep focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-45 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-sm border font-sans font-medium tracking-normal whitespace-nowrap transition-colors outline-none active:translate-y-px focus-visible:outline-2 focus-visible:outline-ion-deep focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-45 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -17,9 +17,9 @@ const buttonVariants = cva(
         warning: "border-warning bg-warning text-warning-foreground hover:bg-warning/90",
       },
       size: {
-        sm: "h-7 px-4 text-[13px] leading-5",
-        md: "h-9 px-5 text-[15px] leading-5",
-        lg: "h-11 px-6 text-[17px] leading-6",
+        sm: "h-7 px-4 text-[13px] leading-5 has-[>svg:first-child]:ps-3",
+        md: "h-9 px-5 text-[15px] leading-5 has-[>svg:first-child]:ps-4",
+        lg: "h-11 px-6 text-[17px] leading-6 has-[>svg:first-child]:ps-5",
       },
     },
     defaultVariants: {

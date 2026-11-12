@@ -2,7 +2,7 @@ import { z } from "zod";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { createPgDb } from "@twodb/core-data/db";
 import { createAsyncEngine } from "@twodb/core-async/engine";
-import { INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER, handleManifestRequest } from "@twodb/core-platform/manifest";
+
 import { twodooManifest } from "./manifest.js";
 import type { TwoDooConfig } from "./config.js";
 import { applySchema, type TwoDooDb } from "./db/schema.js";
@@ -404,14 +404,6 @@ export async function buildServer(config: TwoDooConfig) {
 
   app.get("/healthz", async () => ({ ok: true, app: "twodoo" }));
 
-  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => {
-    if (!config.TWODB_PROVISION_TOKEN) return reply.code(404).send({ error: "not_configured" });
-    const res = handleManifestRequest(twodooManifest, {
-      registrationToken: config.TWODB_PROVISION_TOKEN,
-      httpUrl: config.HTTP_URL,
-    }, (req.headers[REGISTRATION_TOKEN_HEADER] as string | undefined) ?? undefined);
-    return reply.code(res.status).send(res.body);
-  });
 
   return app;
 }

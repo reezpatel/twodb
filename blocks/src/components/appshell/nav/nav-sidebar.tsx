@@ -88,7 +88,7 @@ function NavSidebar({
     <div
       data-slot="nav-sidebar"
       aria-hidden={!open}
-      className={cn("relative h-full shrink-0 overflow-hidden border-r border-outline bg-card transition-[width,opacity] duration-200 ease-out", className)}
+      className={cn("relative h-full shrink-0 overflow-hidden border-r border-outline/50 bg-card/50 transition-[width,opacity] duration-300 ease-in-out", className)}
       style={{ width: open ? width : 0, opacity: open ? 1 : 0 }}
     >
       {resizable && open ? (
@@ -107,21 +107,21 @@ function NavSidebar({
         />
       ) : null}
 
-      <div className="flex h-full flex-col p-2" style={{ width }}>
+      <div className="flex h-full flex-col p-3" style={{ width }}>
         {workspaces?.length && activeWorkspace ? (
-          <div className="px-0 pb-2">
+          <div className="px-0 pb-4">
             <WorkspaceSwitcher workspaces={workspaces} value={activeWorkspace} onChange={onWorkspaceChange} onCreate={onCreateWorkspace} />
           </div>
         ) : null}
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mt-2 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {groups.map((group, index) => (
             <NavSection key={group.heading ?? index} group={group} activeId={activeId} onSelect={onSelect} />
           ))}
         </div>
 
         {footerItems?.length ? (
-          <div className="mt-auto flex flex-col gap-0.5 border-t border-outline pt-2">
+          <div className="mt-auto flex flex-col gap-0.5 border-t border-outline/50 pt-4">
             {footerItems.map((item) => (
               <NavItem key={item.id} item={item} activeId={activeId} onSelect={onSelect} />
             ))}

@@ -4,18 +4,20 @@ import fastifyStatic from "@fastify/static";
 import * as fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { Kysely } from "kysely";
 import type { ControlPlaneDb } from "../db/sqlite.js";
 import { createRegistryRepo } from "../db/registry.js";
 import { setupAuth } from "../auth/index.js";
 import type { TwoDbConfig } from "../config.js";
-import { decryptSecret } from "../db/provisioning.js";
+import { decryptSecret, encryptSecret } from "../db/provisioning.js";
 import { toWebRequest, sendWebResponse } from "./web-request.js";
 import { proxyToApp } from "./proxy.js";
+import { isInternalPath } from "./ws-paths.js";
+import { createOAuthFlow, OAuthError, isAllowedRedirect } from "../auth/oauth.js";
 import { registerWsPassthrough } from "./ws-passthrough.js";
 import { federatedSearch } from "./federated-search.js";
-import { APP_CATALOG } from "../orchestrator/catalog.js";
+import { APP_CATALOG, getCatalogEntry } from "../orchestrator/catalog.js";
 import {
   installApp,
   startApp,
@@ -24,16 +26,28 @@ import {
   upgradeApp,
   removeApp,
   getContainerStatus,
-  issueRegistrationToken,
+  issueApiToken,
+  rotateAppToken,
   provisionDatabase,
 } from "../orchestrator/install.js";
 
 // apps/twodb/src/gateway/server.ts -> repo root
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../../..");
 
+declare module "fastify" {
+  interface FastifyRequest {
+    /** Result of screening x-twodb-app / x-twodb-token in the gateway's onRequest hook. */
+    callerApp: { slug: string | null; verified: boolean; kind: "managed" | "api" | null };
+  }
+}
+
 export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfig) {
   const app = Fastify({ logger: true });
-  await app.register(cors, { origin: config.AUTH_TRUSTED_ORIGINS, credentials: true });
+  await app.register(cors, {
+    // Trusted origins + app webapps allowed to run "Login with TwoDB" (same rule as the redirect check).
+    origin: (origin, cb) => cb(null, !origin || config.AUTH_TRUSTED_ORIGINS.includes(origin) || isAllowedRedirect(origin, config)),
+    credentials: true,
+  });
 
   // Preserve non-JSON request bodies as raw Buffers so the proxy can
   // forward them byte-for-byte — Fastify's default 415s unknown content
@@ -49,84 +63,277 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     await sendWebResponse(reply, response);
   });
 
-  // --- Registry: an installed app calls this once it boots, presenting the
-  // unique per-app token TwoDB generated for it at install time (see
-  // orchestrator/install.ts). There is no shared secret anymore — a stolen
-  // token only ever impersonates the one app it was issued for, and is
-  // rotated automatically on every (re)install/upgrade.
-  app.post("/registry/register", async (req, reply) => {
-    const body = req.body as {
-      slug: string;
-      registrationToken: string;
-      httpUrl: string;
-      socketPath?: string;
-      manifest: unknown;
-    };
+  // --- "Login with TwoDB" (authorization code + PKCE; see auth/oauth.ts) ----
+  const oauth = createOAuthFlow(db, config);
 
-    const result = await registry.completeRegistration({
-      slug: body.slug,
-      registrationToken: body.registrationToken,
+  /** Called by the TwoDB webapp's /authorize page, with the user's own session. Returns where to send the browser. */
+  app.post("/registry/oauth/authorize", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session" || !ctx.userId) return reply.code(401).send({ error: "unauthorized" });
+    const b = (req.body ?? {}) as { redirectUri?: string; codeChallenge?: string; state?: string };
+    if (!b.redirectUri || !b.codeChallenge) return reply.code(400).send({ error: "redirectUri and codeChallenge are required" });
+    try {
+      return await oauth.authorize({ userId: ctx.userId, redirectUri: b.redirectUri, codeChallenge: b.codeChallenge, state: b.state });
+    } catch (err) {
+      if (err instanceof OAuthError) return reply.code(err.status).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  /** Public (PKCE is the proof): exchanges the code for a session token usable as `Authorization: Bearer`. */
+  app.post("/registry/oauth/token", async (req, reply) => {
+    const b = (req.body ?? {}) as { code?: string; codeVerifier?: string; redirectUri?: string };
+    if (!b.code || !b.codeVerifier || !b.redirectUri) return reply.code(400).send({ error: "code, codeVerifier and redirectUri are required" });
+    reply.header("cache-control", "no-store");
+    try {
+      const { userId } = await oauth.redeem({ code: b.code, codeVerifier: b.codeVerifier, redirectUri: b.redirectUri });
+      const authCtx = await authEngine.$context;
+      const ttl = config.TWODB_APP_SESSION_DAYS * 24 * 60 * 60;
+      const session = await authCtx.internalAdapter.createSession(userId, false, {
+        expiresAt: new Date(Date.now() + ttl * 1000),
+        userAgent: String(req.headers["user-agent"] ?? "").slice(0, 200),
+        ipAddress: req.ip,
+      });
+      if (!session) return reply.code(500).send({ error: "could not create session" });
+      return { tokenType: "Bearer", accessToken: session.token, expiresAt: session.expiresAt };
+    } catch (err) {
+      if (err instanceof OAuthError) return reply.code(err.status).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  // --- Caller-app identity (x-twodb-app + x-twodb-token) ----------------
+  // Every request is screened here, BEFORE routing: the token header is
+  // always removed (it never travels further than this hook), and the result
+  // is recorded as `x-gateway-verified: true|false` — an inbound value of
+  // that header is never trusted. Registry endpoints below read
+  // `req.callerApp`; the proxy forwards `x-gateway-verified` (+ `x-twodb-app`
+  // when verified) to the target app.
+  app.decorateRequest("callerApp", null as any);
+  // EventSource can't set headers either: for GET, promote ?access_token= (what the webapp lib
+  // appends) to Authorization and strip it from the URL so it is never forwarded or logged downstream.
+  app.addHook("onRequest", async (req) => {
+    if (req.method !== "GET" || !req.url.includes("access_token=")) return;
+    const u = new URL(req.url, "http://internal");
+    const t = u.searchParams.get("access_token");
+    if (!t) return;
+    u.searchParams.delete("access_token");
+    if (!req.headers.authorization && !req.headers["x-api-key"]) req.headers.authorization = `Bearer ${t}`;
+    req.raw.url = u.pathname + u.search;
+  });
+  app.addHook("onRequest", async (req) => {
+    const slug = (req.headers["x-twodb-app"] as string | undefined)?.trim() || null;
+    const token = (req.headers["x-twodb-token"] as string | undefined)?.trim() || null;
+    delete req.headers["x-twodb-token"];
+    delete req.headers["x-gateway-verified"];
+    let verified: { kind: "managed" | "api" } | null = null;
+    if (slug && token) verified = await registry.verifyToken(slug, token).catch(() => null);
+    req.callerApp = { slug, verified: Boolean(verified), kind: verified?.kind ?? null };
+    req.headers["x-gateway-verified"] = verified ? "true" : "false";
+  });
+
+  // --- User vs machine requests -------------------------------------------
+  // Anything under an `internal` path segment is user-session only: API keys
+  // and app tokens are rejected with 403, anonymous callers with 401.
+  app.addHook("onRequest", async (req, reply) => {
+    if (!isInternalPath(new URL(req.url, "http://internal").pathname)) return;
+    const ctx = await resolveContext(new Headers(req.headers as any)).catch(() => null);
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    if (ctx.kind !== "session") {
+      return reply.code(403).send({ error: "internal endpoints require an interactive user session — API keys and app tokens are not accepted" });
+    }
+  });
+
+  const secretMatches = (presented: unknown): boolean => {
+    const expected = config.TWODB_REGISTRATION_SECRET;
+    if (!expected || typeof presented !== "string") return false;
+    const a = createHash("sha256").update(presented).digest();
+    const b = createHash("sha256").update(expected).digest();
+    return timingSafeEqual(a, b);
+  };
+
+  const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+  /**
+   * App-initiated registration — the only way an app becomes known to the
+   * gateway (managed containers do exactly the same thing with the token
+   * TwoDB injected). Authenticates either with a live app token for the
+   * slug (re-register after restart) or with the shared
+   * TWODB_REGISTRATION_SECRET (header x-twodb-registration-secret), in which
+   * case a fresh 30-day token is minted and returned — store it, send it as
+   * `x-twodb-token`.
+   */
+  app.post("/registry/register", async (req, reply) => {
+    const body = (req.body ?? {}) as {
+      slug?: string;
+      name?: string;
+      version?: string;
+      httpUrl?: string;
+      socketPath?: string;
+      capabilities?: string[];
+      manifest?: unknown;
+    };
+    const slug = body.slug?.trim().toLowerCase();
+    if (!slug || !SLUG_RE.test(slug) || slug === "twodb") return reply.code(400).send({ error: "slug must be kebab-case and not reserved" });
+    if (!body.httpUrl || !/^https?:\/\//.test(body.httpUrl)) return reply.code(400).send({ error: "httpUrl must be an http(s) URL" });
+
+    let issued: { token: string; expiresAt: string | null } | null = null;
+    const tokenOk = req.callerApp.verified && req.callerApp.slug === slug;
+    if (!tokenOk) {
+      if (!secretMatches(req.headers["x-twodb-registration-secret"])) {
+        return reply.code(401).send({ error: "invalid or missing app token / registration secret" });
+      }
+      const t = await issueApiToken(slug, { registry, config });
+      issued = { token: t.appToken, expiresAt: t.expiresAt };
+    }
+
+    const { created } = await registry.registerApp({
+      slug,
+      name: body.name,
+      version: body.version,
       httpUrl: body.httpUrl,
       socketPath: body.socketPath,
+      capabilities: body.capabilities,
       manifestJson: body.manifest,
+      hostId: config.TWODB_HOST_ID,
     });
+    return { ok: true, created, ...(issued ? { token: issued.token, expiresAt: issued.expiresAt } : {}) };
+  });
 
-    if (!result.ok) return reply.code(401).send({ error: result.reason });
-    return { ok: true };
+  /** Heartbeat: apps ping every ~10s; the control plane marks an app inactive after TWODB_HEARTBEAT_TIMEOUT_MS (30s) of silence. */
+  app.post("/registry/ping", async (req, reply) => {
+    if (!req.callerApp.verified || !req.callerApp.slug) return reply.code(401).send({ error: "invalid app token" });
+    const known = await registry.ping(req.callerApp.slug);
+    if (!known) return reply.code(404).send({ error: "app not registered — call /registry/register" });
+    return { ok: true, pong: true, intervalMs: 10_000, timeoutMs: config.TWODB_HEARTBEAT_TIMEOUT_MS };
   });
 
   /**
-   * Boot-time DB credential bootstrap for apps running outside a TwoDB
-   * container (dev on the host): present the registration token, get the
-   * credentials TwoDB provisioned for your slug. Only secret an app needs
-   * in dev is its token — no per-app DATABASE_URL in .env. The stored
-   * string is the CONTAINER form; rewrite the host for the caller (a
-   * host-run dev process reaches Postgres on localhost).
+   * Runtime config for an authenticated app: its Postgres schema/role/
+   * connection string, its S3 location and its stable data key. This is what
+   * `twodb-core` calls on boot — apps carry no DATABASE_URL / S3 env.
+   * Connection host: containers (managed token) get the docker-network
+   * form; everything else gets the admin URL's own host:port.
    */
-  app.post("/registry/credentials", async (req, reply) => {
-    const body = req.body as { slug?: string; registrationToken?: string };
-    if (!body?.slug || !body?.registrationToken) return reply.code(400).send({ error: "slug and registrationToken are required" });
+  app.get("/registry/config", async (req, reply) => {
+    const slug = req.callerApp.slug;
+    if (!req.callerApp.verified || !slug) return reply.code(401).send({ error: "invalid app token" });
+    const row = await registry.getApp(slug);
+    if (!row) return reply.code(404).send({ error: `"${slug}" is not registered` });
 
-    const row = await registry.getApp(body.slug);
-    if (!row || !row.registration_token_hash) return reply.code(404).send({ error: `"${body.slug}" was never installed` });
-    const hash = createHash("sha256").update(body.registrationToken).digest("hex");
-    if (hash !== row.registration_token_hash) return reply.code(401).send({ error: "invalid registration token" });
-
-    if (!row.pg_connection_string_encrypted || !row.pg_schema || !row.pg_role) {
-      return reply.code(409).send({ error: `"${body.slug}" has no provisioned database — install it first` });
-    }
-
-    // Decrypt the stored (container-form) connection string. If it fails,
-    // the ciphertext predates a secret change (or came from another
-    // machine) — self-heal by re-provisioning the app's schema+role and
-    // storing fresh ciphertext instead of 500ing forever.
-    let containerUrl: string;
-    try {
-      containerUrl = decryptSecret(row.pg_connection_string_encrypted, config.AUTH_SECRET);
-    } catch {
-      app.log.warn({ slug: body.slug }, "stored credentials failed to decrypt — re-provisioning");
-      const provisioned = await provisionDatabase(body.slug, { registry, config });
-      containerUrl = provisioned.containerConnectionString;
-    }
-
-    const hostUrl = new URL(containerUrl);
-    hostUrl.hostname = "localhost";
-    hostUrl.port = "5432";
-
-    // Data key decrypt can fail on the same stale-secret history; it's
-    // optional for apps (they fall back to dev defaults) — warn and omit
-    // rather than 500. provisionDatabase above already healed the
-    // connection string; the key regenerates on next clean install.
-    let dataKey: string | undefined;
-    if (row.data_key_encrypted) {
+    let containerUrl: string | null = null;
+    if (row.pg_connection_string_encrypted && row.pg_schema && row.pg_role) {
       try {
-        dataKey = decryptSecret(row.data_key_encrypted, config.AUTH_SECRET);
+        containerUrl = decryptSecret(row.pg_connection_string_encrypted, config.AUTH_SECRET);
       } catch {
-        app.log.warn({ slug: body.slug }, "stored data key failed to decrypt — serving credentials without it");
+        app.log.warn({ slug }, "stored credentials failed to decrypt — re-provisioning");
       }
     }
-    return { connectionString: hostUrl.toString(), schema: row.pg_schema, role: row.pg_role, ...(dataKey ? { dataKey } : {}) };
+    // First contact (unmanaged app) or stale ciphertext: provision now.
+    // NB: provisioning resets the role password, so never do it when valid creds exist.
+    let schema = row.pg_schema;
+    let role = row.pg_role;
+    if (!containerUrl) {
+      const p = await provisionDatabase(slug, { registry, config });
+      containerUrl = p.containerConnectionString;
+      schema = p.schema;
+      role = p.role;
+    }
+
+    let connectionString = containerUrl;
+    if (req.callerApp.kind !== "managed") {
+      const admin = new URL(config.TWODB_PG_ADMIN_URL);
+      const u = new URL(containerUrl);
+      u.hostname = admin.hostname;
+      u.port = admin.port || "5432";
+      connectionString = u.toString();
+    }
+
+    let dataKey: string | undefined = undefined;
+    const fresh = await registry.getApp(slug);
+    if (fresh?.data_key_encrypted) {
+      try {
+        dataKey = decryptSecret(fresh.data_key_encrypted, config.AUTH_SECRET);
+      } catch {
+        app.log.warn({ slug }, "stored data key failed to decrypt — omitting");
+      }
+    } else {
+      dataKey = randomBytes(32).toString("hex");
+      await registry.setDataKey(slug, encryptSecret(dataKey, config.AUTH_SECRET));
+    }
+
+    const s3 =
+      config.TWODB_S3_BUCKET && config.TWODB_S3_ACCESS_KEY_ID && config.TWODB_S3_SECRET_ACCESS_KEY
+        ? {
+            bucket: config.TWODB_S3_BUCKET,
+            prefix: `${slug}/`,
+            region: config.TWODB_S3_REGION ?? null,
+            endpoint: config.TWODB_S3_ENDPOINT ?? null,
+            forcePathStyle: config.TWODB_S3_FORCE_PATH_STYLE ?? Boolean(config.TWODB_S3_ENDPOINT),
+            accessKeyId: config.TWODB_S3_ACCESS_KEY_ID,
+            secretAccessKey: config.TWODB_S3_SECRET_ACCESS_KEY,
+          }
+        : null;
+
+    return {
+      slug,
+      postgres: { connectionString, schema, role },
+      s3,
+      ...(dataKey ? { dataKey } : {}),
+    };
   });
+
+  // --- App tokens (session-only admin API) -------------------------------
+  app.get("/registry/apps/:slug/tokens", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    return { tokens: await registry.listTokens(slug) };
+  });
+
+  /** Mints a token (expiry TWODB_APP_TOKEN_TTL_DAYS, default 30d) for an app TwoDB doesn't run. Plaintext is returned once. */
+  app.post("/registry/apps/:slug/tokens", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    if (!SLUG_RE.test(slug) || slug === "twodb") return reply.code(400).send({ error: "invalid slug" });
+    const t = await issueApiToken(slug, { registry, config });
+    return { token: t.appToken, expiresAt: t.expiresAt };
+  });
+
+  /** Rotate an app's token from the UI (session only). Unmanaged: new token returned once. Managed: container is recreated async. */
+  app.post("/registry/apps/:slug/rotate-token", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    if (slug === "twodb") return reply.code(400).send({ error: "the control plane has no app token" });
+    try {
+      const r = await rotateAppToken(slug, { registry, config });
+      if (r.managed) {
+        runLifecycle(slug, r.run);
+        return { ok: true, managed: true, status: "installing" };
+      }
+      return { ok: true, managed: false, token: r.appToken, expiresAt: r.expiresAt };
+    } catch (err) {
+      return reply.code(500).send({ error: String(err) });
+    }
+  });
+
+  app.delete("/registry/tokens/:id", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    await registry.revokeTokenById((req.params as { id: string }).id);
+    return { ok: true };
+  });
+
+  // Liveness sweep: apps ping every 10s; silence for >30s => inactive.
+  const sweeper = setInterval(() => {
+    registry
+      .markStale(new Date(Date.now() - config.TWODB_HEARTBEAT_TIMEOUT_MS).toISOString())
+      .catch((err) => app.log.warn({ err }, "heartbeat sweep failed"));
+  }, 10_000);
+  sweeper.unref();
+  app.addHook("onClose", async () => clearInterval(sweeper));
 
   app.get("/registry/apps", async (req, reply) => {
     const ctx = await resolveContext(new Headers(req.headers as any));
@@ -134,7 +341,9 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     const apps = await registry.listApps();
     return apps.map((a) => ({
       slug: a.slug,
-      name: a.name,
+      // Display name: the catalog's brand name when known (rows seeded before names were stored
+      // hold the lowercase slug), else what the app reported.
+      name: getCatalogEntry(a.slug)?.name ?? a.name,
       basePath: a.base_path,
       status: a.status,
       installStatus: a.install_status,
@@ -327,8 +536,8 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
     try {
-      const result = await issueRegistrationToken(slug, { registry, config });
-      return result;
+      const { appToken, expiresAt } = await issueApiToken(slug, { registry, config });
+      return { appToken, expiresAt };
     } catch (err) {
       return reply.code(500).send({ error: String(err) });
     }
@@ -339,7 +548,8 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { slug } = req.params as { slug: string };
     try {
-      const result = await provisionDatabase(slug, { registry, config });
+      const rotate = Boolean((req.body as { rotate?: boolean } | null)?.rotate);
+      const result = await provisionDatabase(slug, { registry, config }, { rotate });
       return result;
     } catch (err) {
       return reply.code(500).send({ error: String(err) });
@@ -461,7 +671,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     __resolveContext: (h: Headers, a?: string | null, b?: string | null) => Promise<unknown>;
   };
   serverAny.__resolveContext = resolveContext as unknown as typeof serverAny.__resolveContext;
-  registerWsPassthrough(app, (slug) => registry.getApp(slug));
+  registerWsPassthrough(app, (slug) => registry.getApp(slug), (slug, token) => registry.verifyToken(slug, token));
 
   // --- Admin webapp: serve the built SPA when its dist exists (production
   // image builds it; dev uses the Vite dev server on :6500 instead).

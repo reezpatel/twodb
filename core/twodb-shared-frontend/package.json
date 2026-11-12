@@ -1,0 +1,25 @@
+{
+  "name": "@twodb/twodb-shared-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Frontend library every TwoDB app webapp imports: 'Login with TwoDB' (auth code + PKCE against the control plane), session hook, RequireTwoDbAuth guard, and an authenticated fetch.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@twodb/blocks": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "react": "^19.2.8",
+    "typescript": "^5.8.0"
+  }
+}

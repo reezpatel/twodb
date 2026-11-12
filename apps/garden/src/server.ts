@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import { createPgDb } from "@twodb/core-data/db";
-import { INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER, handleManifestRequest } from "@twodb/core-platform/manifest";
+
 import type { GardenConfig } from "./config.js";
 import { applySchema, type GardenDb } from "./db/schema.js";
 import { manifest } from "./manifest.js";
@@ -28,14 +28,6 @@ export async function buildServer(config: GardenConfig) {
   app.setErrorHandler((err, _req, reply) => sendError(err, reply, app.log));
 
   app.get("/healthz", async () => ({ ok: true, app: manifest.slug }));
-  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => {
-    const res = handleManifestRequest(
-      manifest,
-      { registrationToken: config.TWODB_PROVISION_TOKEN, httpUrl: config.HTTP_URL },
-      req.headers[REGISTRATION_TOKEN_HEADER] as string | undefined,
-    );
-    return reply.code(res.status).send(res.body);
-  });
 
   registerRecordRoutes(app, db);
   registerDatabaseRoutes(app, db);

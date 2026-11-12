@@ -1,45 +1,49 @@
 import { useApiKeys } from "./hooks/useApiKeys.js";
-import { CreateKeyDialog, KeyRow, RawKeyBanner } from "./partials/ApiKeysPartials.js";
+import { CreateKeyDialog } from "./partials/CreateKeyDialog.js";
+import { EmptyKeys } from "./partials/EmptyKeys.js";
+import { KeysTable } from "./partials/KeysTable.js";
+import { RawKeyBanner } from "./partials/RawKeyBanner.js";
+import { PaneHeader } from "../shell/partials/PaneHeader.js";
 
 /** Only calls its holding hook and renders partials. */
 export function ApiKeysView() {
-  const { keys, loading, busy, error, freshRawKey, dismissRawKey, create, revoke } = useApiKeys();
+  const k = useApiKeys();
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-6 py-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-ink">API keys</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Workspace keys for the <code className="font-mono text-xs">x-api-key</code> header on gateway calls.
-          </p>
-        </div>
-        <CreateKeyDialog busy={busy} onCreate={create} />
-      </div>
+    <div className="mx-auto w-full max-w-4xl px-6 py-6">
+      <PaneHeader action={<CreateKeyDialog busy={k.busy} onCreate={k.create} />} />
 
-      {error ? (
-        <p role="alert" className="mt-6 rounded-[10px] border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
+      {k.error ? (
+        <p role="alert" className="mb-4 rounded-[10px] border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {k.error}
         </p>
       ) : null}
 
-      {freshRawKey ? (
-        <div className="mt-6">
-          <RawKeyBanner rawKey={freshRawKey} onDismiss={dismissRawKey} />
-        </div>
-      ) : null}
+      <RawKeyBanner
+        rawKey={k.freshRawKey}
+        visible={k.secretVisible}
+        copied={k.copied}
+        onToggleVisible={k.toggleSecretVisible}
+        onCopy={() => void k.copySecret()}
+        onDismiss={k.dismissRawKey}
+      />
 
-      {loading ? (
+      {k.loading && k.keys.length === 0 ? (
         <p className="mt-10 text-center text-muted-foreground">Loading…</p>
-      ) : keys.length === 0 ? (
-        <p className="mt-8 rounded-[10px] border border-dashed border-outline bg-stone/60 px-4 py-6 text-center text-sm text-muted-foreground">
-          No API keys yet — generate one to call the gateway from scripts and CLIs.
-        </p>
       ) : (
-        <div className="mt-8 overflow-hidden rounded-[10px] border border-outline bg-paper">
-          {keys.map((k) => (
-            <KeyRow key={k.id} k={k} busy={busy} onRevoke={() => void revoke(k.id)} />
-          ))}
+        <div className="overflow-hidden rounded-xl border border-outline bg-card shadow-[0_1px_2px_rgba(0,0,0,.025)]">
+          {k.keys.length === 0 ? (
+            <EmptyKeys />
+          ) : (
+            <KeysTable
+              keys={k.keys}
+              busy={k.busy}
+              confirmingId={k.confirmingId}
+              onStartRevoke={k.startRevoke}
+              onCancelRevoke={k.cancelRevoke}
+              onRevoke={(id) => void k.revoke(id)}
+            />
+          )}
         </div>
       )}
     </div>

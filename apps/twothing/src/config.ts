@@ -5,8 +5,8 @@ export const configSchema = z.object({
   ...commonConfigFields,
   PORT: z.coerce.number().int().positive().default(6411),
   DATABASE_URL: z.string().url().default("postgres://twodb:twodb@localhost:5432/twodb"), // dev default (shared cluster)
-  /** The unique per-app registration token TwoDB issued for this app at install time. */
-  TWODB_PROVISION_TOKEN: z.string().default("dev-token"),
+  /** Stable per-app key — delivered by the control plane at boot (twodb-core), never set by hand. */
+  TWODB_DATA_KEY: z.string().optional(),
   HTTP_URL: z.string().url().default("http://localhost:6411"),
   /**
    * DEV ONLY: when set, requests that arrive WITHOUT gateway identity headers
@@ -25,6 +25,5 @@ export function loadTwoThingConfig(source: Record<string, string | undefined> = 
     PORT: source.TWOTHING_PORT ?? source.PORT,
     DATABASE_URL: source.TWOTHING_DATABASE_URL ?? source.DATABASE_URL,
     HTTP_URL: source.TWOTHING_HTTP_URL ?? source.HTTP_URL,
-    TWODB_PROVISION_TOKEN: source.TWOTHING_PROVISION_TOKEN ?? source.TWODB_PROVISION_TOKEN,
   });
 }

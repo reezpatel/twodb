@@ -10,6 +10,15 @@ import { ulid } from "ulid";
 import type { ControlPlaneDb } from "../db/sqlite.js";
 import type { TwoDbConfig } from "../config.js";
 
+async function anyPasskeyUser(db: Kysely<ControlPlaneDb>): Promise<boolean> {
+  const row = await (db as any)
+    .selectFrom("user")
+    .innerJoin("passkey", "passkey.userId", "user.id")
+    .select((eb: any) => eb.fn.countAll().as("n"))
+    .executeTakeFirst();
+  return Number(row?.n ?? 0) > 0;
+}
+
 function buildEngineOptions(db: Kysely<ControlPlaneDb>, config: TwoDbConfig): AuthEngineOptions {
   return {
     db: db as any,
@@ -21,13 +30,10 @@ function buildEngineOptions(db: Kysely<ControlPlaneDb>, config: TwoDbConfig): Au
     firstUserBootstrap: {
       // Bootstrap closes once a user WITH a passkey exists — orphan users
       // from cancelled ceremonies (no passkey bound) keep registration open.
+      // TWODB_OPEN_SIGNUP=true keeps registration open for new emails.
       hasUsers: async () => {
-        const row = await (db as any)
-          .selectFrom("user")
-          .innerJoin("passkey", "passkey.userId", "user.id")
-          .select((eb: any) => eb.fn.countAll().as("n"))
-          .executeTakeFirst();
-        return Number(row?.n ?? 0) > 0;
+        if (config.TWODB_OPEN_SIGNUP) return false;
+        return anyPasskeyUser(db);
       },
       ensureUser: async (email: string) => {
         // Idempotent: a cancelled ceremony leaves an orphan user (no passkey
@@ -39,6 +45,15 @@ function buildEngineOptions(db: Kysely<ControlPlaneDb>, config: TwoDbConfig): Au
           .where("email", "=", email)
           .executeTakeFirst();
         if (existing) {
+          // An email that already owns a passkey can never be (re)registered
+          // sessionlessly — that would let anyone add a credential to someone
+          // else's account. Only orphans (no passkey bound) are reused.
+          const bound = await (db as any)
+            .selectFrom("passkey")
+            .select("id")
+            .where("userId", "=", existing.id)
+            .executeTakeFirst();
+          if (bound) throw new Error("An account with this email already exists — sign in instead.");
           // A prior run may have created the user but crashed before seeding
           // a workspace (pre-transaction) — repair that so session auth works.
           const membership = await (db as any)
@@ -62,6 +77,7 @@ function buildEngineOptions(db: Kysely<ControlPlaneDb>, config: TwoDbConfig): Au
         // first-run bootstrap creates it at options-generation time. First
         // user is a superadmin.
         const id = ulid();
+        const firstUser = !(await anyPasskeyUser(db));
         const now = new Date().toISOString();
         // Fully transactional: user + org + workspace + space + membership
         // commit together or not at all — a failure partway (e.g. a slug
@@ -78,7 +94,7 @@ function buildEngineOptions(db: Kysely<ControlPlaneDb>, config: TwoDbConfig): Au
               email,
               emailVerified: 1, // better-auth stores booleans as 0/1 on sqlite
               image: null,
-              role: "admin",
+              role: firstUser ? "admin" : "user",
               createdAt: now,
               updatedAt: now,
             })

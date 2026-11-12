@@ -15,6 +15,7 @@
     "@twodb/core-async": "workspace:*",
     "@twodb/core-data": "workspace:*",
     "@twodb/core-platform": "workspace:*",
+    "@twodb/twodb-core": "workspace:*",
     "fastify": "^5.11.2",
     "hono": "^4.13.17",
     "kysely": "^0.29.5",

@@ -13,6 +13,7 @@
   "dependencies": {
     "@twodb/core-data": "workspace:*",
     "@twodb/core-platform": "workspace:*",
+    "@twodb/twodb-core": "workspace:*",
     "@twodb/core-async": "workspace:*",
     "fastify": "^5.11.2",
     "kysely": "^0.29.5",

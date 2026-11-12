@@ -15,3 +15,13 @@ test("rejects undeclared / wrong-shaped paths", () => {
   assert.equal(isDeclaredWebsocketPath("{bad", "/live"), false);
   assert.equal(isDeclaredWebsocketPath(JSON.stringify({}), "/live"), false);
 });
+
+import { isInternalPath } from "./ws-paths.js";
+test("isInternalPath flags only whole `internal` segments", () => {
+  assert.equal(isInternalPath("/internal/x"), true);
+  assert.equal(isInternalPath("/apps/twoday/internal/x?y=1"), true);
+  assert.equal(isInternalPath("/apps/twoday/internal"), true);
+  assert.equal(isInternalPath("/apps/twoday/internals"), false);
+  assert.equal(isInternalPath("/apps/twoday/foo?next=/internal/x"), false);
+  assert.equal(isInternalPath("/registry/apps"), false);
+});

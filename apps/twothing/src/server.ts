@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import { createPgDb } from "@twodb/core-data/db";
-import { INTERNAL_MANIFEST_PATH, REGISTRATION_TOKEN_HEADER, handleManifestRequest } from "@twodb/core-platform/manifest";
+
 import { manifest } from "./manifest.js";
 import type { TwoThingConfig } from "./config.js";
 import { applySchema, type TwoThingDb } from "./db/schema.js";
@@ -25,10 +25,6 @@ export async function buildServer(config: TwoThingConfig) {
     console.warn(`[twothing] DEV identity fallback enabled → workspace "${config.TWOTHING_DEV_WORKSPACE}"`);
   }
 
-  app.get(INTERNAL_MANIFEST_PATH, async (req, reply) => {
-    const res = handleManifestRequest(manifest, { registrationToken: config.TWODB_PROVISION_TOKEN, httpUrl: config.HTTP_URL }, req.headers[REGISTRATION_TOKEN_HEADER]);
-    return reply.code(res.status).send(res.body);
-  });
   app.get("/healthz", async () => ({ ok: true, app: manifest.slug }));
 
   const ctx = { db };
