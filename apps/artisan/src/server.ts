@@ -812,7 +812,11 @@ echo saved`;
   // WS upgrade on the editor path (code-server Management/ExtensionHost sockets
   // are built from window.location, so they hit /editor/<stable>…?query) -> proxy
   // to dispatch's proxy-ws tunnel on code-server.
-  app.get("/sessions/:id/editor-ws-path/*", { websocket: true }, (socket, req) => {
+  // Dedicated WS-only path (no HTTP route registered here, so no duplicate-route
+  // conflict). The HTML rewrite below points the workbench's same-origin socket
+  // URLs at this base; code-server appends <stable-…>?query, which we forward to
+  // dispatch's proxy-ws on the code-server port.
+  app.get("/sessions/:id/editor-ws/*", { websocket: true }, (socket, req) => {
     void (async () => {
       const ctx = readForwardedContext(req);
       if (!ctx) return socket.close(4401, "unauthorized");
@@ -820,7 +824,7 @@ echo saved`;
       const session = await repo.getSession(ctx.workspaceId, id);
       if (!session) return socket.close(4404, "session not found");
       const url = new URL(req.url, "http://internal");
-      const sub = url.pathname.split("/editor/")[1] ?? "/";
+      const sub = url.pathname.split("/editor-ws/")[1] ?? "/";
       const upstream = new WebSocket(
         `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(session.runner)}/proxy-ws?port=${EDITOR_PORT}&path=${encodeURIComponent("/" + sub + url.search)}`,
         { headers: { authorization: `Bearer ${apiKeyFor(req)}` } },
@@ -895,22 +899,36 @@ echo saved`;
     if (/^(text\/html|text\/css|application\/javascript|text\/javascript)/.test(contentType)) {
       const proto = req.headers["x-forwarded-proto"] ?? (req.raw.socket as { encrypted?: boolean })?.encrypted ? "https" : "http";
       const host = req.headers["host"] ?? "localhost";
-      const wsBase = `${proto === "https" ? "wss" : "ws"}://${host}/apps/artisan/sessions/${id}/editor-ws-path`;
+      const wsBase = `${proto === "https" ? "wss" : "ws"}://${host}/apps/artisan/sessions/${id}/editor-ws`;
       // Rewrite WS URLs and root-relative asset paths so they resolve through the
       // proxy. Replacement FUNCTIONS keep a literal "$" in the source intact. Only
       // rewrite HTML entry points (which reference the tunnel); leave JS/CSS opaque.
       if (contentType.startsWith("text/html")) {
         out = Buffer.from(out.toString("utf8")
           .replace(/wss?:\/\/[^"'\\\s]+/g, (m) => {
-            // only rewrite same-origin code-server WS URLs (path starts with / or
-            // matches the editor prefix); leave external URLs (voice, telemetry) intact
+            // Rewrite same-origin code-server WS URLs to the WS tunnel, preserving the
+            // <stable-…>?query suffix. Leave external URLs (voice, telemetry) intact.
             try {
               const u = new URL(m);
-              if (u.host === host || u.pathname.includes("/editor")) return wsBase;
+              if (u.host !== host) return m; // external
+              const edIdx = u.pathname.indexOf("/editor/");
+              const suffix = edIdx >= 0 ? u.pathname.slice(edIdx + "/editor/".length) : u.pathname.replace(/^\/+/, "");
+              return `${wsBase}/${suffix}${u.search}`;
             } catch { /* not a full URL — leave */ }
             return m;
           })
           .replace(/(["'(])(\/?)(stable-[a-z0-9]+|static|webview|vscode-resource|update|manifest\.json)/g, (_m, p1, slash, p2) => `${p1}${prefix}/${p2}`), "utf8");
+
+      // Redirect same-origin code-server socket connects (built from
+      // window.location, so they point at /editor/<stable>…) to the /editor-ws/
+      // tunnel. Done with a WebSocket wrapper because workbench.js derives the
+      // URL at runtime — static rewriting can't reach it.
+      const wsShim = `<script>(() => { const N = window.WebSocket; const base = ${JSON.stringify(wsBase)}; window.WebSocket = function (url, proto) { try { const u = new URL(url, location.href); if (u.host === location.host) { const i = u.pathname.indexOf("/editor/"); if (i >= 0) { const suffix = u.pathname.slice(i + 8); url = base + "/" + suffix + u.search; } } } catch (e) {} return proto ? new N(url, proto) : new N(url); }; window.WebSocket.prototype = N.prototype; Object.setPrototypeOf(window.WebSocket, N); })();</script>`;
+      const shimIdx = out.toString("utf8").search(/<head[^>]*>/i);
+      if (shimIdx >= 0) {
+        const headEnd = out.toString("utf8").indexOf(">", shimIdx) + 1;
+        out = Buffer.concat([out.subarray(0, headEnd), Buffer.from(wsShim, "utf8"), out.subarray(headEnd)]);
+      }
       }
     }
     reply.type(outHeaders["content-type"] ?? "application/octet-stream");
