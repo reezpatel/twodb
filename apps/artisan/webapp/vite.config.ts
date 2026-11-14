@@ -40,6 +40,7 @@ export default defineConfig({
         rewrite: (p) => p.replace(/^\/artisan-api/, "/apps/artisan"),
       },
       "/apps": { target: gateway, changeOrigin: true, ws: true },
+      "/auth": { target: gateway, changeOrigin: true }, // /auth/gateway-token (per-login token)
       "/api": { target: gateway, changeOrigin: true },
       "/registry": { target: gateway, changeOrigin: true },
     },
