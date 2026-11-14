@@ -49,7 +49,7 @@ export function SessionSidebar(props: SessionSidebarProps) {
       ) : null}
 
       <SideSection title="Plan" count={plan.length ? `${done}/${plan.length}` : undefined}>
-        <PlanList items={planSteps} empty="No plan yet — the agent uses update_plan." />
+        <PlanList items={planSteps} hideHeader collapsible={false} empty="No plan yet — the agent uses update_plan." />
       </SideSection>
 
       <SideSection title="Git" defaultOpen>

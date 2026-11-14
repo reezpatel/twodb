@@ -225,6 +225,8 @@ export interface PlanListProps extends Omit<React.ComponentProps<"div">, "title"
   loading?: boolean;
   /** Fold to one line showing the step in progress (controlled/uncontrolled, default open). */
   collapsible?: boolean;
+  /** Hide the built-in header row (e.g. when an outer section already provides one). */
+  hideHeader?: boolean;
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -251,6 +253,7 @@ export function PlanList({
   title = "Plan",
   loading = false,
   collapsible = true,
+  hideHeader = false,
   open: openProp,
   defaultOpen = true,
   onOpenChange,
@@ -313,6 +316,7 @@ export function PlanList({
 
   return (
     <div data-slot="plan-list" className={cn("flex min-w-0 flex-col", className)} {...props}>
+      {hideHeader ? null : (
       <button
         type="button"
         aria-expanded={open}
@@ -336,6 +340,7 @@ export function PlanList({
           </svg>
         ) : null}
       </button>
+      )}
 
       <div className="px-1 pb-1"><PlanProgress items={items} /></div>
 
