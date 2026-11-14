@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"os"
 	"os/exec"
 	"bytes"
@@ -232,10 +233,17 @@ func (r *runner) doProxyWsOpen(f frame) {
 		_ = r.send(frame{"type": "proxyWsOpenResult", "callId": callID, "error": "bad port/path"})
 		return
 	}
-	dialer := websocket.Dialer{}
+	// Do NOT offer a subprotocol: code-server answers the Management socket
+	// with no Sec-WebSocket-Protocol, and gorilla (unlike browsers) hard-fails
+	// the handshake when an offered subprotocol isn't echoed — the whole
+	// editor relay then died 1006. code-server ignores the header regardless.
+	dialer := websocket.Dialer{Subprotocols: []string{}}
 	hdr := http.Header{}
 	if headers, ok := f["headers"].(map[string]any); ok {
 		for k, v := range headers {
+			if strings.EqualFold(k, "sec-websocket-protocol") {
+				continue
+			}
 			hdr.Set(k, fmt.Sprint(v))
 		}
 	}
