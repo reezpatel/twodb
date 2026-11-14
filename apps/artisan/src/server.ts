@@ -510,6 +510,31 @@ export async function buildServer(config: ArtisanConfig) {
     return { git: true, branch, additions: Number(additions) || 0, deletions: Number(deletions) || 0, files };
   });
 
+  // --- per-file git diff (Changes view) ------------------------------------------
+  app.get("/sessions/:id/diff", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const q = req.query as { path?: string };
+    if (!q.path) return reply.code(400).send({ error: "path required" });
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    const safe = q.path.replace(/'/g, "'\\''");
+    const script = [
+      "git rev-parse --git-dir >/dev/null 2>&1 || exit 14",
+      `if git ls-files --error-unmatch '${safe}' >/dev/null 2>&1; then`,
+      `  git -c core.quotepath=false diff HEAD -- '${safe}'`,
+      "else",
+      `  git diff --no-index -- /dev/null '${safe}' || true`,
+      "fi",
+    ].join("\n");
+    const res = await deps.dispatch.exec(session.runner, script, session.directory, 20_000);
+    if (res.exitCode === 14) return reply.code(409).send({ error: "not_a_git_repo" });
+    if (res.exitCode !== 0) return reply.code(500).send({ error: "git_failed", detail: res.stderr.slice(0, 300) });
+    return { path: q.path, diff: res.stdout };
+  });
+
   // --- git commit (sidebar) -------------------------------------------------------
   app.post("/sessions/:id/git/commit", async (req, reply) => {
     const ctx = requireCtx(req, reply);
@@ -658,9 +683,10 @@ echo saved`;
       const session = await repo.getSession(ctx.workspaceId, id);
       if (!session) return socket.close(4404, "session not found");
       const runner = url.searchParams.get("runner") ?? session.runner;
-      const command = url.searchParams.get("command") ?? `tmux new-session -A -s twodb -c ${shellQuote(session.directory)}`;
+      const command = url.searchParams.get("command") ?? `tmux new-session -A -s twodb -c ${shellQuote(session.directory)} -l`;
+      const termCallId = newId();
       const upstream = new WebSocket(
-        `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(runner)}/term?command=${encodeURIComponent(command)}&cwd=${encodeURIComponent(session.directory)}`,
+        `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(runner)}/term?command=${encodeURIComponent(command)}&cwd=${encodeURIComponent(session.directory)}&callId=${termCallId}`,
         { headers: { "x-api-key": apiKeyFor(req) } },
       );
       upstream.on("message", (raw: unknown) => {
@@ -669,7 +695,18 @@ echo saved`;
       upstream.on("close", () => { if (socket.readyState === socket.OPEN) socket.close(); });
       upstream.on("error", () => { if (socket.readyState === socket.OPEN) socket.close(1011, "upstream error"); });
       socket.on("message", (raw: unknown) => {
-        if (upstream.readyState === upstream.OPEN) upstream.send(String(raw));
+        const str = String(raw);
+        // JSON resize control frame -> forward as a termResize to the runner
+        if (str.startsWith("{")) {
+          try {
+            const m = JSON.parse(str) as { type?: string; cols?: number; rows?: number };
+            if (m.type === "resize" && upstream.readyState === upstream.OPEN) {
+              upstream.send(JSON.stringify({ type: "termResize", callId: termCallId, cols: m.cols, rows: m.rows }));
+              return;
+            }
+          } catch { /* fall through */ }
+        }
+        if (upstream.readyState === upstream.OPEN) upstream.send(str);
       });
       socket.on("close", () => { try { upstream.close(); } catch { /* ignore */ } });
     })();

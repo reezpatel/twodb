@@ -662,8 +662,10 @@ export async function buildServer(config: DispatchConfig) {
         socket.close(4409, "runner offline");
         return;
       }
-      const callId = newId();
-      const ack = await hub.sendToRunner(runner, { type: "termOpen", callId, command, cwd }, { timeoutMs: 15_000 }).catch(() => null);
+      const callId = url.searchParams.get("callId") ?? newId();
+      const cols = Number(url.searchParams.get("cols") ?? 0);
+      const rows = Number(url.searchParams.get("rows") ?? 0);
+      const ack = await hub.sendToRunner(runner, { type: "termOpen", callId, command, cwd, cols, rows }, { timeoutMs: 15_000 }).catch(() => null);
       if (!ack || ack.error) {
         socket.close(1011, String((ack as any)?.error ?? "term failed to start"));
         return;
@@ -676,8 +678,18 @@ export async function buildServer(config: DispatchConfig) {
         }
       });
       socket.on("message", (raw: unknown) => {
+        const str = String(raw);
         if (socket.readyState === socket.OPEN) {
-          void hub.sendToRunner(runner, { type: "termWrite", callId, data: String(raw) }, { reply: false });
+          if (str.startsWith("{")) {
+            try {
+              const m = JSON.parse(str) as { type?: string; cols?: number; rows?: number };
+              if (m.type === "termResize") {
+                void hub.sendToRunner(runner, { type: "termResize", callId, cols: m.cols, rows: m.rows }, { reply: false });
+                return;
+              }
+            } catch { /* fall through */ }
+          }
+          void hub.sendToRunner(runner, { type: "termWrite", callId, data: str }, { reply: false });
         }
       });
       socket.on("close", () => {

@@ -5,6 +5,7 @@ import { ChatView } from "./ChatView.js";
 import { EditorScreen } from "./EditorScreen.js";
 import { TerminalScreen } from "./TerminalScreen.js";
 import { CheckpointsScreen } from "./CheckpointsScreen.js";
+import { ChangesScreen } from "./ChangesScreen.js";
 import { SessionTabs, type SessionTabId } from "./partials/SessionTabs.js";
 import { SessionSidebar } from "./partials/SessionSidebar.js";
 import { useSessionSide } from "./hooks/useSessionSide.js";
@@ -42,6 +43,7 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
           {tab === "chat" ? <ChatView sessionId={props.sessionId} noHeader /> : null}
           {tab === "editor" ? <EditorScreen sessionId={props.sessionId} /> : null}
           {tab === "terminal" ? <TerminalScreen sessionId={props.sessionId} /> : null}
+          {tab === "changes" ? <ChangesScreen sessionId={props.sessionId} /> : null}
           {tab === "checkpoints" ? <CheckpointsScreen sessionId={props.sessionId} /> : null}
         </div>
       </div>

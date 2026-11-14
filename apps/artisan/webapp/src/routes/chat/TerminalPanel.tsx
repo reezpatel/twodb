@@ -43,18 +43,30 @@ export function TerminalPanel(props: { sessionId: string; height: number; onClos
     ws.onclose = () => setStatus("closed");
     ws.onerror = () => setStatus("closed");
     ws.onmessage = (ev) => {
-      // dispatch sends base64-encoded pty bytes
-      const b64 = typeof ev.data === "string" ? ev.data : "";
-      if (b64) term.write(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+      const raw = typeof ev.data === "string" ? ev.data : "";
+      if (!raw) return;
+      // JSON control frames (e.g. {type:"error"}) start with '{'; else base64 pty bytes
+      if (raw.startsWith("{")) {
+        try { const m = JSON.parse(raw); if (m.type === "error") term.write(`\r\n[${m.message}]\r\n`); } catch { /* ignore */ }
+        return;
+      }
+      term.write(Uint8Array.from(atob(raw), (c) => c.charCodeAt(0)));
     };
     term.onData((data) => {
       if (ws.readyState === ws.OPEN) ws.send(btoa(data));
     });
 
     const ro = new ResizeObserver(() => {
-      try { fit.fit(); } catch { /* ignore */ }
+      try {
+        fit.fit();
+        if (ws.readyState === ws.OPEN && term.cols && term.rows) {
+          ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+        }
+      } catch { /* ignore */ }
     });
     ro.observe(container);
+    // initial size
+    try { fit.fit(); if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows })); } catch { /* ignore */ }
     // report size so the pty matches the xterm cols/rows
     const sendSize = () => {
       if (ws.readyState === ws.OPEN && term.cols && term.rows) {
