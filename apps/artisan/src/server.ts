@@ -925,7 +925,10 @@ echo saved`;
     if (/^(text\/html|text\/css|application\/javascript|text\/javascript)/.test(contentType)) {
       const proto = req.headers["x-forwarded-proto"] ?? (req.raw.socket as { encrypted?: boolean })?.encrypted ? "https" : "http";
       const host = req.headers["host"] ?? "localhost";
-      const wsBase = `${proto === "https" ? "wss" : "ws"}://${host}/apps/artisan/sessions/${id}/editor-ws`;
+      // Origin-RELATIVE path — the browser resolves it against its own origin,
+      // so the WS goes to whatever host/port served the page (never the internal
+      // artisan host that req.headers.host leaks through the proxy chain).
+      const wsBasePath = `/apps/artisan/sessions/${id}/editor-ws`;
       // Rewrite WS URLs and root-relative asset paths so they resolve through the
       // proxy. Replacement FUNCTIONS keep a literal "$" in the source intact. Only
       // rewrite HTML entry points (which reference the tunnel); leave JS/CSS opaque.
@@ -939,7 +942,8 @@ echo saved`;
               if (u.host !== host) return m; // external
               const edIdx = u.pathname.indexOf("/editor/");
               const suffix = edIdx >= 0 ? u.pathname.slice(edIdx + "/editor/".length) : u.pathname.replace(/^\/+/, "");
-              return `${wsBase}/${suffix}${u.search}`;
+              const wsProto = u.protocol === "wss:" ? "wss" : "ws";
+              return `${wsProto}://${u.host}${wsBasePath}/${suffix}${u.search}`;
             } catch { /* not a full URL — leave */ }
             return m;
           })
@@ -949,7 +953,7 @@ echo saved`;
       // window.location, so they point at /editor/<stable>…) to the /editor-ws/
       // tunnel. Done with a WebSocket wrapper because workbench.js derives the
       // URL at runtime — static rewriting can't reach it.
-      const wsShim = `<script>(() => { const N = window.WebSocket; const base = ${JSON.stringify(wsBase)}; window.WebSocket = function (url, proto) { try { const u = new URL(url, location.href); if (u.host === location.host) { const i = u.pathname.indexOf("/editor/"); if (i >= 0) { const suffix = u.pathname.slice(i + 8); url = base + "/" + suffix + u.search; } } } catch (e) {} return proto ? new N(url, proto) : new N(url); }; window.WebSocket.prototype = N.prototype; Object.setPrototypeOf(window.WebSocket, N); })();</script>`;
+      const wsShim = `<script>(() => { const N = window.WebSocket; const basePath = ${JSON.stringify(wsBasePath)}; const wsProto = location.protocol === "https:" ? "wss" : "ws"; const authTok = new URLSearchParams(location.search).get("access_token") || ""; window.WebSocket = function (url, proto) { try { const u = new URL(url, location.href); if (u.host === location.host) { const i = u.pathname.indexOf("/editor/"); if (i >= 0) { const suffix = u.pathname.slice(i + 8); let q = u.search || ""; if (authTok && !/access_token=/.test(q)) q += (q ? "&" : "?") + "access_token=" + encodeURIComponent(authTok); url = wsProto + "://" + location.host + basePath + "/" + suffix + q; } } } catch (e) {} return proto ? new N(url, proto) : new N(url); }; window.WebSocket.prototype = N.prototype; Object.setPrototypeOf(window.WebSocket, N); })();</script>`;
       const shimIdx = out.toString("utf8").search(/<head[^>]*>/i);
       if (shimIdx >= 0) {
         const headEnd = out.toString("utf8").indexOf(">", shimIdx) + 1;
