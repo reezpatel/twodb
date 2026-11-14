@@ -170,7 +170,10 @@ function fileTools(dispatch: DispatchClient): ToolSpec[] {
       description: "Reads this session's current plan (step list with statuses).",
       parameters: { type: "object", properties: {} },
       async execute(_args, ctx) {
-        const plan = parseJson<unknown>(ctx.session.plan_json, null);
+        // Read fresh from the DB — ctx.session.plan_json is a snapshot from run
+        // start and would miss a plan written earlier in THIS run.
+        const row = await ctx.repo.getSession(ctx.session.workspace_id, ctx.session.id);
+        const plan = parseJson<unknown>(row?.plan_json ?? null, null);
         return plan ? JSON.stringify(plan) : "no plan set";
       },
     },
@@ -186,6 +189,7 @@ function fileTools(dispatch: DispatchClient): ToolSpec[] {
         const steps = (args.steps as Array<{ description: string; status?: string }>) ?? [];
         const plan = steps.map((s) => ({ description: s.description, status: s.status === "in_progress" || s.status === "done" ? s.status : "pending" }));
         await ctx.repo.setSessionPlan(ctx.session.id, plan);
+        ctx.session.plan_json = JSON.stringify(plan); // keep the in-run snapshot in sync
         ctx.emit({ type: "plan", plan });
         return "plan updated";
       },
