@@ -72,7 +72,7 @@ export function EditorScreen(props: { sessionId: string }) {
   if (status.state === "ready") {
     return (
       <iframe
-        src={`/artisan-api/sessions/${props.sessionId}/editor/`}
+        src={`/artisan-api/sessions/${props.sessionId}/editor/?folder=${encodeURIComponent("/")}`}
         className="h-full w-full border-0"
         title="Code editor"
         allow="clipboard-read; clipboard-write"

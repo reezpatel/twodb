@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useResizableWidth } from "../../lib/useResizableWidth.js";
 import { ChatView } from "./ChatView.js";
@@ -19,6 +19,16 @@ import { useSessionSide } from "./hooks/useSessionSide.js";
 export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionId: string) => void; title?: string }) {
   const [tab, setTab] = useState<SessionTabId>("chat");
   const [showSidebar, setShowSidebar] = useState(true);
+
+  // footer shortcuts (terminal button) request a tab switch
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const t = (e as CustomEvent<SessionTabId>).detail;
+      if (t === "terminal" || t === "editor" || t === "changes" || t === "chat" || t === "checkpoints") setTab(t);
+    };
+    window.addEventListener("artisan:open-tab", onOpen);
+    return () => window.removeEventListener("artisan:open-tab", onOpen);
+  }, []);
   const side = useSessionSide(props.sessionId);
   const right = useResizableWidth("artisan.sidebar.right", 288, 200, 480);
 

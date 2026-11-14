@@ -683,7 +683,7 @@ echo saved`;
       const session = await repo.getSession(ctx.workspaceId, id);
       if (!session) return socket.close(4404, "session not found");
       const runner = url.searchParams.get("runner") ?? session.runner;
-      const command = url.searchParams.get("command") ?? `tmux new-session -A -s twodb -c ${shellQuote(session.directory)} -l`;
+      const command = url.searchParams.get("command") ?? `tmux new-session -A -s twodb-${session.id.slice(0, 8)} -c ${shellQuote(session.directory)} -l`;
       const termCallId = newId();
       const upstream = new WebSocket(
         `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(runner)}/term?command=${encodeURIComponent(command)}&cwd=${encodeURIComponent(session.directory)}&callId=${termCallId}`,
@@ -799,10 +799,25 @@ echo saved`;
     const hasBody = !["GET", "HEAD"].includes(req.method);
     const rawBody: unknown = hasBody ? await (req as { body?: unknown }).body : undefined;
     const bodyBuf = hasBody ? Buffer.from((rawBody as Buffer | undefined) ?? Buffer.alloc(0)) : undefined;
-    const proxied = await deps.dispatch.proxyHttp(session.runner, {
-      port: EDITOR_PORT, method: req.method, path: path + (req.url.includes("?") ? "?" + req.url.split("?")[1] : ""),
-      headers, bodyBase64: bodyBuf?.toString("base64") ?? "",
-    }).catch((e) => ({ error: String(e) }));
+    // follow redirects (code-server / -> /?folder=...) so the iframe gets HTML, not a redirect body
+    let proxyPath = path + (req.url.includes("?") ? "?" + req.url.split("?")[1] : "");
+    let proxied: { status: number; headers: Record<string, string>; body: string } | { error: string } | undefined;
+    for (let redirect = 0; redirect < 4; redirect++) {
+      const attempt = await deps.dispatch.proxyHttp(session.runner, {
+        port: EDITOR_PORT, method: req.method, path: proxyPath,
+        headers, bodyBase64: bodyBuf?.toString("base64") ?? "",
+      }).catch((e) => ({ error: String(e) }));
+      if ((attempt as { error?: string }).error) { proxied = attempt as { error: string }; break; }
+      const pr = attempt as { status: number; headers: Record<string, string>; body: string };
+      const loc = pr.headers["location"] ?? pr.headers["Location"];
+      if (pr.status >= 300 && pr.status < 400 && loc) {
+        proxyPath = loc.startsWith("http") ? new URL(loc).pathname + new URL(loc).search : loc;
+        continue;
+      }
+      proxied = pr;
+      break;
+    }
+    proxied = proxied ?? { error: "too many redirects" };
     if ((proxied as { error?: string }).error) return reply.code(502).send((proxied as { error: string }).error);
     const pr = proxied as { status: number; headers: Record<string, string>; body: string };
     const outHeaders: Record<string, string> = {};

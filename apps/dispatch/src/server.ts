@@ -752,7 +752,10 @@ export async function buildServer(config: DispatchConfig) {
     const unsub = hub.subscribe(callId, (frame) => {
       if (frame.type === "proxyHttpResponse") {
         status = Number(frame.status) || 502;
-        resHeaders = (frame.headers as Record<string, string>) ?? {};
+        const raw = (frame.headers as Record<string, string>) ?? {};
+        // normalize to lowercase (Go canonicalizes to Content-Type)
+        resHeaders = {};
+        for (const [k, v] of Object.entries(raw)) resHeaders[k.toLowerCase()] = v;
       } else if (frame.type === "proxyHttpChunk") {
         chunks.push(Buffer.from(String(frame.dataBase64 ?? ""), "base64"));
       } else if (frame.type === "proxyHttpEnd") {

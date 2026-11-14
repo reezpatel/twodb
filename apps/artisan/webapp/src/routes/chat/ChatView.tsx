@@ -11,8 +11,6 @@ import { AttachmentChips, MentionPopup, QueuePills } from "./partials/ChatAttach
 import { useDirectoryFiles, useSkills, uploadAttachment } from "./hooks/useDirectoryFiles.js";
 import { SlashPopup, useSlashCommands } from "./partials/SlashCommands.js";
 import { useWorkspaceWs } from "../../lib/workspace-ws.js";
-import { TerminalPanel } from "./TerminalPanel.js";
-import { useResizableHeight } from "../../lib/useResizableHeight.js";
 import { SquareDashed } from "lucide-react";
 import { ChatComposer, ChatComposerInput, ChatComposerActions, ChatComposerSpacer, ChatComposerSend, ChatComposerStop } from "./partials/ChatComposer.js";
 import { ChatUsage, ChatUsageStat, ChatUsageContext, ChatUsageSpacer } from "./partials/ChatUsage.js";
@@ -58,8 +56,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
   const [tokPerSec, setTokPerSec] = useState<number | null>(null);
   /** Cmd/Ctrl+0 → 1 = expand all, 0 = collapse all, null = manual per-block. */
   const [expandAll, setExpandAll] = useState<null | 1 | 0>(null);
-  const [showTerminal, setShowTerminal] = useState(false);
-  const term = useResizableHeight("artisan.terminal.height", 240, 120, 600);
+
   const liveDeltaRef = useRef({ count: 0, startedAt: 0 });
   const [mentionIndex, setMentionIndex] = useState(0);
   const files = useDirectoryFiles(props.sessionId);
@@ -305,13 +302,6 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
         ) : null}
       </ChatThread>
 
-      {showTerminal ? (
-        <div className="flex min-h-0 shrink-0 flex-col" style={{ height: term.height }}>
-          <term.Handle />
-          <TerminalPanel sessionId={props.sessionId} height={term.height} onClose={() => setShowTerminal(false)} />
-        </div>
-      ) : null}
-
       <ChatFooter>
         {chat.error ? <ChatFooterNotice>{chat.error}</ChatFooterNotice> : null}
         {!connected ? <ChatReconnecting /> : null}
@@ -427,10 +417,9 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
             <button
               type="button"
               data-slot="terminal-toggle"
-              aria-pressed={showTerminal}
-              title="Toggle terminal (tmux)"
-              className={`flex size-6 items-center justify-center rounded-md transition-colors ${showTerminal ? "bg-surface-muted text-ink" : "text-ink-muted hover:bg-surface-muted hover:text-ink"}`}
-              onClick={() => setShowTerminal((v) => !v)}
+              title="Open terminal"
+              className="flex size-6 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
+              onClick={() => window.dispatchEvent(new CustomEvent("artisan:open-tab", { detail: "terminal" }))}
             >
               <SquareDashed className="size-3.5" />
             </button>
