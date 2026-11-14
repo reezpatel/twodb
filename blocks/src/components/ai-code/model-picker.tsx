@@ -94,7 +94,7 @@ function ModelPicker({ providers, models, value, onChange, thinkingLevel, onThin
         <ChevronDown className="size-3.5 shrink-0 opacity-60 transition-transform group-data-[state=open]:rotate-180" strokeWidth={2} aria-hidden="true" />
       </button>
 
-      <DialogContent showClose={false} className="gap-0 p-0" style={{ width: 560, maxWidth: "92vw" }} aria-describedby={undefined}>
+      <DialogContent showClose={false} className="flex max-h-[86vh] flex-col gap-0 overflow-hidden p-0" style={{ width: 560, maxWidth: "92vw" }} aria-describedby={undefined}>
         <DialogTitle className="sr-only">Choose a model</DialogTitle>
         {/* Search */}
         <div className="flex items-center gap-2 border-b border-outline px-3 py-2.5">

@@ -97,7 +97,7 @@ function Shell() {
         onNew={() => setNewOpen(true)}
         onNav={(page) => navigate(`/${page}`)}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* connection dot */}
         <div className="flex items-center gap-1.5 border-b border-outline px-3 py-1 text-[10px] text-ink-muted">
           <span className={`inline-block size-1.5 rounded-full ${connected ? "bg-emerald-500" : "bg-red-400"}`} />
@@ -126,7 +126,7 @@ function Shell() {
             <button type="button" className="ml-1 px-2 py-1 text-[13px] text-ink-muted hover:text-ink" onClick={() => setNewOpen(true)}>+</button>
           </div>
         ) : null}
-        <div className="min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <Routes>
             <Route path="/" element={showTabs && tabs.active ? <SessionScreen sessionId={tabs.active} onOpenChild={(id) => tabs.open(id)} title={tabs.tabs.find((t) => t.sessionId === tabs.active)?.label} /> : <EmptyState onNew={() => setNewOpen(true)} />} />
             <Route path="/s/:sessionId" element={<ChatViewRoute tabs={tabs} />} />
