@@ -1,24 +1,25 @@
 import { Paperclip, X } from "lucide-react";
 import { cn } from "../../../lib/cn.js";
 
-/** Attached-file chips above the composer (legacy code-chat-attachments). */
-export function AttachmentChips(props: { paths: string[]; onRemove: (path: string) => void }) {
-  if (props.paths.length === 0) return null;
+/** Attached-file chips above the composer (legacy code-chat-attachments).
+ *  `items` are { path, uploaded?, name? }; uploaded files show their basename. */
+export function AttachmentChips(props: { items: Array<{ path: string; uploaded?: boolean; name?: string }>; onRemove: (path: string) => void }) {
+  if (props.items.length === 0) return null;
   return (
     <div data-slot="attachment-chips" className="flex flex-wrap gap-1 px-1">
-      {props.paths.map((p) => (
+      {props.items.map((item) => (
         <span
-          key={p}
+          key={item.path}
           className="flex max-w-56 items-center gap-1 rounded-md border border-outline bg-surface px-1.5 py-0.5 font-mono text-[11px] text-ink-muted"
-          title={p}
+          title={item.path}
         >
           <Paperclip className="size-3 shrink-0" />
-          <span className="truncate">{p}</span>
+          <span className="truncate">{item.uploaded ? (item.name ?? item.path.split("/").pop()) : item.path}</span>
           <button
             type="button"
-            aria-label={`Remove attachment ${p}`}
+            aria-label={`Remove attachment ${item.path}`}
             className="shrink-0 text-ink-muted hover:text-destructive"
-            onClick={() => props.onRemove(p)}
+            onClick={() => props.onRemove(item.path)}
           >
             <X className="size-3" />
           </button>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, Scissors } from "lucide-react";
+import { Sparkles, Scissors, Paperclip } from "lucide-react";
 import { Markdown, ThinkingState } from "@twodb/blocks";
 import { toolToNode, thinkingToNode, liveToolToNode, type ToolCallMeta, type ThinkingMeta } from "./trace.js";
 import { useSessionChat } from "./hooks/useSessionChat.js";
@@ -8,7 +8,8 @@ import { ChatShell, ChatThread, ChatThreadRow, ChatThreadHeader } from "./partia
 import { ChatHeader, ChatHeaderTitle, ChatHeaderStatus, ChatHeaderActions, ChatHeaderAction } from "./partials/ChatHeader.js";
 import { ChatFooter, ChatFooterNotice, ChatReconnecting, ChatStatusBar } from "./partials/ChatFooter.js";
 import { AttachmentChips, MentionPopup, QueuePills } from "./partials/ChatAttachments.js";
-import { useDirectoryFiles, buildAttachmentBlock } from "./hooks/useDirectoryFiles.js";
+import { useDirectoryFiles, useSkills, uploadAttachment } from "./hooks/useDirectoryFiles.js";
+import { SlashPopup, useSlashCommands } from "./partials/SlashCommands.js";
 import { useWorkspaceWs } from "../../lib/workspace-ws.js";
 import { ChatComposer, ChatComposerInput, ChatComposerActions, ChatComposerSpacer, ChatComposerSend, ChatComposerStop } from "./partials/ChatComposer.js";
 import { ChatUsage, ChatUsageStat, ChatUsageContext, ChatUsageSpacer } from "./partials/ChatUsage.js";
@@ -39,15 +40,23 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
   const { connected } = useWorkspaceWs();
   const catalog = useCatalog();
   const [draft, setDraft] = useState("");
-  const [attachments, setAttachments] = useState<string[]>([]);
   const [tokPerSec, setTokPerSec] = useState<number | null>(null);
   const liveDeltaRef = useRef({ count: 0, startedAt: 0 });
   const [mentionIndex, setMentionIndex] = useState(0);
   const files = useDirectoryFiles(props.sessionId);
+  const detail = chat.detail;
+  const [attachments, setAttachments] = useState<Array<{ path: string; uploaded?: boolean; name?: string }>>([]);
+  const [skillContent, setSkillContent] = useState<Record<string, string>>({});
+  const [slashIndex, setSlashIndex] = useState(0);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const skills = useSkills(detail?.spaceId);
+  const slashCommands = useSlashCommands(skills);
 
   useEffect(() => {
     setDraft("");
     setAttachments([]);
+    setSkillContent({});
   }, [props.sessionId]);
 
   // Trailing `@query` (null when the composer isn't mentioning).
@@ -59,12 +68,51 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
     ? []
     : files.filter((f) => f.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 8);
 
+  // Trailing `/query` (null when not slashing) — but not when mentioning (@ wins).
+  const slashQuery = (() => {
+    if (mentionQuery !== null) return null;
+    const m = /(?:^|\s)\/(\S*)$/.exec(draft);
+    return m ? m[1] : null;
+  })();
+  const slashMatches = slashQuery === null
+    ? []
+    : slashCommands.filter((c) => !slashQuery || c.label.toLowerCase().includes(slashQuery.toLowerCase()) || c.description.toLowerCase().includes(slashQuery.toLowerCase())).slice(0, 9);
+
   const pickMention = (index: number) => {
     const path = mentionMatches[index];
     if (!path) return;
     setDraft((d) => d.replace(/(?:^|\s)@\S*$/, " ").replace(/\s+$/, " "));
-    setAttachments((prev) => (prev.includes(path) ? prev : [...prev, path]));
+    setAttachments((prev) => (prev.some((a) => a.path === path) ? prev : [...prev, { path }]));
     setMentionIndex(0);
+  };
+
+  const pickSlash = (index: number) => {
+    const item = slashMatches[index];
+    if (!item) return;
+    setDraft((d) => d.replace(/(?:^|\s)\/\S*$/, " ").replace(/\s+$/, " "));
+    setSlashIndex(0);
+    if (item.id === "cmd:compact") void chat.compact();
+    else if (item.id === "cmd:clear") void chat.clearThread();
+    else if (item.id === "cmd:new") void chat.newThread();
+    else if (item.content) {
+      // skill: attach as a fenced block on send
+      setAttachments((prev) => [...prev, { path: `skill:${item.label}`, uploaded: true, name: `${item.label} (skill)` }]);
+      setSkillContent((prev) => ({ ...prev, [`skill:${item.label}`]: item.content ?? "" }));
+    }
+  };
+
+  const onPickFiles = async (list: FileList | null) => {
+    if (!list || list.length === 0) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(list)) {
+        const path = await uploadAttachment(props.sessionId, file);
+        setAttachments((prev) => [...prev, { path, uploaded: true, name: file.name }]);
+      }
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const submit = () => {
@@ -72,21 +120,39 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
       pickMention(mentionIndex);
       return;
     }
+    if (slashQuery !== null && slashMatches.length > 0) {
+      pickSlash(slashIndex);
+      return;
+    }
     const text = draft.trim();
     if (!text && attachments.length === 0) return;
-    const paths = attachments;
-    setDraft("");
-    setAttachments([]);
-    if (!chat.running && text === "/new") void chat.newThread();
-    else if (!chat.running && text === "/compact") void chat.compact();
-    else if (paths.length === 0) void chat.send(text);
-    else {
-      // Fetch attached file contents and append as path-fenced blocks.
-      void buildAttachmentBlock(props.sessionId, paths).then((block) => void chat.send(text + block));
-    }
+    // Resolve attachment bodies: uploaded files read from disk, skills from cached content.
+    void (async () => {
+      const blocks = await Promise.all(
+        attachments.map(async (a) => {
+          if (a.path.startsWith("skill:")) {
+            return `--- ${a.path.slice(6)} (skill) ---\n${(skillContent[a.path] ?? "").slice(0, 20_000)}`;
+          }
+          const content = a.uploaded
+            ? await fetch(`/artisan-api/files/read?path=${encodeURIComponent(a.path)}`, { credentials: "include" })
+                .then((r) => (r.ok ? r.json() : { content: "" }))
+                .then((d: { content?: string }) => d.content ?? "")
+                .catch(() => "")
+            : await fetch(`/artisan-api/sessions/${props.sessionId}/files/${encodeURI(a.path)}`, { credentials: "include" })
+                .then((r) => (r.ok ? r.json() : { content: "" }))
+                .then((d: { content?: string }) => d.content ?? "")
+                .catch(() => "");
+          return `--- ${a.uploaded ? a.name : a.path} ---\n${content.slice(0, 20_000)}`;
+        }),
+      );
+      const body = blocks.length ? `${text}\n\n${blocks.join("\n\n")}` : text;
+      setDraft("");
+      setAttachments([]);
+      setSkillContent({});
+      void chat.send(body);
+    })();
   };
 
-  const detail = chat.detail;
   const plan = detail?.plan ?? null;
 
   // Group models into providers for the picker.
@@ -235,15 +301,38 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
               onPick={pickMention}
               onHover={setMentionIndex}
             />
-            <AttachmentChips paths={attachments} onRemove={(p) => setAttachments((prev) => prev.filter((x) => x !== p))} />
+            <SlashPopup
+              query={slashQuery ?? ""}
+              items={slashQuery === null ? [] : slashCommands}
+              activeIndex={slashIndex}
+              onPick={pickSlash}
+              onHover={setSlashIndex}
+            />
+            <AttachmentChips items={attachments} onRemove={(p) => setAttachments((prev) => prev.filter((x) => x.path !== p))} />
             <ChatComposerInput
               value={draft}
-              placeholder={detail ? `Message ${detail.title}…  (@ file, /new, /compact)` : "Message…"}
+              placeholder={detail ? `Message ${detail.title}…  (@ file, / command)` : "Message…"}
               onChange={(e) => {
                 setDraft(e.target.value);
                 setMentionIndex(0);
+                setSlashIndex(0);
               }}
               onKeyDown={(e) => {
+                if (e.key === "ArrowDown" && slashMatches.length > 0) {
+                  e.preventDefault();
+                  setSlashIndex((i) => (i + 1) % slashMatches.length);
+                  return;
+                }
+                if (e.key === "ArrowUp" && slashMatches.length > 0) {
+                  e.preventDefault();
+                  setSlashIndex((i) => (i - 1 + slashMatches.length) % slashMatches.length);
+                  return;
+                }
+                if ((e.key === "Tab" || e.key === "Enter") && slashQuery !== null && slashMatches.length > 0 && !e.shiftKey) {
+                  e.preventDefault();
+                  pickSlash(slashIndex);
+                  return;
+                }
                 if (e.key === "ArrowDown" && mentionMatches.length > 0) {
                   e.preventDefault();
                   setMentionIndex((i) => (i + 1) % mentionMatches.length);
@@ -267,6 +356,24 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
               }}
             />
             <ChatComposerActions>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                hidden
+                onChange={(e) => void onPickFiles(e.target.files)}
+              />
+              <button
+                type="button"
+                data-slot="chat-attach"
+                aria-label="Attach files"
+                title="Attach files"
+                disabled={uploading}
+                className="flex size-8 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink disabled:opacity-40"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Paperclip className="size-4" />
+              </button>
               <ChatComposerSpacer />
               {chat.running ? <ChatComposerStop onClick={() => void chat.abort()} /> : null}
               <ChatComposerSend disabled={!draft.trim() && attachments.length === 0} aria-label={chat.running ? "Queue message" : "Send"} onClick={submit} />

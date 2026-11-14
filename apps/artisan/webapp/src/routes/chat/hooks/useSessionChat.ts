@@ -168,6 +168,12 @@ export function useSessionChat(sessionId: string) {
     void refresh();
   }, [sessionId, refresh]);
 
+  /** /clear — drop prior context by starting a fresh thread (same as /new). */
+  const clearThread = useCallback(async () => {
+    await artisanClient.newThread(sessionId);
+    void refresh();
+  }, [sessionId, refresh]);
+
   const compact = useCallback(async () => {
     await artisanClient.compact(sessionId);
     void refresh();
@@ -181,6 +187,6 @@ export function useSessionChat(sessionId: string) {
     detail, error, running, status, streamText, thinking, toolEvents, ask, usage,
     queue,
     messages: detail?.messages ?? [] as MessageInfo[],
-    scroller, send, removeQueued, sendQueuedNow, answer, cancelAsk, newThread, compact, abort, refresh,
+    scroller, send, removeQueued, sendQueuedNow, answer, cancelAsk, newThread, clearThread, compact, abort, refresh,
   };
 }

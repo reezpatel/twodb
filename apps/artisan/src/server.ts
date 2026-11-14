@@ -290,8 +290,9 @@ export async function buildServer(config: ArtisanConfig) {
   app.get("/skills", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
-    const q = req.query as { spaceId?: string };
+    const q = req.query as { spaceId?: string; content?: string };
     const rows = await repo.listSkills(ctx.workspaceId, q.spaceId ?? ctx.spaceIds[0]);
+    if (q.content === "1") return rows.map((r) => ({ ...skillOut(r), content: r.content }));
     return rows.map(skillOut);
   });
 
@@ -507,6 +508,25 @@ export async function buildServer(config: ArtisanConfig) {
     );
     const files = res.stdout.split("\n").filter((l) => l.startsWith("./")).map((l) => l.slice(2)).sort();
     return { files };
+  });
+
+  /** Read any absolute path on the runner (e.g. an uploaded attachment under
+   *  the shared scratch dir) — same dispatch exec path, bypasses the find-based
+   *  listing which only covers the session directory tree. */
+  app.get("/files/read", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const q = req.query as { path?: string };
+    if (!q.path || q.path.includes("..")) return reply.code(400).send({ error: "invalid path" });
+    const deps = depsFor(req);
+    // Resolve an online runner to exec against (uploads land on the shared scratch).
+    const runners = await deps.dispatch.listRunners();
+    const online = runners.find((r) => r.status === "online");
+    if (!online) return reply.code(503).send({ error: "no online runner" });
+    const safe = q.path.replace(/'/g, "'\\''");
+    const res = await deps.dispatch.exec(online.name, `cat '${safe}'`, "/", 15_000);
+    if (res.exitCode !== 0) return reply.code(404).send({ error: res.stderr.slice(0, 200) });
+    return { path: q.path, content: res.stdout };
   });
 
   app.get("/sessions/:id/files/*", async (req, reply) => {
