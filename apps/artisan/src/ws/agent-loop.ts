@@ -292,6 +292,11 @@ export async function runAgentLoop(opts: {
     // History: prior threads' summaries + current thread messages.
     const messages = await buildContext(deps, session, agent, visible, thread);
 
+    // max_tokens = the model's own context capacity so reasoning models (e.g. glm)
+    // never starve the answer out of the budget. Capped to keep a single turn sane.
+    const modelInfo = await deps.tworoute.getModel(model).catch(() => undefined);
+    const maxTokens = Math.min(modelInfo?.contextWindow ?? 8192, 32_768);
+
     let round = 0;
     const roundUsage = { input: 0, output: 0, cached: 0 };
     // Per-round display trace: thinking text + tool results, persisted on the
@@ -323,8 +328,8 @@ export async function runAgentLoop(opts: {
           signal: ctrl.signal,
           effort: session.thinking_level ?? null,
           // Reasoning models (e.g. glm) spend budget on reasoning_content and can return
-          // empty content when it runs out — give enough headroom for an answer + tool args.
-          maxTokens: 8192,
+          // empty content when it runs out — size to the model's context capacity.
+          maxTokens,
         })) {
           const think = chunk.delta?.reasoning ?? chunk.delta?.reasoning_content;
           if (think) {
