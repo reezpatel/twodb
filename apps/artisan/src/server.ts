@@ -719,11 +719,15 @@ echo saved`;
 
   // --- code editor (code-server on the session's runner, iframed) --------------
   const EDITOR_PORT = 8443;
-  const EDITOR_BIN = `${process.env.HOME ?? "/root"}/.local/share/twodb-editor/code-server/bin/code-server`;
+  // code-server's bin/code-server is a symlink that loops on some installs —
+  // resolve the versioned binary under lib/ instead (the same fallback the
+  // start script uses).
+  const EDITOR_DIR = `${process.env.HOME ?? "/root"}/.local/share/twodb-editor/code-server`;
+  const EDITOR_BIN_RESOLVE = `ls ${shellQuote(EDITOR_DIR)}/lib/code-server-*/bin/code-server 2>/dev/null | head -1`;
 
   async function editorStatus(session: { runner: string; directory: string }): Promise<{ state: string; bytes?: number; total?: number; port?: number }> {
     const deps = depsFor({ headers: {} } as FastifyRequest);
-    const which = await deps.dispatch.exec(session.runner, `ls ${shellQuote(EDITOR_BIN)} >/dev/null 2>&1 && echo yes`, "/", 10_000).catch(() => null);
+    const which = await deps.dispatch.exec(session.runner, `BIN=$(${EDITOR_BIN_RESOLVE}); [ -n "$BIN" ] && [ -x "$BIN" ] && echo yes`, "/", 10_000).catch(() => null);
     const installed = which?.stdout?.trim().includes("yes");
     if (!installed) return { state: "not_installed" };
     // is it already listening?
@@ -750,14 +754,28 @@ echo saved`;
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
     const deps = depsFor(req);
-    // Install code-server standalone tarball (~60MB) into the runner user's home.
+    // Install code-server standalone into the runner user's home, atomically:
+    // build under a tmp dir and only swap it in once complete — an interrupted
+    // download/extract must never leave a half-installed tree that the status
+    // check then mistakes for "installed".
     const script = [
       "set -e",
-      `mkdir -p ${shellQuote(process.env.HOME ?? "/root")}/.local/share/twodb-editor`,
-      `cd ${shellQuote(process.env.HOME ?? "/root")}/.local/share/twodb-editor`,
-      "if [ ! -x code-server/bin/code-server ]; then",
-      "  curl -fsSL https://code-server.dev/install.sh | sh -s -- --method standalone --prefix ./code-server 2>&1 | tail -5",
-      "fi",
+      `BASE=${shellQuote(process.env.HOME ?? "/root")}/.local/share/twodb-editor`,
+      'mkdir -p "$BASE"',
+      'TMP="$BASE/.install-tmp"',
+      // mkdir is atomic — only one install runs at a time; a second concurrent
+      // click exits 0 immediately instead of wiping the first install's tmp.
+      'if ! mkdir "$TMP.lock" 2>/dev/null; then echo "install already running"; exit 0; fi',
+      'trap "rm -rf \"$TMP.lock\"" EXIT',
+      'rm -rf "$TMP" "$BASE/code-server.new"',
+      'mkdir -p "$TMP"',
+      'cd "$TMP"',
+      "curl -fsSL https://code-server.dev/install.sh | sh -s -- --method standalone --prefix ./code-server 2>&1 | tail -5",
+      'mv "$TMP/code-server" "$BASE/code-server.new"',
+      'rm -rf "$BASE/code-server.old"',
+      'if [ -d "$BASE/code-server" ]; then mv "$BASE/code-server" "$BASE/code-server.old"; fi',
+      'mv "$BASE/code-server.new" "$BASE/code-server"',
+      'rm -rf "$TMP" "$BASE/code-server.old"',
       "echo installed",
     ].join("\n");
     void deps.dispatch.exec(session.runner, script, "/", 600_000).catch(() => {});
@@ -775,7 +793,7 @@ echo saved`;
     const status = await editorStatus(session);
     if (status.state === "ready") return { ok: true, port: EDITOR_PORT };
     const csBase = `${process.env.HOME ?? "/root"}/.local/share/twodb-editor/code-server`;
-    const script = `CSBIN=$(ls ${shellQuote(csBase)}/lib/code-server-*/bin/code-server 2>/dev/null | head -1); if [ -z "$CSBIN" ]; then CSBIN=${shellQuote(EDITOR_BIN)}; fi; export PASSWORD=; "$CSBIN" --bind-addr 127.0.0.1:${EDITOR_PORT} --auth none --user-data-dir ${shellQuote(session.directory + "/.code-server")} ${shellQuote(session.directory)} > /tmp/code-server.log 2>&1`;
+    const script = `CSBIN=$(ls ${shellQuote(csBase)}/lib/code-server-*/bin/code-server 2>/dev/null | head -1); export PASSWORD=; "$CSBIN" --bind-addr 127.0.0.1:${EDITOR_PORT} --auth none --user-data-dir ${shellQuote(session.directory + "/.code-server")} ${shellQuote(session.directory)} > /tmp/code-server.log 2>&1`;
     const job = await deps.dispatch.createJob(session.runner, script, session.directory, session.id).catch((e) => ({ id: "", error: String(e) }));
     if ((job as { error?: string }).error) return reply.code(502).send({ error: (job as { error: string }).error });
     // wait for the port to come up
