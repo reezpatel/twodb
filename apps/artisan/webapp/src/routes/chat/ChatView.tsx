@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, Scissors } from "lucide-react";
 import { Markdown, ThinkingState } from "@twodb/blocks";
 import { toolToNode, thinkingToNode, liveToolToNode, type ToolCallMeta, type ThinkingMeta } from "./trace.js";
@@ -15,6 +15,13 @@ import { ChatUsage, ChatUsageStat, ChatUsageContext, ChatUsageSpacer } from "./p
 import { ChatMessage } from "./partials/ChatMessage.js";
 import { AskWidget } from "./partials/AskWidget.js";
 import { ModelPicker, type ModelProvider, type ModelEntry } from "@twodb/blocks";
+
+/** Legacy token formatting: 1.2k / 3.4M (never raw thousands). */
+function fmtTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
 
 /** Context chars → tokens estimate → % of the model's window. */
 function contextPercent(usage: { inputTokens: number } | null, contextWindow: number | null): number | null {
@@ -33,6 +40,8 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
   const catalog = useCatalog();
   const [draft, setDraft] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
+  const [tokPerSec, setTokPerSec] = useState<number | null>(null);
+  const liveDeltaRef = useRef({ count: 0, startedAt: 0 });
   const [mentionIndex, setMentionIndex] = useState(0);
   const files = useDirectoryFiles(props.sessionId);
 
@@ -85,7 +94,14 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
     const byConn = new Map<string, ModelEntry[]>();
     for (const m of catalog.models) {
       const list = byConn.get(m.connection) ?? [];
-      list.push({ id: m.id, label: m.name, context: m.contextWindow ? `${Math.round(m.contextWindow / 1000)}k` : undefined, triggerLabel: m.id });
+      list.push({
+        id: m.id,
+        label: m.name,
+        context: m.contextWindow ? `${Math.round(m.contextWindow / 1000)}k` : undefined,
+        triggerLabel: m.id,
+        thinking: m.thinking,
+        thinkingLevels: m.thinkingLevel?.length ? m.thinkingLevel : undefined,
+      });
       byConn.set(m.connection, list);
     }
     return [...byConn.entries()].map(([name, models]) => ({ id: name, title: name, models }));
@@ -93,6 +109,25 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
 
   const modelInfo = catalog.models.find((m) => m.id === detail?.model);
   const ctxPct = contextPercent(chat.usage, modelInfo?.contextWindow ?? null);
+  const cacheHit = chat.usage && chat.usage.inputTokens > 0 ? `${Math.round((chat.usage.cachedTokens / chat.usage.inputTokens) * 100)}%` : "—";
+
+  // Generation speed: token/400ms window, reset on run start (legacy code-chat usage bar).
+  useEffect(() => {
+    if (chat.streamText && chat.running) {
+      if (liveDeltaRef.current.count === 0) liveDeltaRef.current.startedAt = Date.now();
+      liveDeltaRef.current.count += 1;
+      const elapsed = Date.now() - liveDeltaRef.current.startedAt;
+      if (elapsed > 400) setTokPerSec(Math.round((liveDeltaRef.current.count / elapsed) * 1000 * 10) / 10);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.streamText]);
+  useEffect(() => {
+    if (!chat.running) {
+      setTokPerSec(null);
+      liveDeltaRef.current.count = 0;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.running]);
 
   return (
     <ChatShell>
@@ -241,33 +276,26 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
 
         <ChatStatusBar>
           <ChatUsage>
-            {chat.usage ? (
-              <>
-                <ChatUsageStat title="Input tokens (incl. cached)">↑ {(chat.usage.inputTokens + chat.usage.cachedTokens).toLocaleString()}</ChatUsageStat>
-                <ChatUsageStat title="Output tokens">↓ {chat.usage.outputTokens.toLocaleString()}</ChatUsageStat>
-                {chat.usage.cachedTokens ? (
-                  <ChatUsageStat title="Cached input tokens">⚡ {chat.usage.cachedTokens.toLocaleString()}</ChatUsageStat>
-                ) : null}
-                <ChatUsageStat title="Model calls">{chat.usage.calls} calls</ChatUsageStat>
-                <ChatUsageContext
-                  percent={ctxPct}
-                  label={ctxPct === null ? "context ?" : `${ctxPct}%`}
-                  breakdown={[
-                    { label: "input", value: chat.usage.inputTokens.toLocaleString() },
-                    { label: "cached", value: chat.usage.cachedTokens.toLocaleString() },
-                    { label: "output", value: chat.usage.outputTokens.toLocaleString() },
-                    { label: "model calls", value: String(chat.usage.calls) },
-                  ]}
-                />
-              </>
-            ) : (
-              <ChatUsageStat>no usage yet</ChatUsageStat>
-            )}
+            <ChatUsageStat title="Input tokens (incl. cached)">↑ {fmtTokens(chat.usage?.inputTokens ?? 0)}</ChatUsageStat>
+            <ChatUsageStat title="Output tokens">↓ {fmtTokens(chat.usage?.outputTokens ?? 0)}</ChatUsageStat>
+            <ChatUsageStat title="Cache hit — cached input / total input">⚡ {cacheHit}</ChatUsageStat>
+            <ChatUsageContext
+              percent={ctxPct}
+              label={chat.usage ? `${fmtTokens(chat.usage.inputTokens)}${modelInfo?.contextWindow ? ` / ${fmtTokens(modelInfo.contextWindow)}` : ""}` : "context —"}
+              title="Context consumed vs the model's context window"
+              breakdown={[
+                { label: "input", value: fmtTokens(chat.usage?.inputTokens ?? 0) },
+                { label: "cached", value: fmtTokens(chat.usage?.cachedTokens ?? 0) },
+                { label: "output", value: fmtTokens(chat.usage?.outputTokens ?? 0) },
+                { label: "model calls", value: String(chat.usage?.calls ?? 0) },
+              ]}
+            />
             <ChatUsageSpacer />
             {providers.length > 0 && detail ? (
               <ModelPicker
                 providers={providers}
                 value={detail.model}
+                thinkingLevel={detail.thinkingLevel ?? undefined}
                 onChange={(id) => {
                   void fetch(`/artisan-api/sessions/${detail.id}`, {
                     method: "PATCH",
@@ -276,9 +304,21 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
                     body: JSON.stringify({ model: id }),
                   }).then(() => chat.refresh());
                 }}
+                onThinkingChange={(level) => {
+                  void fetch(`/artisan-api/sessions/${detail.id}`, {
+                    method: "PATCH",
+                    credentials: "include",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ thinkingLevel: level }),
+                  }).then(() => chat.refresh());
+                }}
               />
             ) : null}
           </ChatUsage>
+          <div data-slot="chat-metrics" className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-sm text-ink-muted">
+            <ChatUsageStat title="Generation speed">Speed {tokPerSec !== null ? `${tokPerSec} tok/s` : "—"}</ChatUsageStat>
+            <ChatUsageStat title="Session cost">Cost {chat.usage?.costUsd != null ? `$${chat.usage.costUsd.toFixed(4)}` : "—"}</ChatUsageStat>
+          </div>
         </ChatStatusBar>
       </ChatFooter>
     </ChatShell>

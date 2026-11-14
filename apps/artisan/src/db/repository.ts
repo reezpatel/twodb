@@ -24,6 +24,7 @@ export interface ArtisanRepo {
   listSessionsAll(workspaceId: string, parentSessionId?: string): Promise<SessionRow[]>;
   touchSession(id: string): Promise<void>;
   renameSession(workspaceId: string, id: string, title: string): Promise<void>;
+  setSessionThinkingLevel(workspaceId: string, id: string, level: string | null): Promise<void>;
   setSessionModel(workspaceId: string, id: string, model: string): Promise<void>;
   setSessionPlan(id: string, plan: Array<{ description: string; status: string }> | null): Promise<void>;
 
@@ -106,6 +107,7 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
         adhoc_prompt: input.adhocPrompt ?? null,
         depth: input.depth ?? 0,
         plan_json: null,
+        thinking_level: null,
         created_at: now(),
         updated_at: now(),
       };
@@ -141,6 +143,10 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
 
     async renameSession(workspaceId, id, title) {
       await db.updateTable("session").set({ title, updated_at: now() }).where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
+    },
+
+    async setSessionThinkingLevel(workspaceId, id, level) {
+      await db.updateTable("session").set({ thinking_level: level, updated_at: now() }).where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
     },
 
     async setSessionModel(workspaceId, id, model) {

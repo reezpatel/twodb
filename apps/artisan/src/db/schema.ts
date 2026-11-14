@@ -29,6 +29,8 @@ export interface SessionRow {
   depth: number;
   /** Serialized plan: [{description, status}] — get_plan/update_plan. */
   plan_json: string | null;
+  /** Thinking effort (low|medium|high|max); null = provider default. */
+  thinking_level: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -137,6 +139,12 @@ export interface ArtisanDb {
 }
 
 export async function applySchema(db: Kysely<ArtisanDb>): Promise<void> {
+  // Idempotent column adds for pre-existing databases.
+  try {
+    await db.schema.alterTable("session").addColumn("thinking_level", "text").execute();
+  } catch {
+    /* column already exists */
+  }
   await db.schema.createSchema("artisan").ifNotExists().execute();
 
   await db.schema
@@ -156,6 +164,7 @@ export async function applySchema(db: Kysely<ArtisanDb>): Promise<void> {
     .addColumn("adhoc_prompt", "text")
     .addColumn("depth", "integer", (c) => c.notNull().defaultTo(0))
     .addColumn("plan_json", "text")
+    .addColumn("thinking_level", "text")
     .addColumn("created_at", "text", (c) => c.notNull())
     .addColumn("updated_at", "text", (c) => c.notNull())
     .execute();

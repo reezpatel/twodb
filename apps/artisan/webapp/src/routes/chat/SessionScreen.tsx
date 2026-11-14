@@ -25,7 +25,7 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
           <div className="mx-1.5 h-4 w-px bg-outline" />
           <span className="truncate text-[13px] font-medium">{props.title ?? props.sessionId.slice(-8)}</span>
         </header>
-        <div className="min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {tab === "chat" ? <ChatView sessionId={props.sessionId} noHeader /> : null}
           {tab === "editor" ? <EditorScreen sessionId={props.sessionId} /> : null}
           {tab === "terminal" ? <TerminalScreen sessionId={props.sessionId} /> : null}

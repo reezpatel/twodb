@@ -15,6 +15,8 @@ export interface CompletionRequest {
   stream?: boolean;
   temperature?: number;
   max_tokens?: number;
+  /** Thinking effort (low|medium|high|max) — forwarded verbatim to providers that support it. */
+  effort?: string;
 }
 
 export interface LlmProvider {

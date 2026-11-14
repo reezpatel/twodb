@@ -12,6 +12,10 @@ export interface ModelInfo {
   provider: string;
   connection: string;
   contextWindow: number | null;
+  /** Supports extended thinking. */
+  thinking?: boolean;
+  /** Thinking levels the model supports (low|medium|high|max). */
+  thinkingLevel?: string[];
 }
 
 export interface ChatMessage {
@@ -68,7 +72,15 @@ export class TworouteClient {
       headers: { authorization: `Bearer ${this.apiKey}` },
     });
     if (!res.ok) throw new Error(`tworoute /v1/models ${res.status}`);
-    const body = (await res.json()) as { data?: Array<{ id: string; owned_by?: string; context_window?: number }> };
+    const body = (await res.json()) as {
+      data?: Array<{
+        id: string;
+        owned_by?: string;
+        context_window?: number;
+        thinking?: boolean;
+        thinking_level?: string[];
+      }>;
+    };
     return (body.data ?? []).map((m) => {
       const [conn, ...rest] = m.id.split("/");
       return {
@@ -77,6 +89,8 @@ export class TworouteClient {
         provider: m.owned_by ?? "",
         connection: conn,
         contextWindow: m.context_window ?? null,
+        thinking: Boolean(m.thinking),
+        thinkingLevel: m.thinking_level ?? [],
       };
     });
   }
@@ -93,6 +107,8 @@ export class TworouteClient {
     tools?: ToolDef[];
     maxTokens?: number;
     signal?: AbortSignal;
+    /** Thinking effort (low|medium|high|max) forwarded to the provider. */
+    effort?: string | null;
   }): AsyncGenerator<ChatChunk> {
     const body: Record<string, unknown> = {
       model: input.model,
@@ -102,6 +118,7 @@ export class TworouteClient {
     };
     if (input.tools?.length) body.tools = input.tools;
     if (input.maxTokens) body.max_tokens = input.maxTokens;
+    if (input.effort) body.effort = input.effort;
 
     const res = await fetch(`${this.config.TWOROUTE_URL}/v1/chat/completions`, {
       method: "POST",

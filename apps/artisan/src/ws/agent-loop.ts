@@ -303,6 +303,7 @@ export async function runAgentLoop(opts: {
           messages,
           tools: toolDefs.length ? toolDefs : undefined,
           signal: ctrl.signal,
+          effort: session.thinking_level ?? null,
         })) {
           const think = chunk.delta?.reasoning ?? chunk.delta?.reasoning_content;
           if (think) {
@@ -320,7 +321,19 @@ export async function runAgentLoop(opts: {
             if (tc.function?.name) toolCalls[i].name += tc.function.name;
             if (tc.function?.arguments) toolCalls[i].args += tc.function.arguments;
           }
-          if (chunk.usage) usage = chunk.usage;
+          if (chunk.usage) {
+            usage = chunk.usage;
+            emit({
+              type: "usage",
+              usage: {
+                inputTokens: roundUsage.input + (chunk.usage.prompt_tokens ?? 0),
+                outputTokens: roundUsage.output + (chunk.usage.completion_tokens ?? 0),
+                cachedTokens: roundUsage.cached + (chunk.usage.cached_tokens ?? 0),
+                calls: round,
+                costUsd: null,
+              },
+            });
+          }
         }
       } catch (err) {
         if (ctrl.signal.aborted) {

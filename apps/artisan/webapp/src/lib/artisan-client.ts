@@ -48,6 +48,7 @@ export interface SessionInfo {
   spaceId: string;
   agentId: string | null;
   parentSessionId: string | null;
+  thinkingLevel?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -69,6 +70,7 @@ export interface UsageInfo {
 }
 
 export interface SessionDetail extends SessionInfo {
+  thinkingLevel?: string | null;
   plan: Array<{ description: string; status: string }> | null;
   running: boolean;
   usage: UsageInfo | null;
@@ -106,6 +108,8 @@ export interface ModelInfo {
   provider: string;
   connection: string;
   contextWindow: number | null;
+  thinking?: boolean;
+  thinkingLevel?: string[];
 }
 
 export interface RunnerInfo {

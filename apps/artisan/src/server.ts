@@ -142,9 +142,10 @@ export async function buildServer(config: ArtisanConfig) {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const { id } = req.params as { id: string };
-    const body = (req.body ?? {}) as { title?: string; model?: string };
+    const body = (req.body ?? {}) as { title?: string; model?: string; thinkingLevel?: string | null };
     if (body.title) await repo.renameSession(ctx.workspaceId, id, body.title);
     if (body.model) await repo.setSessionModel(ctx.workspaceId, id, body.model);
+    if (body.thinkingLevel !== undefined) await repo.setSessionThinkingLevel(ctx.workspaceId, id, body.thinkingLevel);
     const session = await repo.getSession(ctx.workspaceId, id);
     return session ? sessionOut(session) : reply.code(404).send({ error: "not found" });
   });
@@ -600,11 +601,11 @@ function checkpointOut(c: { id: string; session_id: string; label: string | null
   return { id: c.id, sessionId: c.session_id, label: c.label, commitSha: c.commit_sha, ref: c.ref, trigger: c.trigger, createdAt: c.created_at };
 }
 
-function sessionOut(s: { id: string; type: string; title: string; runner: string; directory: string; model: string; interactive: boolean; space_id: string; agent_id: string | null; parent_session_id: string | null; created_at: string; updated_at: string }) {
+function sessionOut(s: { id: string; type: string; title: string; runner: string; directory: string; model: string; interactive: boolean; space_id: string; agent_id: string | null; parent_session_id: string | null; thinking_level: string | null; created_at: string; updated_at: string }) {
   return {
     id: s.id, type: s.type, title: s.title, runner: s.runner, directory: s.directory,
     model: s.model, interactive: s.interactive, spaceId: s.space_id, agentId: s.agent_id,
-    parentSessionId: s.parent_session_id, createdAt: s.created_at, updatedAt: s.updated_at,
+    parentSessionId: s.parent_session_id, thinkingLevel: s.thinking_level, createdAt: s.created_at, updatedAt: s.updated_at,
   };
 }
 

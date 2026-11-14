@@ -849,6 +849,7 @@ export async function buildServer(config: TwoRouteConfig) {
           display_name: m.display_name,
           context_window: m.context_window,
           thinking: m.thinking,
+          thinking_level: JSON.parse(m.thinking_level) as string[],
           input_modalities: JSON.parse(m.input) as string[],
           output_modalities: JSON.parse(m.output) as string[],
           temperature: m.temperature,
