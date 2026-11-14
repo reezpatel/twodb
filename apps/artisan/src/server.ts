@@ -142,12 +142,14 @@ export async function buildServer(config: ArtisanConfig) {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const { id } = req.params as { id: string };
-    const body = (req.body ?? {}) as { title?: string; model?: string; thinkingLevel?: string | null };
+    const body = (req.body ?? {}) as { title?: string; model?: string; thinkingLevel?: string | null; plan?: Array<{ description: string; status: string }> | null };
     if (body.title) await repo.renameSession(ctx.workspaceId, id, body.title);
     if (body.model) await repo.setSessionModel(ctx.workspaceId, id, body.model);
     if (body.thinkingLevel !== undefined) await repo.setSessionThinkingLevel(ctx.workspaceId, id, body.thinkingLevel);
+    if (body.plan !== undefined) await repo.setSessionPlan(id, body.plan);
     const session = await repo.getSession(ctx.workspaceId, id);
-    return session ? sessionOut(session) : reply.code(404).send({ error: "not found" });
+    const plan = session?.plan_json ? JSON.parse(session.plan_json) : null;
+    return session ? { ...sessionOut(session), plan } : reply.code(404).send({ error: "not found" });
   });
 
   // Message send via HTTP (WS send is the primary path).

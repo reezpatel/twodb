@@ -1,7 +1,8 @@
 import type { SessionDetail } from "../../../lib/artisan-client.js";
 import { useState } from "react";
 import type { ChildSession, GitInfo, JobRow as JobRowT } from "../hooks/useSessionSide.js";
-import { SideSection, PlanRow, SubagentRow, GitFileRow, JobRow } from "./SidePanel.js";
+import { SideSection, SubagentRow, GitFileRow, JobRow } from "./SidePanel.js";
+import { PlanList, type PlanStep } from "../../../components/ui/plan-list.js";
 
 export interface SessionSidebarProps {
   plan: SessionDetail["plan"];
@@ -17,6 +18,12 @@ export interface SessionSidebarProps {
 export function SessionSidebar(props: SessionSidebarProps) {
   const plan = props.plan ?? [];
   const done = plan.filter((s) => s.status === "done").length;
+  const planSteps: PlanStep[] = plan.map((s, i) => ({
+    id: `step-${i}`,
+    title: s.description,
+    activeTitle: s.description,
+    status: s.status === "in_progress" ? "in_progress" : s.status === "done" ? "done" : s.status === "blocked" ? "blocked" : s.status === "failed" ? "failed" : "pending",
+  }));
   const git = props.git;
   const [message, setMessage] = useState("");
   const [commitError, setCommitError] = useState<string | null>(null);
@@ -42,15 +49,7 @@ export function SessionSidebar(props: SessionSidebarProps) {
       ) : null}
 
       <SideSection title="Plan" count={plan.length ? `${done}/${plan.length}` : undefined}>
-        {plan.length > 0 ? (
-          <ul>
-            {plan.map((step, i) => (
-              <PlanRow key={i} title={step.description} status={step.status} />
-            ))}
-          </ul>
-        ) : (
-          <p className="text-[11px] text-ink-muted">No plan yet — the agent uses update_plan.</p>
-        )}
+        <PlanList items={planSteps} empty="No plan yet — the agent uses update_plan." />
       </SideSection>
 
       <SideSection title="Git" defaultOpen>
