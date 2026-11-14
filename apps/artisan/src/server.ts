@@ -825,6 +825,10 @@ echo saved`;
       if (!session) return socket.close(4404, "session not found");
       const url = new URL(req.url, "http://internal");
       const sub = url.pathname.split("/editor-ws/")[1] ?? "/";
+      // Strip the artisan-auth access_token from the path forwarded to
+      // code-server — it's our credential, not code-server's, and a stray
+      // unknown query param can break its reconnection handshake.
+      url.searchParams.delete("access_token");
       const upstream = new WebSocket(
         `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(session.runner)}/proxy-ws?port=${EDITOR_PORT}&path=${encodeURIComponent("/" + sub + url.search)}`,
         { headers: { authorization: `Bearer ${apiKeyFor(req)}` } },
@@ -834,6 +838,18 @@ echo saved`;
       upstream.on("error", () => { if (socket.readyState === socket.OPEN) socket.close(1011, "upstream"); });
       socket.on("message", (raw: unknown) => { if (upstream.readyState === upstream.OPEN) upstream.send(String(raw)); });
       socket.on("close", () => { try { upstream.close(); } catch { /* ignore */ } });
+      // Keep the hop chain (browser→gateway→artisan→dispatch→runner→code-server)
+      // alive: none of the intermediaries sends WS pings, so a backgrounded tab
+      // (browser throttles timers) can let an intermediary reap the connection as
+      // idle, surfacing in the workbench as a 1006. Ping both ends; the 'pong'
+      // frames keep every hop's read deadline fresh.
+      const keepalive = setInterval(() => {
+        try { if (socket.readyState === socket.OPEN) (socket as unknown as { ping?: () => void }).ping?.(); } catch { /* ignore */ }
+        try { if (upstream.readyState === upstream.OPEN) (upstream as unknown as { ping?: () => void }).ping?.(); } catch { /* ignore */ }
+      }, 25_000);
+      const stop = () => clearInterval(keepalive);
+      socket.on("close", stop);
+      upstream.on("close", stop);
     })();
   });
 
@@ -881,6 +897,16 @@ echo saved`;
     proxied = proxied ?? { error: "too many redirects" };
     if ((proxied as { error?: string }).error) return reply.code(502).send((proxied as { error: string }).error);
     const pr = proxied as { status: number; headers: Record<string, string>; body: string };
+    // code-server's standalone tarball omits the dist/browser/* entry point for
+    // ~19 built-in extensions (emmet, css/html/json/ts language features, git…),
+    // so it 404s them and the web console fills with noise. Serve a minimal AMD
+    // stub that activates to nothing — VS Code treats the extension as present
+    // but inert, exactly its own fallback for a missing entry point.
+    if (pr.status === 404 && /\/extensions\/[^/]+\/.*\/browser\/[^/]+\.js$/.test(path)) {
+      reply.type("application/javascript");
+      reply.header("cache-control", "no-store");
+      return reply.code(200).send("define([], function () { return { activate: function () {} }; });\n");
+    }
     const outHeaders: Record<string, string> = {};
     for (const [k, v] of Object.entries(pr.headers)) if (!HOP_BY_HOP.has(k.toLowerCase()) && k !== "set-cookie") outHeaders[k] = v;
     let out = Buffer.from(pr.body, "base64");
