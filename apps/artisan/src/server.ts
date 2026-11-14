@@ -848,7 +848,15 @@ echo saved`;
       // rewrite HTML entry points (which reference the tunnel); leave JS/CSS opaque.
       if (contentType.startsWith("text/html")) {
         out = Buffer.from(out.toString("utf8")
-          .replace(/wss?:\/\/[^"'\\\s)]+/g, () => wsBase)
+          .replace(/wss?:\/\/[^"'\\\s]+/g, (m) => {
+            // only rewrite same-origin code-server WS URLs (path starts with / or
+            // matches the editor prefix); leave external URLs (voice, telemetry) intact
+            try {
+              const u = new URL(m);
+              if (u.host === host || u.pathname.includes("/editor")) return wsBase;
+            } catch { /* not a full URL — leave */ }
+            return m;
+          })
           .replace(/(["'(])(\/?)(stable-[a-z0-9]+|static|webview|vscode-resource|update|manifest\.json)/g, (_m, p1, slash, p2) => `${p1}${prefix}/${p2}`), "utf8");
       }
     }
