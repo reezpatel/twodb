@@ -15,7 +15,7 @@ import { ChatComposer, ChatComposerInput, ChatComposerActions, ChatComposerSpace
 import { ChatUsage, ChatUsageStat, ChatUsageContext, ChatUsageSpacer } from "./partials/ChatUsage.js";
 import { ChatMessage } from "./partials/ChatMessage.js";
 import { AskWidget } from "./partials/AskWidget.js";
-import { ModelPicker, type ModelProvider, type ModelEntry } from "@twodb/blocks";
+import { ModelPicker, type ModelProvider, type ModelEntry, type TraceNode } from "@twodb/blocks";
 
 /** Legacy token formatting: 1.2k / 3.4M (never raw thousands). */
 function fmtTokens(n: number): string {
@@ -23,6 +23,18 @@ function fmtTokens(n: number): string {
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(n);
 }
+
+/** Stable wrappers so the transcript map doesn't create new component types
+ *  each render (which would remount blocks and drop their expansion state). */
+const AssistantMarkdown = (p: { text: string }) => (
+  <ChatMessage variant="assistant"><Markdown text={p.text} /></ChatMessage>
+);
+const AssistantError = (p: { text: string }) => (
+  <ChatMessage variant="assistant"><p className="text-destructive">{p.text}</p></ChatMessage>
+);
+const PersistedTrace = (p: { nodes: TraceNode[]; forceExpanded?: boolean }) => (
+  <ThinkingState nodes={p.nodes} autoPlay={false} forceExpanded={p.forceExpanded} />
+);
 
 /** Context chars → tokens estimate → % of the model's window. */
 function contextPercent(usage: { inputTokens: number } | null, contextWindow: number | null): number | null {
@@ -41,6 +53,8 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
   const catalog = useCatalog();
   const [draft, setDraft] = useState("");
   const [tokPerSec, setTokPerSec] = useState<number | null>(null);
+  /** Cmd/Ctrl+0 → 1 = expand all, 0 = collapse all, null = manual per-block. */
+  const [expandAll, setExpandAll] = useState<null | 1 | 0>(null);
   const liveDeltaRef = useRef({ count: 0, startedAt: 0 });
   const [mentionIndex, setMentionIndex] = useState(0);
   const files = useDirectoryFiles(props.sessionId);
@@ -177,6 +191,18 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
   const ctxPct = contextPercent(chat.usage, modelInfo?.contextWindow ?? null);
   const cacheHit = chat.usage && chat.usage.inputTokens > 0 ? `${Math.round((chat.usage.cachedTokens / chat.usage.inputTokens) * 100)}%` : "—";
 
+  // Cmd+0 (mac) / Ctrl+0 (win) → toggle expand/collapse all thinking/tool blocks.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "0") {
+        e.preventDefault();
+        setExpandAll((prev) => (prev === 1 ? 0 : 1));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // Generation speed: token/400ms window, reset on run start (legacy code-chat usage bar).
   useEffect(() => {
     if (chat.streamText && chat.running) {
@@ -238,23 +264,15 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
                 {(() => {
                   const calls = (m.meta?.toolCalls as ToolCallMeta[] | undefined) ?? [];
                   const thinking = (m.meta?.thinking as ThinkingMeta[] | undefined) ?? [];
-                  const trace = [
-                    ...thinking.filter((t) => t.text?.trim()).map((t) => thinkingToNode(t)),
+                  const trace: TraceNode[] = [
+                    ...thinking.filter((t) => t.text?.trim()).map((t, ti) => thinkingToNode({ ...t, id: `think-${m.id}-${ti}` })),
                     ...calls.map((tc) => toolToNode(tc)),
                   ];
                   if (trace.length === 0) return null;
-                  return <ThinkingState nodes={trace} autoPlay={false} />;
+                  return <PersistedTrace nodes={trace} forceExpanded={expandAll === null ? undefined : expandAll === 1} />;
                 })()}
                 {m.content ? (
-                  m.meta?.error ? (
-                    <ChatMessage variant="assistant">
-                      <p className="text-destructive">{m.content}</p>
-                    </ChatMessage>
-                  ) : (
-                    <ChatMessage variant="assistant">
-                      <Markdown text={m.content} />
-                    </ChatMessage>
-                  )
+                  m.meta?.error ? <AssistantError text={m.content} /> : <AssistantMarkdown text={m.content} />
                 ) : null}
               </>
             )}
@@ -268,6 +286,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
               <ThinkingState
                 autoPlay={false}
                 defaultExpanded
+                forceExpanded={expandAll === null ? undefined : expandAll === 1}
                 workingLabel={chat.toolEvents.length > 0 ? "Working…" : "Thinking…"}
                 nodes={[
                   ...(chat.thinking ? [thinkingToNode({ text: chat.thinking }, true)] : []),

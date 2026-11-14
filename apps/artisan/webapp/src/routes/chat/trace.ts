@@ -15,6 +15,7 @@ export interface ToolCallMeta {
 export interface ThinkingMeta {
   text: string;
   durationMs?: number | null;
+  id?: string;
 }
 
 function argsOf(a: ToolCallMeta["args"]): Record<string, unknown> {
@@ -67,6 +68,7 @@ export function toolToNode(tool: ToolCallMeta, live = false): TraceNode {
 
 export function thinkingToNode(thinking: ThinkingMeta, live = false): TraceNode {
   return {
+    id: thinking.id ?? "reasoning",
     type: "reasoning",
     sentences: [thinking.text],
     durationSeconds: thinking.durationMs != null ? thinking.durationMs / 1000 : undefined,

@@ -833,6 +833,7 @@ function TracePillRow({
   first,
   last,
   index,
+  forceOpen,
 }: {
   node: TraceNode;
   isActive: boolean;
@@ -841,9 +842,11 @@ function TracePillRow({
   first: boolean;
   last: boolean;
   index: number;
+  forceOpen?: boolean;
 }) {
   void isFinished;
   const [open, setOpen] = React.useState(false);
+  const isOpen = forceOpen !== undefined ? forceOpen : open;
   const def = node.toolName ? toolRegistry[node.toolName] : undefined;
   const call = nodeToCall(node);
   const [label, chipDetail] = toolChipContent(call);
@@ -880,8 +883,8 @@ function TracePillRow({
       monoDetail={node.mono ?? (isCmd || def?.monoChip)}
       isActive={isActive}
       expandable={hasBody}
-      open={open}
-      onToggle={hasBody ? () => setOpen((v) => !v) : undefined}
+      open={isOpen}
+      onToggle={hasBody && forceOpen === undefined ? () => setOpen((v) => !v) : undefined}
       extraTrail={
         node.add !== undefined || node.del !== undefined ? (
           <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] font-medium tabular-nums">
@@ -960,10 +963,12 @@ export interface ThinkingStateProps extends React.HTMLAttributes<HTMLDivElement>
   defaultExpanded?: boolean;
   workingLabel?: string;
   onSettled?: () => void;
+  /** When true, force the group expanded; when false, force collapsed (overrides manual toggle). */
+  forceExpanded?: boolean;
 }
 
 export const ThinkingState = React.forwardRef<HTMLDivElement, ThinkingStateProps>(
-  ({ nodes = [], tools = DEFAULT_TOOL_REGISTRY, autoPlay = true, defaultExpanded, workingLabel, onSettled, className, style, ...props }, ref) => {
+  ({ nodes = [], tools = DEFAULT_TOOL_REGISTRY, autoPlay = true, defaultExpanded, workingLabel, onSettled, forceExpanded, className, style, ...props }, ref) => {
     const total = nodes.length;
     const [activeIndex, setActiveIndex] = React.useState(autoPlay ? 0 : total);
     const [isWorking, setIsWorking] = React.useState(autoPlay);
@@ -1001,7 +1006,7 @@ export const ThinkingState = React.forwardRef<HTMLDivElement, ThinkingStateProps
     const activeType = nodes[Math.min(activeIndex, total - 1)]?.type;
     const hasThought = nodes.some((n) => n.type === "reasoning");
     const title = workingLabel ?? (summary || (isWorking ? (activeType === "reasoning" ? "Thinking…" : "Working…") : hasThought ? "Thought it through" : "Worked"));
-    const expanded = manualExpanded !== null ? manualExpanded : isWorking;
+    const expanded = forceExpanded !== undefined ? forceExpanded : manualExpanded !== null ? manualExpanded : isWorking;
 
     return (
       <div ref={ref} className={cn("flex w-full flex-col font-sans text-ink select-none", className)} style={style} {...props}>
@@ -1067,7 +1072,7 @@ export const ThinkingState = React.forwardRef<HTMLDivElement, ThinkingStateProps
                     />
                   );
                 }
-                return <TracePillRow key={node.id ?? idx} node={node} isActive={isNodeActive} isFinished={isNodeFinished} toolRegistry={tools} first={idx === 0} last={idx === total - 1} index={idx} />;
+                return <TracePillRow key={node.id ?? idx} node={node} isActive={isNodeActive} isFinished={isNodeFinished} toolRegistry={tools} first={idx === 0} last={idx === total - 1} index={idx} forceOpen={forceExpanded === true ? true : forceExpanded === false ? false : undefined} />;
               })}
             </div>
           </div>
