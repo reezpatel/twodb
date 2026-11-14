@@ -36,10 +36,8 @@ export default defineConfig({
       "/artisan-api": {
         target: gateway,
         changeOrigin: true,
+        ws: true, // forward WS upgrades (terminal + editor-ws relays)
         rewrite: (p) => p.replace(/^\/artisan-api/, "/apps/artisan"),
-        // ws: true not needed here — the terminal relay dials the gateway
-        // origin directly (window.location.origin), which the dev server
-        // proxies under the /apps key below.
       },
       "/apps": { target: gateway, changeOrigin: true, ws: true },
       "/api": { target: gateway, changeOrigin: true },
