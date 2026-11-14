@@ -218,6 +218,15 @@ func (r *runner) handle(f frame) {
 		r.doVmWrite(f)
 	case "vmClose":
 		r.doVmClose(f)
+
+	case "termOpen":
+		r.doTermOpen(f)
+	case "termWrite":
+		r.doTermWrite(f)
+	case "termResize":
+		r.doTermResize(f)
+	case "termClose":
+		r.doTermClose(f)
 	}
 }
 

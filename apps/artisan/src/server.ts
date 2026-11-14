@@ -3,6 +3,7 @@ import fastifyStatic from "@fastify/static";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 import websocket from "@fastify/websocket";
+import { WebSocket } from "ws";
 import { createPgDb } from "@twodb/core-data/db";
 
 import { applySchema } from "./db/schema.js";
@@ -641,6 +642,36 @@ echo saved`;
     const deps = depsFor(req);
     const res = await deps.dispatch.exec(session.runner, body.command, session.directory, 120_000);
     return { stdout: res.stdout, stderr: res.stderr, exitCode: res.exitCode };
+  });
+
+  // --- terminal relay: browser <-> dispatch /runners/:name/term <-> runner PTY --
+  // The webapp can't reach dispatch directly (same-origin through the gateway),
+  // so artisan bridges: it dials dispatch's WS relay carrying the workspace key
+  // and pipes base64 frames both ways.
+  app.get("/sessions/:id/term", { websocket: true }, (socket, req) => {
+    const url = new URL(req.url, "http://internal");
+    void (async () => {
+      const ctx = readForwardedContext(req);
+      if (!ctx) return socket.close(4401, "unauthorized");
+      const { id } = req.params as { id: string };
+      const session = await repo.getSession(ctx.workspaceId, id);
+      if (!session) return socket.close(4404, "session not found");
+      const runner = url.searchParams.get("runner") ?? session.runner;
+      const command = url.searchParams.get("command") ?? `tmux new-session -A -s twodb -c ${shellQuote(session.directory)}`;
+      const upstream = new WebSocket(
+        `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(runner)}/term?command=${encodeURIComponent(command)}&cwd=${encodeURIComponent(session.directory)}`,
+        { headers: { "x-api-key": apiKeyFor(req) } },
+      );
+      upstream.on("message", (raw: unknown) => {
+        if (socket.readyState === socket.OPEN) socket.send(String(raw));
+      });
+      upstream.on("close", () => { if (socket.readyState === socket.OPEN) socket.close(); });
+      upstream.on("error", () => { if (socket.readyState === socket.OPEN) socket.close(1011, "upstream error"); });
+      socket.on("message", (raw: unknown) => {
+        if (upstream.readyState === upstream.OPEN) upstream.send(String(raw));
+      });
+      socket.on("close", () => { try { upstream.close(); } catch { /* ignore */ } });
+    })();
   });
 
   // --- model + runner proxies ---------------------------------------------------

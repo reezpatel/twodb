@@ -260,6 +260,16 @@ function handleFrame(socket: WebSocket, runner: RunnerRow, raw: unknown, enrolle
       })();
       return;
     }
+    case "termData": {
+      // Host PTY terminal relay (tmux attach / code-server): forward pty bytes
+      // to whoever is subscribed to this callId (the WS bridge in server.ts).
+      if (registered) hub_.publish(String(frame.callId), { type: "termData", callId: frame.callId, data: frame.data });
+      return;
+    }
+    case "termClosed": {
+      if (registered) hub_.publish(String(frame.callId), { type: "termClosed", callId: frame.callId });
+      return;
+    }
     default:
       return;
   }

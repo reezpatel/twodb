@@ -642,6 +642,51 @@ export async function buildServer(config: DispatchConfig) {
     })();
   });
 
+  // --- Host terminal / code-server relay (WS bridging caller <-> runner PTY) --
+  // Same shape as the microvm relay but for a host runner session: the runner
+  // spawns `command` under a PTY (tmux attach, or code-server) and streams
+  // base64 termData frames. Query: ?runner=<name>&command=<shell>&cwd=<dir>.
+  app.get("/runners/:name/term", { websocket: true }, (socket, req) => {
+    const url = new URL(req.url, "http://internal");
+    const name = (req.params as { name: string }).name;
+    const command = url.searchParams.get("command") ?? "exec $SHELL";
+    const cwd = url.searchParams.get("cwd") ?? "";
+    void (async () => {
+      const wsId = req.headers["x-twodb-workspace-id"] as string | undefined;
+      if (!wsId) {
+        socket.close(4401, "unauthorized");
+        return;
+      }
+      const runner = hub.listOnline(wsId).find((r) => r.name === name);
+      if (!runner) {
+        socket.close(4409, "runner offline");
+        return;
+      }
+      const callId = newId();
+      const ack = await hub.sendToRunner(runner, { type: "termOpen", callId, command, cwd }, { timeoutMs: 15_000 }).catch(() => null);
+      if (!ack || ack.error) {
+        socket.close(1011, String((ack as any)?.error ?? "term failed to start"));
+        return;
+      }
+      const unsub = hub.subscribe(callId, (frame) => {
+        if (frame.type === "termData" && socket.readyState === socket.OPEN) {
+          socket.send(frame.data as string); // already base64
+        } else if (frame.type === "termClosed") {
+          socket.close();
+        }
+      });
+      socket.on("message", (raw: unknown) => {
+        if (socket.readyState === socket.OPEN) {
+          void hub.sendToRunner(runner, { type: "termWrite", callId, data: String(raw) }, { reply: false });
+        }
+      });
+      socket.on("close", () => {
+        unsub();
+        void hub.sendToRunner(runner, { type: "termClose", callId }, { reply: false });
+      });
+    })();
+  });
+
   // --- S3 (stubbed) -----------------------------------------------------------
   // Runners ship /app zips over their WS (vmArchive frames, handled in
   // ws/archive-store.ts). Callers can download one for inspection:
