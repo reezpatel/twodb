@@ -6,7 +6,10 @@ import { useSessionChat } from "./hooks/useSessionChat.js";
 import { useCatalog } from "../shell/hooks/useCatalog.js";
 import { ChatShell, ChatThread, ChatThreadRow, ChatThreadHeader } from "./partials/ChatShell.js";
 import { ChatHeader, ChatHeaderTitle, ChatHeaderStatus, ChatHeaderActions, ChatHeaderAction } from "./partials/ChatHeader.js";
-import { ChatFooter, ChatFooterNotice, ChatStatusBar } from "./partials/ChatFooter.js";
+import { ChatFooter, ChatFooterNotice, ChatReconnecting, ChatStatusBar } from "./partials/ChatFooter.js";
+import { AttachmentChips, MentionPopup, QueuePills } from "./partials/ChatAttachments.js";
+import { useDirectoryFiles, buildAttachmentBlock } from "./hooks/useDirectoryFiles.js";
+import { useWorkspaceWs } from "../../lib/workspace-ws.js";
 import { ChatComposer, ChatComposerInput, ChatComposerActions, ChatComposerSpacer, ChatComposerSend, ChatComposerStop } from "./partials/ChatComposer.js";
 import { ChatUsage, ChatUsageStat, ChatUsageContext, ChatUsageSpacer } from "./partials/ChatUsage.js";
 import { ChatMessage } from "./partials/ChatMessage.js";
@@ -26,21 +29,52 @@ function contextPercent(usage: { inputTokens: number } | null, contextWindow: nu
  */
 export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
   const chat = useSessionChat(props.sessionId);
+  const { connected } = useWorkspaceWs();
   const catalog = useCatalog();
   const [draft, setDraft] = useState("");
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const files = useDirectoryFiles(props.sessionId);
 
   useEffect(() => {
     setDraft("");
+    setAttachments([]);
   }, [props.sessionId]);
 
+  // Trailing `@query` (null when the composer isn't mentioning).
+  const mentionQuery = (() => {
+    const m = /(?:^|\s)@(\S*)$/.exec(draft);
+    return m ? m[1] : null;
+  })();
+  const mentionMatches = mentionQuery === null
+    ? []
+    : files.filter((f) => f.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 8);
+
+  const pickMention = (index: number) => {
+    const path = mentionMatches[index];
+    if (!path) return;
+    setDraft((d) => d.replace(/(?:^|\s)@\S*$/, " ").replace(/\s+$/, " "));
+    setAttachments((prev) => (prev.includes(path) ? prev : [...prev, path]));
+    setMentionIndex(0);
+  };
+
   const submit = () => {
+    if (mentionQuery !== null && mentionMatches.length > 0) {
+      pickMention(mentionIndex);
+      return;
+    }
     const text = draft.trim();
-    if (!text) return;
+    if (!text && attachments.length === 0) return;
+    const paths = attachments;
     setDraft("");
-    if (chat.running) return; // Stop is the running-state action
-    if (text === "/new") void chat.newThread();
-    else if (text === "/compact") void chat.compact();
-    else void chat.send(text);
+    setAttachments([]);
+    if (!chat.running && text === "/new") void chat.newThread();
+    else if (!chat.running && text === "/compact") void chat.compact();
+    else if (paths.length === 0) void chat.send(text);
+    else {
+      // Fetch attached file contents and append as path-fenced blocks.
+      void buildAttachmentBlock(props.sessionId, paths).then((block) => void chat.send(text + block));
+    }
   };
 
   const detail = chat.detail;
@@ -51,7 +85,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
     const byConn = new Map<string, ModelEntry[]>();
     for (const m of catalog.models) {
       const list = byConn.get(m.connection) ?? [];
-      list.push({ id: m.id, label: m.name, context: m.contextWindow ? `${Math.round(m.contextWindow / 1000)}k` : undefined });
+      list.push({ id: m.id, label: m.name, context: m.contextWindow ? `${Math.round(m.contextWindow / 1000)}k` : undefined, triggerLabel: m.id });
       byConn.set(m.connection, list);
     }
     return [...byConn.entries()].map(([name, models]) => ({ id: name, title: name, models }));
@@ -153,15 +187,43 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
 
       <ChatFooter>
         {chat.error ? <ChatFooterNotice>{chat.error}</ChatFooterNotice> : null}
+        {!connected ? <ChatReconnecting /> : null}
+        <QueuePills items={chat.queue} onRemove={chat.removeQueued} onSendNow={chat.sendQueuedNow} />
         {chat.ask ? (
           <AskWidget questions={chat.ask.questions} onAnswer={(answers) => chat.answer(chat.ask!.askId, answers)} onCancel={() => chat.cancelAsk(chat.ask!.askId)} />
         ) : (
           <ChatComposer busy={chat.running}>
+            <MentionPopup
+              query={mentionQuery ?? "\u0000"}
+              files={mentionQuery === null ? [] : files}
+              activeIndex={mentionIndex}
+              onPick={pickMention}
+              onHover={setMentionIndex}
+            />
+            <AttachmentChips paths={attachments} onRemove={(p) => setAttachments((prev) => prev.filter((x) => x !== p))} />
             <ChatComposerInput
               value={draft}
-              placeholder={detail ? `Message ${detail.title}…  (/new, /compact)` : "Message…"}
-              onChange={(e) => setDraft(e.target.value)}
+              placeholder={detail ? `Message ${detail.title}…  (@ file, /new, /compact)` : "Message…"}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                setMentionIndex(0);
+              }}
               onKeyDown={(e) => {
+                if (e.key === "ArrowDown" && mentionMatches.length > 0) {
+                  e.preventDefault();
+                  setMentionIndex((i) => (i + 1) % mentionMatches.length);
+                  return;
+                }
+                if (e.key === "ArrowUp" && mentionMatches.length > 0) {
+                  e.preventDefault();
+                  setMentionIndex((i) => (i - 1 + mentionMatches.length) % mentionMatches.length);
+                  return;
+                }
+                if (e.key === "Tab" && mentionQuery !== null && mentionMatches.length > 0) {
+                  e.preventDefault();
+                  pickMention(mentionIndex);
+                  return;
+                }
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   submit();
@@ -172,7 +234,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
             <ChatComposerActions>
               <ChatComposerSpacer />
               {chat.running ? <ChatComposerStop onClick={() => void chat.abort()} /> : null}
-              <ChatComposerSend disabled={!draft.trim() || chat.running} aria-label="Send" onClick={submit} />
+              <ChatComposerSend disabled={!draft.trim() && attachments.length === 0} aria-label={chat.running ? "Queue message" : "Send"} onClick={submit} />
             </ChatComposerActions>
           </ChatComposer>
         )}
@@ -187,7 +249,16 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
                   <ChatUsageStat title="Cached input tokens">⚡ {chat.usage.cachedTokens.toLocaleString()}</ChatUsageStat>
                 ) : null}
                 <ChatUsageStat title="Model calls">{chat.usage.calls} calls</ChatUsageStat>
-                <ChatUsageContext percent={ctxPct} label={ctxPct === null ? "context ?" : `${ctxPct}%`} />
+                <ChatUsageContext
+                  percent={ctxPct}
+                  label={ctxPct === null ? "context ?" : `${ctxPct}%`}
+                  breakdown={[
+                    { label: "input", value: chat.usage.inputTokens.toLocaleString() },
+                    { label: "cached", value: chat.usage.cachedTokens.toLocaleString() },
+                    { label: "output", value: chat.usage.outputTokens.toLocaleString() },
+                    { label: "model calls", value: String(chat.usage.calls) },
+                  ]}
+                />
               </>
             ) : (
               <ChatUsageStat>no usage yet</ChatUsageStat>

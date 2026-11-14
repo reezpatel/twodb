@@ -6,6 +6,7 @@ import type { ArtisanConfig } from "./config.js";
  * via the forwarded gateway identity; direct calls use the key directly).
  */
 export interface RunnerInfo {
+  id: string;
   name: string;
   status: "online" | "offline";
   kind: "host" | "microvm-host";
@@ -116,6 +117,17 @@ export class DispatchClient {
 
   async createJob(runner: string, command: string, cwd: string, resourceId?: string): Promise<JobInfo> {
     return this.post<JobInfo>("/jobs", { runnerId: runner, command, cwd, resourceId });
+  }
+
+  /** Lists recent jobs for a runner — accepts the runner NAME (sessions store
+   *  names) or its internal id; resolves name → id via /runners. */
+  async listJobs(runner: string): Promise<Array<JobInfo & { startedAt?: string; endedAt?: string | null }>> {
+    let id = runner;
+    if (!/^01/.test(runner)) {
+      const runners = await this.listRunners().catch(() => [] as RunnerInfo[]);
+      id = runners.find((r) => r.name === runner)?.id ?? runner;
+    }
+    return this.get(`/jobs?runnerId=${encodeURIComponent(id)}&limit=12`);
   }
 
   async getJob(id: string): Promise<JobInfo> {

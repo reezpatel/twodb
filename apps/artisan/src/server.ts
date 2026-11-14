@@ -437,6 +437,48 @@ export async function buildServer(config: ArtisanConfig) {
     return { git: true, branch, additions: Number(additions) || 0, deletions: Number(deletions) || 0, files };
   });
 
+  // --- git commit (sidebar) -------------------------------------------------------
+  app.post("/sessions/:id/git/commit", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const body = (req.body ?? {}) as { message?: string };
+    const message = body.message?.trim();
+    if (!message) return reply.code(400).send({ error: "message required" });
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    const safe = message.replace(/'/g, "'\\''");
+    const script = [
+      "git rev-parse --git-dir >/dev/null 2>&1 || exit 14",
+      "git add -A",
+      "git diff --cached --quiet && exit 15",
+      `git -c user.name=artisan -c user.email=artisan@twodb.local commit -q -m '${safe}' || exit 16`,
+      "git rev-parse HEAD",
+    ].join("\n");
+    const res = await deps.dispatch.exec(session.runner, script, session.directory, 30_000);
+    if (res.exitCode === 14) return reply.code(409).send({ error: "not_a_git_repo" });
+    if (res.exitCode === 15) return reply.code(409).send({ error: "nothing_to_commit" });
+    if (res.exitCode !== 0) return reply.code(500).send({ error: "commit_failed", detail: res.stderr.slice(0, 300) });
+    return { ok: true, sha: res.stdout.trim() };
+  });
+
+  // --- background jobs (sidebar) ----------------------------------------------------
+  app.get("/sessions/:id/jobs", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    const jobs = await deps.dispatch.listJobs(session.runner);
+    // Jobs carry no cwd — show the runner's recent jobs, newest first.
+    return jobs.slice(0, 12).map((j) => ({
+      id: j.id, command: j.command, status: j.status, exitCode: j.exitCode,
+      startedAt: j.startedAt, endedAt: j.endedAt,
+    }));
+  });
+
   // --- child sessions (subagents sidebar) -----------------------------------------
   app.get("/sessions/:id/children", async (req, reply) => {
     const ctx = requireCtx(req, reply);

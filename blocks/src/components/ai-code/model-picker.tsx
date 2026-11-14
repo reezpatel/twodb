@@ -15,6 +15,8 @@ export interface ModelEntry {
   thinking?: boolean;
   /** Thinking levels this model supports (e.g. ["low","medium","high"]). Enables the effort selector when the model is selected. */
   thinkingLevels?: string[];
+  /** Optional full identifier for the trigger chip (e.g. "GLM/glm-4.7"); rows show `label`. */
+  triggerLabel?: string;
 }
 
 export interface ModelProvider {
@@ -57,7 +59,7 @@ function ModelPicker({ providers, models, value, onChange, thinkingLevel, onThin
   // The trigger always shows the model identifier (label), never the internal
   // value/id (which can be a connection-scoped key like "uuid::model").
   const selected = groups.flatMap((g) => g.models).find((m) => m.id === value);
-  const selectedLabel = selected?.label ?? (groups.flatMap((g) => g.models).length ? "Select model" : "No models");
+  const selectedLabel = selected?.triggerLabel ?? selected?.label ?? (groups.flatMap((g) => g.models).length ? "Select model" : "No models");
   const effortLevels = selected?.thinkingLevels ?? (selected?.thinking ? ["low", "medium", "high"] : []);
   const activeEffort = thinkingLevel && effortLevels.includes(thinkingLevel) ? thinkingLevel : effortLevels[Math.floor(effortLevels.length / 2)] ?? effortLevels[0];
 
@@ -83,8 +85,8 @@ function ModelPicker({ providers, models, value, onChange, thinkingLevel, onThin
           "focus-visible:outline-2 focus-visible:outline-ion-deep disabled:pointer-events-none disabled:opacity-40",
         )}
       >
-        <span data-slot="model-picker-label" className="flex min-w-0 items-baseline gap-1.5 text-xs">
-          <span className="truncate text-ink">{selectedLabel}</span>
+        <span data-slot="model-picker-label" className="flex items-baseline gap-1.5 whitespace-nowrap text-xs">
+          <span className="text-ink">{selectedLabel}</span>
           {effortLevels.length > 0 && activeEffort ? (
             <span className="shrink-0 font-medium text-muted-foreground/70 capitalize tabular-nums">{activeEffort}</span>
           ) : null}
@@ -108,7 +110,7 @@ function ModelPicker({ providers, models, value, onChange, thinkingLevel, onThin
         </div>
 
         {/* Provider tabs + model table: clipped to the dialog's rounded corners */}
-        <div className="overflow-hidden rounded-b-[10px]">
+        <div className="flex max-h-[420px] flex-col overflow-hidden rounded-b-[10px]">
           <div className="border-b border-outline px-3 pt-2">
             <Tabs value={activeProvider} onValueChange={setActiveProvider}>
               <TabsList variant="line" size="sm" className="border-b-0">
@@ -125,7 +127,7 @@ function ModelPicker({ providers, models, value, onChange, thinkingLevel, onThin
             </Tabs>
           </div>
 
-          <div className="max-h-[320px] overflow-y-auto p-2">
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
             {groups
               .filter((g) => g.id === activeProvider)
               .map((g) => {
@@ -150,7 +152,7 @@ function ModelPicker({ providers, models, value, onChange, thinkingLevel, onThin
                           )}
                         >
                           <span className="flex size-4 shrink-0 items-center justify-center">{isSel ? <Check className="size-3.5 text-ion-deep" strokeWidth={2.5} /> : null}</span>
-                          <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-ink">{m.label ?? m.id}</span>
+                          <span className="min-w-0 flex-1 font-mono text-[12.5px] text-ink">{m.label ?? m.id}</span>
                           {m.context ? <span className="shrink-0 font-sans text-[11px] text-muted-foreground tabular-nums">{m.context}</span> : null}
                           {m.thinking ? (
                             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ion/40 px-2 py-0.5 font-sans text-[10px] font-medium text-ink">

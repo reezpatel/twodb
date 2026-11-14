@@ -19,6 +19,15 @@ export interface ChildSession {
   updatedAt: string;
 }
 
+export interface JobRow {
+  id: string;
+  command: string;
+  status: string;
+  exitCode: number | null;
+  startedAt: string;
+  endedAt: string | null;
+}
+
 export interface Checkpoint {
   id: string;
   sessionId: string;
@@ -33,6 +42,7 @@ export function useSessionSide(sessionId: string) {
   const [children, setChildren] = useState<ChildSession[]>([]);
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [plan, setPlan] = useState<Array<{ description: string; status: string }> | null>(null);
+  const [jobs, setJobs] = useState<JobRow[]>([]);
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -57,8 +67,39 @@ export function useSessionSide(sessionId: string) {
   useEffect(() => {
     void refresh();
     const t = setInterval(() => void refresh(), 15_000);
-    return () => clearInterval(t);
-  }, [refresh]);
+    const pollJobs = () => {
+      fetch(`/artisan-api/sessions/${sessionId}/jobs`, { credentials: "include" })
+        .then((r) => (r.ok ? r.json() : []))
+        .then(setJobs)
+        .catch(() => {});
+    };
+    pollJobs();
+    const tJobs = setInterval(pollJobs, 6_000);
+    return () => {
+      clearInterval(t);
+      clearInterval(tJobs);
+    };
+  }, [refresh, sessionId]);
+
+  const commit = useCallback(async (message: string): Promise<string | null> => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/artisan-api/sessions/${sessionId}/git/commit`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        return body.error === "nothing_to_commit" ? "nothing to commit" : body.error === "not_a_git_repo" ? "not a git repo" : "commit failed";
+      }
+      await refresh();
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }, [sessionId, refresh]);
 
   const createCheckpoint = useCallback(async (label: string) => {
     setBusy(true);
@@ -89,7 +130,7 @@ export function useSessionSide(sessionId: string) {
     await refresh();
   }, [refresh]);
 
-  return { git, children, checkpoints, plan, busy, refresh, createCheckpoint, restoreCheckpoint, deleteCheckpoint };
+  return { git, children, checkpoints, plan, jobs, busy, refresh, commit, createCheckpoint, restoreCheckpoint, deleteCheckpoint };
 }
 
 /** Load/save session files (editor tab). */

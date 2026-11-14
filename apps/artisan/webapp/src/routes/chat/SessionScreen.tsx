@@ -32,7 +32,7 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
           {tab === "checkpoints" ? <CheckpointsScreen sessionId={props.sessionId} /> : null}
         </div>
       </div>
-      <SessionSidebar plan={side.plan} children={side.children} git={side.git} onOpenChild={props.onOpenChild} />
+      <SessionSidebar plan={side.plan} children={side.children} git={side.git} jobs={side.jobs} busy={side.busy} onCommit={side.commit} onOpenChild={props.onOpenChild} />
     </div>
   );
 }

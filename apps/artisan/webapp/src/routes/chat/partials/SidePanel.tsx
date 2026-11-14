@@ -60,6 +60,19 @@ export function GitFileRow(props: { path: string; status: string }) {
   );
 }
 
+/** Background-job row: command preview + status/exit. */
+export function JobRow(props: { command: string; status: string; exitCode: number | null }) {
+  const running = props.status === "running" || props.status === "queued";
+  const tone = running ? "text-info" : props.exitCode === 0 ? "text-success" : "text-destructive";
+  return (
+    <div className="flex items-center gap-2 py-0.5 text-[11px]">
+      <span className={cn("size-1.5 shrink-0 rounded-full", running ? "animate-pulse bg-info" : props.exitCode === 0 ? "bg-success" : "bg-destructive")} />
+      <span className="min-w-0 flex-1 truncate font-mono text-ink-muted" title={props.command}>{props.command}</span>
+      <span className={cn("shrink-0", tone)}>{running ? props.status : props.exitCode ?? props.status}</span>
+    </div>
+  );
+}
+
 /** Checkpoint row: label + sha + restore/delete. */
 export function CheckpointRow(props: { label: string | null; sha: string; createdAt: string; onRestore: () => void; onDelete: () => void }) {
   return (

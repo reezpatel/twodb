@@ -18,6 +18,7 @@ export function useSessionChat(sessionId: string) {
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [queue, setQueue] = useState<Array<{ id: string; content: string }>>([]);
   const scroller = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
@@ -37,9 +38,55 @@ export function useSessionChat(sessionId: string) {
     setStreamText("");
     setToolEvents([]);
     setAsk(null);
+    setQueue([]);
     socket.send({ type: "join", sessionId });
     return () => socket.send({ type: "leave", sessionId });
   }, [sessionId, refresh, socket]);
+
+  const doSend = useCallback(async (text: string) => {
+    setStreamText("");
+    setRunning(true);
+    try {
+      await artisanClient.sendMessage(sessionId, text);
+      // messages arrive via WS frames; also poke the transcript for the user row
+      void refresh();
+    } catch (e) {
+      setError((e as Error).message);
+      setRunning(false);
+    }
+  }, [sessionId, refresh]);
+
+  const flushQueue = useCallback(() => {
+    setQueue((prev) => {
+      if (prev.length === 0) return prev;
+      const [first, ...rest] = prev;
+      queueMicrotask(() => void doSend(first.content));
+      return rest;
+    });
+  }, [doSend]);
+
+  /** Sends text, or queues it while a run is in flight (legacy code-chat-queue). */
+  const send = useCallback(async (text: string) => {
+    if (running) {
+      setQueue((prev) => [...prev, { id: crypto.randomUUID(), content: text }]);
+      return;
+    }
+    await doSend(text);
+  }, [running, doSend]);
+
+  const removeQueued = useCallback((id: string) => {
+    setQueue((prev) => prev.filter((q) => q.id !== id));
+  }, []);
+
+  /** Send a queued message now: move it to the front, stop the current run. */
+  const sendQueuedNow = useCallback((id: string) => {
+    setQueue((prev) => {
+      const item = prev.find((q) => q.id === id);
+      if (!item) return prev;
+      return [item, ...prev.filter((q) => q.id !== id)];
+    });
+    void artisanClient.abort(sessionId);
+  }, [sessionId]);
 
   useEffect(() => {
     const off = onFrame((frame) => {
@@ -96,28 +143,17 @@ export function useSessionChat(sessionId: string) {
           setRunning(false);
           setStatus(null);
           void refresh();
+          flushQueue();
           break;
       }
     });
     return off;
-  }, [onFrame, sessionId, refresh]);
+  }, [onFrame, sessionId, refresh, flushQueue]);
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
   }, [streamText, toolEvents.length, detail?.messages.length]);
 
-  const send = useCallback(async (text: string) => {
-    setStreamText("");
-    setRunning(true);
-    try {
-      await artisanClient.sendMessage(sessionId, text);
-      // messages arrive via WS frames; also poke the transcript for the user row
-      void refresh();
-    } catch (e) {
-      setError((e as Error).message);
-      setRunning(false);
-    }
-  }, [sessionId, refresh]);
 
   const answer = useCallback((askId: string, answers: Array<string | string[]>) => {
     socket.send({ type: "answer", sessionId, askId, answers });
@@ -143,7 +179,8 @@ export function useSessionChat(sessionId: string) {
 
   return {
     detail, error, running, status, streamText, thinking, toolEvents, ask, usage,
+    queue,
     messages: detail?.messages ?? [] as MessageInfo[],
-    scroller, send, answer, cancelAsk, newThread, compact, abort, refresh,
+    scroller, send, removeQueued, sendQueuedNow, answer, cancelAsk, newThread, compact, abort, refresh,
   };
 }

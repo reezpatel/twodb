@@ -8,7 +8,7 @@ export function ChatComposer({ busy = false, className, ...props }: ComponentPro
     <div
       data-slot="chat-composer"
       data-busy={busy || undefined}
-      className={cn("flex flex-col gap-1.5 rounded-md border bg-surface-muted/60 p-2 shadow-sm transition-colors", busy && "border-primary/50", className)}
+      className={cn("relative flex flex-col gap-1.5 rounded-md border bg-surface-muted/60 p-2 shadow-sm transition-colors", busy && "border-primary/50", className)}
       {...props}
     />
   );
