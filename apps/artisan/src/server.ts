@@ -833,10 +833,18 @@ echo saved`;
         `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(session.runner)}/proxy-ws?port=${EDITOR_PORT}&path=${encodeURIComponent("/" + sub + url.search)}`,
         { headers: { authorization: `Bearer ${apiKeyFor(req)}` } },
       );
-      upstream.on("message", (raw: unknown) => { if (socket.readyState === socket.OPEN) socket.send(String(raw)); });
+      // Binary-safe relay. VS Code's Management/ExtensionHost protocol sends
+      // BINARY frames when skipWebSocketFrames=false; dispatch's proxy-ws and the
+      // runner carry payloads base64-encoded as text. So: client→upstream we
+      // base64-encode the frame (Buffer or string); upstream→client we base64-
+      // DECODE back to raw bytes and forward as binary. String(raw) on a Buffer
+      // would mangle the frame and stall VS Code's handshake.
+      const toB64 = (raw: unknown): string => (typeof raw === "string" ? raw : Buffer.from(raw as Buffer).toString("base64"));
+      const fromB64 = (raw: unknown): Buffer => (typeof raw === "string" ? Buffer.from(raw, "base64") : Buffer.from(raw as Buffer));
+      upstream.on("message", (raw: unknown) => { if (socket.readyState === socket.OPEN) socket.send(fromB64(raw)); });
       upstream.on("close", () => { if (socket.readyState === socket.OPEN) socket.close(); });
       upstream.on("error", () => { if (socket.readyState === socket.OPEN) socket.close(1011, "upstream"); });
-      socket.on("message", (raw: unknown) => { if (upstream.readyState === upstream.OPEN) upstream.send(String(raw)); });
+      socket.on("message", (raw: unknown) => { if (upstream.readyState === upstream.OPEN) upstream.send(toB64(raw)); });
       socket.on("close", () => { try { upstream.close(); } catch { /* ignore */ } });
       // Keep the hop chain (browser→gateway→artisan→dispatch→runner→code-server)
       // alive: none of the intermediaries sends WS pings, so a backgrounded tab
@@ -982,10 +990,18 @@ echo saved`;
         `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(session.runner)}/proxy-ws?port=${port}&path=${encodeURIComponent(path)}`,
         { headers: { authorization: `Bearer ${apiKeyFor(req)}` } },
       );
-      upstream.on("message", (raw: unknown) => { if (socket.readyState === socket.OPEN) socket.send(String(raw)); });
+      // Binary-safe relay. VS Code's Management/ExtensionHost protocol sends
+      // BINARY frames when skipWebSocketFrames=false; dispatch's proxy-ws and the
+      // runner carry payloads base64-encoded as text. So: client→upstream we
+      // base64-encode the frame (Buffer or string); upstream→client we base64-
+      // DECODE back to raw bytes and forward as binary. String(raw) on a Buffer
+      // would mangle the frame and stall VS Code's handshake.
+      const toB64 = (raw: unknown): string => (typeof raw === "string" ? raw : Buffer.from(raw as Buffer).toString("base64"));
+      const fromB64 = (raw: unknown): Buffer => (typeof raw === "string" ? Buffer.from(raw, "base64") : Buffer.from(raw as Buffer));
+      upstream.on("message", (raw: unknown) => { if (socket.readyState === socket.OPEN) socket.send(fromB64(raw)); });
       upstream.on("close", () => { if (socket.readyState === socket.OPEN) socket.close(); });
       upstream.on("error", () => { if (socket.readyState === socket.OPEN) socket.close(1011, "upstream"); });
-      socket.on("message", (raw: unknown) => { if (upstream.readyState === upstream.OPEN) upstream.send(String(raw)); });
+      socket.on("message", (raw: unknown) => { if (upstream.readyState === upstream.OPEN) upstream.send(toB64(raw)); });
       socket.on("close", () => { try { upstream.close(); } catch { /* ignore */ } });
     })();
   });
