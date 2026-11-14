@@ -136,8 +136,9 @@ export async function buildServer(config: ArtisanConfig) {
   app.get("/sessions", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
-    const q = req.query as { type?: string; runner?: string; directory?: string; spaceId?: string; all?: string };
-    const filter: { type?: string; runner?: string; directory?: string; spaceId?: string } = {};
+    const q = req.query as { type?: string; runner?: string; directory?: string; spaceId?: string; all?: string; archived?: string };
+    const filter: { type?: string; runner?: string; directory?: string; spaceId?: string; archived?: "include" | "only" } = {};
+    if (q.archived === "include") filter.archived = "include";
     if (q.all !== "1") filter.type = q.type ?? "directory";
     else if (q.type) filter.type = q.type;
     if (q.runner) filter.runner = q.runner;
@@ -167,14 +168,23 @@ export async function buildServer(config: ArtisanConfig) {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const { id } = req.params as { id: string };
-    const body = (req.body ?? {}) as { title?: string; model?: string; thinkingLevel?: string | null; plan?: Array<{ description: string; status: string }> | null };
+    const body = (req.body ?? {}) as { title?: string; model?: string; thinkingLevel?: string | null; archived?: boolean; plan?: Array<{ description: string; status: string }> | null };
     if (body.title) await repo.renameSession(ctx.workspaceId, id, body.title);
+    if (body.archived !== undefined) await repo.setSessionArchived(ctx.workspaceId, id, body.archived);
     if (body.model) await repo.setSessionModel(ctx.workspaceId, id, body.model);
     if (body.thinkingLevel !== undefined) await repo.setSessionThinkingLevel(ctx.workspaceId, id, body.thinkingLevel);
     if (body.plan !== undefined) await repo.setSessionPlan(id, body.plan);
     const session = await repo.getSession(ctx.workspaceId, id);
     const plan = session?.plan_json ? JSON.parse(session.plan_json) : null;
     return session ? { ...sessionOut(session), plan } : reply.code(404).send({ error: "not found" });
+  });
+
+  app.delete("/sessions/:id", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    if (isSessionRunning(id)) return reply.code(409).send({ error: "session running" });
+    return { ok: await repo.deleteSession(ctx.workspaceId, id) };
   });
 
   // Message send via HTTP (WS send is the primary path).
@@ -494,25 +504,44 @@ export async function buildServer(config: ArtisanConfig) {
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
     const deps = depsFor(req);
+    // Branch, ahead/behind vs upstream, then per-file line counts (numstat vs HEAD) + porcelain status.
     const script = [
       "git rev-parse --abbrev-ref HEAD 2>/dev/null || exit 14",
-      'A=$(git status --porcelain 2>/dev/null | grep -c "^A\|^M\|^ M\|^MM") || A=0',
-      'D=$(git status --porcelain 2>/dev/null | grep -c "^D\|^ D") || D=0',
-      'echo "$A $D"',
+      'echo "@@ab $(git rev-list --left-right --count @{upstream}...HEAD 2>/dev/null || echo none)"',
+      'echo "@@numstat"',
+      "git -c core.quotepath=false diff HEAD --numstat 2>/dev/null",
+      'echo "@@status"',
+      "git -c core.quotepath=false status --porcelain 2>/dev/null",
     ].join("\n");
     const res = await deps.dispatch.exec(session.runner, script, session.directory, 20_000);
     if (res.exitCode === 14) return { git: false };
     if (res.exitCode !== 0) return { git: false, error: res.stderr.slice(0, 200) };
-    const [branch] = res.stdout.trim().split("\n");
-    const last = res.stdout.trim().split("\n").pop() ?? "0 0";
-    const [additions, deletions] = last.split(" ");
-    const porcelain = await deps.dispatch.exec(session.runner, "git status --porcelain", session.directory, 20_000);
-    const files = porcelain.stdout.split("\n").filter(Boolean).slice(0, 50).map((line) => {
+    const lines = res.stdout.split("\n");
+    const branch = lines[0]?.trim() ?? "";
+    const abLine = lines.find((l) => l.startsWith("@@ab ")) ?? "@@ab none";
+    const [behindS, aheadS] = abLine.slice(5).trim().split(/\s+/);
+    const hasUpstream = abLine.slice(5).trim() !== "none";
+    const iNum = lines.indexOf("@@numstat");
+    const iStat = lines.indexOf("@@status");
+    const counts = new Map<string, { additions: number | null; deletions: number | null }>();
+    for (const l of lines.slice(iNum + 1, iStat)) {
+      const [add, del, ...rest] = l.split("\t");
+      if (!rest.length) continue;
+      counts.set(rest.join("\t"), { additions: add === "-" ? null : Number(add), deletions: del === "-" ? null : Number(del) });
+    }
+    const files = lines.slice(iStat + 1).filter(Boolean).slice(0, 200).map((line) => {
       const status = line.slice(0, 2).trim();
-      const path = line.slice(3).trim();
-      return { path, status };
+      const path = line.slice(3).trim().replace(/^.* -> /, "");
+      const c = counts.get(path);
+      return { path, status, additions: c?.additions ?? null, deletions: c?.deletions ?? null };
     });
-    return { git: true, branch, additions: Number(additions) || 0, deletions: Number(deletions) || 0, files };
+    return {
+      git: true, branch,
+      ahead: hasUpstream ? Number(aheadS) || 0 : null, behind: hasUpstream ? Number(behindS) || 0 : null,
+      additions: files.reduce((n, f) => n + (f.additions ?? 0), 0),
+      deletions: files.reduce((n, f) => n + (f.deletions ?? 0), 0),
+      files,
+    };
   });
 
   // --- per-file git diff (Changes view) ------------------------------------------
@@ -1053,11 +1082,11 @@ function checkpointOut(c: { id: string; session_id: string; label: string | null
   return { id: c.id, sessionId: c.session_id, label: c.label, commitSha: c.commit_sha, ref: c.ref, trigger: c.trigger, createdAt: c.created_at };
 }
 
-function sessionOut(s: { id: string; type: string; title: string; runner: string; directory: string; model: string; interactive: boolean; space_id: string; agent_id: string | null; parent_session_id: string | null; thinking_level: string | null; created_at: string; updated_at: string }) {
+function sessionOut(s: { id: string; type: string; title: string; runner: string; directory: string; model: string; interactive: boolean; space_id: string; agent_id: string | null; parent_session_id: string | null; thinking_level: string | null; archived_at?: string | null; created_at: string; updated_at: string }) {
   return {
     id: s.id, type: s.type, title: s.title, runner: s.runner, directory: s.directory,
     model: s.model, interactive: s.interactive, spaceId: s.space_id, agentId: s.agent_id,
-    parentSessionId: s.parent_session_id, thinkingLevel: s.thinking_level, createdAt: s.created_at, updatedAt: s.updated_at,
+    parentSessionId: s.parent_session_id, thinkingLevel: s.thinking_level, archivedAt: s.archived_at ?? null, createdAt: s.created_at, updatedAt: s.updated_at,
   };
 }
 

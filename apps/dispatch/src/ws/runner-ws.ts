@@ -283,6 +283,10 @@ function handleFrame(socket: WebSocket, runner: RunnerRow, raw: unknown, enrolle
       return;
     }
     case "proxyWsOpenResult": {
+      // Resolve the pending sendToRunner (proxy-ws awaits it before subscribing)
+      // AND publish for any subscriber. Only publishing left the await hanging
+      // until its 15s timeout — every editor WS then died as "ws proxy failed".
+      hub_.resolveCall(String(frame.callId), frame);
       hub_.publish(String(frame.callId), { type: "proxyWsOpenResult", callId: frame.callId, ok: frame.ok, error: frame.error });
       return;
     }

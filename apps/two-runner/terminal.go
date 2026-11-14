@@ -239,9 +239,18 @@ func (r *runner) doProxyWsOpen(f frame) {
 	// editor relay then died 1006. code-server ignores the header regardless.
 	dialer := websocket.Dialer{Subprotocols: []string{}}
 	hdr := http.Header{}
+	// Never forward the client's own WS handshake headers — gorilla sets
+	// Sec-WebSocket-Key/Version/Extensions itself, and forwarding the client's
+	// copy produced "duplicate header not allowed: Sec-Websocket-Key" and a
+	// failed handshake.
+	skip := map[string]bool{
+		"sec-websocket-key": true, "sec-websocket-version": true,
+		"sec-websocket-extensions": true, "sec-websocket-protocol": true,
+		"connection": true, "upgrade": true,
+	}
 	if headers, ok := f["headers"].(map[string]any); ok {
 		for k, v := range headers {
-			if strings.EqualFold(k, "sec-websocket-protocol") {
+			if skip[strings.ToLower(k)] {
 				continue
 			}
 			hdr.Set(k, fmt.Sprint(v))
@@ -256,13 +265,16 @@ func (r *runner) doProxyWsOpen(f frame) {
 	wsTunnels[callID] = conn
 	wsTunnelsMu.Unlock()
 	_ = r.send(frame{"type": "proxyWsOpenResult", "callId": callID, "ok": true})
+	println("[proxyws] open ok", callID)
 
 	go func() {
 		for {
 			mt, data, err := conn.ReadMessage()
 			if err != nil {
+				println("[proxyws] cs read err", callID, err.Error())
 				break
 			}
+			println("[proxyws] cs->relay", callID, len(data), "bytes")
 			if mt == websocket.BinaryMessage {
 				_ = r.send(frame{"type": "proxyWsData", "callId": callID, "dataBase64": b64Encode(data)})
 			} else {
@@ -286,8 +298,10 @@ func (r *runner) doProxyWsWrite(f frame) {
 	}
 	b, err := b64Decode(f.str("dataBase64"))
 	if err != nil || len(b) == 0 {
+		println("[proxyws] write decode fail", callID)
 		return
 	}
+	println("[proxyws] write", callID, len(b), "bytes")
 	_ = conn.WriteMessage(websocket.BinaryMessage, b)
 }
 
