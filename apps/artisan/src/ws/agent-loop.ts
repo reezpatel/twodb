@@ -322,6 +322,9 @@ export async function runAgentLoop(opts: {
           tools: toolDefs.length ? toolDefs : undefined,
           signal: ctrl.signal,
           effort: session.thinking_level ?? null,
+          // Reasoning models (e.g. glm) spend budget on reasoning_content and can return
+          // empty content when it runs out — give enough headroom for an answer + tool args.
+          maxTokens: 8192,
         })) {
           const think = chunk.delta?.reasoning ?? chunk.delta?.reasoning_content;
           if (think) {
