@@ -44,6 +44,10 @@ export default defineConfig({
           "/apps/twothing": { target: gateway, changeOrigin: true },
           // Control-plane session surface (better-auth) — shared-origin SSO.
           "/api": { target: gateway, changeOrigin: true },
+          // Central login: the ?code from TwoDB's /authorize is exchanged at
+          // POST /registry/oauth/token (twodb-shared-frontend). Without this
+          // proxy Vite answers 404 and the login never completes.
+          "/registry": { target: gateway, changeOrigin: true },
         },
   },
 });

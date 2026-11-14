@@ -26,9 +26,15 @@ const member = z.object({
 
 const channel = z.object({
   id: z.string(),
+  listId: z.string().nullable(),
   kind: z.enum(["channel", "dm"]),
   name: z.string(),
   topic: z.string().nullable(),
+  isReadOnly: z.boolean(),
+  sourceProvider: z.string().nullable(),
+  sourceExternalId: z.string().nullable(),
+  sourceUrl: z.string().nullable(),
+  avatarUrl: z.string().nullable(),
   dmKey: z.string().nullable(),
   position: z.number(),
   createdBy: z.string().nullable(),
@@ -52,6 +58,9 @@ const message = z.object({
   botId: z.string().nullable(),
   authorName: z.string(),
   authorEmoji: z.string().nullable(),
+  authorAvatarUrl: z.string().nullable(),
+  externalId: z.string().nullable(),
+  sourceUrl: z.string().nullable(),
   text: z.string(),
   blocks: messageBlocks.nullable(),
   replyToId: z.string().nullable(),
@@ -105,6 +114,18 @@ const messageAction = z.object({
   createdAt: z.string(),
 });
 
+const conversationList = z.object({
+  id: z.string(),
+  spaceId: z.string().nullable(),
+  name: z.string(),
+  position: z.number(),
+  isDefault: z.boolean(),
+  conversationCount: z.number(),
+  unreadCount: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 // --- Endpoints -----------------------------------------------------------------
 
 const listChannels = defineEndpoint({
@@ -125,6 +146,7 @@ const createChannel = defineEndpoint({
   request: z.object({
     name: z.string().min(1),
     topic: z.string().optional(),
+    listId: z.string().optional(),
     botIds: z.array(z.string()).optional(),
   }),
   response: channel,
@@ -152,6 +174,9 @@ const updateChannel = defineEndpoint({
     topic: z.string().nullable().optional(),
     archived: z.boolean().optional(),
     position: z.number().optional(),
+    listId: z.string().optional(),
+    isReadOnly: z.boolean().optional(),
+    sourceUrl: z.string().nullable().optional(),
   }),
   response: channel,
 });
@@ -193,6 +218,7 @@ const openDm = defineEndpoint({
   auth: "session",
   description: "Opens (or returns the existing) direct-message channel between the caller and the given users/bots. dm_key is the stable sorted actor set.",
   request: z.object({
+    listId: z.string().optional(),
     userIds: z.array(z.string()).optional(),
     botIds: z.array(z.string()).optional(),
   }),
@@ -436,6 +462,95 @@ const acknowledgeBotAction = defineEndpoint({
   response: z.object({ ok: z.boolean() }),
 });
 
+const listConversationLists = defineEndpoint({
+  name: "listConversationLists",
+  method: "GET",
+  path: "/lists",
+  auth: "session",
+  description: "Lists the dynamic top-level conversation lists visible to the caller. Lists may be workspace-wide or scoped to one accessible space. Messages is created automatically as the default list.",
+  response: z.array(conversationList),
+});
+
+const createConversationList = defineEndpoint({
+  name: "createConversationList",
+  method: "POST",
+  path: "/lists",
+  auth: "session",
+  description: "Creates an isolated conversation list/tab, optionally scoped to a space.",
+  request: z.object({ name: z.string().min(1), spaceId: z.string().nullable().optional() }),
+  response: conversationList,
+});
+
+const updateConversationList = defineEndpoint({
+  name: "updateConversationList",
+  method: "PATCH",
+  path: "/lists/:id",
+  auth: "session",
+  description: "Renames, reorders, or changes the space scope of a conversation list.",
+  request: z.object({ id: z.string(), name: z.string().optional(), spaceId: z.string().nullable().optional(), position: z.number().optional() }),
+  response: z.object({ ok: z.boolean() }),
+});
+
+const deleteConversationList = defineEndpoint({
+  name: "deleteConversationList",
+  method: "DELETE",
+  path: "/lists/:id",
+  auth: "session",
+  description: "Deletes a non-default empty list. Move or delete its conversations first.",
+  request: z.object({ id: z.string() }),
+  response: z.object({ ok: z.boolean() }),
+});
+
+const listListConversations = defineEndpoint({
+  name: "listListConversations",
+  method: "GET",
+  path: "/lists/:id/conversations",
+  auth: "session",
+  description: "Lists only the conversations isolated inside one visible list.",
+  request: z.object({ id: z.string() }),
+  response: z.array(channel),
+});
+
+const createListConversation = defineEndpoint({
+  name: "createListConversation",
+  method: "POST",
+  path: "/lists/:id/conversations",
+  auth: "session",
+  description: "Creates a conversation in a list. Each conversation independently chooses isReadOnly; optional source metadata supports local copies from Slack, Teams, WhatsApp, or any external system.",
+  request: z.object({
+    id: z.string(),
+    name: z.string(),
+    kind: z.enum(["channel", "dm"]).optional(),
+    topic: z.string().optional(),
+    isReadOnly: z.boolean().optional(),
+    sourceProvider: z.string().optional(),
+    sourceExternalId: z.string().optional(),
+    sourceUrl: z.string().optional(),
+    avatarUrl: z.string().optional(),
+  }),
+  response: channel,
+});
+
+const importConversationMessages = defineEndpoint({
+  name: "importConversationMessages",
+  method: "POST",
+  path: "/conversations/:id/import",
+  auth: "session-or-apiKey",
+  description: "Idempotently stores immutable local message copies in a read-only conversation. Source-specific collectors normalize into this provider-neutral envelope.",
+  request: z.object({
+    id: z.string(),
+    messages: z.array(z.object({
+      externalId: z.string(),
+      senderName: z.string(),
+      senderAvatarUrl: z.string().optional(),
+      text: z.string(),
+      sourceUrl: z.string().optional(),
+      sentAt: z.string(),
+    })),
+  }),
+  response: z.object({ inserted: z.number(), duplicate: z.number() }),
+});
+
 const listNotifications = defineEndpoint({
   name: "listNotifications",
   method: "GET",
@@ -520,6 +635,13 @@ export const twochatManifest = defineAppManifest({
     botWebhook,
     listBotActions,
     acknowledgeBotAction,
+    listConversationLists,
+    createConversationList,
+    updateConversationList,
+    deleteConversationList,
+    listListConversations,
+    createListConversation,
+    importConversationMessages,
     listNotifications,
     markNotificationRead,
     markAllNotificationsRead,

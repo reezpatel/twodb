@@ -9,7 +9,7 @@ Workspace chat (Slack-style): public channels, DMs, threads, reactions, pins, sa
 - **Capabilities**: search, ws
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T13:23:28.516Z_
+_Generated: 2026-11-14T03:42:35.842Z_
 
 ## Endpoints
 
@@ -30,6 +30,12 @@ Every visible channel + DM for the caller, each with unread count, member list a
       "id": {
         "type": "string"
       },
+      "listId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
       "kind": {
         "type": "string",
         "enum": [
@@ -41,6 +47,33 @@ Every visible channel + DM for the caller, each with unread count, member list a
         "type": "string"
       },
       "topic": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "isReadOnly": {
+        "type": "boolean"
+      },
+      "sourceProvider": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sourceExternalId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sourceUrl": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "avatarUrl": {
         "type": [
           "string",
           "null"
@@ -151,9 +184,15 @@ Every visible channel + DM for the caller, each with unread count, member list a
     },
     "required": [
       "id",
+      "listId",
       "kind",
       "name",
       "topic",
+      "isReadOnly",
+      "sourceProvider",
+      "sourceExternalId",
+      "sourceUrl",
+      "avatarUrl",
       "dmKey",
       "position",
       "createdBy",
@@ -190,6 +229,9 @@ Creates a group channel. `botIds` optionally adds agent participants at create t
     "topic": {
       "type": "string"
     },
+    "listId": {
+      "type": "string"
+    },
     "botIds": {
       "type": "array",
       "items": {
@@ -213,6 +255,12 @@ Creates a group channel. `botIds` optionally adds agent participants at create t
     "id": {
       "type": "string"
     },
+    "listId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "kind": {
       "type": "string",
       "enum": [
@@ -224,6 +272,33 @@ Creates a group channel. `botIds` optionally adds agent participants at create t
       "type": "string"
     },
     "topic": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "isReadOnly": {
+      "type": "boolean"
+    },
+    "sourceProvider": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceExternalId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "avatarUrl": {
       "type": [
         "string",
         "null"
@@ -334,9 +409,15 @@ Creates a group channel. `botIds` optionally adds agent participants at create t
   },
   "required": [
     "id",
+    "listId",
     "kind",
     "name",
     "topic",
+    "isReadOnly",
+    "sourceProvider",
+    "sourceExternalId",
+    "sourceUrl",
+    "avatarUrl",
     "dmKey",
     "position",
     "createdBy",
@@ -385,6 +466,12 @@ One channel with members. Members (incl. bots) can read; membership is checked. 
     "id": {
       "type": "string"
     },
+    "listId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "kind": {
       "type": "string",
       "enum": [
@@ -396,6 +483,33 @@ One channel with members. Members (incl. bots) can read; membership is checked. 
       "type": "string"
     },
     "topic": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "isReadOnly": {
+      "type": "boolean"
+    },
+    "sourceProvider": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceExternalId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "avatarUrl": {
       "type": [
         "string",
         "null"
@@ -506,9 +620,15 @@ One channel with members. Members (incl. bots) can read; membership is checked. 
   },
   "required": [
     "id",
+    "listId",
     "kind",
     "name",
     "topic",
+    "isReadOnly",
+    "sourceProvider",
+    "sourceExternalId",
+    "sourceUrl",
+    "avatarUrl",
     "dmKey",
     "position",
     "createdBy",
@@ -554,6 +674,18 @@ Rename / re-topic / (un)archive / reorder a channel.
     },
     "position": {
       "type": "number"
+    },
+    "listId": {
+      "type": "string"
+    },
+    "isReadOnly": {
+      "type": "boolean"
+    },
+    "sourceUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [
@@ -572,6 +704,12 @@ Rename / re-topic / (un)archive / reorder a channel.
     "id": {
       "type": "string"
     },
+    "listId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "kind": {
       "type": "string",
       "enum": [
@@ -583,6 +721,33 @@ Rename / re-topic / (un)archive / reorder a channel.
       "type": "string"
     },
     "topic": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "isReadOnly": {
+      "type": "boolean"
+    },
+    "sourceProvider": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceExternalId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "avatarUrl": {
       "type": [
         "string",
         "null"
@@ -693,9 +858,15 @@ Rename / re-topic / (un)archive / reorder a channel.
   },
   "required": [
     "id",
+    "listId",
     "kind",
     "name",
     "topic",
+    "isReadOnly",
+    "sourceProvider",
+    "sourceExternalId",
+    "sourceUrl",
+    "avatarUrl",
     "dmKey",
     "position",
     "createdBy",
@@ -844,6 +1015,9 @@ Opens (or returns the existing) direct-message channel between the caller and th
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
+    "listId": {
+      "type": "string"
+    },
     "userIds": {
       "type": "array",
       "items": {
@@ -870,6 +1044,12 @@ Opens (or returns the existing) direct-message channel between the caller and th
     "id": {
       "type": "string"
     },
+    "listId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "kind": {
       "type": "string",
       "enum": [
@@ -881,6 +1061,33 @@ Opens (or returns the existing) direct-message channel between the caller and th
       "type": "string"
     },
     "topic": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "isReadOnly": {
+      "type": "boolean"
+    },
+    "sourceProvider": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceExternalId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "avatarUrl": {
       "type": [
         "string",
         "null"
@@ -991,9 +1198,15 @@ Opens (or returns the existing) direct-message channel between the caller and th
   },
   "required": [
     "id",
+    "listId",
     "kind",
     "name",
     "topic",
+    "isReadOnly",
+    "sourceProvider",
+    "sourceExternalId",
+    "sourceUrl",
+    "avatarUrl",
     "dmKey",
     "position",
     "createdBy",
@@ -1086,6 +1299,24 @@ Channel history, newest-last, keyset-paginated with `before` = "<createdAtISO>~<
               "null"
             ]
           },
+          "authorAvatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "externalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "text": {
             "type": "string"
           },
@@ -1110,6 +1341,74 @@ Channel history, newest-last, keyset-paginated with `before` = "<createdAtISO>~<
                       "required": [
                         "type",
                         "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "rich-text"
+                        },
+                        "elements": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "text"
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "text"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "mention"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "user",
+                                      "bot"
+                                    ]
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "kind",
+                                  "id",
+                                  "label"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "elements"
                       ],
                       "additionalProperties": false
                     },
@@ -1675,6 +1974,9 @@ Channel history, newest-last, keyset-paginated with `before` = "<createdAtISO>~<
           "botId",
           "authorName",
           "authorEmoji",
+          "authorAvatarUrl",
+          "externalId",
+          "sourceUrl",
           "text",
           "blocks",
           "replyToId",
@@ -1749,6 +2051,74 @@ Posts a message. Body is plain `text` and/or composed `blocks` (markdown, image,
             "properties": {
               "type": {
                 "type": "string",
+                "const": "rich-text"
+              },
+              "elements": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "text"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "mention"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "bot"
+                          ]
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "kind",
+                        "id",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "type",
+              "elements"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
                 "const": "divider"
               }
             },
@@ -2266,6 +2636,24 @@ Posts a message. Body is plain `text` and/or composed `blocks` (markdown, image,
         "null"
       ]
     },
+    "authorAvatarUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "externalId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "text": {
       "type": "string"
     },
@@ -2290,6 +2678,74 @@ Posts a message. Body is plain `text` and/or composed `blocks` (markdown, image,
                 "required": [
                   "type",
                   "text"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "rich-text"
+                  },
+                  "elements": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "text"
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "text"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "mention"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "bot"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "kind",
+                            "id",
+                            "label"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "elements"
                 ],
                 "additionalProperties": false
               },
@@ -2855,6 +3311,9 @@ Posts a message. Body is plain `text` and/or composed `blocks` (markdown, image,
     "botId",
     "authorName",
     "authorEmoji",
+    "authorAvatarUrl",
+    "externalId",
+    "sourceUrl",
     "text",
     "blocks",
     "replyToId",
@@ -2915,6 +3374,74 @@ Edits your own message (text and/or blocks). Sets editedAt.
             "properties": {
               "type": {
                 "type": "string",
+                "const": "rich-text"
+              },
+              "elements": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "text"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "mention"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "bot"
+                          ]
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "kind",
+                        "id",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "type",
+              "elements"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
                 "const": "divider"
               }
             },
@@ -3429,6 +3956,24 @@ Edits your own message (text and/or blocks). Sets editedAt.
         "null"
       ]
     },
+    "authorAvatarUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "externalId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "text": {
       "type": "string"
     },
@@ -3453,6 +3998,74 @@ Edits your own message (text and/or blocks). Sets editedAt.
                 "required": [
                   "type",
                   "text"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "rich-text"
+                  },
+                  "elements": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "text"
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "text"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "mention"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "bot"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "kind",
+                            "id",
+                            "label"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "elements"
                 ],
                 "additionalProperties": false
               },
@@ -4018,6 +4631,9 @@ Edits your own message (text and/or blocks). Sets editedAt.
     "botId",
     "authorName",
     "authorEmoji",
+    "authorAvatarUrl",
+    "externalId",
+    "sourceUrl",
     "text",
     "blocks",
     "replyToId",
@@ -4368,6 +4984,24 @@ Pinned messages of a channel, newest pin first.
           "null"
         ]
       },
+      "authorAvatarUrl": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "externalId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sourceUrl": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
       "text": {
         "type": "string"
       },
@@ -4392,6 +5026,74 @@ Pinned messages of a channel, newest pin first.
                   "required": [
                     "type",
                     "text"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "rich-text"
+                    },
+                    "elements": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "text"
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "mention"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "bot"
+                                ]
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "kind",
+                              "id",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "elements"
                   ],
                   "additionalProperties": false
                 },
@@ -4957,6 +5659,9 @@ Pinned messages of a channel, newest pin first.
       "botId",
       "authorName",
       "authorEmoji",
+      "authorAvatarUrl",
+      "externalId",
+      "sourceUrl",
       "text",
       "blocks",
       "replyToId",
@@ -5021,6 +5726,24 @@ Everything the caller saved, across channels.
           "null"
         ]
       },
+      "authorAvatarUrl": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "externalId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sourceUrl": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
       "text": {
         "type": "string"
       },
@@ -5045,6 +5768,74 @@ Everything the caller saved, across channels.
                   "required": [
                     "type",
                     "text"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "rich-text"
+                    },
+                    "elements": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "text"
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "mention"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "bot"
+                                ]
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "kind",
+                              "id",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "elements"
                   ],
                   "additionalProperties": false
                 },
@@ -5610,6 +6401,9 @@ Everything the caller saved, across channels.
       "botId",
       "authorName",
       "authorEmoji",
+      "authorAvatarUrl",
+      "externalId",
+      "sourceUrl",
       "text",
       "blocks",
       "replyToId",
@@ -6112,6 +6906,74 @@ THE agent participation endpoint. Auth = workspace API key bound to a bot. Posts
             "properties": {
               "type": {
                 "type": "string",
+                "const": "rich-text"
+              },
+              "elements": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "text"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "mention"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "bot"
+                          ]
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "kind",
+                        "id",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "type",
+              "elements"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
                 "const": "divider"
               }
             },
@@ -6626,6 +7488,24 @@ THE agent participation endpoint. Auth = workspace API key bound to a bot. Posts
         "null"
       ]
     },
+    "authorAvatarUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "externalId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "text": {
       "type": "string"
     },
@@ -6650,6 +7530,74 @@ THE agent participation endpoint. Auth = workspace API key bound to a bot. Posts
                 "required": [
                   "type",
                   "text"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "rich-text"
+                  },
+                  "elements": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "text"
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "text"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "mention"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "bot"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "kind",
+                            "id",
+                            "label"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "elements"
                 ],
                 "additionalProperties": false
               },
@@ -7215,6 +8163,9 @@ THE agent participation endpoint. Auth = workspace API key bound to a bot. Posts
     "botId",
     "authorName",
     "authorEmoji",
+    "authorAvatarUrl",
+    "externalId",
+    "sourceUrl",
     "text",
     "blocks",
     "replyToId",
@@ -7352,6 +8303,773 @@ Marks one interactive-message action processed by the calling bot.
   },
   "required": [
     "ok"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /lists` — listConversationLists
+
+Lists the dynamic top-level conversation lists visible to the caller. Lists may be workspace-wide or scoped to one accessible space. Messages is created automatically as the default list.
+
+- **Auth**: `session`
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "spaceId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "name": {
+        "type": "string"
+      },
+      "position": {
+        "type": "number"
+      },
+      "isDefault": {
+        "type": "boolean"
+      },
+      "conversationCount": {
+        "type": "number"
+      },
+      "unreadCount": {
+        "type": "number"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "spaceId",
+      "name",
+      "position",
+      "isDefault",
+      "conversationCount",
+      "unreadCount",
+      "createdAt",
+      "updatedAt"
+    ],
+    "additionalProperties": false
+  }
+}
+```
+
+### `POST /lists` — createConversationList
+
+Creates an isolated conversation list/tab, optionally scoped to a space.
+
+- **Auth**: `session`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "spaceId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "spaceId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "position": {
+      "type": "number"
+    },
+    "isDefault": {
+      "type": "boolean"
+    },
+    "conversationCount": {
+      "type": "number"
+    },
+    "unreadCount": {
+      "type": "number"
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "spaceId",
+    "name",
+    "position",
+    "isDefault",
+    "conversationCount",
+    "unreadCount",
+    "createdAt",
+    "updatedAt"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `PATCH /lists/:id` — updateConversationList
+
+Renames, reorders, or changes the space scope of a conversation list.
+
+- **Auth**: `session`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "spaceId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "position": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `DELETE /lists/:id` — deleteConversationList
+
+Deletes a non-default empty list. Move or delete its conversations first.
+
+- **Auth**: `session`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /lists/:id/conversations` — listListConversations
+
+Lists only the conversations isolated inside one visible list.
+
+- **Auth**: `session`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "listId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "channel",
+          "dm"
+        ]
+      },
+      "name": {
+        "type": "string"
+      },
+      "topic": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "isReadOnly": {
+        "type": "boolean"
+      },
+      "sourceProvider": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sourceExternalId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sourceUrl": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "avatarUrl": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "dmKey": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "position": {
+        "type": "number"
+      },
+      "createdBy": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "createdByType": {
+        "type": "string",
+        "enum": [
+          "user",
+          "bot"
+        ]
+      },
+      "lastMessageAt": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "archivedAt": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      },
+      "unreadCount": {
+        "type": "number"
+      },
+      "memberCount": {
+        "type": "number"
+      },
+      "members": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "user",
+                "bot"
+              ]
+            },
+            "userId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "botId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "avatarEmoji": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "member",
+                "admin"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "userId",
+            "botId",
+            "name",
+            "avatarEmoji",
+            "role"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "id",
+      "listId",
+      "kind",
+      "name",
+      "topic",
+      "isReadOnly",
+      "sourceProvider",
+      "sourceExternalId",
+      "sourceUrl",
+      "avatarUrl",
+      "dmKey",
+      "position",
+      "createdBy",
+      "createdByType",
+      "lastMessageAt",
+      "archivedAt",
+      "createdAt",
+      "updatedAt",
+      "unreadCount",
+      "memberCount",
+      "members"
+    ],
+    "additionalProperties": false
+  }
+}
+```
+
+### `POST /lists/:id/conversations` — createListConversation
+
+Creates a conversation in a list. Each conversation independently chooses isReadOnly; optional source metadata supports local copies from Slack, Teams, WhatsApp, or any external system.
+
+- **Auth**: `session`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "channel",
+        "dm"
+      ]
+    },
+    "topic": {
+      "type": "string"
+    },
+    "isReadOnly": {
+      "type": "boolean"
+    },
+    "sourceProvider": {
+      "type": "string"
+    },
+    "sourceExternalId": {
+      "type": "string"
+    },
+    "sourceUrl": {
+      "type": "string"
+    },
+    "avatarUrl": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "listId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "channel",
+        "dm"
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "topic": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "isReadOnly": {
+      "type": "boolean"
+    },
+    "sourceProvider": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceExternalId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "avatarUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "dmKey": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "position": {
+      "type": "number"
+    },
+    "createdBy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "createdByType": {
+      "type": "string",
+      "enum": [
+        "user",
+        "bot"
+      ]
+    },
+    "lastMessageAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "archivedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "unreadCount": {
+      "type": "number"
+    },
+    "memberCount": {
+      "type": "number"
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "bot"
+            ]
+          },
+          "userId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "botId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatarEmoji": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "member",
+              "admin"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "userId",
+          "botId",
+          "name",
+          "avatarEmoji",
+          "role"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "id",
+    "listId",
+    "kind",
+    "name",
+    "topic",
+    "isReadOnly",
+    "sourceProvider",
+    "sourceExternalId",
+    "sourceUrl",
+    "avatarUrl",
+    "dmKey",
+    "position",
+    "createdBy",
+    "createdByType",
+    "lastMessageAt",
+    "archivedAt",
+    "createdAt",
+    "updatedAt",
+    "unreadCount",
+    "memberCount",
+    "members"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /conversations/:id/import` — importConversationMessages
+
+Idempotently stores immutable local message copies in a read-only conversation. Source-specific collectors normalize into this provider-neutral envelope.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "externalId": {
+            "type": "string"
+          },
+          "senderName": {
+            "type": "string"
+          },
+          "senderAvatarUrl": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "sentAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "externalId",
+          "senderName",
+          "text",
+          "sentAt"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "id",
+    "messages"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "inserted": {
+      "type": "number"
+    },
+    "duplicate": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "inserted",
+    "duplicate"
   ],
   "additionalProperties": false
 }

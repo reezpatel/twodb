@@ -37,9 +37,15 @@ export interface ActorInfo {
 
 export interface ChannelPayload {
   id: string;
+  listId: string | null;
   kind: "channel" | "dm";
   name: string;
   topic: string | null;
+  isReadOnly: boolean;
+  sourceProvider: string | null;
+  sourceExternalId: string | null;
+  sourceUrl: string | null;
+  avatarUrl: string | null;
   dmKey: string | null;
   position: number;
   createdBy: string | null;
@@ -77,6 +83,9 @@ export interface MessagePayload {
   botId: string | null;
   authorName: string;
   authorEmoji: string | null;
+  authorAvatarUrl: string | null;
+  externalId: string | null;
+  sourceUrl: string | null;
   text: string;
   blocks: MessageBlock[] | null;
   replyToId: string | null;
@@ -130,14 +139,32 @@ export interface MessageActionPayload {
   createdAt: string;
 }
 
+export interface ConversationListPayload {
+  id: string;
+  spaceId: string | null;
+  name: string;
+  position: number;
+  isDefault: boolean;
+  conversationCount: number;
+  unreadCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // --- Repo ---------------------------------------------------------------------
 
 export interface CreateChannelInput {
   workspaceId: string;
+  listId?: string | null;
   kind: "channel" | "dm";
   name: string;
   topic?: string | null;
   dmKey?: string | null;
+  isReadOnly?: boolean;
+  sourceProvider?: string | null;
+  sourceExternalId?: string | null;
+  sourceUrl?: string | null;
+  avatarUrl?: string | null;
   creator: Actor;
   members: Actor[];
 }
@@ -196,21 +223,107 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
     return new Map(rows.map((b) => [b.id, b]));
   };
 
+  // -- conversation lists -------------------------------------------------------
+
+  async function ensureDefaultList(workspaceId: string, createdBy: string | null): Promise<TwoChatDb["conversation_list"]> {
+    let list = await db.selectFrom("conversation_list").selectAll().where("workspace_id", "=", workspaceId).where("is_default", "=", true).executeTakeFirst();
+    if (!list) {
+      const now = new Date().toISOString();
+      const id = ulid();
+      await db.insertInto("conversation_list").values({
+        id,
+        workspace_id: workspaceId,
+        space_id: null,
+        name: "Messages",
+        position: 0,
+        is_default: true,
+        created_by: createdBy,
+        created_at: now,
+        updated_at: now,
+      }).execute();
+      list = await db.selectFrom("conversation_list").selectAll().where("id", "=", id).executeTakeFirstOrThrow();
+    }
+    // Adopt conversations created before list groups existed.
+    await db.updateTable("channel").set({ list_id: list.id }).where("workspace_id", "=", workspaceId).where("list_id", "is", null).execute();
+    return list;
+  }
+
+  async function listConversationLists(workspaceId: string, spaceIds: string[], userId: string): Promise<ConversationListPayload[]> {
+    await ensureDefaultList(workspaceId, userId);
+    const rows = await db.selectFrom("conversation_list").selectAll().where("workspace_id", "=", workspaceId).orderBy("position", "asc").orderBy("created_at", "asc").execute();
+    const visible = rows.filter((row) => row.space_id === null || spaceIds.length === 0 || spaceIds.includes(row.space_id));
+    const result: ConversationListPayload[] = [];
+    for (const row of visible) {
+      const channels = await listChannels(workspaceId, userId, row.id);
+      result.push({
+        id: row.id,
+        spaceId: row.space_id,
+        name: row.name,
+        position: row.position,
+        isDefault: row.is_default,
+        conversationCount: channels.length,
+        unreadCount: channels.reduce((sum, channel) => sum + channel.unreadCount, 0),
+        createdAt: isoReq(row.created_at),
+        updatedAt: isoReq(row.updated_at),
+      });
+    }
+    return result;
+  }
+
+  async function getConversationList(workspaceId: string, id: string) {
+    return db.selectFrom("conversation_list").selectAll().where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
+  }
+
+  async function createConversationList(input: { workspaceId: string; spaceId?: string | null; name: string; createdBy: string }): Promise<ConversationListPayload> {
+    const id = ulid();
+    const now = new Date().toISOString();
+    const max = await db.selectFrom("conversation_list").select((eb) => eb.fn.max<number>("position").as("position")).where("workspace_id", "=", input.workspaceId).executeTakeFirst();
+    await db.insertInto("conversation_list").values({
+      id,
+      workspace_id: input.workspaceId,
+      space_id: input.spaceId ?? null,
+      name: input.name,
+      position: Number(max?.position ?? 0) + 1,
+      is_default: false,
+      created_by: input.createdBy,
+      created_at: now,
+      updated_at: now,
+    }).execute();
+    return { id, spaceId: input.spaceId ?? null, name: input.name, position: Number(max?.position ?? 0) + 1, isDefault: false, conversationCount: 0, unreadCount: 0, createdAt: now, updatedAt: now };
+  }
+
+  async function updateConversationList(workspaceId: string, id: string, patch: { name?: string; spaceId?: string | null; position?: number }) {
+    const values: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (patch.name !== undefined) values.name = patch.name;
+    if (patch.spaceId !== undefined) values.space_id = patch.spaceId;
+    if (patch.position !== undefined) values.position = patch.position;
+    return db.updateTable("conversation_list").set(values).where("workspace_id", "=", workspaceId).where("id", "=", id).returningAll().executeTakeFirst();
+  }
+
+  async function deleteConversationList(workspaceId: string, id: string): Promise<"deleted" | "not_found" | "default" | "not_empty"> {
+    const list = await getConversationList(workspaceId, id);
+    if (!list) return "not_found";
+    if (list.is_default) return "default";
+    const conversation = await db.selectFrom("channel").select("id").where("list_id", "=", id).executeTakeFirst();
+    if (conversation) return "not_empty";
+    await db.deleteFrom("conversation_list").where("id", "=", id).execute();
+    return "deleted";
+  }
+
   // -- channels ---------------------------------------------------------------
 
   async function getChannel(workspaceId: string, id: string) {
     return db.selectFrom("channel").selectAll().where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
   }
 
-  async function listChannels(workspaceId: string, userId: string): Promise<ChannelPayload[]> {
-    const channels = await db
+  async function listChannels(workspaceId: string, userId: string, listId?: string | null): Promise<ChannelPayload[]> {
+    let channelQuery = db
       .selectFrom("channel")
       .selectAll()
       .where("workspace_id", "=", workspaceId)
-      .where("archived_at", "is", null)
-      .orderBy("position", "asc")
-      .orderBy("created_at", "asc")
-      .execute();
+      .where("archived_at", "is", null);
+    if (listId) channelQuery = channelQuery.where("list_id", "=", listId);
+    const channels = await channelQuery.orderBy("position", "asc").orderBy("created_at", "asc").execute();
     // Group channels are discoverable; DMs are strictly private and only
     // listed for their members. Message/history routes enforce membership too.
     const dmMemberships = await db
@@ -230,9 +343,15 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
     const unread = await unreadCount(workspaceId, row.id, userId);
     return {
       id: row.id,
+      listId: row.list_id,
       kind: row.kind,
       name: row.name,
       topic: row.topic,
+      isReadOnly: row.is_read_only,
+      sourceProvider: row.source_provider,
+      sourceExternalId: row.source_external_id,
+      sourceUrl: row.source_url,
+      avatarUrl: row.avatar_url,
       dmKey: row.dm_key,
       position: row.position,
       createdBy: row.created_by,
@@ -316,9 +435,15 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
       .values({
         id,
         workspace_id: input.workspaceId,
+        list_id: input.listId ?? null,
         kind: input.kind,
         name: input.name,
         topic: input.topic ?? null,
+        is_read_only: input.isReadOnly ?? false,
+        source_provider: input.sourceProvider ?? null,
+        source_external_id: input.sourceExternalId ?? null,
+        source_url: input.sourceUrl ?? null,
+        avatar_url: input.avatarUrl ?? null,
         dm_key: input.dmKey ?? null,
         created_by: input.creator.id,
         created_by_type: input.creator.type,
@@ -351,18 +476,21 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
     return hydrateChannel(input.workspaceId, row!, input.creator.type === "user" ? input.creator.id : "");
   }
 
-  /** Ensure a Slack-like #general exists and the current user is in it. */
+  /** Ensure a default Messages list and its Slack-like #general channel. */
   async function ensureDefaultChannel(workspaceId: string, actor: Actor): Promise<void> {
+    const list = await ensureDefaultList(workspaceId, actor.type === "user" ? actor.id : null);
     let channel = await db
       .selectFrom("channel")
       .selectAll()
       .where("workspace_id", "=", workspaceId)
+      .where("list_id", "=", list.id)
       .where("kind", "=", "channel")
       .where("name", "=", "general")
       .executeTakeFirst();
     if (!channel) {
       await createChannel({
         workspaceId,
+        listId: list.id,
         kind: "channel",
         name: "general",
         topic: "Company-wide announcements and conversation",
@@ -374,19 +502,21 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
     if (!(await isMember(workspaceId, channel.id, actor))) await joinChannel(workspaceId, channel.id, actor);
   }
 
-  async function findOrCreateDm(workspaceId: string, a: Actor, b: Actor[]): Promise<ChannelPayload> {
+  async function findOrCreateDm(workspaceId: string, listId: string, a: Actor, b: Actor[]): Promise<ChannelPayload> {
     const ids = [...new Set([actorKey(a), ...b.map(actorKey)])].sort();
     const dmKey = ids.join("|");
     const existing = await db
       .selectFrom("channel")
       .selectAll()
       .where("workspace_id", "=", workspaceId)
+      .where("list_id", "=", listId)
       .where("kind", "=", "dm")
       .where("dm_key", "=", dmKey)
       .executeTakeFirst();
     if (existing) return hydrateChannel(workspaceId, existing, a.type === "user" ? a.id : "");
     return createChannel({
       workspaceId,
+      listId,
       kind: "dm",
       name: dmKey,
       dmKey,
@@ -405,13 +535,16 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
   async function updateChannel(
     workspaceId: string,
     id: string,
-    patch: { name?: string; topic?: string | null; archived?: boolean; position?: number },
+    patch: { name?: string; topic?: string | null; archived?: boolean; position?: number; listId?: string; isReadOnly?: boolean; sourceUrl?: string | null },
   ) {
     const set: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (patch.name !== undefined) set.name = patch.name;
     if (patch.topic !== undefined) set.topic = patch.topic;
     if (patch.archived !== undefined) set.archived_at = patch.archived ? new Date() : null;
     if (patch.position !== undefined) set.position = patch.position;
+    if (patch.listId !== undefined) set.list_id = patch.listId;
+    if (patch.isReadOnly !== undefined) set.is_read_only = patch.isReadOnly;
+    if (patch.sourceUrl !== undefined) set.source_url = patch.sourceUrl;
     const row = await db.updateTable("channel").set(set).where("workspace_id", "=", workspaceId).where("id", "=", id).returningAll().executeTakeFirst();
     return row;
   }
@@ -474,13 +607,13 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
       : [];
     const replyIds = rows.map((r) => r.reply_to_id).filter((v): v is string => v !== null);
     const replyRows = replyIds.length
-      ? await db.selectFrom("message").select(["id", "author_type", "user_id", "bot_id", "text"]).where("id", "in", replyIds).execute()
+      ? await db.selectFrom("message").select(["id", "author_type", "user_id", "bot_id", "author_name", "text"]).where("id", "in", replyIds).execute()
       : [];
     const userIds = [...new Set([...rows, ...replyRows].filter((r) => r.author_type === "user").map((r) => r.user_id ?? "").filter(Boolean))];
     const userNames = await userDisplayNameMap(userIds);
 
-    const nameOf = (r: { author_type: string; user_id: string | null; bot_id: string | null }) =>
-      r.author_type === "bot" ? (bots.get(r.bot_id ?? "")?.name ?? "bot") : (userNames.get(r.user_id ?? "") ?? r.user_id ?? "user");
+    const nameOf = (r: { author_type: string; user_id: string | null; bot_id: string | null; author_name?: string | null }) =>
+      r.author_name ?? (r.author_type === "bot" ? (bots.get(r.bot_id ?? "")?.name ?? "bot") : (userNames.get(r.user_id ?? "") ?? r.user_id ?? "user"));
 
     const pinSet = new Set(pins.map((p) => p.message_id));
     const savedSet = new Set(saved.map((s) => s.message_id));
@@ -506,6 +639,9 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
         botId: r.bot_id,
         authorName: nameOf(r),
         authorEmoji: r.author_type === "bot" ? (bots.get(r.bot_id ?? "")?.avatar_emoji ?? null) : null,
+        authorAvatarUrl: r.author_avatar_url,
+        externalId: r.external_id,
+        sourceUrl: r.source_url,
         text: r.deleted_at ? "" : r.text,
         blocks: r.deleted_at ? null : (parseBlocks(r.blocks) as MessageBlock[]),
         replyToId: r.reply_to_id,
@@ -576,6 +712,10 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
         author_type: input.author.type,
         user_id: input.author.type === "user" ? input.author.id : null,
         bot_id: input.author.type === "bot" ? input.author.id : null,
+        author_name: null,
+        author_avatar_url: null,
+        external_id: null,
+        source_url: null,
         text: input.text,
         blocks: input.blocks ? JSON.stringify(input.blocks) : null,
         reply_to_id: replyToId,
@@ -736,13 +876,17 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
 
   // -- search ---------------------------------------------------------------------
 
-  async function searchMessages(workspaceId: string, q: string, viewer: Actor, limit = 50): Promise<MessagePayload[]> {
-    const channels = await db.selectFrom("channel").select(["id", "kind"]).where("workspace_id", "=", workspaceId).execute();
+  async function searchMessages(workspaceId: string, q: string, viewer: Actor, spaceIds: string[], limit = 50): Promise<MessagePayload[]> {
+    const lists = await db.selectFrom("conversation_list").select(["id", "space_id"]).where("workspace_id", "=", workspaceId).execute();
+    const visibleListIds = new Set(lists.filter((list) => list.space_id === null || spaceIds.length === 0 || spaceIds.includes(list.space_id)).map((list) => list.id));
+    const channels = await db.selectFrom("channel").select(["id", "kind", "list_id"]).where("workspace_id", "=", workspaceId).execute();
     let membership = db.selectFrom("channel_member").select("channel_id").where("workspace_id", "=", workspaceId);
     membership = viewer.type === "user" ? membership.where("user_id", "=", viewer.id) : membership.where("bot_id", "=", viewer.id);
     const memberRows = await membership.execute();
     const memberIds = new Set(memberRows.map((m) => m.channel_id));
-    const visibleIds = channels.filter((ch) => ch.kind === "channel" || memberIds.has(ch.id)).map((ch) => ch.id);
+    const visibleIds = channels
+      .filter((channel) => (!channel.list_id || visibleListIds.has(channel.list_id)) && (channel.kind === "channel" || memberIds.has(channel.id)))
+      .map((channel) => channel.id);
     if (!visibleIds.length) return [];
     const rows = await db
       .selectFrom("message")
@@ -937,6 +1081,55 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
     return !!row;
   }
 
+  async function importConversationMessages(input: {
+    workspaceId: string;
+    channelId: string;
+    messages: Array<{
+      externalId: string;
+      senderName: string;
+      senderAvatarUrl?: string | null;
+      text: string;
+      sourceUrl?: string | null;
+      sentAt: string;
+    }>;
+  }): Promise<{ inserted: number; duplicate: number }> {
+    const channel = await getChannel(input.workspaceId, input.channelId);
+    if (!channel || !channel.is_read_only) return { inserted: 0, duplicate: 0 };
+    let inserted = 0;
+    let duplicate = 0;
+    let newestAt = channel.last_message_at;
+    for (const incoming of input.messages) {
+      const exists = await db.selectFrom("message").select("id").where("channel_id", "=", channel.id).where("external_id", "=", incoming.externalId).executeTakeFirst();
+      if (exists) {
+        duplicate += 1;
+        continue;
+      }
+      const sentAt = new Date(incoming.sentAt).toISOString();
+      await db.insertInto("message").values({
+        id: ulid(),
+        workspace_id: input.workspaceId,
+        channel_id: channel.id,
+        author_type: "bot",
+        user_id: null,
+        bot_id: null,
+        author_name: incoming.senderName,
+        author_avatar_url: incoming.senderAvatarUrl ?? null,
+        external_id: incoming.externalId,
+        source_url: incoming.sourceUrl ?? channel.source_url,
+        text: incoming.text,
+        blocks: null,
+        reply_to_id: null,
+        edited_at: null,
+        deleted_at: null,
+        created_at: sentAt,
+      }).execute();
+      inserted += 1;
+      if (!newestAt || sentAt > newestAt) newestAt = sentAt;
+    }
+    if (newestAt) await db.updateTable("channel").set({ last_message_at: newestAt, updated_at: new Date().toISOString() }).where("id", "=", channel.id).execute();
+    return { inserted, duplicate };
+  }
+
   // -- assets --------------------------------------------------------------------------
 
   async function createAsset(input: { workspaceId: string; channelId: string | null; uploader: string; filename: string; contentType: string | null; size: number; storageKey: string }): Promise<AssetPayload> {
@@ -961,6 +1154,12 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
   return {
     actorInfos,
     botMap,
+    ensureDefaultList,
+    listConversationLists,
+    getConversationList,
+    createConversationList,
+    updateConversationList,
+    deleteConversationList,
     getChannel,
     listChannels,
     hydrateChannel,
@@ -1002,6 +1201,7 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
     createMessageAction,
     listMessageActions,
     acknowledgeMessageAction,
+    importConversationMessages,
     createAsset,
     getAsset,
     listAssets,

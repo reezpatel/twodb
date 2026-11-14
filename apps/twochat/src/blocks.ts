@@ -40,6 +40,20 @@ const markdownBlock = z.object({
   text: z.string(),
 });
 
+const richTextBlock = z.object({
+  type: z.literal("rich-text"),
+  /** Inline text and stable actor mentions produced by the rich composer. */
+  elements: z.array(z.discriminatedUnion("type", [
+    z.object({ type: z.literal("text"), text: z.string() }),
+    z.object({
+      type: z.literal("mention"),
+      kind: z.enum(["user", "bot"]),
+      id: z.string(),
+      label: z.string(),
+    }),
+  ])).min(1),
+});
+
 const dividerBlock = z.object({ type: z.literal("divider") });
 
 const imageBlock = z.object({
@@ -159,6 +173,7 @@ const calloutBlock = z.object({
 
 export const messageBlock = z.discriminatedUnion("type", [
   markdownBlock,
+  richTextBlock,
   dividerBlock,
   imageBlock,
   actionsBlock,
@@ -196,6 +211,9 @@ export function blocksToText(input: MessageBlock[]): string {
     switch (b.type) {
       case "markdown":
         out.push(b.text);
+        break;
+      case "rich-text":
+        out.push(b.elements.map((element) => element.type === "mention" ? `@${element.label}` : element.text).join(""));
         break;
       case "divider":
         out.push("—");
@@ -250,6 +268,11 @@ export function collectMentions(input: MessageBlock[]): BlockMention[] {
   for (const b of input) {
     if (b.type === "context") {
       for (const e of b.elements) if (e.mention) push(e.mention);
+    }
+    if (b.type === "rich-text") {
+      for (const element of b.elements) {
+        if (element.type === "mention") push({ kind: element.kind, id: element.id, label: element.label });
+      }
     }
   }
   return found;

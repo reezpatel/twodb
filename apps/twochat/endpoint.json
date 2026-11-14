@@ -14,7 +14,7 @@
     "core-async"
   ],
   "basePath": "/apps/twochat",
-  "generatedAt": "2026-11-12T13:23:28.506Z",
+  "generatedAt": "2026-11-14T03:42:35.831Z",
   "websocketPaths": [
     "/ws"
   ],
@@ -34,6 +34,12 @@
             "id": {
               "type": "string"
             },
+            "listId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "kind": {
               "type": "string",
               "enum": [
@@ -45,6 +51,33 @@
               "type": "string"
             },
             "topic": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "isReadOnly": {
+              "type": "boolean"
+            },
+            "sourceProvider": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceExternalId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceUrl": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "avatarUrl": {
               "type": [
                 "string",
                 "null"
@@ -155,9 +188,15 @@
           },
           "required": [
             "id",
+            "listId",
             "kind",
             "name",
             "topic",
+            "isReadOnly",
+            "sourceProvider",
+            "sourceExternalId",
+            "sourceUrl",
+            "avatarUrl",
             "dmKey",
             "position",
             "createdBy",
@@ -191,6 +230,9 @@
           "topic": {
             "type": "string"
           },
+          "listId": {
+            "type": "string"
+          },
           "botIds": {
             "type": "array",
             "items": {
@@ -210,6 +252,12 @@
           "id": {
             "type": "string"
           },
+          "listId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -221,6 +269,33 @@
             "type": "string"
           },
           "topic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isReadOnly": {
+            "type": "boolean"
+          },
+          "sourceProvider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceExternalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "avatarUrl": {
             "type": [
               "string",
               "null"
@@ -331,9 +406,15 @@
         },
         "required": [
           "id",
+          "listId",
           "kind",
           "name",
           "topic",
+          "isReadOnly",
+          "sourceProvider",
+          "sourceExternalId",
+          "sourceUrl",
+          "avatarUrl",
           "dmKey",
           "position",
           "createdBy",
@@ -375,6 +456,12 @@
           "id": {
             "type": "string"
           },
+          "listId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -386,6 +473,33 @@
             "type": "string"
           },
           "topic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isReadOnly": {
+            "type": "boolean"
+          },
+          "sourceProvider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceExternalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "avatarUrl": {
             "type": [
               "string",
               "null"
@@ -496,9 +610,15 @@
         },
         "required": [
           "id",
+          "listId",
           "kind",
           "name",
           "topic",
+          "isReadOnly",
+          "sourceProvider",
+          "sourceExternalId",
+          "sourceUrl",
+          "avatarUrl",
           "dmKey",
           "position",
           "createdBy",
@@ -541,6 +661,18 @@
           },
           "position": {
             "type": "number"
+          },
+          "listId": {
+            "type": "string"
+          },
+          "isReadOnly": {
+            "type": "boolean"
+          },
+          "sourceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -555,6 +687,12 @@
           "id": {
             "type": "string"
           },
+          "listId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -566,6 +704,33 @@
             "type": "string"
           },
           "topic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isReadOnly": {
+            "type": "boolean"
+          },
+          "sourceProvider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceExternalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "avatarUrl": {
             "type": [
               "string",
               "null"
@@ -676,9 +841,15 @@
         },
         "required": [
           "id",
+          "listId",
           "kind",
           "name",
           "topic",
+          "isReadOnly",
+          "sourceProvider",
+          "sourceExternalId",
+          "sourceUrl",
+          "avatarUrl",
           "dmKey",
           "position",
           "createdBy",
@@ -803,6 +974,9 @@
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
+          "listId": {
+            "type": "string"
+          },
           "userIds": {
             "type": "array",
             "items": {
@@ -825,6 +999,12 @@
           "id": {
             "type": "string"
           },
+          "listId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -836,6 +1016,33 @@
             "type": "string"
           },
           "topic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isReadOnly": {
+            "type": "boolean"
+          },
+          "sourceProvider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceExternalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "avatarUrl": {
             "type": [
               "string",
               "null"
@@ -946,9 +1153,15 @@
         },
         "required": [
           "id",
+          "listId",
           "kind",
           "name",
           "topic",
+          "isReadOnly",
+          "sourceProvider",
+          "sourceExternalId",
+          "sourceUrl",
+          "avatarUrl",
           "dmKey",
           "position",
           "createdBy",
@@ -1034,6 +1247,24 @@
                     "null"
                   ]
                 },
+                "authorAvatarUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "externalId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sourceUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "text": {
                   "type": "string"
                 },
@@ -1058,6 +1289,74 @@
                             "required": [
                               "type",
                               "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "rich-text"
+                              },
+                              "elements": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "const": "text"
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "text"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "const": "mention"
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "user",
+                                            "bot"
+                                          ]
+                                        },
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "kind",
+                                        "id",
+                                        "label"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "elements"
                             ],
                             "additionalProperties": false
                           },
@@ -1623,6 +1922,9 @@
                 "botId",
                 "authorName",
                 "authorEmoji",
+                "authorAvatarUrl",
+                "externalId",
+                "sourceUrl",
                 "text",
                 "blocks",
                 "replyToId",
@@ -1694,6 +1996,74 @@
                   "properties": {
                     "type": {
                       "type": "string",
+                      "const": "rich-text"
+                    },
+                    "elements": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "text"
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "mention"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "bot"
+                                ]
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "kind",
+                              "id",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "elements"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
                       "const": "divider"
                     }
                   },
@@ -2207,6 +2577,24 @@
               "null"
             ]
           },
+          "authorAvatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "externalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "text": {
             "type": "string"
           },
@@ -2231,6 +2619,74 @@
                       "required": [
                         "type",
                         "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "rich-text"
+                        },
+                        "elements": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "text"
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "text"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "mention"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "user",
+                                      "bot"
+                                    ]
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "kind",
+                                  "id",
+                                  "label"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "elements"
                       ],
                       "additionalProperties": false
                     },
@@ -2796,6 +3252,9 @@
           "botId",
           "authorName",
           "authorEmoji",
+          "authorAvatarUrl",
+          "externalId",
+          "sourceUrl",
           "text",
           "blocks",
           "replyToId",
@@ -2853,6 +3312,74 @@
                   "properties": {
                     "type": {
                       "type": "string",
+                      "const": "rich-text"
+                    },
+                    "elements": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "text"
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "mention"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "bot"
+                                ]
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "kind",
+                              "id",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "elements"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
                       "const": "divider"
                     }
                   },
@@ -3363,6 +3890,24 @@
               "null"
             ]
           },
+          "authorAvatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "externalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "text": {
             "type": "string"
           },
@@ -3387,6 +3932,74 @@
                       "required": [
                         "type",
                         "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "rich-text"
+                        },
+                        "elements": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "text"
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "text"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "mention"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "user",
+                                      "bot"
+                                    ]
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "kind",
+                                  "id",
+                                  "label"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "elements"
                       ],
                       "additionalProperties": false
                     },
@@ -3952,6 +4565,9 @@
           "botId",
           "authorName",
           "authorEmoji",
+          "authorAvatarUrl",
+          "externalId",
+          "sourceUrl",
           "text",
           "blocks",
           "replyToId",
@@ -4260,6 +4876,24 @@
                 "null"
               ]
             },
+            "authorAvatarUrl": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "externalId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceUrl": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "text": {
               "type": "string"
             },
@@ -4284,6 +4918,74 @@
                         "required": [
                           "type",
                           "text"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "rich-text"
+                          },
+                          "elements": {
+                            "minItems": 1,
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "const": "text"
+                                    },
+                                    "text": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "const": "mention"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "user",
+                                        "bot"
+                                      ]
+                                    },
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "kind",
+                                    "id",
+                                    "label"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "elements"
                         ],
                         "additionalProperties": false
                       },
@@ -4849,6 +5551,9 @@
             "botId",
             "authorName",
             "authorEmoji",
+            "authorAvatarUrl",
+            "externalId",
+            "sourceUrl",
             "text",
             "blocks",
             "replyToId",
@@ -4910,6 +5615,24 @@
                 "null"
               ]
             },
+            "authorAvatarUrl": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "externalId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceUrl": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "text": {
               "type": "string"
             },
@@ -4934,6 +5657,74 @@
                         "required": [
                           "type",
                           "text"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "rich-text"
+                          },
+                          "elements": {
+                            "minItems": 1,
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "const": "text"
+                                    },
+                                    "text": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "const": "mention"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "user",
+                                        "bot"
+                                      ]
+                                    },
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "kind",
+                                    "id",
+                                    "label"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "elements"
                         ],
                         "additionalProperties": false
                       },
@@ -5499,6 +6290,9 @@
             "botId",
             "authorName",
             "authorEmoji",
+            "authorAvatarUrl",
+            "externalId",
+            "sourceUrl",
             "text",
             "blocks",
             "replyToId",
@@ -5946,6 +6740,74 @@
                   "properties": {
                     "type": {
                       "type": "string",
+                      "const": "rich-text"
+                    },
+                    "elements": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "text"
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "mention"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "bot"
+                                ]
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "kind",
+                              "id",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "elements"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
                       "const": "divider"
                     }
                   },
@@ -6456,6 +7318,24 @@
               "null"
             ]
           },
+          "authorAvatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "externalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "text": {
             "type": "string"
           },
@@ -6480,6 +7360,74 @@
                       "required": [
                         "type",
                         "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "rich-text"
+                        },
+                        "elements": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "text"
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "text"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "mention"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "user",
+                                      "bot"
+                                    ]
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "kind",
+                                  "id",
+                                  "label"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "elements"
                       ],
                       "additionalProperties": false
                     },
@@ -7045,6 +7993,9 @@
           "botId",
           "authorName",
           "authorEmoji",
+          "authorAvatarUrl",
+          "externalId",
+          "sourceUrl",
           "text",
           "blocks",
           "replyToId",
@@ -7168,6 +8119,728 @@
         },
         "required": [
           "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listConversationLists",
+      "method": "GET",
+      "path": "/lists",
+      "auth": "session",
+      "description": "Lists the dynamic top-level conversation lists visible to the caller. Lists may be workspace-wide or scoped to one accessible space. Messages is created automatically as the default list.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "spaceId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "position": {
+              "type": "number"
+            },
+            "isDefault": {
+              "type": "boolean"
+            },
+            "conversationCount": {
+              "type": "number"
+            },
+            "unreadCount": {
+              "type": "number"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "spaceId",
+            "name",
+            "position",
+            "isDefault",
+            "conversationCount",
+            "unreadCount",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createConversationList",
+      "method": "POST",
+      "path": "/lists",
+      "auth": "session",
+      "description": "Creates an isolated conversation list/tab, optionally scoped to a space.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "spaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "conversationCount": {
+            "type": "number"
+          },
+          "unreadCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "spaceId",
+          "name",
+          "position",
+          "isDefault",
+          "conversationCount",
+          "unreadCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateConversationList",
+      "method": "PATCH",
+      "path": "/lists/:id",
+      "auth": "session",
+      "description": "Renames, reorders, or changes the space scope of a conversation list.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteConversationList",
+      "method": "DELETE",
+      "path": "/lists/:id",
+      "auth": "session",
+      "description": "Deletes a non-default empty list. Move or delete its conversations first.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listListConversations",
+      "method": "GET",
+      "path": "/lists/:id/conversations",
+      "auth": "session",
+      "description": "Lists only the conversations isolated inside one visible list.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "listId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "channel",
+                "dm"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "topic": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "isReadOnly": {
+              "type": "boolean"
+            },
+            "sourceProvider": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceExternalId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceUrl": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "avatarUrl": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dmKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "position": {
+              "type": "number"
+            },
+            "createdBy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdByType": {
+              "type": "string",
+              "enum": [
+                "user",
+                "bot"
+              ]
+            },
+            "lastMessageAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "archivedAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            },
+            "unreadCount": {
+              "type": "number"
+            },
+            "memberCount": {
+              "type": "number"
+            },
+            "members": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "bot"
+                    ]
+                  },
+                  "userId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "botId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "avatarEmoji": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "member",
+                      "admin"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "userId",
+                  "botId",
+                  "name",
+                  "avatarEmoji",
+                  "role"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "id",
+            "listId",
+            "kind",
+            "name",
+            "topic",
+            "isReadOnly",
+            "sourceProvider",
+            "sourceExternalId",
+            "sourceUrl",
+            "avatarUrl",
+            "dmKey",
+            "position",
+            "createdBy",
+            "createdByType",
+            "lastMessageAt",
+            "archivedAt",
+            "createdAt",
+            "updatedAt",
+            "unreadCount",
+            "memberCount",
+            "members"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createListConversation",
+      "method": "POST",
+      "path": "/lists/:id/conversations",
+      "auth": "session",
+      "description": "Creates a conversation in a list. Each conversation independently chooses isReadOnly; optional source metadata supports local copies from Slack, Teams, WhatsApp, or any external system.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "channel",
+              "dm"
+            ]
+          },
+          "topic": {
+            "type": "string"
+          },
+          "isReadOnly": {
+            "type": "boolean"
+          },
+          "sourceProvider": {
+            "type": "string"
+          },
+          "sourceExternalId": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "listId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "channel",
+              "dm"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "topic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isReadOnly": {
+            "type": "boolean"
+          },
+          "sourceProvider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceExternalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dmKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdByType": {
+            "type": "string",
+            "enum": [
+              "user",
+              "bot"
+            ]
+          },
+          "lastMessageAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "unreadCount": {
+            "type": "number"
+          },
+          "memberCount": {
+            "type": "number"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "bot"
+                  ]
+                },
+                "userId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "botId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "avatarEmoji": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "member",
+                    "admin"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "userId",
+                "botId",
+                "name",
+                "avatarEmoji",
+                "role"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "listId",
+          "kind",
+          "name",
+          "topic",
+          "isReadOnly",
+          "sourceProvider",
+          "sourceExternalId",
+          "sourceUrl",
+          "avatarUrl",
+          "dmKey",
+          "position",
+          "createdBy",
+          "createdByType",
+          "lastMessageAt",
+          "archivedAt",
+          "createdAt",
+          "updatedAt",
+          "unreadCount",
+          "memberCount",
+          "members"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "importConversationMessages",
+      "method": "POST",
+      "path": "/conversations/:id/import",
+      "auth": "session-or-apiKey",
+      "description": "Idempotently stores immutable local message copies in a read-only conversation. Source-specific collectors normalize into this provider-neutral envelope.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "externalId": {
+                  "type": "string"
+                },
+                "senderName": {
+                  "type": "string"
+                },
+                "senderAvatarUrl": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "sourceUrl": {
+                  "type": "string"
+                },
+                "sentAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "externalId",
+                "senderName",
+                "text",
+                "sentAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "messages"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "inserted": {
+            "type": "number"
+          },
+          "duplicate": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "inserted",
+          "duplicate"
         ],
         "additionalProperties": false
       }

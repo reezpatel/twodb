@@ -2,7 +2,7 @@
 
 > **Generated file — do not hand-edit.** Source of truth is `src/messages.ts` (Zod schemas via `@twodb/core-async/registry`). Regenerate with `pnpm gen:docs`.
 
-_Generated: 2026-11-12T13:23:28.520Z_
+_Generated: 2026-11-14T03:42:35.848Z_
 
 ## Queue jobs
 
@@ -131,6 +131,41 @@ Published when a user clicks a button in a bot-authored composed message. The cl
     "userId",
     "acknowledgedAt",
     "createdAt"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `twochat.conversation.imported`
+
+Published after external messages are idempotently copied into a read-only conversation in any list group.
+
+- **Direction**: `produces`
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "conversationId": {
+      "type": "string"
+    },
+    "inserted": {
+      "type": "number"
+    },
+    "duplicate": {
+      "type": "number"
+    },
+    "importedAt": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "conversationId",
+    "inserted",
+    "duplicate",
+    "importedAt"
   ],
   "additionalProperties": false
 }

@@ -25,6 +25,19 @@ export function BlockView(props: BlockViewProps) {
   switch (block.type) {
     case "markdown":
       return <p className="text-sm leading-relaxed whitespace-pre-wrap">{String(block.text)}</p>;
+    case "rich-text":
+      return (
+        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+          {(Array.isArray(block.elements) ? block.elements : []).map((element, index) => {
+            const item = element as { type?: string; text?: string; kind?: string; id?: string; label?: string };
+            if (item.type === "mention") {
+              const label = props.resolveMention?.(item.kind ?? "user", item.id ?? "") ?? item.label ?? item.id ?? "unknown";
+              return <span key={index} className="rounded bg-primary/15 px-1 py-0.5 font-medium text-primary">@{label}</span>;
+            }
+            return <span key={index}>{item.text ?? ""}</span>;
+          })}
+        </p>
+      );
     case "divider":
       return <hr className="my-2 border-border" />;
     case "image":

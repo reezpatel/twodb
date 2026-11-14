@@ -13,6 +13,17 @@ Shape: `backend+webapp`
 - **Identity:** resolved by the TwoDB Gateway and forwarded through
   `x-twodb-*` headers. TwoChat never talks to better-auth directly.
 - **Realtime:** `/ws`, declared in the app manifest and bridged by the Gateway.
+- **Composer mentions:** `react-rich-mentions` powers the content-editable footer.
+  Selecting `@user`/`@bot` suggestions stores stable actor IDs in a structured
+  `rich-text` message block while retaining a plain-text fallback for search,
+  notifications, agents, and CLI clients.
+- **Conversation lists:** dynamic isolated top-level lists replace provider-specific
+  tabs. The default list is `Messages`; each additional list can be workspace-wide
+  or scoped to one `spaceId`. Every conversation belongs to one list.
+- **Read-only copies:** `isReadOnly` is a property of each conversation, not its
+  list. A read-only Slack/Teams/WhatsApp/custom conversation can live in any list.
+  `POST /conversations/:id/import` stores source-stable local message copies and
+  deduplicates by `(conversation, externalId)`; sending/editing/reacting is blocked.
 - **Attachments:** `StorageAdapter` boundary in `src/storage.ts`. Local storage
   works now; `twodrive` is an intentionally loud stub until TwoDrive's S3 API
   ships. No route or message shape needs to change when it does.

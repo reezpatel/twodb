@@ -10,6 +10,10 @@ export interface ForwardedContext {
   kind: "session" | "apiKey";
   userId: string | null;
   workspaceId: string;
+  /**
+   * User-selected Space filter forwarded by the Gateway. Per the platform
+   * contract, an empty array means access to every Space in the workspace.
+   */
   spaceIds: string[];
   apiKeyId: string | null;
 }

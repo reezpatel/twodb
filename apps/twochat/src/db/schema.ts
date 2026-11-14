@@ -13,9 +13,16 @@ import { sql, type Kysely } from "@twodb/core-data/db";
 export interface ChannelRow {
   id: string;
   workspace_id: string;
+  /** Isolated top-level conversation list containing this conversation. */
+  list_id: string | null;
   kind: "channel" | "dm";
   name: string;
   topic: string | null;
+  is_read_only: boolean;
+  source_provider: string | null;
+  source_external_id: string | null;
+  source_url: string | null;
+  avatar_url: string | null;
   /** Only for kind=dm: the two (or few) member actor ids, stable-sorted, for uniqueness. */
   dm_key: string | null;
   created_by: string | null;
@@ -47,6 +54,11 @@ export interface MessageRow {
   author_type: "user" | "bot";
   user_id: string | null;
   bot_id: string | null;
+  /** Snapshots used by imported/read-only conversations. */
+  author_name: string | null;
+  author_avatar_url: string | null;
+  external_id: string | null;
+  source_url: string | null;
   /** Plain-text projection (search, notifications, CLI). */
   text: string;
   /** Composed MessageBlock[] (src/blocks.ts) — jsonb. */
@@ -162,6 +174,19 @@ export interface MessageActionRow {
   created_at: string;
 }
 
+/** Dynamic top-level tab. `space_id=null` means workspace-wide. */
+export interface ConversationListRow {
+  id: string;
+  workspace_id: string;
+  space_id: string | null;
+  name: string;
+  position: number;
+  is_default: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TwoChatDb {
   channel: ChannelRow;
   channel_member: ChannelMemberRow;
@@ -175,6 +200,7 @@ export interface TwoChatDb {
   bot: BotRow;
   notification: NotificationRow;
   message_action: MessageActionRow;
+  conversation_list: ConversationListRow;
 }
 
 const now = sql`now()`;
@@ -185,9 +211,15 @@ export async function applySchema(db: Kysely<TwoChatDb>): Promise<void> {
     .ifNotExists()
     .addColumn("id", "text", (c) => c.primaryKey())
     .addColumn("workspace_id", "text", (c) => c.notNull())
+    .addColumn("list_id", "text")
     .addColumn("kind", "text", (c) => c.notNull().defaultTo("channel"))
     .addColumn("name", "text", (c) => c.notNull())
     .addColumn("topic", "text")
+    .addColumn("is_read_only", "boolean", (c) => c.notNull().defaultTo(false))
+    .addColumn("source_provider", "text")
+    .addColumn("source_external_id", "text")
+    .addColumn("source_url", "text")
+    .addColumn("avatar_url", "text")
     .addColumn("dm_key", "text")
     .addColumn("created_by", "text")
     .addColumn("created_by_type", "text", (c) => c.notNull().defaultTo("user"))
@@ -236,6 +268,10 @@ export async function applySchema(db: Kysely<TwoChatDb>): Promise<void> {
     .addColumn("author_type", "text", (c) => c.notNull())
     .addColumn("user_id", "text")
     .addColumn("bot_id", "text")
+    .addColumn("author_name", "text")
+    .addColumn("author_avatar_url", "text")
+    .addColumn("external_id", "text")
+    .addColumn("source_url", "text")
     .addColumn("text", "text", (c) => c.notNull().defaultTo(""))
     .addColumn("blocks", "jsonb")
     .addColumn("reply_to_id", "text")
@@ -405,4 +441,37 @@ export async function applySchema(db: Kysely<TwoChatDb>): Promise<void> {
     .on("message_action")
     .columns(["message_id"])
     .execute();
+
+  await db.schema
+    .createTable("conversation_list")
+    .ifNotExists()
+    .addColumn("id", "text", (c) => c.primaryKey())
+    .addColumn("workspace_id", "text", (c) => c.notNull())
+    .addColumn("space_id", "text")
+    .addColumn("name", "text", (c) => c.notNull())
+    .addColumn("position", "integer", (c) => c.notNull().defaultTo(0))
+    .addColumn("is_default", "boolean", (c) => c.notNull().defaultTo(false))
+    .addColumn("created_by", "text")
+    .addColumn("created_at", "timestamptz", (c) => c.notNull().defaultTo(now))
+    .addColumn("updated_at", "timestamptz", (c) => c.notNull().defaultTo(now))
+    .execute();
+  await db.schema.createIndex("conversation_list_workspace_idx").ifNotExists().on("conversation_list").columns(["workspace_id", "position"]).execute();
+  await db.schema.createIndex("conversation_list_space_idx").ifNotExists().on("conversation_list").columns(["space_id"]).execute();
+
+  // Existing installations predate list/source columns. Keep bootstrap
+  // idempotent without requiring a separate migration runner.
+  await sql`alter table channel add column if not exists list_id text`.execute(db);
+  await sql`alter table channel add column if not exists is_read_only boolean not null default false`.execute(db);
+  await sql`alter table channel add column if not exists source_provider text`.execute(db);
+  await sql`alter table channel add column if not exists source_external_id text`.execute(db);
+  await sql`alter table channel add column if not exists source_url text`.execute(db);
+  await sql`alter table channel add column if not exists avatar_url text`.execute(db);
+  await sql`alter table message add column if not exists author_name text`.execute(db);
+  await sql`alter table message add column if not exists author_avatar_url text`.execute(db);
+  await sql`alter table message add column if not exists external_id text`.execute(db);
+  await sql`alter table message add column if not exists source_url text`.execute(db);
+  await sql`create index if not exists channel_list_idx on channel (list_id, position)`.execute(db);
+  await sql`create unique index if not exists message_channel_external_idx on message (channel_id, external_id) where external_id is not null`.execute(db);
+
+
 }

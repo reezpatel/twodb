@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useChat } from "../../../lib/chat-context";
-import { chatApi, type Asset, type Message } from "../../../lib/chat-client";
+import { chatApi, controlPlaneClient, type Asset, type Channel, type ConversationList, type Message, type Space } from "../../../lib/chat-client";
 
-/**
- * Holding hook backing Chat.tsx: composes the shared chat context with
- * view-local state (reply target, dialog, notifications panel, drafts).
- */
-
+/** Holding hook for native and imported conversations organized by list group. */
 export function useChatView() {
   const chat = useChat();
   const [replyTo, setReplyTo] = useState<Message | null>(null);
@@ -15,16 +11,47 @@ export function useChatView() {
   const [startDmOpen, setStartDmOpen] = useState(false);
   const [startDmError, setStartDmError] = useState<string | null>(null);
   const [notifsOpen, setNotifsOpen] = useState(false);
+  const [sidebarSearch, setSidebarSearch] = useState("");
+  const [lists, setLists] = useState<ConversationList[]>([]);
+  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [activeListId, setActiveListId] = useState<string | null>(null);
+  const [conversationsByList, setConversationsByList] = useState<Record<string, Channel[]>>({});
+  const [addListOpen, setAddListOpen] = useState(false);
+  const [addListError, setAddListError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
+  const refreshLists = useCallback(async () => {
+    const result = await chatApi.listLists();
+    setLists(result);
+    setActiveListId((current) => current && result.some((list) => list.id === current) ? current : result.find((list) => list.isDefault)?.id ?? result[0]?.id ?? null);
+    return result;
+  }, []);
+
+  useEffect(() => {
+    void Promise.all([
+      refreshLists().catch(() => [] as ConversationList[]),
+      controlPlaneClient.listSpaces().catch(() => ({ spaces: [] as Space[] })),
+    ]).then(([, result]) => setSpaces(result.spaces));
+  }, [refreshLists]);
+
+  const activeList = lists.find((list) => list.id === activeListId) ?? null;
+  const activeConversations = activeListId ? (conversationsByList[activeListId] ?? []) : [];
+
+  useEffect(() => {
+    if (!activeListId) return;
+    void chatApi.listListConversations(activeListId).then((items) => {
+      setConversationsByList((current) => ({ ...current, [activeListId]: items }));
+      const selectedStillExists = chat.activeChannelId && items.some((conversation) => conversation.id === chat.activeChannelId);
+      if (!selectedStillExists) chat.setActiveChannel(items.find((conversation) => conversation.name === "general")?.id ?? items[0]?.id ?? null);
+    }).catch(() => setConversationsByList((current) => ({ ...current, [activeListId]: [] })));
+  }, [activeListId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const activeChannel = useMemo(
-    () => chat.channels.find((c) => c.id === chat.activeChannelId) ?? null,
-    [chat.channels, chat.activeChannelId],
+    () => activeConversations.find((conversation) => conversation.id === chat.activeChannelId) ?? null,
+    [activeConversations, chat.activeChannelId],
   );
   const messages = chat.activeChannelId ? (chat.messagesByChannel[chat.activeChannelId] ?? []) : [];
-  const hasMore = !!(chat.activeChannelId && null);
 
-  // Load history when entering a channel + mark it read.
   useEffect(() => {
     if (!activeChannel) return;
     setReplyTo(null);
@@ -32,97 +59,110 @@ export function useChatView() {
       const last = chat.messagesByChannel[activeChannel.id]?.at(-1);
       void chat.markChannelRead(activeChannel.id, last?.id ?? null);
     });
-    chatApi
-      .getDraft(activeChannel.id)
-      .then((d) => setDrafts((prev) => ({ ...prev, [activeChannel.id]: d.text })))
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeChannel?.id]);
+    if (!activeChannel.isReadOnly) {
+      chatApi.getDraft(activeChannel.id).then((draft) => setDrafts((current) => ({ ...current, [activeChannel.id]: draft.text }))).catch(() => {});
+    }
+  }, [activeChannel?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-mark-read while watching an active channel that receives messages.
   const lastMessageId = messages.at(-1)?.id ?? null;
   useEffect(() => {
-    if (activeChannel && lastMessageId && activeChannel.unreadCount > 0) {
-      void chat.markChannelRead(activeChannel.id, lastMessageId);
+    if (activeChannel && lastMessageId && activeChannel.unreadCount > 0) void chat.markChannelRead(activeChannel.id, lastMessageId);
+  }, [lastMessageId, activeChannel?.unreadCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sidebarPreviews = useMemo(() => {
+    const previews: Record<string, string> = {};
+    for (const conversation of activeConversations) {
+      const latest = chat.messagesByChannel[conversation.id]?.at(-1);
+      if (latest) {
+        const prefix = latest.userId === chat.myUserId ? "You: " : latest.authorName ? `${latest.authorName}: ` : "";
+        previews[conversation.id] = `${prefix}${latest.text || "Shared an attachment"}`;
+      } else previews[conversation.id] = conversation.topic || (conversation.isReadOnly ? "Read-only local copy" : "Start a conversation");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastMessageId, activeChannel?.unreadCount]);
+    return previews;
+  }, [activeConversations, chat.messagesByChannel, chat.myUserId]);
 
-  const onSend = useCallback(
-    async (input: { text?: string; blocks?: unknown[]; replyToId?: string }) => {
-      if (!activeChannel) return;
-      await chat.send(activeChannel.id, input);
-      setReplyTo(null);
-    },
-    [activeChannel, chat],
-  );
+  const onSend = useCallback(async (input: { text?: string; blocks?: unknown[]; replyToId?: string }) => {
+    if (!activeChannel || activeChannel.isReadOnly) return;
+    await chat.send(activeChannel.id, input);
+    setReplyTo(null);
+  }, [activeChannel, chat]);
 
-  const onUpload = useCallback(
-    async (files: File[]): Promise<Asset[]> => {
-      if (!activeChannel) return [];
-      return chatApi.uploadAssets(activeChannel.id, files);
-    },
-    [activeChannel],
-  );
+  const onUpload = useCallback(async (files: File[]): Promise<Asset[]> => {
+    if (!activeChannel || activeChannel.isReadOnly) return [];
+    return chatApi.uploadAssets(activeChannel.id, files);
+  }, [activeChannel]);
 
-  const onDraftChange = useCallback(
-    (text: string) => {
-      if (!activeChannel) return;
-      setDrafts((prev) => ({ ...prev, [activeChannel.id]: text }));
-      void chatApi.saveDraft(activeChannel.id, text).catch(() => {});
-    },
-    [activeChannel],
-  );
+  const onDraftChange = useCallback((text: string) => {
+    if (!activeChannel || activeChannel.isReadOnly) return;
+    setDrafts((current) => ({ ...current, [activeChannel.id]: text }));
+    void chatApi.saveDraft(activeChannel.id, text).catch(() => {});
+  }, [activeChannel]);
 
-  const onCreateChannel = useCallback(
-    async (name: string, topic: string) => {
-      setNewChannelError(null);
-      try {
-        await chat.createChannel(name, topic || undefined);
-        setNewChannelOpen(false);
-      } catch (err) {
-        setNewChannelError((err as Error).message);
-      }
-    },
-    [chat],
-  );
+  const refreshActiveList = useCallback(async () => {
+    if (!activeListId) return;
+    const items = await chatApi.listListConversations(activeListId);
+    setConversationsByList((current) => ({ ...current, [activeListId]: items }));
+    await refreshLists();
+  }, [activeListId, refreshLists]);
 
-  const onStartDm = useCallback(
-    async (participantId: string, kind: "user" | "bot") => {
-      setStartDmError(null);
-      try {
-        const channel = await chat.openDm(kind === "user" ? [participantId] : [], kind === "bot" ? [participantId] : []);
-        setStartDmOpen(false);
-        if (channel) chat.setActiveChannel(channel.id);
-      } catch (err) {
-        setStartDmError((err as Error).message);
-      }
-    },
-    [chat],
-  );
+  const onCreateChannel = useCallback(async (name: string, topic: string) => {
+    if (!activeListId) return;
+    setNewChannelError(null);
+    try {
+      await chatApi.createListConversation(activeListId, { name, topic: topic || undefined });
+      await refreshActiveList();
+      setNewChannelOpen(false);
+    } catch (err) {
+      setNewChannelError((err as Error).message);
+    }
+  }, [activeListId, refreshActiveList]);
+
+  const onStartDm = useCallback(async (participantId: string, kind: "user" | "bot") => {
+    if (!activeListId) return;
+    setStartDmError(null);
+    try {
+      const channel = await chatApi.openDm({ listId: activeListId, userIds: kind === "user" ? [participantId] : [], botIds: kind === "bot" ? [participantId] : [] });
+      await refreshActiveList();
+      setStartDmOpen(false);
+      chat.setActiveChannel(channel.id);
+    } catch (err) {
+      setStartDmError((err as Error).message);
+    }
+  }, [activeListId, chat, refreshActiveList]);
+
+  const onCreateList = useCallback(async (name: string, spaceId?: string | null) => {
+    setAddListError(null);
+    try {
+      const list = await chatApi.createList({ name, spaceId });
+      setLists((current) => [...current, list]);
+      setActiveListId(list.id);
+      setAddListOpen(false);
+    } catch (err) {
+      setAddListError((err as Error).message);
+    }
+  }, []);
 
   const typingNames = useMemo(() => {
     if (!chat.activeChannelId) return [];
-    const list = chat.typingByChannel[chat.activeChannelId] ?? [];
-    return list.map((t) => (t.actorId === chat.myUserId ? null : t.name)).filter((n): n is string => !!n);
+    return (chat.typingByChannel[chat.activeChannelId] ?? []).map((item) => item.actorId === chat.myUserId ? null : item.name).filter((name): name is string => !!name);
   }, [chat.typingByChannel, chat.activeChannelId, chat.myUserId]);
 
-  const isMember = !!(activeChannel && chat.myUserId && activeChannel.members.some((m) => m.userId === chat.myUserId));
-  const amIAdmin = !!(activeChannel && chat.myUserId && activeChannel.members.some((m) => m.userId === chat.myUserId && m.role === "admin"));
-
-  const resolveMention = useCallback(
-    (kind: string, id: string) => {
-      const hit = chat.members.find((m) => (kind === "user" ? m.userId === id : m.botId === id));
-      return hit ? chat.memberName(hit) : null;
-    },
-    [chat.members, chat],
-  );
+  const isMember = !!(activeChannel && chat.myUserId && activeChannel.members.some((member) => member.userId === chat.myUserId));
+  const resolveMention = useCallback((kind: string, id: string) => {
+    const hit = chat.members.find((member) => kind === "user" ? member.userId === id : member.botId === id);
+    return hit ? chat.memberName(hit) : null;
+  }, [chat.members, chat]);
 
   return {
     chat,
+    lists,
+    spaces,
+    activeList,
+    activeListId,
+    setActiveListId: (id: string) => { setActiveListId(id); setSidebarSearch(""); },
+    activeConversations,
     activeChannel,
     messages,
-    hasMore,
     replyTo,
     setReplyTo,
     newChannelOpen,
@@ -133,15 +173,21 @@ export function useChatView() {
     setStartDmOpen,
     startDmError,
     onStartDm,
+    addListOpen,
+    setAddListOpen,
+    addListError,
+    onCreateList,
     notifsOpen,
     setNotifsOpen,
+    sidebarSearch,
+    setSidebarSearch,
+    sidebarPreviews,
     drafts,
     onSend,
     onUpload,
     onDraftChange,
     typingNames,
     isMember,
-    amIAdmin,
     resolveMention,
   };
 }

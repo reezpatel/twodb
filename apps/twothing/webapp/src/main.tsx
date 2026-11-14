@@ -7,10 +7,15 @@ import { App } from "./App";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <TwoDbAuthProvider>
-      <RequireTwoDbAuth>
-        <App />
-      </RequireTwoDbAuth>
-    </TwoDbAuthProvider>
+    {__TWOTHING_NO_AUTH__ ? (
+      // TWOTHING_DIRECT=1 dev mode: straight to the backend, no gateway, no login.
+      <App />
+    ) : (
+      <TwoDbAuthProvider>
+        <RequireTwoDbAuth>
+          <App />
+        </RequireTwoDbAuth>
+      </TwoDbAuthProvider>
+    )}
   </StrictMode>,
 );

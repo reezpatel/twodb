@@ -36,6 +36,19 @@ export const messageActionEvent = defineBroadcastEvent({
   }),
 });
 
+export const conversationImportedEvent = defineBroadcastEvent({
+  event: "twochat.conversation.imported",
+  description: "Published after external messages are idempotently copied into a read-only conversation in any list group.",
+  direction: "produces",
+  relatedApps: [],
+  payload: z.object({
+    conversationId: z.string(),
+    inserted: z.number(),
+    duplicate: z.number(),
+    importedAt: z.string(),
+  }),
+});
+
 export const notificationCreatedEvent = defineBroadcastEvent({
   event: "twochat.notification.created",
   description: "Published when a user notification is created (mention, DM, bot post) — the hook for future push/email delivery.",
@@ -64,7 +77,7 @@ export const messages = defineAppMessages({
   name: "TwoChat",
   slug: "twochat",
   jobs: [sweepReadStateJob],
-  events: [messagePostedEvent, messageActionEvent, notificationCreatedEvent],
+  events: [messagePostedEvent, messageActionEvent, conversationImportedEvent, notificationCreatedEvent],
 });
 
 export default messages;

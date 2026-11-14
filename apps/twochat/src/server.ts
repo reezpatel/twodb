@@ -51,6 +51,9 @@ export async function buildServer(config: TwoChatConfig) {
 
   // --- identity helpers -----------------------------------------------------
 
+  const canAccessSpace = (ctx: ForwardedContext, spaceId: string | null): boolean =>
+    spaceId === null || ctx.spaceIds.length === 0 || ctx.spaceIds.includes(spaceId);
+
   const requireCtx = (req: FastifyRequest, reply: FastifyReply): ForwardedContext | null => {
     const ctx = readForwardedContext(req);
     if (!ctx) {
@@ -152,8 +155,15 @@ export async function buildServer(config: TwoChatConfig) {
       void reply.code(404).send({ error: "channel_not_found" });
       return null;
     }
+    if (channel.list_id) {
+      const list = await repo.getConversationList(ctx.workspaceId, channel.list_id);
+      if (!list || !canAccessSpace(ctx, list.space_id)) {
+        void reply.code(403).send({ error: "space_not_accessible" });
+        return null;
+      }
+    }
     const member = await repo.isMember(ctx.workspaceId, channelId, actor);
-    if (!member) {
+    if (channel.kind === "dm" && !member) {
       void reply.code(403).send({ error: "not_a_member" });
       return null;
     }
@@ -171,6 +181,12 @@ export async function buildServer(config: TwoChatConfig) {
       return null;
     }
     return message;
+  };
+
+  const requireWritableConversation = (channel: TwoChatDb["channel"], reply: FastifyReply): boolean => {
+    if (!channel.is_read_only) return true;
+    void reply.code(409).send({ error: "conversation_read_only" });
+    return false;
   };
 
   const channelUserIds = async (workspaceId: string, channelId: string): Promise<string[]> => {
@@ -194,7 +210,8 @@ export async function buildServer(config: TwoChatConfig) {
     if (!auth) return reply;
     if (auth.ctx.kind !== "session") return reply.code(403).send({ error: "session_required" });
     await repo.ensureDefaultChannel(auth.ctx.workspaceId, auth.actor);
-    return repo.listChannels(auth.ctx.workspaceId, auth.ctx.userId!);
+    const defaultList = await repo.ensureDefaultList(auth.ctx.workspaceId, auth.ctx.userId!);
+    return repo.listChannels(auth.ctx.workspaceId, auth.ctx.userId!, defaultList.id);
   });
 
   app.post("/channels", async (req, reply) => {
@@ -204,11 +221,17 @@ export async function buildServer(config: TwoChatConfig) {
     const body = json(req.body);
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) return reply.code(400).send({ error: "invalid_name" });
+    const defaultList = await repo.ensureDefaultList(auth.ctx.workspaceId, auth.ctx.userId!);
+    const listId = typeof body.listId === "string" ? body.listId : defaultList.id;
+    const list = await repo.getConversationList(auth.ctx.workspaceId, listId);
+    if (!list) return reply.code(404).send({ error: "list_not_found" });
+    if (!canAccessSpace(auth.ctx, list.space_id)) return reply.code(403).send({ error: "space_not_accessible" });
 
     const existing = await db
       .selectFrom("channel")
       .select("id")
       .where("workspace_id", "=", auth.ctx.workspaceId)
+      .where("list_id", "=", listId)
       .where("kind", "=", "channel")
       .where("name", "=", name)
       .executeTakeFirst();
@@ -221,6 +244,7 @@ export async function buildServer(config: TwoChatConfig) {
 
     const channel = await repo.createChannel({
       workspaceId: auth.ctx.workspaceId,
+      listId,
       kind: "channel",
       name,
       topic: typeof body.topic === "string" ? body.topic : null,
@@ -251,11 +275,19 @@ export async function buildServer(config: TwoChatConfig) {
     const members = await repo.memberPayloads(auth.ctx.workspaceId, id);
     if (!members.some((m) => m.userId === auth.actor.id && m.role === "admin")) return reply.code(403).send({ error: "admin_required" });
     const body = json(req.body);
-    const patch: { name?: string; topic?: string | null; archived?: boolean; position?: number } = {};
+    const patch: { name?: string; topic?: string | null; archived?: boolean; position?: number; listId?: string; isReadOnly?: boolean; sourceUrl?: string | null } = {};
     if (typeof body.name === "string" && body.name.trim()) patch.name = body.name.trim();
     if (body.topic !== undefined) patch.topic = typeof body.topic === "string" ? body.topic : null;
     if (body.archived !== undefined) patch.archived = !!body.archived;
     if (typeof body.position === "number") patch.position = body.position;
+    if (typeof body.listId === "string") {
+      const target = await repo.getConversationList(auth.ctx.workspaceId, body.listId);
+      if (!target) return reply.code(404).send({ error: "list_not_found" });
+      if (!canAccessSpace(auth.ctx, target.space_id)) return reply.code(403).send({ error: "space_not_accessible" });
+      patch.listId = body.listId;
+    }
+    if (typeof body.isReadOnly === "boolean") patch.isReadOnly = body.isReadOnly;
+    if (body.sourceUrl !== undefined) patch.sourceUrl = typeof body.sourceUrl === "string" ? body.sourceUrl : null;
     if (!Object.keys(patch).length) return reply.code(400).send({ error: "empty_update" });
     const row = await repo.updateChannel(auth.ctx.workspaceId, id, patch);
     const hydrated = row ? await repo.hydrateChannel(auth.ctx.workspaceId, row, auth.ctx.userId ?? "") : null;
@@ -304,13 +336,18 @@ export async function buildServer(config: TwoChatConfig) {
     if (!auth) return reply;
     if (auth.ctx.kind !== "session") return reply.code(403).send({ error: "session_required" });
     const body = json(req.body);
+    const defaultList = await repo.ensureDefaultList(auth.ctx.workspaceId, auth.ctx.userId!);
+    const listId = typeof body.listId === "string" ? body.listId : defaultList.id;
+    const list = await repo.getConversationList(auth.ctx.workspaceId, listId);
+    if (!list) return reply.code(404).send({ error: "list_not_found" });
+    if (!canAccessSpace(auth.ctx, list.space_id)) return reply.code(403).send({ error: "space_not_accessible" });
     const others = Array.isArray(body.userIds) ? (body.userIds as unknown[]).filter((v): v is string => typeof v === "string") : [];
     const botIds = Array.isArray(body.botIds) ? (body.botIds as unknown[]).filter((v): v is string => typeof v === "string") : [];
     if (!others.length && !botIds.length) return reply.code(400).send({ error: "no_recipients" });
     const targets: Actor[] = others.map(userActor);
     const bots = await repo.botMap(auth.ctx.workspaceId);
     for (const id of botIds) if (bots.has(id)) targets.push(botActor(id));
-    const channel = await repo.findOrCreateDm(auth.ctx.workspaceId, auth.actor, targets);
+    const channel = await repo.findOrCreateDm(auth.ctx.workspaceId, listId, auth.actor, targets);
     hub.publishToUsers(auth.ctx.workspaceId, await channelUserIds(auth.ctx.workspaceId, channel.id), { type: "channel_created", channel });
     return reply.code(201).send(channel);
   });
@@ -333,6 +370,8 @@ export async function buildServer(config: TwoChatConfig) {
     const { id } = req.params as { id: string };
     const channel = await requireChannelAccess(auth.ctx, auth.actor, id, reply);
     if (!channel) return reply;
+    if (!requireWritableConversation(channel, reply)) return reply;
+    if (!(await repo.isMember(auth.ctx.workspaceId, id, auth.actor))) return reply.code(403).send({ error: "not_a_member" });
     const parsed = parseBlocksOrText(json(req.body));
     if ("error" in parsed) return reply.code(400).send({ error: parsed.error });
 
@@ -374,8 +413,10 @@ export async function buildServer(config: TwoChatConfig) {
     const auth = await requireActor(req, reply);
     if (!auth) return reply;
     const { id } = req.params as { id: string };
-    const row = await repo.getMessage(auth.ctx.workspaceId, id);
-    if (!row) return reply.code(404).send({ error: "message_not_found" });
+    const row = await requireMessageAccess(auth.ctx, auth.actor, id, reply);
+    if (!row) return reply;
+    const conversation = await repo.getChannel(auth.ctx.workspaceId, row.channel_id);
+    if (!conversation || !requireWritableConversation(conversation, reply)) return reply;
     const mine = auth.actor.type === "user" ? row.user_id === auth.actor.id : row.bot_id === auth.actor.id;
     if (!mine) return reply.code(403).send({ error: "not_author" });
     const parsed = parseBlocksOrText(json(req.body));
@@ -391,8 +432,10 @@ export async function buildServer(config: TwoChatConfig) {
     const auth = await requireActor(req, reply);
     if (!auth) return reply;
     const { id } = req.params as { id: string };
-    const row = await repo.getMessage(auth.ctx.workspaceId, id);
-    if (!row) return reply.code(404).send({ error: "message_not_found" });
+    const row = await requireMessageAccess(auth.ctx, auth.actor, id, reply);
+    if (!row) return reply;
+    const conversation = await repo.getChannel(auth.ctx.workspaceId, row.channel_id);
+    if (!conversation || !requireWritableConversation(conversation, reply)) return reply;
     const mine = auth.actor.type === "user" ? row.user_id === auth.actor.id : row.bot_id === auth.actor.id;
     if (!mine) return reply.code(403).send({ error: "not_author" });
     await repo.deleteMessage(auth.ctx.workspaceId, id);
@@ -406,6 +449,8 @@ export async function buildServer(config: TwoChatConfig) {
     const { id } = req.params as { id: string };
     const row = await requireMessageAccess(auth.ctx, auth.actor, id, reply);
     if (!row) return reply;
+    const conversation = await repo.getChannel(auth.ctx.workspaceId, row.channel_id);
+    if (!conversation || !requireWritableConversation(conversation, reply)) return reply;
     const emoji = json(req.body).emoji;
     if (typeof emoji !== "string" || !emoji.trim()) return reply.code(400).send({ error: "invalid_emoji" });
     const reactions = await repo.toggleReaction(auth.ctx.workspaceId, id, auth.actor, emoji.trim());
@@ -522,7 +567,9 @@ export async function buildServer(config: TwoChatConfig) {
     if (!auth) return reply;
     if (auth.ctx.kind !== "session") return reply.code(403).send({ error: "session_required" });
     const { channelId } = req.params as { channelId: string };
-    if (!(await requireChannelAccess(auth.ctx, auth.actor, channelId, reply))) return reply;
+    const conversation = await requireChannelAccess(auth.ctx, auth.actor, channelId, reply);
+    if (!conversation) return reply;
+    if (!requireWritableConversation(conversation, reply)) return reply;
     const text = typeof json(req.body).text === "string" ? (json(req.body).text as string) : "";
     await repo.saveDraft(auth.ctx.workspaceId, channelId, auth.ctx.userId!, text);
     return { ok: true };
@@ -548,6 +595,7 @@ export async function buildServer(config: TwoChatConfig) {
     const { id } = req.params as { id: string };
     const channel = await requireChannelAccess(auth.ctx, auth.actor, id, reply);
     if (!channel) return reply;
+    if (!requireWritableConversation(channel, reply)) return reply;
 
     const parts = req.parts({ limits: { fileSize: config.TWOCHAT_MAX_ATTACHMENT_BYTES } });
     const created = [];
@@ -655,6 +703,7 @@ export async function buildServer(config: TwoChatConfig) {
     if (!channelId) return reply.code(400).send({ error: "channel_required" });
     const channel = await repo.getChannel(auth.ctx.workspaceId, channelId);
     if (!channel) return reply.code(404).send({ error: "channel_not_found" });
+    if (!requireWritableConversation(channel, reply)) return reply;
 
     // Auto-join the bot to the channel on first post (agents self-invite).
     if (!(await repo.isMember(auth.ctx.workspaceId, channelId, auth.actor))) {
@@ -708,6 +757,127 @@ export async function buildServer(config: TwoChatConfig) {
     return { ok: true };
   });
 
+  // --- conversation lists ------------------------------------------------------------
+
+  app.get("/lists", async (req, reply) => {
+    const auth = await requireActor(req, reply);
+    if (!auth) return reply;
+    if (auth.ctx.kind !== "session" || !auth.ctx.userId) return reply.code(403).send({ error: "session_required" });
+    return repo.listConversationLists(auth.ctx.workspaceId, auth.ctx.spaceIds, auth.ctx.userId);
+  });
+
+  app.post("/lists", async (req, reply) => {
+    const auth = await requireActor(req, reply);
+    if (!auth) return reply;
+    if (auth.ctx.kind !== "session" || !auth.ctx.userId) return reply.code(403).send({ error: "session_required" });
+    const body = json(req.body);
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const spaceId = typeof body.spaceId === "string" && body.spaceId ? body.spaceId : null;
+    if (!name) return reply.code(400).send({ error: "name_required" });
+    if (!canAccessSpace(auth.ctx, spaceId)) return reply.code(403).send({ error: "space_not_accessible" });
+    return reply.code(201).send(await repo.createConversationList({ workspaceId: auth.ctx.workspaceId, spaceId, name, createdBy: auth.ctx.userId }));
+  });
+
+  app.patch("/lists/:id", async (req, reply) => {
+    const auth = await requireActor(req, reply);
+    if (!auth) return reply;
+    if (auth.ctx.kind !== "session" || !auth.ctx.userId) return reply.code(403).send({ error: "session_required" });
+    const { id } = req.params as { id: string };
+    const current = await repo.getConversationList(auth.ctx.workspaceId, id);
+    if (!current) return reply.code(404).send({ error: "list_not_found" });
+    if (!canAccessSpace(auth.ctx, current.space_id)) return reply.code(403).send({ error: "space_not_accessible" });
+    const body = json(req.body);
+    const spaceId = body.spaceId === null ? null : typeof body.spaceId === "string" ? body.spaceId : undefined;
+    if (spaceId !== undefined && !canAccessSpace(auth.ctx, spaceId)) return reply.code(403).send({ error: "space_not_accessible" });
+    await repo.updateConversationList(auth.ctx.workspaceId, id, {
+      name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : undefined,
+      spaceId,
+      position: typeof body.position === "number" ? body.position : undefined,
+    });
+    return { ok: true };
+  });
+
+  app.delete("/lists/:id", async (req, reply) => {
+    const auth = await requireActor(req, reply);
+    if (!auth) return reply;
+    if (auth.ctx.kind !== "session") return reply.code(403).send({ error: "session_required" });
+    const { id } = req.params as { id: string };
+    const result = await repo.deleteConversationList(auth.ctx.workspaceId, id);
+    if (result === "not_found") return reply.code(404).send({ error: "list_not_found" });
+    if (result === "default") return reply.code(409).send({ error: "default_list_cannot_be_deleted" });
+    if (result === "not_empty") return reply.code(409).send({ error: "list_not_empty", detail: "Move or delete its conversations first." });
+    return { ok: true };
+  });
+
+  app.get("/lists/:id/conversations", async (req, reply) => {
+    const auth = await requireActor(req, reply);
+    if (!auth) return reply;
+    if (auth.ctx.kind !== "session" || !auth.ctx.userId) return reply.code(403).send({ error: "session_required" });
+    const { id } = req.params as { id: string };
+    const list = await repo.getConversationList(auth.ctx.workspaceId, id);
+    if (!list) return reply.code(404).send({ error: "list_not_found" });
+    if (!canAccessSpace(auth.ctx, list.space_id)) return reply.code(403).send({ error: "space_not_accessible" });
+    return repo.listChannels(auth.ctx.workspaceId, auth.ctx.userId, id);
+  });
+
+  app.post("/lists/:id/conversations", async (req, reply) => {
+    const auth = await requireActor(req, reply);
+    if (!auth) return reply;
+    if (auth.ctx.kind !== "session" || !auth.ctx.userId) return reply.code(403).send({ error: "session_required" });
+    const { id } = req.params as { id: string };
+    const list = await repo.getConversationList(auth.ctx.workspaceId, id);
+    if (!list) return reply.code(404).send({ error: "list_not_found" });
+    if (!canAccessSpace(auth.ctx, list.space_id)) return reply.code(403).send({ error: "space_not_accessible" });
+    const body = json(req.body);
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name) return reply.code(400).send({ error: "name_required" });
+    const conversation = await repo.createChannel({
+      workspaceId: auth.ctx.workspaceId,
+      listId: id,
+      kind: body.kind === "dm" ? "dm" : "channel",
+      name,
+      topic: typeof body.topic === "string" ? body.topic : null,
+      isReadOnly: body.isReadOnly === true,
+      sourceProvider: typeof body.sourceProvider === "string" ? body.sourceProvider : null,
+      sourceExternalId: typeof body.sourceExternalId === "string" ? body.sourceExternalId : null,
+      sourceUrl: typeof body.sourceUrl === "string" ? body.sourceUrl : null,
+      avatarUrl: typeof body.avatarUrl === "string" ? body.avatarUrl : null,
+      creator: auth.actor,
+      members: [],
+    });
+    return reply.code(201).send(conversation);
+  });
+
+  /** Idempotently imports immutable source messages into a read-only conversation. */
+  app.post("/conversations/:id/import", async (req, reply) => {
+    const auth = await requireActor(req, reply);
+    if (!auth) return reply;
+    const { id } = req.params as { id: string };
+    const conversation = await repo.getChannel(auth.ctx.workspaceId, id);
+    if (!conversation) return reply.code(404).send({ error: "conversation_not_found" });
+    if (!conversation.is_read_only) return reply.code(409).send({ error: "conversation_is_writable" });
+    const list = conversation.list_id ? await repo.getConversationList(auth.ctx.workspaceId, conversation.list_id) : null;
+    if (list && !canAccessSpace(auth.ctx, list.space_id)) return reply.code(403).send({ error: "space_not_accessible" });
+    const body = json(req.body);
+    if (!Array.isArray(body.messages)) return reply.code(400).send({ error: "messages_required" });
+    const messages = (body.messages as unknown[]).map((value) => {
+      const message = value as Record<string, unknown>;
+      return {
+        externalId: String(message.externalId ?? ""),
+        senderName: String(message.senderName ?? "Unknown"),
+        senderAvatarUrl: typeof message.senderAvatarUrl === "string" ? message.senderAvatarUrl : null,
+        text: String(message.text ?? ""),
+        sourceUrl: typeof message.sourceUrl === "string" ? message.sourceUrl : null,
+        sentAt: typeof message.sentAt === "string" ? message.sentAt : new Date().toISOString(),
+      };
+    }).filter((message) => message.externalId);
+    const result = await repo.importConversationMessages({ workspaceId: auth.ctx.workspaceId, channelId: id, messages });
+    const importedAt = new Date().toISOString();
+    await asyncEngine.broadcast.publish("twochat.conversation.imported", { conversationId: id, ...result, importedAt });
+    void publishToChannel(auth.ctx.workspaceId, id, { type: "channel_updated", channel: await repo.hydrateChannel(auth.ctx.workspaceId, (await repo.getChannel(auth.ctx.workspaceId, id))!, auth.ctx.userId ?? "") });
+    return reply.code(202).send(result);
+  });
+
   // --- notifications -------------------------------------------------------------------------
 
   app.get("/notifications", async (req, reply) => {
@@ -743,7 +913,7 @@ export async function buildServer(config: TwoChatConfig) {
     if (!auth) return reply;
     const q = (req.query as { q?: string }).q ?? "";
     if (!q.trim()) return { results: [] };
-    const messages = await repo.searchMessages(auth.ctx.workspaceId, q.trim(), auth.actor, 25);
+    const messages = await repo.searchMessages(auth.ctx.workspaceId, q.trim(), auth.actor, auth.ctx.spaceIds, 25);
     return {
       results: messages.map((m) => ({
         id: m.id,

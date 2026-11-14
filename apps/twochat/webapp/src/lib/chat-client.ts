@@ -19,9 +19,15 @@ export interface Member {
 
 export interface Channel {
   id: string;
+  listId: string | null;
   kind: "channel" | "dm";
   name: string;
   topic: string | null;
+  isReadOnly: boolean;
+  sourceProvider: string | null;
+  sourceExternalId: string | null;
+  sourceUrl: string | null;
+  avatarUrl: string | null;
   dmKey: string | null;
   position: number;
   createdBy: string | null;
@@ -49,6 +55,9 @@ export interface Message {
   botId: string | null;
   authorName: string;
   authorEmoji: string | null;
+  authorAvatarUrl: string | null;
+  externalId: string | null;
+  sourceUrl: string | null;
   text: string;
   blocks: MessageBlock[] | null;
   replyToId: string | null;
@@ -90,13 +99,30 @@ export interface Asset {
   createdAt: string;
 }
 
+export interface ConversationList {
+  id: string;
+  spaceId: string | null;
+  name: string;
+  position: number;
+  isDefault: boolean;
+  conversationCount: number;
+  unreadCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Space {
+  id: string;
+  name: string;
+}
+
 const BASE = "/twochat-api";
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     credentials: "include",
     ...init,
-    headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
+    headers: { ...(init?.body ? { "content-type": "application/json" } : {}), ...(init?.headers ?? {}) },
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
@@ -108,7 +134,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 export const chatApi = {
   listChannels: () => call<Channel[]>("/channels"),
 
-  createChannel: (input: { name: string; topic?: string; botIds?: string[] }) =>
+  createChannel: (input: { name: string; topic?: string; listId?: string; botIds?: string[] }) =>
     call<Channel>("/channels", { method: "POST", body: JSON.stringify(input) }),
 
   getChannel: (id: string) => call<Channel & { members: Member[] }>(`/channels/${id}`),
@@ -120,7 +146,7 @@ export const chatApi = {
 
   joinChannel: (id: string) => call<{ ok: boolean }>(`/channels/${id}/join`, { method: "POST" }),
 
-  openDm: (input: { userIds?: string[]; botIds?: string[] }) =>
+  openDm: (input: { listId?: string; userIds?: string[]; botIds?: string[] }) =>
     call<Channel>("/dms", { method: "POST", body: JSON.stringify(input) }),
 
   listMessages: (channelId: string, before?: string | null) =>
@@ -174,11 +200,51 @@ export const chatApi = {
 
   listBots: () => call<Bot[]>("/bots"),
 
+  listLists: () => call<ConversationList[]>("/lists"),
+
+  createList: (input: { name: string; spaceId?: string | null }) =>
+    call<ConversationList>("/lists", { method: "POST", body: JSON.stringify(input) }),
+
+  updateList: (id: string, patch: { name?: string; spaceId?: string | null; position?: number }) =>
+    call<{ ok: boolean }>(`/lists/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+
+  deleteList: (id: string) => call<{ ok: boolean }>(`/lists/${id}`, { method: "DELETE" }),
+
+  listListConversations: (listId: string) => call<Channel[]>(`/lists/${listId}/conversations`),
+
+  createListConversation: (listId: string, input: {
+    name: string;
+    kind?: "channel" | "dm";
+    topic?: string;
+    isReadOnly?: boolean;
+    sourceProvider?: string;
+    sourceExternalId?: string;
+    sourceUrl?: string;
+    avatarUrl?: string;
+  }) => call<Channel>(`/lists/${listId}/conversations`, { method: "POST", body: JSON.stringify(input) }),
+
+  importConversationMessages: (conversationId: string, messages: Array<{
+    externalId: string;
+    senderName: string;
+    senderAvatarUrl?: string;
+    text: string;
+    sourceUrl?: string;
+    sentAt: string;
+  }>) => call<{ inserted: number; duplicate: number }>(`/conversations/${conversationId}/import`, { method: "POST", body: JSON.stringify({ messages }) }),
+
   listNotifications: () => call<{ notifications: Notification[]; unread: number }>("/notifications"),
 
   markNotificationRead: (id: string) => call<{ ok: boolean }>(`/notifications/${id}/read`, { method: "POST" }),
 
   markAllNotificationsRead: () => call<{ ok: boolean }>("/notifications/read-all", { method: "POST" }),
+};
+
+export const controlPlaneClient = {
+  listSpaces: async (): Promise<{ spaces: Space[] }> => {
+    const response = await fetch("/registry/spaces", { credentials: "include" });
+    if (!response.ok) throw new Error(`${response.status}: unable to load spaces`);
+    return response.json() as Promise<{ spaces: Space[] }>;
+  },
 };
 
 /** Direct message channels show the other members' names, not the raw dm_key. */

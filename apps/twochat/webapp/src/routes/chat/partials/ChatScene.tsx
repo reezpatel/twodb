@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Hash, ArrowDown } from "lucide-react";
 import type { Channel, Message } from "../../../lib/chat-client";
 import { MessageRow } from "./MessageRow";
+import { MessageGroup } from "./message";
 
 /**
  * Center column: header (topic), scrollable message history with
@@ -14,6 +15,7 @@ export interface ChatSceneProps {
   messages: Message[];
   hasMore: boolean;
   myUserId: string | null;
+  readOnly?: boolean;
   typingNames: string[];
   resolveMention?: (kind: string, id: string) => string | null;
   onLoadMore: () => void;
@@ -111,7 +113,7 @@ function MessageList(props: ChatSceneProps) {
   let lastAuthor: string | null = null;
   let lastDay = "";
   return (
-    <div className="flex flex-col gap-0.5">
+    <MessageGroup className="gap-0.5">
       {props.messages.map((m) => {
         const day = new Date(m.createdAt).toDateString();
         const showDay = day !== lastDay;
@@ -132,6 +134,7 @@ function MessageList(props: ChatSceneProps) {
               message={m}
               mine={props.myUserId !== null && m.userId === props.myUserId}
               showAuthor={showAuthor}
+              readOnly={props.readOnly}
               resolveMention={props.resolveMention}
               onReact={props.onReact}
               onReply={props.onReply}
@@ -149,6 +152,6 @@ function MessageList(props: ChatSceneProps) {
           <span className="text-xs">Say hello 👋</span>
         </div>
       ) : null}
-    </div>
+    </MessageGroup>
   );
 }
