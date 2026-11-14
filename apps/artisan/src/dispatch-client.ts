@@ -37,7 +37,7 @@ export class DispatchClient {
   private async post<T>(path: string, body: unknown): Promise<T> {
     const res = await fetch(`${this.config.DISPATCH_URL}${path}`, {
       method: "POST",
-      headers: { "x-api-key": this.apiKey, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json" },
       body: JSON.stringify(body),
     });
     const json = (await res.json().catch(() => ({}))) as T & { error?: string; message?: string };
@@ -47,7 +47,7 @@ export class DispatchClient {
 
   private async get<T>(path: string): Promise<T> {
     const res = await fetch(`${this.config.DISPATCH_URL}${path}`, {
-      headers: { "x-api-key": this.apiKey },
+      headers: { authorization: `Bearer ${this.apiKey}` },
     });
     const json = (await res.json().catch(() => ({}))) as T & { error?: string; message?: string };
     if (!res.ok) throw new Error(`dispatch ${path} ${res.status}: ${json.error ?? json.message ?? ""}`);
@@ -68,7 +68,7 @@ export class DispatchClient {
   async *call(runner: string, command: string, cwd: string, timeoutMs = 600_000): AsyncGenerator<{ stream: "stdout" | "stderr"; data: string; done?: boolean; exitCode?: number | null }> {
     const { callId } = await this.post<{ callId: string }>("/calls", { runnerId: runner, command, cwd, timeoutMs });
     const res = await fetch(`${this.config.DISPATCH_URL}/calls/${callId}/stream`, {
-      headers: { "x-api-key": this.apiKey },
+      headers: { authorization: `Bearer ${this.apiKey}` },
     });
     if (!res.ok || !res.body) throw new Error(`dispatch stream ${res.status}`);
     const reader = res.body.getReader();
@@ -156,14 +156,14 @@ export class DispatchClient {
   async terminateJob(id: string): Promise<void> {
     await fetch(`${this.config.DISPATCH_URL}/jobs/${id}/terminate`, {
       method: "POST",
-      headers: { "x-api-key": this.apiKey },
+      headers: { authorization: `Bearer ${this.apiKey}` },
     });
   }
 
   async jobInput(id: string, data: string, eof?: boolean): Promise<void> {
     await fetch(`${this.config.DISPATCH_URL}/jobs/${id}/input`, {
       method: "POST",
-      headers: { "x-api-key": this.apiKey, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json" },
       body: JSON.stringify(eof ? { eof: true } : { data }),
     });
   }

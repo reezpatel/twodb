@@ -688,7 +688,7 @@ echo saved`;
       const termCallId = newId();
       const upstream = new WebSocket(
         `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(runner)}/term?command=${encodeURIComponent(command)}&cwd=${encodeURIComponent(session.directory)}&callId=${termCallId}`,
-        { headers: { "x-api-key": apiKeyFor(req) } },
+        { headers: { authorization: `Bearer ${apiKeyFor(req)}` } },
       );
       upstream.on("message", (raw: unknown) => {
         if (socket.readyState === socket.OPEN) socket.send(String(raw));
@@ -798,7 +798,7 @@ echo saved`;
       const sub = url.pathname.split("/editor/")[1] ?? "/";
       const upstream = new WebSocket(
         `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(session.runner)}/proxy-ws?port=${EDITOR_PORT}&path=${encodeURIComponent("/" + sub + url.search)}`,
-        { headers: { "x-api-key": apiKeyFor(req) } },
+        { headers: { authorization: `Bearer ${apiKeyFor(req)}` } },
       );
       upstream.on("message", (raw: unknown) => { if (socket.readyState === socket.OPEN) socket.send(String(raw)); });
       upstream.on("close", () => { if (socket.readyState === socket.OPEN) socket.close(); });
@@ -903,7 +903,7 @@ echo saved`;
       const path = url.searchParams.get("path") ?? "/";
       const upstream = new WebSocket(
         `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(session.runner)}/proxy-ws?port=${port}&path=${encodeURIComponent(path)}`,
-        { headers: { "x-api-key": apiKeyFor(req) } },
+        { headers: { authorization: `Bearer ${apiKeyFor(req)}` } },
       );
       upstream.on("message", (raw: unknown) => { if (socket.readyState === socket.OPEN) socket.send(String(raw)); });
       upstream.on("close", () => { if (socket.readyState === socket.OPEN) socket.close(); });
