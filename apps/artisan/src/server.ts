@@ -843,11 +843,14 @@ echo saved`;
       const proto = req.headers["x-forwarded-proto"] ?? (req.raw.socket as { encrypted?: boolean })?.encrypted ? "https" : "http";
       const host = req.headers["host"] ?? "localhost";
       const wsBase = `${proto === "https" ? "wss" : "ws"}://${host}/apps/artisan/sessions/${id}/editor-ws`;
-      // Use replacement FUNCTIONS (not $-template strings) so a "$" in the JS
-      // source isn't treated as a regex backreference ($', $&, $1…) and corrupted.
-      out = Buffer.from(out.toString("utf8")
-        .replace(/wss?:\/\/[^"'\\\s)]+/g, () => wsBase)
-        .replace(/(["'(])\/(stable-[a-z0-9]+|static|webview|vscode-resource|update|manifest\.json)/g, (_m, p1, p2) => `${p1}${prefix}/${p2}`), "utf8");
+      // Rewrite WS URLs and root-relative asset paths so they resolve through the
+      // proxy. Replacement FUNCTIONS keep a literal "$" in the source intact. Only
+      // rewrite HTML entry points (which reference the tunnel); leave JS/CSS opaque.
+      if (contentType.startsWith("text/html")) {
+        out = Buffer.from(out.toString("utf8")
+          .replace(/wss?:\/\/[^"'\\\s)]+/g, () => wsBase)
+          .replace(/(["'(])(\/?)(stable-[a-z0-9]+|static|webview|vscode-resource|update|manifest\.json)/g, (_m, p1, slash, p2) => `${p1}${prefix}/${p2}`), "utf8");
+      }
     }
     reply.type(outHeaders["content-type"] ?? "application/octet-stream");
     reply.header("cache-control", "no-store");
