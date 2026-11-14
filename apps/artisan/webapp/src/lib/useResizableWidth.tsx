@@ -57,12 +57,14 @@ export function useResizableWidth(key: string, initial: number, min = 160, max =
         role="separator"
         aria-orientation="vertical"
         onPointerDown={start}
-        className={`group relative z-10 w-1 shrink-0 cursor-col-resize ${
+        className={`group relative z-20 w-2 shrink-0 cursor-col-resize touch-none ${
           edge === "right" ? "order-last" : "order-first"
         }`}
-        style={{ marginLeft: edge === "right" ? -2 : 0, marginRight: edge === "left" ? -2 : 0 }}
+        style={{ marginLeft: edge === "right" ? -4 : -4, marginRight: -4 }}
       >
-        <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-ion-deep group-active:bg-ion-deep" />
+        {/* wide invisible hit-target + a visible 1px divider that highlights on hover/active */}
+        <div className="absolute inset-y-0 left-1/2 h-full w-2 -translate-x-1/2" />
+        <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-outline transition-colors group-hover:bg-ion-deep group-active:bg-ion-deep" />
       </div>
     ),
     [start],
