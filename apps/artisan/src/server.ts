@@ -9,6 +9,7 @@ import { createPgDb } from "@twodb/core-data/db";
 import { applySchema } from "./db/schema.js";
 import { createArtisanRepo, newId } from "./db/repository.js";
 import { loadArtisanConfig, type ArtisanConfig } from "./config.js";
+import { gunzipSync } from "node:zlib";
 import { readForwardedContext } from "./gateway-context.js";
 import { artisanManifest } from "./manifest.js";
 import { TworouteClient } from "./tworoute-client.js";
@@ -683,7 +684,7 @@ echo saved`;
       const session = await repo.getSession(ctx.workspaceId, id);
       if (!session) return socket.close(4404, "session not found");
       const runner = url.searchParams.get("runner") ?? session.runner;
-      const command = url.searchParams.get("command") ?? `tmux new-session -A -s twodb-${session.id.slice(0, 8)} -c ${shellQuote(session.directory)} -l`;
+      const command = url.searchParams.get("command") ?? `tmux new-session -A -s twodb-${session.id.slice(0, 8)} -c ${shellQuote(session.directory)}`;
       const termCallId = newId();
       const upstream = new WebSocket(
         `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(runner)}/term?command=${encodeURIComponent(command)}&cwd=${encodeURIComponent(session.directory)}&callId=${termCallId}`,
@@ -722,9 +723,10 @@ echo saved`;
     const installed = which?.stdout?.trim().includes("yes");
     if (!installed) return { state: "not_installed" };
     // is it already listening?
+    // code-server / returns 302 -> /?folder=…; any non-000 response means it is up
     const listening = await deps.dispatch.exec(session.runner, `(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${EDITOR_PORT}/ || echo 000) 2>/dev/null`, "/", 10_000).catch(() => null);
     const code = listening?.stdout?.trim();
-    if (code && code !== "000") return { state: "ready", port: EDITOR_PORT };
+    if (code && code !== "000" && !code.startsWith("5")) return { state: "ready", port: EDITOR_PORT };
     return { state: "idle", port: EDITOR_PORT };
   }
 
@@ -823,6 +825,17 @@ echo saved`;
     const outHeaders: Record<string, string> = {};
     for (const [k, v] of Object.entries(pr.headers)) if (!HOP_BY_HOP.has(k.toLowerCase()) && k !== "set-cookie") outHeaders[k] = v;
     let out = Buffer.from(pr.body, "base64");
+    // code-server gzip-compresses; dispatch drops content-encoding, so detect
+    // gzip by magic bytes (1f 8b). Decompress FIRST (before any UTF-8 rewrite,
+    // which would corrupt the binary).
+    const isGzip = out.length > 2 && out[0] === 0x1f && out[1] === 0x8b;
+    if ((isGzip || (pr.headers["content-encoding"] ?? "") === "gzip") && out.length > 0) {
+      try {
+        out = gunzipSync(out);
+        delete outHeaders["content-encoding"];
+      } catch { /* leave as-is */ }
+    }
+    delete outHeaders["content-length"];
     const contentType = outHeaders["content-type"] ?? "";
     if (/^(text\/html|text\/css|application\/javascript|text\/javascript)/.test(contentType)) {
       const proto = req.headers["x-forwarded-proto"] ?? (req.raw.socket as { encrypted?: boolean })?.encrypted ? "https" : "http";
@@ -831,7 +844,6 @@ echo saved`;
       out = Buffer.from(out.toString("utf8")
         .replace(/wss?:\/\/[^"'\\\s)]+/g, wsBase)
         .replace(/(["'(])\/(stable-[a-z0-9]+|static|webview|vscode-resource|update|manifest\.json)/g, `$1${prefix}/$2`), "utf8");
-      delete outHeaders["content-length"];
     }
     reply.type(outHeaders["content-type"] ?? "application/octet-stream");
     for (const [k, v] of Object.entries(outHeaders)) reply.header(k, v);
