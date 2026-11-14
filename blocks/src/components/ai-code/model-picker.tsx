@@ -111,20 +111,26 @@ function ModelPicker({ providers, models, value, onChange, thinkingLevel, onThin
 
         {/* Provider tabs + model table: clipped to the dialog's rounded corners */}
         <div className="flex max-h-[420px] flex-col overflow-hidden rounded-b-[10px]">
+          {/* Provider tabs: horizontally scrollable (many providers must not
+              push the whole dialog wider). A thin scrollbar appears on hover. */}
           <div className="border-b border-outline px-3 pt-2">
-            <Tabs value={activeProvider} onValueChange={setActiveProvider}>
-              <TabsList variant="line" size="sm" className="border-b-0">
-                {groups.map((g) => {
-                  const Icon = g.icon;
-                  return (
-                    <TabsTrigger key={g.id} value={g.id}>
-                      {Icon ? <Icon strokeWidth={1.5} /> : null}
-                      {g.title}
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
-            </Tabs>
+            <div className="-mx-3 overflow-x-auto [scrollbar-width:thin]" data-slot="model-picker-provider-scroll">
+              <div className="px-3">
+                <Tabs value={activeProvider} onValueChange={setActiveProvider}>
+                  <TabsList variant="line" size="sm" className="border-b-0">
+                    {groups.map((g) => {
+                      const Icon = g.icon;
+                      return (
+                        <TabsTrigger key={g.id} value={g.id}>
+                          {Icon ? <Icon strokeWidth={1.5} /> : null}
+                          {g.title}
+                        </TabsTrigger>
+                      );
+                    })}
+                  </TabsList>
+                </Tabs>
+              </div>
+            </div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
