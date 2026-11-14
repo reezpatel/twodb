@@ -542,9 +542,9 @@ export async function buildServer(config: ArtisanConfig) {
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
     const deps = depsFor(req);
-    const jobs = await deps.dispatch.listJobs(session.runner);
-    // Jobs carry no cwd — show the runner's recent jobs, newest first.
-    return jobs.slice(0, 12).map((j) => ({
+    // Scope to this session: job_start stamps the session id as the dispatch resourceId.
+    const jobs = await deps.dispatch.listJobs(session.runner, id);
+    return jobs.map((j) => ({
       id: j.id, command: j.command, status: j.status, exitCode: j.exitCode,
       startedAt: j.startedAt, endedAt: j.endedAt,
     }));

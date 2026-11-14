@@ -121,13 +121,18 @@ export class DispatchClient {
 
   /** Lists recent jobs for a runner — accepts the runner NAME (sessions store
    *  names) or its internal id; resolves name → id via /runners. */
-  async listJobs(runner: string): Promise<Array<JobInfo & { startedAt?: string; endedAt?: string | null }>> {
+  /** Lists recent jobs for a runner — optionally scoped to a session via the
+   *  dispatch `resourceId` (= artisan session id) that job_start stamps on the job. */
+  async listJobs(runner: string, sessionId?: string): Promise<Array<JobInfo & { startedAt?: string; endedAt?: string | null; resourceId?: string | null }>> {
     let id = runner;
     if (!/^01/.test(runner)) {
       const runners = await this.listRunners().catch(() => [] as RunnerInfo[]);
       id = runners.find((r) => r.name === runner)?.id ?? runner;
     }
-    return this.get(`/jobs?runnerId=${encodeURIComponent(id)}&limit=12`);
+    const res = await this.get(`/jobs?runnerId=${encodeURIComponent(id)}&limit=30`);
+    const list = (Array.isArray(res) ? res : []) as Array<JobInfo & { startedAt?: string; endedAt?: string | null; resourceId?: string | null }>;
+    const scoped = sessionId ? list.filter((j) => j.resourceId === sessionId) : list;
+    return scoped.slice(0, 12);
   }
 
   async getJob(id: string): Promise<JobInfo> {

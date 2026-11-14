@@ -40,6 +40,17 @@ export interface ToolSpec {
 }
 
 /** Tools that need no session context (pure). */
+/** Job tools may only touch jobs stamped with THIS session's id (the
+ *  dispatch resourceId set by job_start) — an agent can't read, feed, or kill
+ *  another session's or the user's jobs. */
+async function assertJobOwned(ctx: ToolContext, jobId: string): Promise<{ id: string; resourceId: string | null; status: string; exitCode: number | null }> {
+  const job = await ctx.dispatch.getJob(jobId);
+  if (job.resourceId !== ctx.session.id) {
+    throw new Error(`job ${jobId} is not part of this session (jobs are scoped to the session/agent that started them)`);
+  }
+  return job;
+}
+
 function fileTools(dispatch: DispatchClient): ToolSpec[] {
   const run = async (session: SessionRow, command: string, timeoutMs?: number) => {
     const res = await dispatch.exec(session.runner, command, session.directory, timeoutMs);
@@ -116,9 +127,10 @@ function fileTools(dispatch: DispatchClient): ToolSpec[] {
     },
     {
       name: "job_logs",
-      description: "Fetches a job's log lines (optionally after a sequence number).",
+      description: "Fetches a job's log lines (optionally after a sequence number). Only jobs started in THIS session are visible.",
       parameters: { type: "object", properties: { jobId: { type: "string" }, after: { type: "number" } }, required: ["jobId"] },
       async execute(args, ctx) {
+        await assertJobOwned(ctx, String(args.jobId));
         const res = await ctx.dispatch.jobLogs(String(args.jobId), Number(args.after ?? 0));
         const lines = res.lines.map((l: { line: string }) => l.line).join("\n");
         return lines.slice(0, 20_000) || "(no logs yet)";
@@ -129,7 +141,7 @@ function fileTools(dispatch: DispatchClient): ToolSpec[] {
       description: "Checks a job's status and exit code.",
       parameters: { type: "object", properties: { jobId: { type: "string" } }, required: ["jobId"] },
       async execute(args, ctx) {
-        const job = await ctx.dispatch.getJob(String(args.jobId));
+        const job = await assertJobOwned(ctx, String(args.jobId));
         return JSON.stringify({ status: job.status, exitCode: job.exitCode });
       },
     },
@@ -138,6 +150,7 @@ function fileTools(dispatch: DispatchClient): ToolSpec[] {
       description: "Feeds data (or EOF) to a running job's stdin.",
       parameters: { type: "object", properties: { jobId: { type: "string" }, data: { type: "string" }, eof: { type: "boolean" } }, required: ["jobId"] },
       async execute(args, ctx) {
+        await assertJobOwned(ctx, String(args.jobId));
         await ctx.dispatch.jobInput(String(args.jobId), String(args.data ?? ""), Boolean(args.eof));
         return args.eof ? "stdin closed" : "fed";
       },
@@ -147,6 +160,7 @@ function fileTools(dispatch: DispatchClient): ToolSpec[] {
       description: "Terminates a running job (SIGTERM).",
       parameters: { type: "object", properties: { jobId: { type: "string" } }, required: ["jobId"] },
       async execute(args, ctx) {
+        await assertJobOwned(ctx, String(args.jobId));
         await ctx.dispatch.terminateJob(String(args.jobId));
         return "terminate sent";
       },
