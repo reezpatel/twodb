@@ -3,9 +3,13 @@ package main
 import (
 	"os"
 	"os/exec"
+	"bytes"
+	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/creack/pty"
+	"github.com/gorilla/websocket"
 )
 
 // termHandle: an interactive PTY session (terminal or code-server) so the
@@ -125,5 +129,167 @@ func (r *runner) doTermClose(f frame) {
 	_ = h.pt.Close()
 	if h.cmd.Process != nil {
 		_ = h.cmd.Process.Kill()
+	}
+}
+
+// --- code-server HTTP proxy -------------------------------------------------
+
+// doProxyHttp: proxy one HTTP request to a localhost port (code-server) and
+// stream the response back as proxyHttpResponse/Chunk/End frames. Ack the callId
+// first so dispatch's sendToRunner resolves, then stream the body.
+func (r *runner) doProxyHttp(f frame) {
+	callID := f.str("callId")
+	port := f.num("port")
+	if port <= 0 {
+		_ = r.send(frame{"type": "result", "callId": callID, "ok": true})
+		_ = r.send(frame{"type": "proxyHttpResponse", "callId": callID, "status": 502, "headers": map[string]string{}})
+		_ = r.send(frame{"type": "proxyHttpEnd", "callId": callID, "error": "bad port"})
+		return
+	}
+	_ = r.send(frame{"type": "result", "callId": callID, "ok": true})
+	method := f.str("method")
+	if method == "" {
+		method = "GET"
+	}
+	path := f.str("path")
+	if path == "" {
+		path = "/"
+	}
+	url := "http://127.0.0.1:" + itoa(port) + path
+
+	var body []byte
+	if b64, ok := f["bodyBase64"].(string); ok && b64 != "" {
+		b, err := b64Decode(b64)
+		if err == nil {
+			body = b
+		}
+	}
+	req, err := http.NewRequest(method, url, bytesReader(body))
+	if err != nil {
+		_ = r.send(frame{"type": "proxyHttpResponse", "callId": callID, "status": 502, "headers": map[string]string{}})
+		_ = r.send(frame{"type": "proxyHttpEnd", "callId": callID, "error": err.Error()})
+		return
+	}
+	if headers, ok := f["headers"].(map[string]any); ok {
+		for k, v := range headers {
+			req.Header.Set(k, fmt.Sprint(v))
+		}
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		_ = r.send(frame{"type": "proxyHttpResponse", "callId": callID, "status": 502, "headers": map[string]string{}})
+		_ = r.send(frame{"type": "proxyHttpEnd", "callId": callID, "error": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	hdr := map[string]string{}
+	for k, vv := range res.Header {
+		if len(vv) > 0 {
+			hdr[k] = vv[0]
+		}
+	}
+	_ = r.send(frame{"type": "proxyHttpResponse", "callId": callID, "status": res.StatusCode, "headers": hdr})
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := res.Body.Read(buf)
+		if n > 0 {
+			_ = r.send(frame{"type": "proxyHttpChunk", "callId": callID, "dataBase64": b64Encode(buf[:n])})
+		}
+		if err != nil {
+			break
+		}
+	}
+	_ = r.send(frame{"type": "proxyHttpEnd", "callId": callID})
+}
+
+func bytesReader(b []byte) *bytes.Reader {
+	if len(b) == 0 {
+		return bytes.NewReader(nil)
+	}
+	return bytes.NewReader(b)
+}
+
+func itoa(n int) string {
+	return fmt.Sprint(n)
+}
+
+// --- code-server WebSocket tunnel -------------------------------------------
+
+var (
+	wsTunnels   = map[string]*websocket.Conn{}
+	wsTunnelsMu sync.Mutex
+)
+
+// doProxyWsOpen: dial a WebSocket on a localhost port (code-server workbench)
+// and bridge frames: upstream -> proxyWsData frames, proxyWsWrite -> upstream.
+func (r *runner) doProxyWsOpen(f frame) {
+	callID := f.str("callId")
+	port := f.num("port")
+	path := f.str("path")
+	if port <= 0 || path == "" {
+		_ = r.send(frame{"type": "proxyWsOpenResult", "callId": callID, "error": "bad port/path"})
+		return
+	}
+	dialer := websocket.Dialer{}
+	hdr := http.Header{}
+	if headers, ok := f["headers"].(map[string]any); ok {
+		for k, v := range headers {
+			hdr.Set(k, fmt.Sprint(v))
+		}
+	}
+	conn, _, err := dialer.Dial(fmt.Sprintf("ws://127.0.0.1:%d%s", port, path), hdr)
+	if err != nil {
+		_ = r.send(frame{"type": "proxyWsOpenResult", "callId": callID, "error": err.Error()})
+		return
+	}
+	wsTunnelsMu.Lock()
+	wsTunnels[callID] = conn
+	wsTunnelsMu.Unlock()
+	_ = r.send(frame{"type": "proxyWsOpenResult", "callId": callID, "ok": true})
+
+	go func() {
+		for {
+			mt, data, err := conn.ReadMessage()
+			if err != nil {
+				break
+			}
+			if mt == websocket.BinaryMessage {
+				_ = r.send(frame{"type": "proxyWsData", "callId": callID, "dataBase64": b64Encode(data)})
+			} else {
+				_ = r.send(frame{"type": "proxyWsData", "callId": callID, "dataBase64": b64Encode(data)})
+			}
+		}
+		wsTunnelsMu.Lock()
+		delete(wsTunnels, callID)
+		wsTunnelsMu.Unlock()
+		_ = r.send(frame{"type": "proxyWsClose", "callId": callID})
+	}()
+}
+
+func (r *runner) doProxyWsWrite(f frame) {
+	callID := f.str("callId")
+	wsTunnelsMu.Lock()
+	conn := wsTunnels[callID]
+	wsTunnelsMu.Unlock()
+	if conn == nil {
+		return
+	}
+	b, err := b64Decode(f.str("dataBase64"))
+	if err != nil || len(b) == 0 {
+		return
+	}
+	_ = conn.WriteMessage(websocket.BinaryMessage, b)
+}
+
+func (r *runner) doProxyWsClose(f frame) {
+	callID := f.str("callId")
+	wsTunnelsMu.Lock()
+	conn := wsTunnels[callID]
+	delete(wsTunnels, callID)
+	wsTunnelsMu.Unlock()
+	if conn != nil {
+		_ = conn.Close()
 	}
 }

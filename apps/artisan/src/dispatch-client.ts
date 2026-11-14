@@ -115,6 +115,20 @@ export class DispatchClient {
     if (exitCode === null) yield { stream: "stdout", data: "", done: true, exitCode: null };
   }
 
+  /** Proxy one HTTP request to a localhost port on a runner (code-server). */
+  async proxyHttp(runner: string, req: { port: number; method: string; path: string; headers?: Record<string, string>; bodyBase64?: string }): Promise<{ status: number; headers: Record<string, string>; body: string }> {
+    const res = await fetch(`${this.config.DISPATCH_URL}/runners/${encodeURIComponent(runner)}/proxy-http`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new Error(`proxy-http ${res.status}`);
+    const headers: Record<string, string> = {};
+    res.headers.forEach((v, k) => { headers[k] = v; });
+    const buf = Buffer.from(await res.arrayBuffer());
+    return { status: res.status, headers, body: buf.toString("base64") };
+  }
+
   async createJob(runner: string, command: string, cwd: string, resourceId?: string): Promise<JobInfo> {
     return this.post<JobInfo>("/jobs", { runnerId: runner, command, cwd, resourceId });
   }

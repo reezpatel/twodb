@@ -270,6 +270,30 @@ function handleFrame(socket: WebSocket, runner: RunnerRow, raw: unknown, enrolle
       if (registered) hub_.publish(String(frame.callId), { type: "termClosed", callId: frame.callId });
       return;
     }
+    case "proxyHttpResponse": {
+      hub_.publish(String(frame.callId), { type: "proxyHttpResponse", callId: frame.callId, status: frame.status, headers: frame.headers });
+      return;
+    }
+    case "proxyHttpChunk": {
+      hub_.publish(String(frame.callId), { type: "proxyHttpChunk", callId: frame.callId, dataBase64: frame.dataBase64 });
+      return;
+    }
+    case "proxyHttpEnd": {
+      hub_.publish(String(frame.callId), { type: "proxyHttpEnd", callId: frame.callId, error: frame.error });
+      return;
+    }
+    case "proxyWsOpenResult": {
+      hub_.publish(String(frame.callId), { type: "proxyWsOpenResult", callId: frame.callId, ok: frame.ok, error: frame.error });
+      return;
+    }
+    case "proxyWsData": {
+      hub_.publish(String(frame.callId), { type: "proxyWsData", callId: frame.callId, dataBase64: frame.dataBase64 });
+      return;
+    }
+    case "proxyWsClose": {
+      hub_.publish(String(frame.callId), { type: "proxyWsClose", callId: frame.callId });
+      return;
+    }
     default:
       return;
   }

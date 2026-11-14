@@ -227,6 +227,15 @@ func (r *runner) handle(f frame) {
 		r.doTermResize(f)
 	case "termClose":
 		r.doTermClose(f)
+
+	case "proxyHttp":
+		r.doProxyHttp(f)
+	case "proxyWsOpen":
+		r.doProxyWsOpen(f)
+	case "proxyWsWrite":
+		r.doProxyWsWrite(f)
+	case "proxyWsClose":
+		r.doProxyWsClose(f)
 	}
 }
 

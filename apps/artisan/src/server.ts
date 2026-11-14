@@ -25,6 +25,7 @@ export async function buildServer(config: ArtisanConfig) {
   await app.register(websocket);
 
   const db = createPgDb<{ tables: never }>({ connectionString: config.DATABASE_URL, schema: "artisan" }) as never;
+  const HOP_BY_HOP = new Set(["connection","keep-alive","transfer-encoding","te","trailer","upgrade","proxy-authenticate","proxy-authorization","content-length"]);
   const repo = createArtisanRepo(db as never);
   const hub = new WorkspaceHub();
 
@@ -670,6 +671,140 @@ echo saved`;
       socket.on("message", (raw: unknown) => {
         if (upstream.readyState === upstream.OPEN) upstream.send(String(raw));
       });
+      socket.on("close", () => { try { upstream.close(); } catch { /* ignore */ } });
+    })();
+  });
+
+  // --- code editor (code-server on the session's runner, iframed) --------------
+  const EDITOR_PORT = 8443;
+  const EDITOR_BIN = `${process.env.HOME ?? "/root"}/.local/share/twodb-editor/code-server/bin/code-server`;
+
+  async function editorStatus(session: { runner: string; directory: string }): Promise<{ state: string; bytes?: number; total?: number; port?: number }> {
+    const deps = depsFor({ headers: {} } as FastifyRequest);
+    const which = await deps.dispatch.exec(session.runner, `ls ${shellQuote(EDITOR_BIN)} >/dev/null 2>&1 && echo yes`, "/", 10_000).catch(() => null);
+    const installed = which?.stdout?.trim().includes("yes");
+    if (!installed) return { state: "not_installed" };
+    // is it already listening?
+    const listening = await deps.dispatch.exec(session.runner, `(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${EDITOR_PORT}/ || echo 000) 2>/dev/null`, "/", 10_000).catch(() => null);
+    const code = listening?.stdout?.trim();
+    if (code && code !== "000") return { state: "ready", port: EDITOR_PORT };
+    return { state: "idle", port: EDITOR_PORT };
+  }
+
+  app.get("/sessions/:id/editor/status", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    return editorStatus(session);
+  });
+
+  app.post("/sessions/:id/editor/install", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    // Install code-server standalone tarball (~60MB) into the runner user's home.
+    const script = [
+      "set -e",
+      `mkdir -p ${shellQuote(process.env.HOME ?? "/root")}/.local/share/twodb-editor`,
+      `cd ${shellQuote(process.env.HOME ?? "/root")}/.local/share/twodb-editor`,
+      "if [ ! -x code-server/bin/code-server ]; then",
+      "  curl -fsSL https://code-server.dev/install.sh | sh -s -- --method standalone --prefix ./code-server 2>&1 | tail -5",
+      "fi",
+      "echo installed",
+    ].join("\n");
+    void deps.dispatch.exec(session.runner, script, "/", 600_000).catch(() => {});
+    return { ok: true, state: "installing" };
+  });
+
+  app.post("/sessions/:id/editor/start", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    // Start code-server as a persistent job bound to localhost, no auth (proxied).
+    const status = await editorStatus(session);
+    if (status.state === "ready") return { ok: true, port: EDITOR_PORT };
+    const csBase = `${process.env.HOME ?? "/root"}/.local/share/twodb-editor/code-server`;
+    const script = `CSBIN=$(ls ${shellQuote(csBase)}/lib/code-server-*/bin/code-server 2>/dev/null | head -1); if [ -z "$CSBIN" ]; then CSBIN=${shellQuote(EDITOR_BIN)}; fi; export PASSWORD=; "$CSBIN" --bind-addr 127.0.0.1:${EDITOR_PORT} --auth none --user-data-dir ${shellQuote(session.directory + "/.code-server")} ${shellQuote(session.directory)} > /tmp/code-server.log 2>&1`;
+    const job = await deps.dispatch.createJob(session.runner, script, session.directory, session.id).catch((e) => ({ id: "", error: String(e) }));
+    if ((job as { error?: string }).error) return reply.code(502).send({ error: (job as { error: string }).error });
+    // wait for the port to come up
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const st = await editorStatus(session);
+      if (st.state === "ready") return { ok: true, port: EDITOR_PORT };
+    }
+    return reply.code(502).send({ error: "code-server did not start" });
+  });
+
+  // HTTP proxy: /sessions/:id/editor/<path…> -> code-server, rewriting WS URLs.
+  app.all("/sessions/:id/editor/*", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id, "*": rest } = req.params as { id: string; "*": string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const deps = depsFor(req);
+    const status = await editorStatus(session);
+    if (status.state !== "ready") return reply.code(502).send("editor not running");
+    const prefix = `/apps/artisan/sessions/${id}/editor`;
+    const path = "/" + (rest ?? "");
+    const headers: Record<string, string> = {};
+    for (const [k, v] of Object.entries(req.headers)) if (!HOP_BY_HOP.has(k.toLowerCase())) headers[k] = typeof v === "string" ? v : String(v ?? "");
+    delete headers["host"]; delete headers["content-length"]; delete headers["connection"];
+    const hasBody = !["GET", "HEAD"].includes(req.method);
+    const rawBody: unknown = hasBody ? await (req as { body?: unknown }).body : undefined;
+    const bodyBuf = hasBody ? Buffer.from((rawBody as Buffer | undefined) ?? Buffer.alloc(0)) : undefined;
+    const proxied = await deps.dispatch.proxyHttp(session.runner, {
+      port: EDITOR_PORT, method: req.method, path: path + (req.url.includes("?") ? "?" + req.url.split("?")[1] : ""),
+      headers, bodyBase64: bodyBuf?.toString("base64") ?? "",
+    }).catch((e) => ({ error: String(e) }));
+    if ((proxied as { error?: string }).error) return reply.code(502).send((proxied as { error: string }).error);
+    const pr = proxied as { status: number; headers: Record<string, string>; body: string };
+    const outHeaders: Record<string, string> = {};
+    for (const [k, v] of Object.entries(pr.headers)) if (!HOP_BY_HOP.has(k.toLowerCase()) && k !== "set-cookie") outHeaders[k] = v;
+    let out = Buffer.from(pr.body, "base64");
+    const contentType = outHeaders["content-type"] ?? "";
+    if (/^(text\/html|text\/css|application\/javascript|text\/javascript)/.test(contentType)) {
+      const proto = req.headers["x-forwarded-proto"] ?? (req.raw.socket as { encrypted?: boolean })?.encrypted ? "https" : "http";
+      const host = req.headers["host"] ?? "localhost";
+      const wsBase = `${proto === "https" ? "wss" : "ws"}://${host}/apps/artisan/sessions/${id}/editor-ws`;
+      out = Buffer.from(out.toString("utf8")
+        .replace(/wss?:\/\/[^"'\\\s)]+/g, wsBase)
+        .replace(/(["'(])\/(stable-[a-z0-9]+|static|webview|vscode-resource|update|manifest\.json)/g, `$1${prefix}/$2`), "utf8");
+      delete outHeaders["content-length"];
+    }
+    reply.type(outHeaders["content-type"] ?? "application/octet-stream");
+    for (const [k, v] of Object.entries(outHeaders)) reply.header(k, v);
+    return reply.code(pr.status).send(out);
+  });
+
+  // WS tunnel for the code-server workbench: browser <-> dispatch proxy-ws <-> runner.
+  app.get("/sessions/:id/editor-ws", { websocket: true }, (socket, req) => {
+    const url = new URL(req.url, "http://internal");
+    void (async () => {
+      const ctx = readForwardedContext(req);
+      if (!ctx) return socket.close(4401, "unauthorized");
+      const { id } = req.params as { id: string };
+      const session = await repo.getSession(ctx.workspaceId, id);
+      if (!session) return socket.close(4404, "session not found");
+      const port = EDITOR_PORT;
+      const path = url.searchParams.get("path") ?? "/";
+      const upstream = new WebSocket(
+        `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(session.runner)}/proxy-ws?port=${port}&path=${encodeURIComponent(path)}`,
+        { headers: { "x-api-key": apiKeyFor(req) } },
+      );
+      upstream.on("message", (raw: unknown) => { if (socket.readyState === socket.OPEN) socket.send(String(raw)); });
+      upstream.on("close", () => { if (socket.readyState === socket.OPEN) socket.close(); });
+      upstream.on("error", () => { if (socket.readyState === socket.OPEN) socket.close(1011, "upstream"); });
+      socket.on("message", (raw: unknown) => { if (upstream.readyState === upstream.OPEN) upstream.send(String(raw)); });
       socket.on("close", () => { try { upstream.close(); } catch { /* ignore */ } });
     })();
   });

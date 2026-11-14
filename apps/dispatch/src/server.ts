@@ -687,6 +687,85 @@ export async function buildServer(config: DispatchConfig) {
     })();
   });
 
+  // --- WebSocket tunnel to a localhost port on a runner (code-server workbench)
+  app.get("/runners/:name/proxy-ws", { websocket: true }, (socket, req) => {
+    const url = new URL(req.url, "http://internal");
+    void (async () => {
+      const wsId = req.headers["x-twodb-workspace-id"] as string | undefined;
+      if (!wsId) return socket.close(4401, "unauthorized");
+      const name = (req.params as { name: string }).name;
+      const port = Number(url.searchParams.get("port") ?? 0);
+      const path = url.searchParams.get("path") ?? "/";
+      const runner = hub.listOnline(wsId).find((r) => r.name === name);
+      if (!runner || !port) return socket.close(4409, "runner offline");
+      const callId = newId();
+      const headers: Record<string, string> = {};
+      for (const [k, v] of Object.entries(req.headers)) if (typeof v === "string") headers[k] = v;
+      const ack = await hub.sendToRunner(runner, { type: "proxyWsOpen", callId, port, path, headers }, { timeoutMs: 15_000 }).catch(() => null);
+      if (!ack || ack.error) return socket.close(1011, String((ack as any)?.error ?? "ws proxy failed"));
+      const unsub = hub.subscribe(callId, (frame) => {
+        if (frame.type === "proxyWsData" && socket.readyState === socket.OPEN) {
+          socket.send(frame.dataBase64 as string);
+        } else if (frame.type === "proxyWsClose") {
+          socket.close();
+        }
+      });
+      socket.on("message", (raw: unknown) => {
+        if (socket.readyState === socket.OPEN) {
+          void hub.sendToRunner(runner, { type: "proxyWsWrite", callId, dataBase64: String(raw) }, { reply: false });
+        }
+      });
+      socket.on("close", () => {
+        unsub();
+        void hub.sendToRunner(runner, { type: "proxyWsClose", callId }, { reply: false });
+      });
+    })();
+  });
+
+  // --- Buffered HTTP proxy to a localhost port on a runner (code-server) -----
+  // Drives the runner's proxyHttp over the WS bridge; collects the streamed
+  // response frames into one reply. Used by artisan's editor.
+  app.post("/runners/:name/proxy-http", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { name } = req.params as { name: string };
+    const body = (req.body ?? {}) as { port?: number; method?: string; path?: string; headers?: Record<string, string>; bodyBase64?: string };
+    const runner = hub.listOnline(ctx.workspaceId).find((r) => r.name === name);
+    if (!runner) return reply.code(409).send({ error: "runner offline" });
+    const callId = newId();
+    const chunks: Buffer[] = [];
+    let status = 502;
+    let resHeaders: Record<string, string> = {};
+    let done = false;
+    const unsub = hub.subscribe(callId, (frame) => {
+      if (frame.type === "proxyHttpResponse") {
+        status = Number(frame.status) || 502;
+        resHeaders = (frame.headers as Record<string, string>) ?? {};
+      } else if (frame.type === "proxyHttpChunk") {
+        chunks.push(Buffer.from(String(frame.dataBase64 ?? ""), "base64"));
+      } else if (frame.type === "proxyHttpEnd") {
+        done = true;
+      }
+    });
+    const ack = await hub.sendToRunner(runner, {
+      type: "proxyHttp", callId,
+      port: body.port, method: body.method, path: body.path,
+      headers: body.headers ?? {}, bodyBase64: body.bodyBase64 ?? "",
+    }, { timeoutMs: 60_000 }).catch(() => null);
+    if (!ack || ack.error) {
+      unsub();
+      return reply.code(502).send({ error: String((ack as any)?.error ?? "proxy failed") });
+    }
+    // wait for the stream to finish (bounded)
+    const start = Date.now();
+    while (!done && Date.now() - start < 55_000) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    unsub();
+    reply.type(resHeaders["content-type"] ?? "application/octet-stream");
+    return reply.code(status).send(Buffer.concat(chunks));
+  });
+
   // --- S3 (stubbed) -----------------------------------------------------------
   // Runners ship /app zips over their WS (vmArchive frames, handled in
   // ws/archive-store.ts). Callers can download one for inspection:
