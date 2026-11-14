@@ -17,6 +17,8 @@ export interface SessionRow {
   directory: string;
   /** "<conn>/<model>" TwoRoute id. */
   model: string;
+  /** Owning code_directory (null = legacy/implicit directory). */
+  directory_id: string | null;
   /** ask_user works only when true (viewers on the workspace WS). */
   interactive: boolean;
   /** Agent config id when bound to a custom agent; null = directory agent. */
@@ -37,6 +39,27 @@ export interface SessionRow {
 
 /** One run. `/new` and compaction close the current thread and open the next;
  *  the frontend renders messages flat across threads. */
+/** A registered project directory: runner + path + per-project config.
+ *  Sessions belong to a directory (directory_id) and inherit its space,
+ *  default model and project-settings (.agents/.claude/AGENTS.md loading). */
+export interface DirectoryRow {
+  id: string;
+  workspace_id: string;
+  space_id: string;
+  /** Dispatch runner name hosting the path. */
+  runner: string;
+  /** Absolute directory path on the runner. */
+  path: string;
+  /** Display title (defaults to the path basename). */
+  title: string;
+  /** "<conn>/<model>" default for sessions created in this directory. */
+  default_model: string | null;
+  /** Serialized { loadAgents: boolean; loadClaude: boolean; loadAgentsMd: boolean }. */
+  project_settings_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ThreadRow {
   id: string;
   session_id: string;
@@ -129,6 +152,7 @@ export interface CheckpointRow {
 }
 
 export interface ArtisanDb {
+  directory: DirectoryRow;
   session: SessionRow;
   thread: ThreadRow;
   message: MessageRow;
@@ -145,6 +169,11 @@ export async function applySchema(db: Kysely<ArtisanDb>): Promise<void> {
   } catch {
     /* column already exists */
   }
+  try {
+    await db.schema.alterTable("session").addColumn("directory_id", "text").execute();
+  } catch {
+    /* column already exists */
+  }
   await db.schema.createSchema("artisan").ifNotExists().execute();
 
   await db.schema
@@ -157,6 +186,7 @@ export async function applySchema(db: Kysely<ArtisanDb>): Promise<void> {
     .addColumn("title", "text", (c) => c.notNull())
     .addColumn("runner", "text", (c) => c.notNull())
     .addColumn("directory", "text", (c) => c.notNull())
+    .addColumn("directory_id", "text")
     .addColumn("model", "text", (c) => c.notNull())
     .addColumn("interactive", "boolean", (c) => c.notNull().defaultTo(true))
     .addColumn("agent_id", "text")
@@ -165,6 +195,21 @@ export async function applySchema(db: Kysely<ArtisanDb>): Promise<void> {
     .addColumn("depth", "integer", (c) => c.notNull().defaultTo(0))
     .addColumn("plan_json", "text")
     .addColumn("thinking_level", "text")
+    .addColumn("created_at", "text", (c) => c.notNull())
+    .addColumn("updated_at", "text", (c) => c.notNull())
+    .execute();
+
+  await db.schema
+    .createTable("directory")
+    .ifNotExists()
+    .addColumn("id", "text", (c) => c.primaryKey())
+    .addColumn("workspace_id", "text", (c) => c.notNull())
+    .addColumn("space_id", "text", (c) => c.notNull())
+    .addColumn("runner", "text", (c) => c.notNull())
+    .addColumn("path", "text", (c) => c.notNull())
+    .addColumn("title", "text", (c) => c.notNull())
+    .addColumn("default_model", "text")
+    .addColumn("project_settings_json", "text", (c) => c.notNull().defaultTo("{}"))
     .addColumn("created_at", "text", (c) => c.notNull())
     .addColumn("updated_at", "text", (c) => c.notNull())
     .execute();

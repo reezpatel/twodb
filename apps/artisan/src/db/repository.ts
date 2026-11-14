@@ -1,7 +1,7 @@
 import type { Kysely } from "kysely";
 import { sql } from "kysely";
 import { ulid } from "ulid";
-import type { AgentRow, ArtisanDb, CheckpointRow, MessageRow, SessionRow, SessionUsageRow, SkillRow, ThreadRow } from "./schema.js";
+import type { AgentRow, ArtisanDb, CheckpointRow, DirectoryRow, MessageRow, SessionRow, SessionUsageRow, SkillRow, ThreadRow } from "./schema.js";
 
 export function newId(): string {
   return ulid().toLowerCase();
@@ -17,6 +17,7 @@ export interface ArtisanRepo {
     workspaceId: string; spaceId: string; type?: string; title: string;
     runner: string; directory: string; model: string; interactive?: boolean;
     agentId?: string | null; parentSessionId?: string | null; adhocPrompt?: string | null; depth?: number;
+    directoryId?: string | null;
   }): Promise<SessionRow>;
   getSession(workspaceId: string, id: string): Promise<SessionRow | undefined>;
   listSessions(workspaceId: string, filter?: { type?: string; runner?: string; directory?: string; spaceId?: string; parentSessionId?: string }): Promise<SessionRow[]>;
@@ -69,6 +70,14 @@ export interface ArtisanRepo {
   }>): Promise<SkillRow | undefined>;
   deleteSkill(workspaceId: string, id: string): Promise<boolean>;
 
+  // directories
+  createDirectory(input: { workspaceId: string; spaceId: string; runner: string; path: string; title?: string; defaultModel?: string | null; projectSettings?: { loadAgents?: boolean; loadClaude?: boolean; loadAgentsMd?: boolean } }): Promise<DirectoryRow>;
+  getDirectory(workspaceId: string, id: string): Promise<DirectoryRow | undefined>;
+  getDirectoryByPath(workspaceId: string, runner: string, path: string): Promise<DirectoryRow | undefined>;
+  listDirectories(workspaceId: string): Promise<DirectoryRow[]>;
+  updateDirectory(workspaceId: string, id: string, patch: { title?: string; defaultModel?: string | null; spaceId?: string; projectSettings?: { loadAgents?: boolean; loadClaude?: boolean; loadAgentsMd?: boolean } }): Promise<void>;
+  deleteDirectory(workspaceId: string, id: string): Promise<boolean>;
+
   // checkpoints
   addCheckpoint(input: { workspaceId: string; sessionId: string; runner: string; directory: string; label: string | null; ref: string; commitSha: string; trigger?: string }): Promise<CheckpointRow>;
   listCheckpoints(workspaceId: string, sessionId: string): Promise<CheckpointRow[]>;
@@ -100,6 +109,7 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
         title: input.title,
         runner: input.runner,
         directory: input.directory,
+        directory_id: input.directoryId ?? null,
         model: input.model,
         interactive: input.interactive ?? true,
         agent_id: input.agentId ?? null,
@@ -336,6 +346,50 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
 
     async deleteSkill(workspaceId, id) {
       const rows = await db.deleteFrom("skill").where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
+      const res = Array.isArray(rows) ? rows[0] : rows;
+      return Number(res?.numDeletedRows ?? 0) > 0;
+    },
+
+    async createDirectory(input) {
+      const row: DirectoryRow = {
+        id: newId(),
+        workspace_id: input.workspaceId,
+        space_id: input.spaceId,
+        runner: input.runner,
+        path: input.path,
+        title: input.title ?? input.path.split("/").filter(Boolean).pop() ?? input.path,
+        default_model: input.defaultModel ?? null,
+        project_settings_json: JSON.stringify(input.projectSettings ?? { loadAgents: true, loadClaude: false, loadAgentsMd: false }),
+        created_at: now(),
+        updated_at: now(),
+      };
+      await db.insertInto("directory").values(row).execute();
+      return row;
+    },
+
+    async getDirectory(workspaceId, id) {
+      return db.selectFrom("directory").selectAll().where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
+    },
+
+    async getDirectoryByPath(workspaceId, runner, path) {
+      return db.selectFrom("directory").selectAll().where("workspace_id", "=", workspaceId).where("runner", "=", runner).where("path", "=", path).executeTakeFirst();
+    },
+
+    async listDirectories(workspaceId) {
+      return db.selectFrom("directory").selectAll().where("workspace_id", "=", workspaceId).orderBy("title", "asc").execute();
+    },
+
+    async updateDirectory(workspaceId, id, patch) {
+      const set: Record<string, unknown> = { updated_at: now() };
+      if (patch.title !== undefined) set.title = patch.title;
+      if (patch.defaultModel !== undefined) set.default_model = patch.defaultModel;
+      if (patch.spaceId !== undefined) set.space_id = patch.spaceId;
+      if (patch.projectSettings !== undefined) set.project_settings_json = JSON.stringify(patch.projectSettings);
+      await db.updateTable("directory").set(set).where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
+    },
+
+    async deleteDirectory(workspaceId, id) {
+      const rows = await db.deleteFrom("directory").where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
       const res = Array.isArray(rows) ? rows[0] : rows;
       return Number(res?.numDeletedRows ?? 0) > 0;
     },

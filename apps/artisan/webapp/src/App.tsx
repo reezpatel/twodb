@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
-import { artisanClient, type SessionInfo } from "./lib/artisan-client.js";
+import { artisanClient, type DirectoryInfo, type SessionInfo } from "./lib/artisan-client.js";
 import { WorkspaceProvider, useWorkspaceWs } from "./lib/workspace-ws.js";
 import { RequireAuth } from "./routes/auth/RequireAuth.js";
 import { Sidebar } from "./routes/shell/partials/Sidebar.js";
 import { NewSessionDialog } from "./routes/shell/partials/NewSessionDialog.js";
+import { DirectoryDialog } from "./routes/shell/partials/DirectoryDialog.js";
 import { useTabs } from "./routes/shell/hooks/useTabs.js";
 import { useCatalog } from "./routes/shell/hooks/useCatalog.js";
 import { SessionScreen } from "./routes/chat/SessionScreen.js";
@@ -34,11 +35,15 @@ function Shell() {
   const catalog = useCatalog();
   const tabs = useTabs();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [directories, setDirectories] = useState<DirectoryInfo[]>([]);
   const [newOpen, setNewOpen] = useState(false);
+  const [dirDialog, setDirDialog] = useState<{ open: boolean; directory?: DirectoryInfo }>({ open: false });
+  const [quickCreateDir, setQuickCreateDir] = useState<DirectoryInfo | null>(null);
 
   const refreshSessions = useCallback(async () => {
     try {
       setSessions(await artisanClient.listSessions());
+      setDirectories(await artisanClient.listRegisteredDirectories());
     } catch {
       // offline
     }
@@ -49,6 +54,18 @@ function Shell() {
     const t = setInterval(() => void refreshSessions(), 15_000);
     return () => clearInterval(t);
   }, [refreshSessions]);
+
+  // App-wide Cmd/Ctrl+0 → broadcast expand/collapse-all for thinking/tool blocks.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "0") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("artisan:toggle-expand"));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // URL → tab (deep links: /s/<id>)
   useEffect(() => {
@@ -75,13 +92,29 @@ function Shell() {
     navigate(`/s/${s.id}`);
   };
 
-  const createSession = async (input: { runner: string; directory: string; model: string; title?: string; message?: string }) => {
+  const createSession = async (input: { runner: string; directory: string; model: string; title?: string; message?: string; directoryId?: string }) => {
     const s = await artisanClient.createSession(input);
     setNewOpen(false);
+    setQuickCreateDir(null);
     await refreshSessions();
     tabs.open(s.id, s.title);
     navigate(`/s/${s.id}`);
     return null;
+  };
+
+  /** Directory `+` button: create a session immediately with the directory's defaults. */
+  const quickCreate = async (dir: DirectoryInfo) => {
+    try {
+      await createSession({
+        runner: dir.runner,
+        directory: dir.path,
+        directoryId: dir.id,
+        model: dir.defaultModel ?? catalog.models[0]?.id ?? "",
+        title: `session-${Date.now().toString(36).slice(-4)}`,
+      });
+    } catch {
+      setQuickCreateDir(dir); // fall back to the full dialog on error
+    }
   };
 
   const showTabs = tabs.tabs.length > 0;
@@ -92,9 +125,12 @@ function Shell() {
     <div className="flex h-screen overflow-hidden bg-paper text-ink">
       <Sidebar
         sessions={sessions}
+        directories={directories}
         activeSessionId={tabs.active}
         onOpenSession={openSession}
-        onNew={() => setNewOpen(true)}
+        onNewSession={(dir) => void quickCreate(dir)}
+        onAddDirectory={() => setDirDialog({ open: true })}
+        onEditDirectory={(dir) => setDirDialog({ open: true, directory: dir })}
         onNav={(page) => navigate(`/${page}`)}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -123,7 +159,7 @@ function Shell() {
                 </button>
               </div>
             ))}
-            <button type="button" className="ml-1 px-2 py-1 text-[13px] text-ink-muted hover:text-ink" onClick={() => setNewOpen(true)}>+</button>
+            <button type="button" title="Add directory" className="ml-1 px-2 py-1 text-[13px] text-ink-muted hover:text-ink" onClick={() => setDirDialog({ open: true })}>+</button>
           </div>
         ) : null}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -143,6 +179,28 @@ function Shell() {
           busy={false}
           onClose={() => setNewOpen(false)}
           onCreate={createSession}
+        />
+      ) : null}
+      {dirDialog.open ? (
+        <DirectoryDialog
+          directory={dirDialog.directory}
+          models={catalog.models}
+          busy={false}
+          onClose={() => setDirDialog({ open: false })}
+          onSave={async (input) => {
+            if (dirDialog.directory) {
+              await artisanClient.updateDirectory(dirDialog.directory.id, {
+                title: input.title,
+                defaultModel: input.defaultModel ?? null,
+                projectSettings: input.projectSettings,
+              });
+            } else {
+              await artisanClient.createDirectory(input);
+            }
+            setDirDialog({ open: false });
+            await refreshSessions();
+            return null;
+          }}
         />
       ) : null}
     </div>

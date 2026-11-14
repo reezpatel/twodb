@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import { useResizableWidth } from "../../lib/useResizableWidth.js";
 import { ChatView } from "./ChatView.js";
 import { EditorScreen } from "./EditorScreen.js";
 import { TerminalScreen } from "./TerminalScreen.js";
@@ -15,7 +17,9 @@ import { useSessionSide } from "./hooks/useSessionSide.js";
  */
 export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionId: string) => void; title?: string }) {
   const [tab, setTab] = useState<SessionTabId>("chat");
+  const [showSidebar, setShowSidebar] = useState(true);
   const side = useSessionSide(props.sessionId);
+  const right = useResizableWidth("artisan.sidebar.right", 288, 200, 480);
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -24,6 +28,15 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
           <SessionTabs active={tab} onChange={setTab} />
           <div className="mx-1.5 h-4 w-px bg-outline" />
           <span className="truncate text-[13px] font-medium">{props.title ?? props.sessionId.slice(-8)}</span>
+          <button
+            type="button"
+            aria-label={showSidebar ? "Hide sidebar" : "Show sidebar"}
+            title={showSidebar ? "Hide sidebar" : "Show sidebar"}
+            className="ml-auto rounded-md p-1 text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
+            onClick={() => setShowSidebar((v) => !v)}
+          >
+            {showSidebar ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
+          </button>
         </header>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {tab === "chat" ? <ChatView sessionId={props.sessionId} noHeader /> : null}
@@ -32,7 +45,14 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
           {tab === "checkpoints" ? <CheckpointsScreen sessionId={props.sessionId} /> : null}
         </div>
       </div>
-      <SessionSidebar plan={side.plan} children={side.children} git={side.git} jobs={side.jobs} busy={side.busy} onCommit={side.commit} onOpenChild={props.onOpenChild} />
+      {showSidebar ? (
+        <div className="flex h-full min-h-0 shrink-0" style={{ width: right.width }}>
+          <right.Handle edge="right" />
+          <div className="h-full min-h-0 w-full">
+            <SessionSidebar plan={side.plan} children={side.children} git={side.git} jobs={side.jobs} busy={side.busy} onCommit={side.commit} onOpenChild={props.onOpenChild} />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

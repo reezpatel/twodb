@@ -498,6 +498,32 @@ async function buildContext(deps: RunDeps, session: SessionRow, agent: AgentRow,
   }
   const plan = parseJson<unknown>(session.plan_json, null);
   if (plan) systemParts.push(`\n## Current plan\n${JSON.stringify(plan)}`);
+
+  // Per-project context files (.agents by default; .claude / AGENTS.md when enabled) —
+  // loaded fresh from the runner each run, like pi/earendil-works does.
+  const projParts: string[] = [];
+  const dirRow = session.directory_id ? await deps.repo.getDirectory(session.workspace_id, session.directory_id) : undefined;
+  if (dirRow) {
+    const ps = parseJson<{ loadAgents?: boolean; loadClaude?: boolean; loadAgentsMd?: boolean }>(dirRow.project_settings_json, {});
+    const read = async (rel: string) => {
+      const res = await deps.dispatch.exec(session.runner, `cat ${shellQuote(rel)} 2>/dev/null`, session.directory, 10_000).catch(() => null);
+      return res && res.exitCode === 0 ? res.stdout.trim() : null;
+    };
+    if (ps.loadAgentsMd !== false) {
+      const md = await read("AGENTS.md");
+      if (md) projParts.push(`\n## AGENTS.md\n${md}`);
+    }
+    if (ps.loadAgents !== false) {
+      const agents = await read(".agents/AGENTS.md");
+      if (agents) projParts.push(`\n## .agents/AGENTS.md\n${agents}`);
+    }
+    if (ps.loadClaude) {
+      const claude = await read(".claude/CLAUDE.md");
+      if (claude) projParts.push(`\n## .claude/CLAUDE.md\n${claude}`);
+    }
+    if (projParts.length) systemParts.push(...projParts);
+  }
+
   out.push({ role: "system", content: systemParts.join("\n") });
 
   // Prior threads' summaries.

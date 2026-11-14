@@ -62,9 +62,17 @@ export async function buildServer(config: ArtisanConfig) {
       spaceId?: string; type?: string; title?: string; runner: string; directory: string;
       model?: string; interactive?: boolean; agentId?: string | null; message?: string;
     };
-    const spaceId = body.spaceId ?? ctx.spaceIds[0];
+    // Resolve the owning directory first (explicit id or auto-register) so its
+    // space is the default — API-key callers carry no space context.
+    let directoryId = (body as { directoryId?: string }).directoryId ?? null;
+    if (!directoryId) {
+      const existing = await repo.getDirectoryByPath(ctx.workspaceId, body.runner, body.directory);
+      if (existing) directoryId = existing.id;
+    }
+    const dirRow = directoryId ? await repo.getDirectory(ctx.workspaceId, directoryId) : undefined;
+    const spaceId = body.spaceId ?? dirRow?.space_id ?? ctx.spaceIds[0];
     if (!spaceId) return reply.code(400).send({ error: "no space" });
-    const model = body.model ?? process.env.ARTISAN_DEFAULT_MODEL ?? "";
+    const model = body.model ?? dirRow?.default_model ?? process.env.ARTISAN_DEFAULT_MODEL ?? "";
     if (!body.runner || !body.directory) return reply.code(400).send({ error: "runner and directory required" });
     if (!model) return reply.code(400).send({ error: "model required (no default configured)" });
 
@@ -76,6 +84,15 @@ export async function buildServer(config: ArtisanConfig) {
         throw new Error(`runner "${body.runner}" unreachable: ${(err as Error).message}`);
       });
 
+    // Auto-register the path if not already a directory.
+    if (!directoryId) {
+      const created = await repo.createDirectory({
+        workspaceId: ctx.workspaceId, spaceId, runner: body.runner, path: body.directory,
+        defaultModel: model,
+      });
+      directoryId = created.id;
+    }
+
     const session = await repo.createSession({
       workspaceId: ctx.workspaceId,
       spaceId,
@@ -83,6 +100,7 @@ export async function buildServer(config: ArtisanConfig) {
       title: body.title ?? `session-${newId().slice(-4)}`,
       runner: body.runner,
       directory: body.directory,
+      directoryId,
       model,
       interactive: body.interactive ?? true,
       agentId: body.agentId ?? null,
@@ -320,17 +338,66 @@ export async function buildServer(config: ArtisanConfig) {
     return { ok: await repo.deleteSkill(ctx.workspaceId, id) };
   });
 
+  // --- directories (registered projects) ---------------------------------------
+  function directoryOut(d: { id: string; space_id: string; runner: string; path: string; title: string; default_model: string | null; project_settings_json: string }) {
+    return { id: d.id, spaceId: d.space_id, runner: d.runner, path: d.path, title: d.title, defaultModel: d.default_model, projectSettings: JSON.parse(d.project_settings_json || "{}") };
+  }
+
+  app.get("/directories/registered", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    return (await repo.listDirectories(ctx.workspaceId)).map(directoryOut);
+  });
+
+  app.post("/directories", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const body = (req.body ?? {}) as { spaceId?: string; runner: string; path: string; title?: string; defaultModel?: string | null; projectSettings?: { loadAgents?: boolean; loadClaude?: boolean; loadAgentsMd?: boolean } };
+    if (!body.runner || !body.path) return reply.code(400).send({ error: "runner and path required" });
+    const spaceId = body.spaceId ?? ctx.spaceIds[0];
+    if (!spaceId) return reply.code(400).send({ error: "no space" });
+    const existing = await repo.getDirectoryByPath(ctx.workspaceId, body.runner, body.path);
+    if (existing) return reply.code(409).send({ error: "directory already registered", directory: directoryOut(existing) });
+    const row = await repo.createDirectory({
+      workspaceId: ctx.workspaceId, spaceId, runner: body.runner, path: body.path,
+      title: body.title, defaultModel: body.defaultModel ?? null, projectSettings: body.projectSettings,
+    });
+    return directoryOut(row);
+  });
+
+  app.patch("/directories/:id", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const body = (req.body ?? {}) as { title?: string; defaultModel?: string | null; spaceId?: string; projectSettings?: { loadAgents?: boolean; loadClaude?: boolean; loadAgentsMd?: boolean } };
+    await repo.updateDirectory(ctx.workspaceId, id, body);
+    const row = await repo.getDirectory(ctx.workspaceId, id);
+    return row ? directoryOut(row) : reply.code(404).send({ error: "not found" });
+  });
+
+  app.delete("/directories/:id", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    return { ok: await repo.deleteDirectory(ctx.workspaceId, id) };
+  });
+
   // --- directories (implicit, from sessions) -----------------------------------
   app.get("/directories", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
+    const registered = await repo.listDirectories(ctx.workspaceId);
+    const byPath = new Map(registered.map((d) => [`${d.runner}:${d.path}`, d]));
     const rows = await repo.listSessions(ctx.workspaceId, {});
-    const dirs = new Map<string, { runner: string; directory: string; spaceId: string; sessions: number }>();
+    const dirs = new Map<string, { runner: string; directory: string; spaceId: string; sessions: number; id?: string; title?: string; defaultModel?: string | null; projectSettings?: unknown }>();
     for (const s of rows) {
       const key = `${s.runner}:${s.directory}`;
       const existing = dirs.get(key);
       if (existing) existing.sessions += 1;
-      else dirs.set(key, { runner: s.runner, directory: s.directory, spaceId: s.space_id, sessions: 1 });
+      else {
+        const reg = byPath.get(key);
+        dirs.set(key, { runner: s.runner, directory: s.directory, spaceId: s.space_id, sessions: 1, id: reg?.id, title: reg?.title, defaultModel: reg?.default_model, projectSettings: reg ? JSON.parse(reg.project_settings_json || "{}") : undefined });
+      }
     }
     return [...dirs.values()];
   });

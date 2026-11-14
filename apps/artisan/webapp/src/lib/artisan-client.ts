@@ -37,6 +37,16 @@ async function del<T>(path: string): Promise<T> {
   return fetch(`${BASE}${path}`, { method: "DELETE", credentials: "include" }).then((r) => json<T>(r));
 }
 
+export interface DirectoryInfo {
+  id: string;
+  spaceId: string;
+  runner: string;
+  path: string;
+  title: string;
+  defaultModel: string | null;
+  projectSettings: { loadAgents?: boolean; loadClaude?: boolean; loadAgentsMd?: boolean };
+}
+
 export interface SessionInfo {
   id: string;
   type: string;
@@ -161,7 +171,19 @@ export const artisanClient = {
     return post(`/sessions/${id}/abort`);
   },
 
-  listDirectories(): Promise<Array<{ runner: string; directory: string; spaceId: string; sessions: number }>> {
+  listRegisteredDirectories(): Promise<DirectoryInfo[]> {
+    return get("/directories/registered");
+  },
+  createDirectory(input: { spaceId?: string; runner: string; path: string; title?: string; defaultModel?: string | null; projectSettings?: { loadAgents?: boolean; loadClaude?: boolean; loadAgentsMd?: boolean } }): Promise<DirectoryInfo> {
+    return post("/directories", input);
+  },
+  updateDirectory(id: string, body: Partial<{ title: string; defaultModel: string | null; spaceId: string; projectSettings: { loadAgents?: boolean; loadClaude?: boolean; loadAgentsMd?: boolean } }>): Promise<DirectoryInfo> {
+    return patch(`/directories/${id}`, body);
+  },
+  deleteDirectory(id: string): Promise<{ ok: boolean }> {
+    return del(`/directories/${id}`);
+  },
+  listDirectories(): Promise<Array<{ runner: string; directory: string; spaceId: string; sessions: number; id?: string; title?: string; defaultModel?: string | null }>> {
     return get("/directories");
   },
 

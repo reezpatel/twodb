@@ -191,16 +191,11 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
   const ctxPct = contextPercent(chat.usage, modelInfo?.contextWindow ?? null);
   const cacheHit = chat.usage && chat.usage.inputTokens > 0 ? `${Math.round((chat.usage.cachedTokens / chat.usage.inputTokens) * 100)}%` : "—";
 
-  // Cmd+0 (mac) / Ctrl+0 (win) → toggle expand/collapse all thinking/tool blocks.
+  // App-wide Cmd/Ctrl+0 (wired in App.tsx) → toggle expand/collapse all thinking/tool blocks.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "0") {
-        e.preventDefault();
-        setExpandAll((prev) => (prev === 1 ? 0 : 1));
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const onToggle = () => setExpandAll((prev) => (prev === 1 ? 0 : 1));
+    window.addEventListener("artisan:toggle-expand", onToggle);
+    return () => window.removeEventListener("artisan:toggle-expand", onToggle);
   }, []);
 
   // Generation speed: token/400ms window, reset on run start (legacy code-chat usage bar).
