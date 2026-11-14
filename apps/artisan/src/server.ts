@@ -843,9 +843,11 @@ echo saved`;
       const proto = req.headers["x-forwarded-proto"] ?? (req.raw.socket as { encrypted?: boolean })?.encrypted ? "https" : "http";
       const host = req.headers["host"] ?? "localhost";
       const wsBase = `${proto === "https" ? "wss" : "ws"}://${host}/apps/artisan/sessions/${id}/editor-ws`;
+      // Use replacement FUNCTIONS (not $-template strings) so a "$" in the JS
+      // source isn't treated as a regex backreference ($', $&, $1…) and corrupted.
       out = Buffer.from(out.toString("utf8")
-        .replace(/wss?:\/\/[^"'\\\s)]+/g, wsBase)
-        .replace(/(["'(])\/(stable-[a-z0-9]+|static|webview|vscode-resource|update|manifest\.json)/g, `$1${prefix}/$2`), "utf8");
+        .replace(/wss?:\/\/[^"'\\\s)]+/g, () => wsBase)
+        .replace(/(["'(])\/(stable-[a-z0-9]+|static|webview|vscode-resource|update|manifest\.json)/g, (_m, p1, p2) => `${p1}${prefix}/${p2}`), "utf8");
     }
     reply.type(outHeaders["content-type"] ?? "application/octet-stream");
     reply.header("cache-control", "no-store");
