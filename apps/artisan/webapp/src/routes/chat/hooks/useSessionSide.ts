@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SessionDetail } from "../../../lib/artisan-client.js";
+import { useWorkspaceWs } from "../../../lib/workspace-ws.js";
 
 /** Right-sidebar data: git status, subagents, checkpoints (plan comes from the chat hook). */
 
@@ -38,6 +39,7 @@ export interface Checkpoint {
 }
 
 export function useSessionSide(sessionId: string) {
+  const { onFrame } = useWorkspaceWs();
   const [git, setGit] = useState<GitInfo | null>(null);
   const [children, setChildren] = useState<ChildSession[]>([]);
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
@@ -80,6 +82,20 @@ export function useSessionSide(sessionId: string) {
       clearInterval(tJobs);
     };
   }, [refresh, sessionId]);
+
+  // Live updates: apply the plan (and other session frames) the moment the agent
+  // emits them — the 15s poll alone leaves the sidebar stale mid-run.
+  useEffect(() => {
+    const off = onFrame((frame) => {
+      if (frame.sessionId !== sessionId) return;
+      if (frame.type === "plan") {
+        setPlan((frame.plan as Array<{ description: string; status: string }> | null) ?? null);
+      } else if (frame.type === "session_renamed" || frame.type === "compaction_done" || frame.type === "done") {
+        void refresh();
+      }
+    });
+    return off;
+  }, [onFrame, sessionId, refresh]);
 
   const commit = useCallback(async (message: string): Promise<string | null> => {
     setBusy(true);
