@@ -732,7 +732,10 @@ echo saved`;
     if (!installed) return { state: "not_installed" };
     // is it already listening?
     // code-server / returns 302 -> /?folder=…; any non-000 response means it is up
-    const listening = await deps.dispatch.exec(session.runner, `(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${EDITOR_PORT}/ || echo 000) 2>/dev/null`, "/", 10_000).catch(() => null);
+    // NOTE: curl -w '%{http_code}' prints 000 on connection refused, so never
+    // pair it with `|| echo 000` (yields "000000" — which is not "000" and once
+    // made every down server look ready). Print the code alone.
+    const listening = await deps.dispatch.exec(session.runner, `curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:${EDITOR_PORT}/ 2>/dev/null; echo`, "/", 10_000).catch(() => null);
     const code = listening?.stdout?.trim();
     if (code && code !== "000" && !code.startsWith("5")) return { state: "ready", port: EDITOR_PORT };
     return { state: "idle", port: EDITOR_PORT };
