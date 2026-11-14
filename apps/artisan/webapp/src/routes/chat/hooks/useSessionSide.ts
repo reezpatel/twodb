@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SessionDetail } from "../../../lib/artisan-client.js";
 import { useWorkspaceWs } from "../../../lib/workspace-ws.js";
+import { apiFetch } from "../../../lib/artisan-client.js";
 
 /** Right-sidebar data: git status, subagents, checkpoints (plan comes from the chat hook). */
 
@@ -48,14 +49,12 @@ export function useSessionSide(sessionId: string) {
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    const base = "/artisan-api";
-    const opts = { credentials: "include" as const };
     try {
       const [g, c, cp, detail] = await Promise.all([
-        fetch(`${base}/sessions/${sessionId}/git`, opts).then((r) => (r.ok ? r.json() : null)),
-        fetch(`${base}/sessions/${sessionId}/children`, opts).then((r) => (r.ok ? r.json() : [])),
-        fetch(`${base}/sessions/${sessionId}/checkpoints`, opts).then((r) => (r.ok ? r.json() : [])),
-        fetch(`${base}/sessions/${sessionId}`, opts).then((r) => (r.ok ? r.json() : null)),
+        apiFetch(`/sessions/${sessionId}/git`).then((r) => (r.ok ? r.json() : null)),
+        apiFetch(`/sessions/${sessionId}/children`).then((r) => (r.ok ? r.json() : [])),
+        apiFetch(`/sessions/${sessionId}/checkpoints`).then((r) => (r.ok ? r.json() : [])),
+        apiFetch(`/sessions/${sessionId}`).then((r) => (r.ok ? r.json() : null)),
       ]);
       setGit(g);
       setChildren(c);
@@ -70,7 +69,7 @@ export function useSessionSide(sessionId: string) {
     void refresh();
     const t = setInterval(() => void refresh(), 15_000);
     const pollJobs = () => {
-      fetch(`/artisan-api/sessions/${sessionId}/jobs`, { credentials: "include" })
+      apiFetch(`/sessions/${sessionId}/jobs`)
         .then((r) => (r.ok ? r.json() : []))
         .then(setJobs)
         .catch(() => {});
@@ -100,9 +99,8 @@ export function useSessionSide(sessionId: string) {
   const commit = useCallback(async (message: string): Promise<string | null> => {
     setBusy(true);
     try {
-      const res = await fetch(`/artisan-api/sessions/${sessionId}/git/commit`, {
+      const res = await apiFetch(`/sessions/${sessionId}/git/commit`, {
         method: "POST",
-        credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ message }),
       });
@@ -120,9 +118,8 @@ export function useSessionSide(sessionId: string) {
   const createCheckpoint = useCallback(async (label: string) => {
     setBusy(true);
     try {
-      await fetch(`/artisan-api/sessions/${sessionId}/checkpoints`, {
+      await apiFetch(`/sessions/${sessionId}/checkpoints`, {
         method: "POST",
-        credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(label ? { label } : {}),
       });
@@ -135,14 +132,14 @@ export function useSessionSide(sessionId: string) {
   const restoreCheckpoint = useCallback(async (id: string) => {
     setBusy(true);
     try {
-      await fetch(`/artisan-api/checkpoints/${id}/restore`, { method: "POST", credentials: "include" });
+      await apiFetch(`/checkpoints/${id}/restore`, { method: "POST" });
     } finally {
       setBusy(false);
     }
   }, []);
 
   const deleteCheckpoint = useCallback(async (id: string) => {
-    await fetch(`/artisan-api/checkpoints/${id}`, { method: "DELETE", credentials: "include" });
+    await apiFetch(`/checkpoints/${id}`, { method: "DELETE" });
     await refresh();
   }, [refresh]);
 
@@ -158,7 +155,7 @@ export function useSessionFiles(sessionId: string) {
 
   const list = useCallback(async () => {
     try {
-      const res = await fetch(`/artisan-api/sessions/${sessionId}/files`, { credentials: "include" });
+      const res = await apiFetch(`/sessions/${sessionId}/files`);
       if (res.ok) setFiles(((await res.json()) as { files: string[] }).files);
     } catch {
       // offline
@@ -172,7 +169,7 @@ export function useSessionFiles(sessionId: string) {
   }, [list]);
 
   const open = useCallback(async (path: string) => {
-    const res = await fetch(`/artisan-api/sessions/${sessionId}/files/${encodeURI(path)}`, { credentials: "include" });
+    const res = await apiFetch(`/sessions/${sessionId}/files/${encodeURI(path)}`);
     if (!res.ok) return;
     const body = (await res.json()) as { content: string };
     setOpenPath(path);
@@ -182,9 +179,8 @@ export function useSessionFiles(sessionId: string) {
 
   const save = useCallback(async () => {
     if (!openPath) return;
-    await fetch(`/artisan-api/sessions/${sessionId}/files/${encodeURI(openPath)}`, {
+    await apiFetch(`/sessions/${sessionId}/files/${encodeURI(openPath)}`, {
       method: "PUT",
-      credentials: "include",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ content }),
     });
@@ -202,9 +198,8 @@ export function useSessionConsole(sessionId: string) {
   const run = useCallback(async (command: string) => {
     setBusy(true);
     try {
-      const res = await fetch(`/artisan-api/sessions/${sessionId}/console`, {
+      const res = await apiFetch(`/sessions/${sessionId}/console`, {
         method: "POST",
-        credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ command }),
       });

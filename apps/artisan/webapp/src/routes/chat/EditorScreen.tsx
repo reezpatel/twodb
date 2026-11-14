@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Code2, Download, MonitorX, Loader2 } from "lucide-react";
+import { apiFetch } from "../../lib/artisan-client.js";
+import { gatewayToken } from "../../lib/gateway-token.js";
 
 type EditorState = "starting" | "not_installed" | "installing" | "idle" | "ready" | "unsupported" | "error";
 
@@ -18,15 +20,25 @@ interface EditorStatus {
 export function EditorScreen(props: { sessionId: string }) {
   const [status, setStatus] = useState<EditorStatus>({ state: "starting" });
   const [error, setError] = useState<string | null>(null);
+  const [iframeSrc, setIframeSrc] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch(`/artisan-api/sessions/${props.sessionId}/editor/status`, { credentials: "include" });
+      const res = await apiFetch(`/sessions/${props.sessionId}/editor/status`);
       if (res.ok) setStatus((await res.json()) as EditorStatus);
     } catch {
       /* offline */
     }
   }, [props.sessionId]);
+
+  useEffect(() => {
+    if (status.state !== "ready") return;
+    let live = true;
+    void gatewayToken().then((t) => {
+      if (live) setIframeSrc(`/artisan-api/sessions/${props.sessionId}/editor/?folder=${encodeURIComponent("/")}&cb=${Date.now()}&access_token=${encodeURIComponent(t)}`);
+    });
+    return () => { live = false; };
+  }, [status.state, props.sessionId]);
 
   useEffect(() => {
     void refresh();
@@ -44,7 +56,7 @@ export function EditorScreen(props: { sessionId: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/artisan-api/sessions/${props.sessionId}/editor/start`, { method: "POST", credentials: "include" });
+        const res = await apiFetch(`/sessions/${props.sessionId}/editor/start`, { method: "POST" });
         if (res.ok) {
           const body = (await res.json()) as { ok?: boolean };
           if (body.ok && !cancelled) setStatus({ state: "ready", port: 8443 });
@@ -62,17 +74,17 @@ export function EditorScreen(props: { sessionId: string }) {
   const install = async () => {
     setStatus((s) => ({ ...s, state: "installing" }));
     try {
-      await fetch(`/artisan-api/sessions/${props.sessionId}/editor/install`, { method: "POST", credentials: "include" });
+      await apiFetch(`/sessions/${props.sessionId}/editor/install`, { method: "POST" });
       await refresh();
     } catch (e) {
       setError((e as Error).message);
     }
   };
 
-  if (status.state === "ready") {
+  if (status.state === "ready" && iframeSrc) {
     return (
       <iframe
-        src={`/artisan-api/sessions/${props.sessionId}/editor/?folder=${encodeURIComponent("/")}&cb=${Date.now()}`}
+        src={iframeSrc}
         className="h-full w-full border-0"
         title="Code editor"
         allow="clipboard-read; clipboard-write"

@@ -80,6 +80,26 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     }
   });
 
+  /** Mints a gateway Bearer token from the caller's current better-auth cookie
+   *  session. Webapps fetch this once at load (same-origin, cookie rides along)
+   *  and keep the token in memory only — never persisted — then send it as
+   *  `Authorization: Bearer` on every gateway call (fetch + WS ?access_token=).
+   *  This is the single per-login token every app + the gateway validate. */
+  app.get("/auth/gateway-token", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any)).catch(() => null);
+    if (!ctx || ctx.kind !== "session" || !ctx.userId) return reply.code(401).send({ error: "unauthorized" });
+    reply.header("cache-control", "no-store");
+    const authCtx = await authEngine.$context;
+    const ttl = config.TWODB_APP_SESSION_DAYS * 24 * 60 * 60;
+    const session = await authCtx.internalAdapter.createSession(ctx.userId, false, {
+      expiresAt: new Date(Date.now() + ttl * 1000),
+      userAgent: String(req.headers["user-agent"] ?? "").slice(0, 200),
+      ipAddress: req.ip,
+    });
+    if (!session) return reply.code(500).send({ error: "could not create session" });
+    return { tokenType: "Bearer", accessToken: session.token, expiresAt: session.expiresAt };
+  });
+
   /** Public (PKCE is the proof): exchanges the code for a session token usable as `Authorization: Bearer`. */
   app.post("/registry/oauth/token", async (req, reply) => {
     const b = (req.body ?? {}) as { code?: string; codeVerifier?: string; redirectUri?: string };

@@ -3,6 +3,7 @@ import { Terminal, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { RotateCw, TerminalSquare } from "lucide-react";
+import { apiWsUrl } from "../../lib/artisan-client.js";
 
 const THEME: ITheme = {
   background: "#1a1815",
@@ -38,52 +39,64 @@ export function TerminalScreen(props: { sessionId: string }) {
     const focusTerm = () => term.focus();
     container.addEventListener("click", focusTerm);
 
-    const proto = window.location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${proto}://${window.location.host}/artisan-api/sessions/${props.sessionId}/term`);
-    ws.binaryType = "arraybuffer";
-    ws.onopen = () => {
-      if (ws.readyState === ws.OPEN && term.cols && term.rows) {
-        ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
-      }
-    };
-    ws.onmessage = (ev) => {
-      const raw = typeof ev.data === "string" ? ev.data : "";
-      if (!raw) return;
-      if (raw.startsWith("{")) {
-        try {
-          const m = JSON.parse(raw) as { type?: string; message?: string };
-          if (m.type === "error") term.write(`\r\n[${m.message}]\r\n`);
-        } catch { /* ignore */ }
-        return;
-      }
-      term.write(Uint8Array.from(atob(raw), (c) => c.charCodeAt(0)));
-    };
-    ws.onclose = () => {
+    let ws: WebSocket | null = null;
+    let cleanupWs: (() => void) | null = null;
+    void apiWsUrl(`/sessions/${props.sessionId}/term`).then((url) => {
       if (disposed) return;
-      term.write("\r\n[disconnected]\r\n");
-      setDead(true);
-    };
-    ws.onerror = () => { /* onclose follows */ };
+      ws = new WebSocket(url);
+      ws.binaryType = "arraybuffer";
+      cleanupWs = wireWs(ws);
+    });
 
-    const dataSub = term.onData((data) => {
-      if (ws.readyState === ws.OPEN) ws.send(btoa(data));
-    });
-    const ro = new ResizeObserver(() => {
-      try {
-        fit.fit();
-        if (ws.readyState === ws.OPEN && term.cols && term.rows) {
-          ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+    function wireWs(sock: WebSocket): () => void {
+      sock.onopen = () => {
+        if (sock.readyState === sock.OPEN && term.cols && term.rows) {
+          sock.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
         }
-      } catch { /* ignore */ }
-    });
-    ro.observe(container);
+      };
+      sock.onmessage = (ev) => {
+        const raw = typeof ev.data === "string" ? ev.data : "";
+        if (!raw) return;
+        if (raw.startsWith("{")) {
+          try {
+            const m = JSON.parse(raw) as { type?: string; message?: string };
+            if (m.type === "error") term.write(`\r\n[${m.message}]\r\n`);
+          } catch { /* ignore */ }
+          return;
+        }
+        term.write(Uint8Array.from(atob(raw), (c) => c.charCodeAt(0)));
+      };
+      sock.onclose = () => {
+        if (disposed) return;
+        term.write("\r\n[disconnected]\r\n");
+        setDead(true);
+      };
+      sock.onerror = () => { /* onclose follows */ };
+
+      const dataSub = term.onData((data) => {
+        if (sock.readyState === sock.OPEN) sock.send(btoa(data));
+      });
+      const ro = new ResizeObserver(() => {
+        try {
+          fit.fit();
+          if (sock.readyState === sock.OPEN && term.cols && term.rows) {
+            sock.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+          }
+        } catch { /* ignore */ }
+      });
+      ro.observe(container!);
+
+      return () => {
+        ro.disconnect();
+        dataSub.dispose();
+        try { sock.close(); } catch { /* ignore */ }
+      };
+    }
 
     return () => {
       disposed = true;
       container.removeEventListener("click", focusTerm);
-      ro.disconnect();
-      dataSub.dispose();
-      ws.close();
+      cleanupWs?.();
       term.dispose();
     };
   }, [props.sessionId, generation]);

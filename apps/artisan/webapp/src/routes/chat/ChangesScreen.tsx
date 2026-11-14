@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FilePen, FilePlus, FileMinus, FileQuestion, Folder, RefreshCw } from "lucide-react";
 import { cn } from "../../lib/cn.js";
 import { useSessionSide, type GitInfo } from "./hooks/useSessionSide.js";
+import { apiFetch } from "../../lib/artisan-client.js";
 
 /** Parse a unified diff into per-line tokens for rendering. */
 function parseDiff(diff: string): Array<{ kind: "ctx" | "add" | "del" | "hunk" | "meta"; text: string }> {
@@ -56,7 +57,7 @@ export function ChangesScreen(props: { sessionId: string }) {
     if (!selected) return;
     let cancelled = false;
     setLoading(true);
-    fetch(`/artisan-api/sessions/${props.sessionId}/diff?path=${encodeURIComponent(selected)}`, { credentials: "include" })
+    apiFetch(`/sessions/${props.sessionId}/diff?path=${encodeURIComponent(selected)}`)
       .then((r) => (r.ok ? r.json() : { diff: "" }))
       .then((d: { diff?: string }) => {
         if (!cancelled) setDiff(d.diff ?? "");

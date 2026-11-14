@@ -1,7 +1,11 @@
-/** Artisan API client — same-origin through the gateway (vite proxies
- *  /artisan-api → /apps/artisan in dev). */
+/** Artisan API client — every call goes through the gateway with the
+ *  per-login Bearer token (in memory only, see gateway-token.ts). The gateway
+ *  validates that one token for artisan + dispatch + tworoute alike, so
+ *  artisan can propagate it downstream. Vite proxies /apps/* → gateway in dev. */
 
-const BASE = "/artisan-api";
+import { gatewayAuthHeader, gatewayToken } from "./gateway-token.js";
+
+const BASE = "/apps/artisan";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -12,30 +16,48 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 async function get<T>(path: string): Promise<T> {
-  return fetch(`${BASE}${path}`, { credentials: "include" }).then((r) => json<T>(r));
+  const headers = await gatewayAuthHeader();
+  return fetch(`${BASE}${path}`, { headers }).then((r) => json<T>(r));
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
   const hasBody = body !== undefined;
+  const headers = { ...(await gatewayAuthHeader()), ...(hasBody ? { "content-type": "application/json" } : {}) };
   return fetch(`${BASE}${path}`, {
     method: "POST",
-    credentials: "include",
-    ...(hasBody ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}),
+    headers,
+    ...(hasBody ? { body: JSON.stringify(body) } : {}),
   }).then((r) => json<T>(r));
 }
 
 async function patch<T>(path: string, body: unknown): Promise<T> {
-  return fetch(`${BASE}${path}`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  }).then((r) => json<T>(r));
+  const headers = { ...(await gatewayAuthHeader()), "content-type": "application/json" };
+  return fetch(`${BASE}${path}`, { method: "PATCH", headers, body: JSON.stringify(body) }).then((r) => json<T>(r));
 }
 
 async function del<T>(path: string): Promise<T> {
-  return fetch(`${BASE}${path}`, { method: "DELETE", credentials: "include" }).then((r) => json<T>(r));
+  const headers = await gatewayAuthHeader();
+  return fetch(`${BASE}${path}`, { method: "DELETE", headers }).then((r) => json<T>(r));
 }
+
+/** Same-origin fetch to the artisan API with the in-memory gateway token.
+ *  Use for the few components that call endpoints directly (editor, files,
+ *  changes) instead of going through artisanClient methods. */
+export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const auth = await gatewayAuthHeader();
+  const headers = { ...(init.headers as Record<string, string> | undefined), ...auth };
+  return fetch(`/artisan-api${path}`, { ...init, headers });
+}
+
+/** WS URL to an artisan WS endpoint, authenticated via ?access_token= (the
+ *  gateway promotes it to Authorization; artisan accepts it too). */
+export async function apiWsUrl(path: string): Promise<string> {
+  const proto = window.location.protocol === "https:" ? "wss" : "ws";
+  const token = await gatewayToken();
+  const sep = path.includes("?") ? "&" : "?";
+  return `${proto}://${window.location.host}/artisan-api${path}${sep}access_token=${encodeURIComponent(token)}`;
+}
+
 
 export interface DirectoryInfo {
   id: string;
@@ -247,7 +269,13 @@ export class WorkspaceSocket {
 
   connect(): void {
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${proto}://${window.location.host}/apps/artisan/ws`);
+    void apiWsUrl("/ws")
+      .catch(() => `${proto}://${window.location.host}/apps/artisan/ws`)
+      .then((url) => this.open(url));
+  }
+
+  private open(url: string): void {
+    const ws = new WebSocket(url);
     this.ws = ws;
     ws.onopen = () => {
       // Ignore a stale open (a newer connect superseded this socket).

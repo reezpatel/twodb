@@ -34,7 +34,11 @@ export async function buildServer(config: ArtisanConfig) {
   // x-api-key when present (gateway forwards it) or the provision token env.
   const apiKeyFor = (req: FastifyRequest): string => {
     const fwd = (req.headers["x-api-key"] as string | undefined) ?? (req.headers["authorization"] as string | undefined)?.replace(/^Bearer\s+/i, "");
-    return fwd ?? process.env.WORKSPACE_API_KEY ?? "";
+    if (fwd) return fwd;
+    // Browsers can't set headers on WS upgrades / iframes: the webapp passes
+    // the per-login gateway token as ?access_token=.
+    const q = new URL(req.url, "http://internal").searchParams.get("access_token");
+    return q ?? process.env.WORKSPACE_API_KEY ?? "";
   };
 
   const depsFor = (req: FastifyRequest): RunDeps & { tworoute: TworouteClient; dispatch: DispatchClient } => {
@@ -809,6 +813,10 @@ echo saved`;
   });
 
   app.all("/sessions/:id/editor/*", async (req, reply) => {
+    // Iframes can't set headers: accept ?access_token= and promote it so the
+    // request authenticates exactly like a Bearer call.
+    const at = new URL(req.url, "http://internal").searchParams.get("access_token");
+    if (at && !req.headers.authorization) req.headers.authorization = `Bearer ${at}`;
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const { id, "*": rest } = req.params as { id: string; "*": string };

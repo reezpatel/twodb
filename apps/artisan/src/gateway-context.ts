@@ -24,3 +24,4 @@ export function readForwardedContext(req: FastifyRequest): ForwardedContext | nu
     spaceIds: spaceIdsHeader ? spaceIdsHeader.split(",") : [],
   };
 }
+

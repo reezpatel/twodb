@@ -292,6 +292,7 @@ export async function runAgentLoop(opts: {
     // History: prior threads' summaries + current thread messages.
     const messages = await buildContext(deps, session, agent, visible, thread);
 
+
     // max_tokens = the model's own context capacity so reasoning models (e.g. glm)
     // never starve the answer out of the budget. Capped to keep a single turn sane.
     const modelInfo = await deps.tworoute.getModel(model).catch(() => undefined);

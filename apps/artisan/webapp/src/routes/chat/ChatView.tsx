@@ -17,6 +17,7 @@ import { ChatUsage, ChatUsageStat, ChatUsageContext, ChatUsageSpacer } from "./p
 import { ChatMessage } from "./partials/ChatMessage.js";
 import { AskWidget } from "./partials/AskWidget.js";
 import { ModelPicker, type ModelProvider, type ModelEntry, type TraceNode } from "@twodb/blocks";
+import { apiFetch } from "../../lib/artisan-client.js";
 
 /** Legacy token formatting: 1.2k / 3.4M (never raw thousands). */
 function fmtTokens(n: number): string {
@@ -150,11 +151,11 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
             return `--- ${a.path.slice(6)} (skill) ---\n${(skillContent[a.path] ?? "").slice(0, 20_000)}`;
           }
           const content = a.uploaded
-            ? await fetch(`/artisan-api/files/read?path=${encodeURIComponent(a.path)}`, { credentials: "include" })
+            ? await apiFetch(`/files/read?path=${encodeURIComponent(a.path)}`)
                 .then((r) => (r.ok ? r.json() : { content: "" }))
                 .then((d: { content?: string }) => d.content ?? "")
                 .catch(() => "")
-            : await fetch(`/artisan-api/sessions/${props.sessionId}/files/${encodeURI(a.path)}`, { credentials: "include" })
+            : await apiFetch(`/sessions/${props.sessionId}/files/${encodeURI(a.path)}`)
                 .then((r) => (r.ok ? r.json() : { content: "" }))
                 .then((d: { content?: string }) => d.content ?? "")
                 .catch(() => "");
@@ -429,17 +430,15 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
                 value={detail.model}
                 thinkingLevel={detail.thinkingLevel ?? undefined}
                 onChange={(id) => {
-                  void fetch(`/artisan-api/sessions/${detail.id}`, {
+                  void apiFetch(`/sessions/${detail.id}`, {
                     method: "PATCH",
-                    credentials: "include",
                     headers: { "content-type": "application/json" },
                     body: JSON.stringify({ model: id }),
                   }).then(() => chat.refresh());
                 }}
                 onThinkingChange={(level) => {
-                  void fetch(`/artisan-api/sessions/${detail.id}`, {
+                  void apiFetch(`/sessions/${detail.id}`, {
                     method: "PATCH",
-                    credentials: "include",
                     headers: { "content-type": "application/json" },
                     body: JSON.stringify({ thinkingLevel: level }),
                   }).then(() => chat.refresh());

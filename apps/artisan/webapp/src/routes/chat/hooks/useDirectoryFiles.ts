@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiFetch } from "../../../lib/artisan-client.js";
 
 /** File walk for the composer's @ mentions — one fetch, cached 60s, filtered client-side. */
 
@@ -19,7 +20,7 @@ export function useDirectoryFiles(sessionId: string | null): string[] {
       return;
     }
     let cancelled = false;
-    fetch(`/artisan-api/sessions/${sessionId}/files`, { credentials: "include" })
+    apiFetch(`/sessions/${sessionId}/files`)
       .then((r) => (r.ok ? r.json() : { files: [] }))
       .then((d: { files?: string[] }) => {
         const list = (d.files ?? []).filter((f) => !f.startsWith("."));
@@ -37,7 +38,7 @@ export function useDirectoryFiles(sessionId: string | null): string[] {
 
 /** Fetches one file's content (for sending attachments). */
 export async function fetchFileContent(sessionId: string, path: string): Promise<string> {
-  const res = await fetch(`/artisan-api/sessions/${sessionId}/files/${encodeURI(path)}`, { credentials: "include" });
+  const res = await apiFetch(`/sessions/${sessionId}/files/${encodeURI(path)}`);
   if (!res.ok) return "";
   return ((await res.json()) as { content?: string }).content ?? "";
 }
@@ -66,7 +67,7 @@ export function useSkills(spaceId?: string): Array<{ id: string; name: string; d
       return;
     }
     let cancelled = false;
-    fetch(`/artisan-api/skills?spaceId=${encodeURIComponent(spaceId)}&content=1`, { credentials: "include" })
+    apiFetch(`/skills?spaceId=${encodeURIComponent(spaceId)}&content=1`)
       .then((r) => (r.ok ? r.json() : []))
       .then((list: Array<{ id: string; name: string; description: string; content: string }>) => {
         skillCache.set(spaceId, { at: Date.now(), skills: list });
@@ -98,9 +99,8 @@ export async function uploadAttachment(sessionId: string, file: File): Promise<s
     `printf '%s' '${b64w}' | base64 -d > '${target.replace(/'/g, "'\\''")}'`,
     `echo '${target.replace(/'/g, "'\\''")}'`,
   ].join(" && ");
-  const res = await fetch(`/artisan-api/sessions/${sessionId}/console`, {
+  const res = await apiFetch(`/sessions/${sessionId}/console`, {
     method: "POST",
-    credentials: "include",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ command: cmd }),
   });
@@ -119,7 +119,7 @@ export async function buildAttachmentBlock2(
   const parts = await Promise.all(
     items.map(async (it) => {
       const content = it.uploaded
-        ? await fetch(`/artisan-api/files/read?path=${encodeURIComponent(it.path)}`, { credentials: "include" })
+        ? await apiFetch(`/files/read?path=${encodeURIComponent(it.path)}`)
             .then((r) => (r.ok ? r.json() : { content: "" }))
             .then((d: { content?: string }) => d.content ?? "")
             .catch(() => "")
