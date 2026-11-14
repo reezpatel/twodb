@@ -846,6 +846,7 @@ echo saved`;
         .replace(/(["'(])\/(stable-[a-z0-9]+|static|webview|vscode-resource|update|manifest\.json)/g, `$1${prefix}/$2`), "utf8");
     }
     reply.type(outHeaders["content-type"] ?? "application/octet-stream");
+    reply.header("cache-control", "no-store");
     for (const [k, v] of Object.entries(outHeaders)) reply.header(k, v);
     return reply.code(pr.status).send(out);
   });
