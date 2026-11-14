@@ -784,6 +784,30 @@ echo saved`;
   });
 
   // HTTP proxy: /sessions/:id/editor/<path…> -> code-server, rewriting WS URLs.
+  // WS upgrade on the editor path (code-server Management/ExtensionHost sockets
+  // are built from window.location, so they hit /editor/<stable>…?query) -> proxy
+  // to dispatch's proxy-ws tunnel on code-server.
+  app.get("/sessions/:id/editor-ws-path/*", { websocket: true }, (socket, req) => {
+    void (async () => {
+      const ctx = readForwardedContext(req);
+      if (!ctx) return socket.close(4401, "unauthorized");
+      const { id } = req.params as { id: string };
+      const session = await repo.getSession(ctx.workspaceId, id);
+      if (!session) return socket.close(4404, "session not found");
+      const url = new URL(req.url, "http://internal");
+      const sub = url.pathname.split("/editor/")[1] ?? "/";
+      const upstream = new WebSocket(
+        `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(session.runner)}/proxy-ws?port=${EDITOR_PORT}&path=${encodeURIComponent("/" + sub + url.search)}`,
+        { headers: { "x-api-key": apiKeyFor(req) } },
+      );
+      upstream.on("message", (raw: unknown) => { if (socket.readyState === socket.OPEN) socket.send(String(raw)); });
+      upstream.on("close", () => { if (socket.readyState === socket.OPEN) socket.close(); });
+      upstream.on("error", () => { if (socket.readyState === socket.OPEN) socket.close(1011, "upstream"); });
+      socket.on("message", (raw: unknown) => { if (upstream.readyState === upstream.OPEN) upstream.send(String(raw)); });
+      socket.on("close", () => { try { upstream.close(); } catch { /* ignore */ } });
+    })();
+  });
+
   app.all("/sessions/:id/editor/*", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
@@ -842,7 +866,7 @@ echo saved`;
     if (/^(text\/html|text\/css|application\/javascript|text\/javascript)/.test(contentType)) {
       const proto = req.headers["x-forwarded-proto"] ?? (req.raw.socket as { encrypted?: boolean })?.encrypted ? "https" : "http";
       const host = req.headers["host"] ?? "localhost";
-      const wsBase = `${proto === "https" ? "wss" : "ws"}://${host}/apps/artisan/sessions/${id}/editor-ws`;
+      const wsBase = `${proto === "https" ? "wss" : "ws"}://${host}/apps/artisan/sessions/${id}/editor-ws-path`;
       // Rewrite WS URLs and root-relative asset paths so they resolve through the
       // proxy. Replacement FUNCTIONS keep a literal "$" in the source intact. Only
       // rewrite HTML entry points (which reference the tunnel); leave JS/CSS opaque.
