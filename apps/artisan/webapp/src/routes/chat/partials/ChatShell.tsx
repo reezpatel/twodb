@@ -5,7 +5,7 @@ import { cn } from "../../../lib/cn.js";
 export const chatWidth = "mx-auto w-full max-w-4xl";
 
 export function ChatShell({ className, ...props }: ComponentProps<"div">) {
-  return <div data-slot="chat-shell" className={cn("flex min-h-0 min-w-0 flex-1 flex-col", className)} {...props} />;
+  return <div data-slot="chat-shell" className={cn("flex min-h-0 min-w-0 flex-1 gap-2 flex-col", className)} {...props} />;
 }
 
 export function ChatThread({ className, ...props }: ComponentProps<"div">) {

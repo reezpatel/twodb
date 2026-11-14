@@ -81,6 +81,7 @@ export interface SessionInfo {
   agentId: string | null;
   parentSessionId: string | null;
   thinkingLevel?: string | null;
+  archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,10 +94,25 @@ export interface MessageInfo {
   createdAt: string;
 }
 
+export interface InspectSnapshot {
+  id: string;
+  round: number;
+  createdAt: string;
+  tools: Array<{ type: string; function: { name: string; description?: string; parameters?: unknown } }>;
+  messages: Array<{
+    role: string;
+    content: string | null;
+    toolCallId?: string;
+    toolCalls?: Array<{ id: string; function: { name: string; arguments: string } }>;
+  }>;
+}
+
 export interface UsageInfo {
   inputTokens: number;
   outputTokens: number;
   cachedTokens: number;
+  /** Prompt size of the latest request — what currently fills the context window. */
+  contextTokens?: number;
   calls: number;
   costUsd: number | null;
 }
@@ -121,16 +137,60 @@ export interface AgentInfo {
   runner: string | null;
   directory: string | null;
   spaceId: string;
+  spaceIds: string[];
   instruction?: string;
+}
+
+export type SkillMode = "global" | "agents" | "spaces" | "types";
+
+export type ScopeMode = SkillMode | "directories";
+export type McpTransport = "auto" | "http" | "sse";
+export interface McpScope {
+  mode: ScopeMode;
+  all: boolean;
+  ids: string[];
+}
+export interface McpServerInfo {
+  id: string;
+  name: string;
+  url: string;
+  transport: McpTransport;
+  headers: Record<string, string>;
+  enabled: boolean;
+  scope: McpScope;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface McpImportPreview {
+  drafts: Array<{ name: string; url: string; transport: McpTransport; headers: Record<string, string> }>;
+  skipped: Array<{ name: string; reason: string }>;
+}
+
+export interface SkillScope {
+  mode: SkillMode;
+  /** true = unrestricted on the chosen dimension (ids ignored). */
+  all: boolean;
+  ids: string[];
+}
+
+export type MemoryLevel = "organization" | "code_directory" | "self" | "session";
+export interface MemoryInfo {
+  id: string;
+  level: MemoryLevel;
+  title: string;
+  content: string;
+  directoryId: string | null;
+  agentId: string | null;
+  sessionId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SkillInfo {
   id: string;
   name: string;
   description: string;
-  directory: string | null;
-  tags: string[];
-  spaceId: string;
+  scope: SkillScope;
   content?: string;
 }
 
@@ -144,6 +204,26 @@ export interface ModelInfo {
   thinkingLevel?: string[];
 }
 
+export interface ToolInfo {
+  name: string;
+  description: string;
+}
+
+export interface SpaceInfo {
+  id: string;
+  name: string;
+}
+
+export interface MicrovmInfo {
+  id: string;
+  identifier: string;
+  runnerId: string;
+  runnerName: string | null;
+  status: string;
+  bootCount: number;
+  lastActiveAt: string;
+}
+
 export interface RunnerInfo {
   name: string;
   status: string;
@@ -152,14 +232,24 @@ export interface RunnerInfo {
 
 export const artisanClient = {
   // --- sessions ---
-  listSessions(filter?: { type?: string; runner?: string; directory?: string; all?: string }): Promise<SessionInfo[]> {
+  listSessions(filter?: { type?: string; runner?: string; directory?: string; all?: string; archived?: string; agentId?: string }): Promise<SessionInfo[]> {
     const q = new URLSearchParams();
     if (filter?.type) q.set("type", filter.type);
     if (filter?.runner) q.set("runner", filter.runner);
     if (filter?.directory) q.set("directory", filter.directory);
     if (filter?.all) q.set("all", filter.all);
+    if (filter?.archived) q.set("archived", filter.archived);
+    if (filter?.agentId) q.set("agentId", filter.agentId);
     const qs = q.toString();
     return get(`/sessions${qs ? `?${qs}` : ""}`);
+  },
+
+  deleteSession(id: string): Promise<{ ok: boolean }> {
+    return del(`/sessions/${id}`);
+  },
+
+  getInspectRound(sessionId: string, inspectId: string): Promise<InspectSnapshot> {
+    return get(`/sessions/${sessionId}/inspect/${inspectId}`);
   },
 
   getSession(id: string): Promise<SessionDetail> {
@@ -173,7 +263,7 @@ export const artisanClient = {
     return post("/sessions", input);
   },
 
-  updateSession(id: string, patchBody: { title?: string; model?: string }): Promise<SessionInfo> {
+  updateSession(id: string, patchBody: { title?: string; model?: string; archived?: boolean }): Promise<SessionInfo> {
     return patch(`/sessions/${id}`, patchBody);
   },
 
@@ -216,13 +306,13 @@ export const artisanClient = {
   },
 
   createAgent(input: {
-    spaceId?: string; type: string; name: string; description?: string; instruction: string;
+    spaceId?: string; spaceIds?: string[]; type: string; name: string; description?: string; instruction?: string;
     model?: string | null; tools?: string[]; skillTags?: string[]; tags?: string[]; runner?: string | null; directory?: string | null;
   }): Promise<AgentInfo> {
     return post("/agents", input);
   },
 
-  updateAgent(id: string, body: Partial<{ name: string; description: string; instruction: string; model: string | null; tools: string[]; skillTags: string[]; tags: string[]; runner: string | null; directory: string | null }>): Promise<AgentInfo> {
+  updateAgent(id: string, body: Partial<{ name: string; spaceIds: string[]; description: string; instruction: string; model: string | null; tools: string[]; skillTags: string[]; tags: string[]; runner: string | null; directory: string | null }>): Promise<AgentInfo> {
     return patch(`/agents/${id}`, body);
   },
 
@@ -231,16 +321,61 @@ export const artisanClient = {
   },
 
   // --- skills ---
-  listSkills(spaceId?: string): Promise<SkillInfo[]> {
-    const q = spaceId ? `?spaceId=${spaceId}` : "";
-    return get(`/skills${q}`);
+  listMemories(sessionId?: string): Promise<MemoryInfo[]> {
+    return get(`/memories${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`);
+  },
+  createMemory(input: { level: MemoryLevel; title: string; content: string; sessionId?: string; directoryId?: string; agentId?: string }): Promise<MemoryInfo> {
+    return post("/memories", input);
+  },
+  updateMemory(id: string, body: { title?: string; content?: string }): Promise<MemoryInfo> {
+    return patch(`/memories/${id}`, body);
+  },
+  deleteMemory(id: string): Promise<{ ok: boolean }> {
+    return del(`/memories/${id}`);
   },
 
-  createSkill(input: { spaceId?: string; directory?: string | null; name: string; description: string; content: string; tags?: string[] }): Promise<SkillInfo> {
+  listMcpServers(): Promise<McpServerInfo[]> {
+    return get("/mcp");
+  },
+  getMcpServer(id: string): Promise<McpServerInfo> {
+    return get(`/mcp/${id}`);
+  },
+  createMcpServer(input: { name: string; url: string; transport?: McpTransport; headers?: Record<string, string>; enabled?: boolean; scope: McpScope }): Promise<McpServerInfo> {
+    return post("/mcp", input);
+  },
+  updateMcpServer(id: string, body: Partial<{ name: string; url: string; transport: McpTransport; headers: Record<string, string>; enabled: boolean; scope: McpScope }>): Promise<McpServerInfo> {
+    return patch(`/mcp/${id}`, body);
+  },
+  deleteMcpServer(id: string): Promise<{ ok: boolean }> {
+    return del(`/mcp/${id}`);
+  },
+  previewMcpImport(json: string): Promise<McpImportPreview> {
+    return post("/mcp/import/preview", { json });
+  },
+  importMcpServers(json: string, scope: McpScope): Promise<{ created: McpServerInfo[]; conflicts: string[]; skipped: McpImportPreview["skipped"] }> {
+    return post("/mcp/import", { json, scope });
+  },
+
+  listSkills(): Promise<SkillInfo[]> {
+    return get("/skills");
+  },
+
+  getGlobalInstruction(): Promise<{ content: string; updatedAt: string | null }> {
+    return get("/settings/global-instruction");
+  },
+  async setGlobalInstruction(content: string): Promise<{ content: string; updatedAt: string | null }> {
+    return json(await fetch(`${BASE}/settings/global-instruction`, { method: "PUT", headers: { "content-type": "application/json", ...(await gatewayAuthHeader()) }, body: JSON.stringify({ content }) }));
+  },
+
+  getSkill(id: string): Promise<SkillInfo> {
+    return get(`/skills/${id}`);
+  },
+
+  createSkill(input: { name: string; description?: string; content?: string; scope: SkillScope }): Promise<SkillInfo> {
     return post("/skills", input);
   },
 
-  updateSkill(id: string, body: Partial<{ name: string; description: string; content: string; directory: string | null; tags: string[] }>): Promise<SkillInfo> {
+  updateSkill(id: string, body: Partial<{ name: string; description: string; content: string; scope: SkillScope }>): Promise<SkillInfo> {
     return patch(`/skills/${id}`, body);
   },
 
@@ -255,6 +390,38 @@ export const artisanClient = {
 
   listRunners(): Promise<RunnerInfo[]> {
     return get("/runners");
+  },
+
+  /** Workspace spaces (served by the control plane, same origin). */
+  async listSpaces(): Promise<SpaceInfo[]> {
+    const res = await fetch("/registry/spaces", { credentials: "include", headers: await gatewayAuthHeader() });
+    if (!res.ok) throw new Error(`${res.status}: unable to load spaces`);
+    const body = (await res.json()) as SpaceInfo[] | { spaces: SpaceInfo[] };
+    return Array.isArray(body) ? body : body.spaces;
+  },
+
+  getAgent(id: string): Promise<AgentInfo> {
+    return get(`/agents/${id}`);
+  },
+
+  listTools(): Promise<ToolInfo[]> {
+    return get("/tools");
+  },
+
+  listMicrovms(): Promise<MicrovmInfo[]> {
+    return get("/microvms");
+  },
+
+  createMicrovm(input: { name?: string }): Promise<MicrovmInfo> {
+    return post("/microvms", input);
+  },
+
+  listRunnerDir(runner: string, path: string): Promise<{ path: string; entries: Array<{ name: string; dir: boolean }> }> {
+    return get(`/runners/${encodeURIComponent(runner)}/fs?path=${encodeURIComponent(path)}`);
+  },
+
+  makeRunnerDir(runner: string, path: string): Promise<{ ok: boolean; path: string }> {
+    return post(`/runners/${encodeURIComponent(runner)}/fs/mkdir`, { path });
   },
 };
 

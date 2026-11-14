@@ -3,9 +3,12 @@ import { parseJson, type ArtisanRepo } from "../db/repository.js";
 import type { DispatchClient } from "../dispatch-client.js";
 import type { ChatMessage, TworouteClient, ToolDef } from "../tworoute-client.js";
 import type { WorkspaceHub, ServerFrameBody } from "./hub.js";
+import { skillApplies } from "../skills.js";
 import { runCompaction } from "./compaction.js";
 import { subagentTools } from "./tools/subagents.js";
 import { askUserTool } from "./tools/ask-user.js";
+import { memoryTools } from "./tools/memory.js";
+import { memoryPrompt, sessionMemories } from "../memory.js";
 
 /** Invocation matrix — caller agent type (null = main session) → allowed target types. */
 const INVOKABLE_BY: Record<string, string[]> = {
@@ -51,7 +54,7 @@ async function assertJobOwned(ctx: ToolContext, jobId: string): Promise<{ id: st
   return job;
 }
 
-function fileTools(dispatch: DispatchClient): ToolSpec[] {
+export function fileTools(dispatch: DispatchClient): ToolSpec[] {
   const run = async (session: SessionRow, command: string, timeoutMs?: number) => {
     const res = await dispatch.exec(session.runner, command, session.directory, timeoutMs);
     if (res.error) throw new Error(res.error);
@@ -69,7 +72,17 @@ function fileTools(dispatch: DispatchClient): ToolSpec[] {
         const offset = Number(args.offset ?? 1);
         const limit = Number(args.limit ?? 2000);
         const res = await run(ctx.session, `awk 'NR>=${offset} && NR<${offset + limit} {print NR\"\\t\"$0}' ${shellQuote(String(args.path))}`);
-        return res.stdout || "(empty)";
+        if (!res.stdout) return "(empty)";
+        const lines = res.stdout.split("\n");
+        const shown = lines.length - (res.stdout.endsWith("\n") ? 1 : 0);
+        // Whole lines only, so the model can continue from an exact offset.
+        if (res.stdout.length > MAX_TOOL_RESULT_CHARS) {
+          let n = 0, used = 0;
+          while (n < lines.length && used + lines[n].length + 1 <= MAX_TOOL_RESULT_CHARS - 400) used += lines[n++].length + 1;
+          n = Math.max(n, 1);
+          return `${lines.slice(0, n).join("\n")}\n\n[truncated: showed lines ${offset}-${offset + n - 1} of ${shown} read; call read_file again with offset=${offset + n} to continue, or use a smaller limit]`;
+        }
+        return res.stdout;
       },
     },
     {
@@ -211,7 +224,7 @@ function fileTools(dispatch: DispatchClient): ToolSpec[] {
       description: "Reads a skill's full content by name. Skill names are listed in your system prompt.",
       parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
       async execute(args, ctx) {
-        const skills = await ctx.repo.listSkills(ctx.session.workspace_id, ctx.session.space_id);
+        const skills = (await ctx.repo.listSkills(ctx.session.workspace_id)).filter((s) => skillApplies(s, ctx.agent, ctx.session));
         const skill = skills.find((s) => s.name === String(args.name));
         if (!skill) return `no skill named "${args.name}"`;
         return skill.content;
@@ -229,6 +242,16 @@ export interface RunDeps {
   hub: WorkspaceHub;
   tworoute: TworouteClient;
   dispatch: DispatchClient;
+}
+
+/** Max chars of a single tool result sent to the model (~3k tokens). The full text is not kept. */
+const MAX_TOOL_RESULT_CHARS = 12_000;
+
+const MAX_PROJECT_FILE_CHARS = 20_000;
+
+function capToolResult(out: string): string {
+  if (out.length <= MAX_TOOL_RESULT_CHARS) return out;
+  return `${out.slice(0, MAX_TOOL_RESULT_CHARS)}\n\n[output truncated: ${out.length - MAX_TOOL_RESULT_CHARS} more characters omitted. Narrow the request (offset/limit, grep, head/tail) to see the rest.]`;
 }
 
 /** Sessions currently running — one run per session. */
@@ -272,8 +295,10 @@ export async function runAgentLoop(opts: {
       emit({ type: "run_start" });
     }
 
-    const thread = await deps.repo.currentThread(session.id);
-    if (!thread) throw new Error("no open thread");
+    const firstThread = await deps.repo.currentThread(session.id);
+    if (!firstThread) throw new Error("no open thread");
+    // Reassigned when auto-compaction opens a fresh thread mid-run.
+    let thread = firstThread;
 
     // Persist the user message (subagent runs replay their prompt as the system).
     if (opts.userMessage) {
@@ -284,6 +309,7 @@ export async function runAgentLoop(opts: {
     const allTools: ToolSpec[] = [
       ...fileTools(deps.dispatch),
       ...subagentTools(),
+      ...memoryTools(),
       askUserTool(),
     ];
     const allow = parseJson<string[]>(agent.tools_json, []);
@@ -311,6 +337,7 @@ export async function runAgentLoop(opts: {
       round += 1;
       emit({ type: "round_start", round });
 
+      const sentCount = messages.length;
       const toolDefs: ToolDef[] = visible.map((t) => ({
         type: "function",
         function: { name: t.name, description: t.description, parameters: t.parameters },
@@ -320,6 +347,28 @@ export async function runAgentLoop(opts: {
       let content = "";
       const toolCalls: Array<{ id: string; name: string; args: string }> = [];
       let usage: { prompt_tokens?: number; completion_tokens?: number; cached_tokens?: number } | undefined;
+      // Inspector: snapshot exactly what is sent (system prompt, history, tool schemas).
+      // Short-lived and separate from the transcript; failure never blocks the run.
+      const inspectId = await deps.repo.saveInspectRound({
+        sessionId: session.id, round,
+        messages: messages.map((m) => ({
+          role: m.role, content: m.content,
+          toolCallId: m.tool_call_id,
+          toolCalls: m.tool_calls,
+        })),
+        toolsJson: JSON.stringify(toolDefs),
+      }).catch(() => null);
+      // Inspector timing: when the model call began, first token, and end.
+      const modelStartedAt = Date.now();
+      let firstTokenAt: number | null = null;
+      const request = {
+        model,
+        effort: session.thinking_level ?? null,
+        maxTokens,
+        messageCount: messages.length,
+        contextChars: messages.reduce((n, m) => n + (m.content?.length ?? 0), 0),
+        toolNames: toolDefs.map((t) => t.function.name),
+      };
 
       try {
         for await (const chunk of deps.tworoute.streamChat({
@@ -333,6 +382,7 @@ export async function runAgentLoop(opts: {
           maxTokens,
         })) {
           const think = chunk.delta?.reasoning ?? chunk.delta?.reasoning_content;
+          if (firstTokenAt === null && (think || chunk.delta?.content || chunk.delta?.tool_calls?.length)) firstTokenAt = Date.now();
           if (think) {
             roundThinking += think;
             emit({ type: "thinking_delta", text: think });
@@ -356,6 +406,7 @@ export async function runAgentLoop(opts: {
                 inputTokens: roundUsage.input + (chunk.usage.prompt_tokens ?? 0),
                 outputTokens: roundUsage.output + (chunk.usage.completion_tokens ?? 0),
                 cachedTokens: roundUsage.cached + (chunk.usage.cached_tokens ?? 0),
+                contextTokens: chunk.usage.prompt_tokens ?? 0,
                 calls: round,
                 costUsd: null,
               },
@@ -387,10 +438,13 @@ export async function runAgentLoop(opts: {
           type: "usage",
           usage: {
             inputTokens: usageRow.input_tokens, outputTokens: usageRow.output_tokens,
-            cachedTokens: usageRow.cached_tokens, calls: usageRow.calls, costUsd: usageRow.cost_usd,
+            cachedTokens: usageRow.cached_tokens, contextTokens: usage?.prompt_tokens ?? 0, calls: usageRow.calls, costUsd: usageRow.cost_usd,
           },
         });
       }
+
+      const modelEndedAt = Date.now();
+      const timing = { modelStartedAt, firstTokenAt, modelEndedAt, request, inspectId };
 
       // Persist the assistant message (with tool calls).
       const assistantRow = await deps.repo.addMessage({
@@ -401,6 +455,7 @@ export async function runAgentLoop(opts: {
           thinking: roundThinking.trim() ? [{ text: roundThinking, durationMs: null }] : [],
           usage: usage ?? null,
           round,
+          ...timing,
         },
       });
       roundThinking = "";
@@ -411,7 +466,7 @@ export async function runAgentLoop(opts: {
         role: "assistant",
         content: content || null,
         tool_calls: toolCalls.length ? toolCalls.map((tc) => ({
-          id: tc.id, type: "function" as const, function: { name: tc.name, arguments: tc.args },
+          id: tc.id, type: "function" as const, function: { name: tc.name, arguments: tc.args || "{}" },
         })) : undefined,
       });
 
@@ -450,7 +505,7 @@ export async function runAgentLoop(opts: {
           const out = await tool.execute(args, toolCtx);
           toolResults.set(tc.id, { output: out.slice(0, 8_000), ok: true, durationMs: Date.now() - (toolStartedAt.get(tc.id) ?? Date.now()) });
           emit({ type: "tool_result", id: tc.id, name: tc.name, output: out.slice(0, 4_000), ok: true });
-          messages.push({ role: "tool", tool_call_id: tc.id, content: out.slice(0, 60_000) });
+          messages.push({ role: "tool", tool_call_id: tc.id, content: capToolResult(out) });
         } catch (err) {
           const out = `tool error: ${(err as Error).message}`;
           toolResults.set(tc.id, { output: out, ok: false, durationMs: Date.now() - (toolStartedAt.get(tc.id) ?? Date.now()) });
@@ -475,22 +530,38 @@ export async function runAgentLoop(opts: {
           thinking: (parseJson<{ thinking?: unknown[] }>(assistantRow.meta_json, {})).thinking ?? [],
           usage: usage ?? null,
           round,
+          ...timing,
         }).catch(() => {});
         toolResults.clear();
         toolStartedAt.clear();
       }
 
-      // Auto-compaction check.
-      const contextChars = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0);
-      const estTokens = Math.ceil(contextChars / 4);
-      const modelInfo = await deps.tworoute.getModel(model).catch(() => undefined);
+      // Auto-compaction check. Count what is really sent: message text, tool-call arguments and
+      // the tool schemas. Prefer the provider's own prompt_tokens for the request just made, plus
+      // an estimate for what was appended since (tool results).
+      const charsOf = (ms: ChatMessage[]) => ms.reduce((n, m) => n + (m.content?.length ?? 0) + (m.tool_calls ?? []).reduce((k, c) => k + c.function.name.length + c.function.arguments.length, 0), 0);
+      const schemaChars = JSON.stringify(toolDefs).length;
+      const estimated = Math.ceil((charsOf(messages) + schemaChars) / 4);
+      const measured = usage?.prompt_tokens ? usage.prompt_tokens + Math.ceil(charsOf(messages.slice(sentCount)) / 4) : 0;
+      const estTokens = Math.max(estimated, measured);
       const limit = modelInfo?.contextWindow ?? 128_000;
       if (estTokens > limit - 24_000) {
         emit({ type: "status", text: "compacting context…" });
         const summary = await runCompaction(deps, session, model, messages, ctrl.signal);
         emit({ type: "compaction_done", summary });
+        // Compaction closed this thread and opened a new one holding the summary: continue there,
+        // and re-state the request in flight (the new thread has no messages of its own yet).
+        const lastUser = [...messages].reverse().find((m) => m.role === "user" && m.content)?.content ?? null;
+        const next = await deps.repo.currentThread(session.id);
+        if (next) thread = next;
         messages.length = 0;
         messages.push(...(await buildContext(deps, session, agent, visible, thread)));
+        if (lastUser) {
+          messages.push({
+            role: "user",
+            content: `The conversation was compacted to free up context (summary above). Continue working on the user's most recent request:\n\n${lastUser}`,
+          });
+        }
       }
     }
 
@@ -504,17 +575,13 @@ export async function runAgentLoop(opts: {
 async function buildContext(deps: RunDeps, session: SessionRow, agent: AgentRow, tools: ToolSpec[], thread: { id: string; summary: string | null }): Promise<ChatMessage[]> {
   const out: ChatMessage[] = [];
 
-  const skills = await deps.repo.listSkills(session.workspace_id, session.space_id);
-  const agentSkillTags = parseJson<string[]>(agent.skill_tags_json, ["default"]);
-  const visibleSkills = skills.filter((s) => {
-    if (s.directory && s.directory !== session.directory) return false;
-    const tags = parseJson<string[]>(s.tags_json, ["default"]);
-    return tags.includes("default") || tags.some((t) => agentSkillTags.includes(t));
-  });
+  const visibleSkills = (await deps.repo.listSkills(session.workspace_id)).filter((s) => skillApplies(s, agent, session));
 
   const systemParts: string[] = [];
   systemParts.push("You are an expert coding agent operating on a remote machine via tools.");
   systemParts.push(`Working directory: ${session.directory} on runner ${session.runner}. Use relative paths from there.`);
+  const globalInstruction = (await deps.repo.getSetting(session.workspace_id, "global_instruction"))?.value.trim();
+  if (globalInstruction) systemParts.push(`\n## Global instructions\nThese apply to every agent in this workspace:\n${globalInstruction}`);
   if (agent.instruction) systemParts.push(`\n## Instructions\n${agent.instruction}`);
   if (session.adhoc_prompt) systemParts.push(`\n## Task\n${session.adhoc_prompt}`);
   if (session.parent_session_id) {
@@ -522,6 +589,9 @@ async function buildContext(deps: RunDeps, session: SessionRow, agent: AgentRow,
   }
   if (visibleSkills.length) {
     systemParts.push(`\n## Skills\n${visibleSkills.map((s) => `- ${s.name}: ${s.description}`).join("\n")}\n(read_skill <name> for the full content; follow it when relevant)`);
+  }
+  if (tools.some((t) => t.name === "get_memories")) {
+    systemParts.push(memoryPrompt(await sessionMemories(deps.repo, session.workspace_id, session.id)));
   }
   const plan = parseJson<unknown>(session.plan_json, null);
   if (plan) systemParts.push(`\n## Current plan\n${JSON.stringify(plan)}`);
@@ -536,18 +606,17 @@ async function buildContext(deps: RunDeps, session: SessionRow, agent: AgentRow,
       const res = await deps.dispatch.exec(session.runner, `cat ${shellQuote(rel)} 2>/dev/null`, session.directory, 10_000).catch(() => null);
       return res && res.exitCode === 0 ? res.stdout.trim() : null;
     };
-    if (ps.loadAgentsMd !== false) {
-      const md = await read("AGENTS.md");
-      if (md) projParts.push(`\n## AGENTS.md\n${md}`);
-    }
-    if (ps.loadAgents !== false) {
-      const agents = await read(".agents/AGENTS.md");
-      if (agents) projParts.push(`\n## .agents/AGENTS.md\n${agents}`);
-    }
-    if (ps.loadClaude) {
-      const claude = await read(".claude/CLAUDE.md");
-      if (claude) projParts.push(`\n## .claude/CLAUDE.md\n${claude}`);
-    }
+    // Identical content in several files (common: AGENTS.md symlinked/copied) is sent once.
+    const seen = new Set<string>();
+    const addProject = (name: string, text: string | null) => {
+      if (!text || seen.has(text)) return;
+      seen.add(text);
+      const capped = text.length > MAX_PROJECT_FILE_CHARS ? `${text.slice(0, MAX_PROJECT_FILE_CHARS)}\n[truncated: file is ${text.length} characters]` : text;
+      projParts.push(`\n## ${name}\n${capped}`);
+    };
+    if (ps.loadAgentsMd !== false) addProject("AGENTS.md", await read("AGENTS.md"));
+    if (ps.loadAgents !== false) addProject(".agents/AGENTS.md", await read(".agents/AGENTS.md"));
+    if (ps.loadClaude) addProject(".claude/CLAUDE.md", await read(".claude/CLAUDE.md"));
     if (projParts.length) systemParts.push(...projParts);
   }
 
@@ -566,19 +635,20 @@ async function buildContext(deps: RunDeps, session: SessionRow, agent: AgentRow,
   for (const row of rows) {
     if (row.role === "user") out.push({ role: "user", content: row.content });
     else if (row.role === "assistant") {
-      const meta = parseJson<{ toolCalls?: Array<{ id: string; name: string; args: string }> }>(row.meta_json, {});
+      const meta = parseJson<{ toolCalls?: Array<{ id: string; name: string; args: string; output?: string | null }> }>(row.meta_json, {});
       const calls = meta.toolCalls ?? [];
       out.push({
         role: "assistant",
         content: row.content || null,
-        tool_calls: calls.length ? calls.map((c) => ({ id: c.id, type: "function" as const, function: { name: c.name, arguments: c.args } })) : undefined,
+        tool_calls: calls.length ? calls.map((c) => ({ id: c.id, type: "function" as const, function: { name: c.name, arguments: c.args || "{}" } })) : undefined,
       });
+      // Every tool call needs a tool reply or providers reject / misread the history.
+      // Results live on the assistant row's meta (patched in once the tools finish).
+      for (const c of calls) {
+        out.push({ role: "tool", tool_call_id: c.id, content: c.output ?? "(no result recorded — the run was interrupted)" });
+      }
     }
-    // Tool results are folded below — see toolRows pass.
   }
-  // Tool results come as synthetic user rows? No: we persist them only in context, not
-  // to the db — the loop pushes them live. For rebuilds, replay is best-effort from
-  // assistant + user rows; tool rows are ephemeral per run.
   return out;
 }
 

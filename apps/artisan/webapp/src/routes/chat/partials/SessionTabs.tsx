@@ -1,7 +1,7 @@
-import { MessageSquare, Braces, Terminal, GitBranch, FileDiff, type LucideIcon } from "lucide-react";
+import { MessageSquare, Braces, Terminal, GitBranch, FileDiff, ScanSearch, type LucideIcon } from "lucide-react";
 import { cn } from "../../../lib/cn.js";
 
-export type SessionTabId = "chat" | "editor" | "terminal" | "changes" | "checkpoints";
+export type SessionTabId = "chat" | "editor" | "terminal" | "changes" | "checkpoints" | "inspector";
 
 export const SESSION_TABS: Array<{ id: SessionTabId; label: string; icon: LucideIcon }> = [
   { id: "chat", label: "Chat", icon: MessageSquare },
@@ -9,6 +9,7 @@ export const SESSION_TABS: Array<{ id: SessionTabId; label: string; icon: Lucide
   { id: "terminal", label: "Terminal", icon: Terminal },
   { id: "changes", label: "Changes", icon: FileDiff },
   { id: "checkpoints", label: "Checkpoints", icon: GitBranch },
+  { id: "inspector", label: "Inspector", icon: ScanSearch },
 ];
 
 /** Underline tab strip (legacy code-header tabs). */

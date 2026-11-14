@@ -1,33 +1,160 @@
-import { useEffect, useMemo, useState } from "react";
-import { FilePen, FilePlus, FileMinus, FileQuestion, Folder, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Columns2,
+  FileDiff as FileDiff_,
+  FileMinus,
+  FilePen,
+  FilePlus,
+  FileQuestion,
+  Folder,
+  GitBranch,
+  Rows2,
+  RefreshCw,
+  Search,
+  WrapText,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "../../lib/cn.js";
 import { useSessionSide, type GitInfo } from "./hooks/useSessionSide.js";
 import { apiFetch } from "../../lib/artisan-client.js";
+import { FileDiff, type DiffHunk } from "../../components/ui/file-diff.js";
+import { FileTree, type FileTreeItem } from "../../components/ui/file-tree.js";
 
-/** Parse a unified diff into per-line tokens for rendering. */
-function parseDiff(diff: string): Array<{ kind: "ctx" | "add" | "del" | "hunk" | "meta"; text: string }> {
-  const out: Array<{ kind: "ctx" | "add" | "del" | "hunk" | "meta"; text: string }> = [];
+type GitFile = NonNullable<GitInfo["files"]>[number];
+type Kind = "modified" | "added" | "deleted" | "renamed" | "untracked";
+
+const KIND: Record<Kind, { icon: LucideIcon; tone: string; label: string }> = {
+  modified: { icon: FilePen, tone: "text-warning", label: "Modified" },
+  added: { icon: FilePlus, tone: "text-success", label: "Added" },
+  deleted: { icon: FileMinus, tone: "text-destructive", label: "Deleted" },
+  renamed: { icon: FileDiff_, tone: "text-info", label: "Renamed" },
+  untracked: { icon: FileQuestion, tone: "text-ink-muted", label: "Untracked" },
+};
+const BY_LETTER: Record<string, Kind> = { M: "modified", A: "added", D: "deleted", R: "renamed", C: "added", "?": "untracked", U: "untracked" };
+const kindOf = (f: GitFile): Kind => BY_LETTER[f.status.slice(0, 1)] ?? "modified";
+
+// ---- diff parsing ---------------------------------------------------------------
+
+function parseHunks(diff: string): DiffHunk[] {
+  const hunks: DiffHunk[] = [];
+  let cur: DiffHunk | null = null;
+  let a = 0;
+  let b = 0;
+  let prevOldEnd = 1;
   for (const raw of diff.split("\n")) {
-    if (raw.startsWith("@@")) out.push({ kind: "hunk", text: raw });
-    else if (raw.startsWith("+") && !raw.startsWith("+++")) out.push({ kind: "add", text: raw });
-    else if (raw.startsWith("-") && !raw.startsWith("---")) out.push({ kind: "del", text: raw });
-    else if (raw.startsWith("diff ") || raw.startsWith("index ") || raw.startsWith("---") || raw.startsWith("+++")) out.push({ kind: "meta", text: raw });
-    else out.push({ kind: "ctx", text: raw });
+    const m = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
+    if (m) {
+      a = Number(m[1]);
+      b = Number(m[2]);
+      cur = { id: `h${hunks.length}`, header: raw, skipped: Math.max(0, a - prevOldEnd), lines: [] };
+      hunks.push(cur);
+    } else if (!cur) {
+      continue; // file headers (diff --git, index, ---, +++)
+    } else if (raw.startsWith("+")) cur.lines.push({ type: "addition", content: raw.slice(1), newNumber: b++ });
+    else if (raw.startsWith("-")) cur.lines.push({ type: "deletion", content: raw.slice(1), oldNumber: a++ });
+    else if (raw.startsWith("\\")) continue; // "\ No newline at end of file"
+    else {
+      cur.lines.push({ type: "context", content: raw.slice(1), oldNumber: a++, newNumber: b++ });
+    }
+    if (cur) prevOldEnd = a;
   }
+  // drop the trailing empty context line produced by the final newline
+  const last = hunks[hunks.length - 1];
+  const ll = last?.lines[last.lines.length - 1];
+  if (last && ll && ll.type === "context" && ll.content === "") last.lines.pop();
+  return hunks;
+}
+
+// ---- tree items -----------------------------------------------------------------
+
+interface Dir {
+  name: string;
+  dirs: Map<string, Dir>;
+  files: GitFile[];
+}
+
+/** Nested folder tree from flat paths; single-child folder chains are compacted ("src/routes/chat"). */
+function buildItems(files: GitFile[]): FileTreeItem[] {
+  const root: Dir = { name: "", dirs: new Map(), files: [] };
+  for (const f of files) {
+    const parts = f.path.split("/");
+    let d = root;
+    for (const part of parts.slice(0, -1)) {
+      let next = d.dirs.get(part);
+      if (!next) d.dirs.set(part, (next = { name: part, dirs: new Map(), files: [] }));
+      d = next;
+    }
+    d.files.push(f);
+  }
+  const out: FileTreeItem[] = [];
+  const emit = (d: Dir, prefix: string, depth: number) => {
+    for (const dir of [...d.dirs.values()].sort((a, b) => a.name.localeCompare(b.name))) {
+      let cur = dir;
+      let name = dir.name;
+      while (cur.files.length === 0 && cur.dirs.size === 1) {
+        cur = [...cur.dirs.values()][0];
+        name += `/${cur.name}`;
+      }
+      const path = prefix ? `${prefix}/${name}` : name;
+      out.push({ id: `dir:${path}`, name, kind: "folder", depth, expanded: true, title: path });
+      emit(cur, path, depth + 1);
+    }
+    for (const f of [...d.files].sort((a, b) => a.path.localeCompare(b.path))) {
+      const k = kindOf(f);
+      out.push({
+        id: f.path,
+        name: f.path.split("/").pop() ?? f.path,
+        kind: "file",
+        depth,
+        title: `${f.path} — ${KIND[k].label}`,
+        status: k === "added" || k === "untracked" ? "added" : k === "deleted" ? "deleted" : "modified",
+        additions: f.additions,
+        deletions: f.deletions,
+      });
+    }
+  };
+  emit(root, "", 0);
   return out;
 }
 
-function FileGlyph({ status }: { status: string }) {
-  const s = status.slice(0, 1);
-  if (s === "A" || s === "?") return <FilePlus className="size-3.5 shrink-0 text-success" />;
-  if (s === "D") return <FileMinus className="size-3.5 shrink-0 text-destructive" />;
-  if (s === "R") return <FileQuestion className="size-3.5 shrink-0 text-info" />;
-  return <FilePen className="size-3.5 shrink-0 text-warning" />;
+// ---- small pieces ----------------------------------------------------------------
+
+function Counts(props: { additions: number | null; deletions: number | null }) {
+  return (
+    <span className="flex shrink-0 gap-1.5 font-mono text-[10px] tabular-nums">
+      {props.additions ? <span className="text-success">+{props.additions}</span> : null}
+      {props.deletions ? <span className="text-destructive">−{props.deletions}</span> : null}
+    </span>
+  );
 }
 
+function IconButton(props: { label: string; onClick: () => void; active?: boolean; disabled?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      title={props.label}
+      aria-label={props.label}
+      aria-pressed={props.active}
+      disabled={props.disabled}
+      onClick={props.onClick}
+      className={cn(
+        "flex size-6 items-center justify-center rounded text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink disabled:opacity-40",
+        props.active && "bg-surface-muted text-ink",
+      )}
+    >
+      {props.children}
+    </button>
+  );
+}
+
+// ---- screen ----------------------------------------------------------------------
+
 /**
- * Changes view: git-status file tree on the left, the selected file's diff on
- * the right (like the legacy app's changes / code-commit surface).
+ * Changes view: filterable, folder-grouped file list (status, per-file +/−) on the
+ * left; the selected file's diff on the right with line numbers, unified/split
+ * modes, word-wrap, prev/next file (j/k) and copy-path.
  */
 export function ChangesScreen(props: { sessionId: string }) {
   const side = useSessionSide(props.sessionId);
@@ -36,21 +163,21 @@ export function ChangesScreen(props: { sessionId: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [diff, setDiff] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState("");
+  const [mode, setMode] = useState<"unified" | "split">(() => (localStorage.getItem("artisan.diff.mode") === "split" ? "split" : "unified"));
+  const [wrap, setWrap] = useState(false);
+  
+  const visible = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return q ? files.filter((f) => f.path.toLowerCase().includes(q)) : files;
+  }, [files, filter]);
 
-  // group files by directory
-  const groups = useMemo(() => {
-    const map = new Map<string, typeof files>();
-    for (const f of files) {
-      const dir = f.path.includes("/") ? f.path.slice(0, f.path.lastIndexOf("/")) : "";
-      const list = map.get(dir) ?? [];
-      list.push(f);
-      map.set(dir, list);
-    }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [files]);
+  const items = useMemo(() => buildItems(visible), [visible]);
 
+  // keep selection valid as the file list changes
   useEffect(() => {
-    if (!selected && files.length > 0) setSelected(files[0].path);
+    if (files.length === 0) setSelected(null);
+    else if (!selected || !files.some((f) => f.path === selected)) setSelected(files[0].path);
   }, [files, selected]);
 
   useEffect(() => {
@@ -59,9 +186,7 @@ export function ChangesScreen(props: { sessionId: string }) {
     setLoading(true);
     apiFetch(`/sessions/${props.sessionId}/diff?path=${encodeURIComponent(selected)}`)
       .then((r) => (r.ok ? r.json() : { diff: "" }))
-      .then((d: { diff?: string }) => {
-        if (!cancelled) setDiff(d.diff ?? "");
-      })
+      .then((d: { diff?: string }) => !cancelled && setDiff(d.diff ?? ""))
       .catch(() => !cancelled && setDiff(""))
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -69,82 +194,132 @@ export function ChangesScreen(props: { sessionId: string }) {
     };
   }, [selected, props.sessionId]);
 
-  const lines = useMemo(() => (diff ? parseDiff(diff) : []), [diff]);
+  const hunks = useMemo(() => (diff ? parseHunks(diff) : []), [diff]);
+  const current = files.find((f) => f.path === selected);
+  const idx = visible.findIndex((f) => f.path === selected);
+
+  const go = useCallback(
+    (delta: number) => {
+      if (visible.length === 0) return;
+      const next = visible[(Math.max(idx, 0) + delta + visible.length) % visible.length];
+      setSelected(next.path);
+    },
+    [visible, idx],
+  );
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.target as HTMLElement).tagName === "INPUT") return;
+    if (e.key === "j" || e.key === "ArrowDown") {
+      e.preventDefault();
+      go(1);
+    } else if (e.key === "k" || e.key === "ArrowUp") {
+      e.preventDefault();
+      go(-1);
+    }
+  };
+
+  const setViewMode = (m: "unified" | "split") => {
+    setMode(m);
+    localStorage.setItem("artisan.diff.mode", m);
+  };
+
+  const isRepo = !!git && git.git !== false;
 
   return (
-    <div className="flex h-full min-h-0">
-      {/* file tree */}
-      <div className="flex w-64 shrink-0 flex-col border-r border-outline">
+    <div className="flex h-full min-h-0 outline-none" tabIndex={0} onKeyDown={onKeyDown}>
+      {/* file list */}
+      <div className="flex w-72 shrink-0 flex-col border-r border-outline">
         <div className="flex shrink-0 items-center gap-2 border-b border-outline px-3 py-2">
-          <span className="text-[12px] font-medium">Changes</span>
-          {git?.git ? (
-            <span className="font-mono text-[10px] text-ink-muted">
-              {git.branch} {git.additions ? <span className="text-success">+{git.additions}</span> : null}
-              {git.deletions ? <span className="text-destructive"> −{git.deletions}</span> : null}
-            </span>
-          ) : null}
-          <button type="button" aria-label="Refresh" title="Refresh" className="ml-auto rounded p-1 text-ink-muted hover:bg-surface-muted hover:text-ink" onClick={() => side.refresh()}>
+          <span className="text-[13px] font-medium">{files.length > 0 ? `${files.length} changed ${files.length === 1 ? "file" : "files"}` : "Changes"}</span>
+          {isRepo && files.length > 0 ? <Counts additions={git!.additions ?? 0} deletions={git!.deletions ?? 0} /> : null}
+          <span className="ml-auto" />
+          <IconButton label="Refresh" onClick={() => side.refresh()}>
             <RefreshCw className="size-3.5" />
-          </button>
+          </IconButton>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto py-1">
-          {!git || git.git === false ? (
+        {isRepo ? (
+          <div className="flex shrink-0 items-center gap-1.5 border-b border-outline px-3 py-1.5 text-[11px] text-ink-muted">
+            <GitBranch className="size-3.5 shrink-0" />
+            <span className="truncate font-mono">{git!.branch}</span>
+            {git!.ahead != null ? (
+              <span className={cn("shrink-0 font-mono", git!.ahead > 0 ? "text-success" : "")}>
+                {git!.ahead > 0 ? `↑${git!.ahead}` : "0"}
+                {git!.behind ? ` ↓${git!.behind}` : ""}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        {files.length > 6 ? (
+          <div className="relative shrink-0 border-b border-outline px-2 py-1.5">
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-3 -translate-y-1/2 text-ink-muted" />
+            <input
+              value={filter}
+              placeholder="Filter files…"
+              className="h-6 w-full rounded bg-surface-muted pl-6 pr-2 text-[11px] outline-none"
+              onChange={(e) => setFilter(e.target.value)}
+            />
+          </div>
+        ) : null}
+        <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+          {!git ? (
+            <p className="px-3 py-4 text-[12px] text-ink-muted">Loading…</p>
+          ) : !isRepo ? (
             <p className="px-3 py-4 text-[12px] text-ink-muted">Not a git repository</p>
           ) : files.length === 0 ? (
             <p className="px-3 py-4 text-[12px] text-ink-muted">Working tree clean — no changes.</p>
+          ) : visible.length === 0 ? (
+            <p className="px-3 py-4 text-[12px] text-ink-muted">No files match “{filter}”.</p>
           ) : (
-            groups.map(([dir, dirFiles]) => (
-              <div key={dir || "."}>
-                {dir ? (
-                  <p className="flex items-center gap-1 px-2.5 py-0.5 font-mono text-[10px] text-ink-muted">
-                    <Folder className="size-3" /> {dir}
-                  </p>
-                ) : null}
-                {dirFiles.map((f) => (
-                  <button
-                    key={f.path}
-                    type="button"
-                    onClick={() => setSelected(f.path)}
-                    className={cn(
-                      "flex w-full items-center gap-1.5 px-2.5 py-1 text-left font-mono text-[11px]",
-                      f.path === selected ? "bg-surface-muted text-ink" : "text-ink-muted hover:bg-surface-muted/60 hover:text-ink",
-                    )}
-                    title={f.path}
-                  >
-                    <FileGlyph status={f.status} />
-                    <span className="truncate">{f.path.split("/").pop()}</span>
-                  </button>
-                ))}
-              </div>
-            ))
+            <FileTree bare title="Changed files" items={items} selectedId={selected ?? undefined} onSelect={setSelected} />
           )}
         </div>
       </div>
 
       {/* diff */}
       <div className="flex min-w-0 flex-1 flex-col bg-paper">
-        <div className="flex shrink-0 items-center gap-2 border-b border-outline px-3 py-2">
-          <span className="truncate font-mono text-[12px]">{selected ?? "Select a file"}</span>
-          {loading ? <RefreshCw className="size-3 animate-spin text-ink-muted" /> : null}
+        <div className="flex shrink-0 items-center gap-2 border-b border-outline px-3 py-1.5">
+          <span className="text-[12px] text-ink-muted">{current ? `${KIND[kindOf(current)].label} file` : "Select a file"}</span>
+          {loading ? <RefreshCw className="size-3 shrink-0 animate-spin text-ink-muted" /> : null}
+          <span className="ml-auto" />
+          <IconButton label={wrap ? "Disable word wrap" : "Word wrap"} active={wrap} onClick={() => setWrap((w) => !w)}>
+            <WrapText className="size-3.5" />
+          </IconButton>
+          <div className="flex items-center gap-0.5 rounded-md border border-outline p-0.5">
+            <IconButton label="Unified" active={mode === "unified"} onClick={() => setViewMode("unified")}>
+              <Rows2 className="size-3.5" />
+            </IconButton>
+            <IconButton label="Split" active={mode === "split"} onClick={() => setViewMode("split")}>
+              <Columns2 className="size-3.5" />
+            </IconButton>
+          </div>
+          <div className="flex items-center gap-0.5">
+            <IconButton label="Previous file (k)" onClick={() => go(-1)} disabled={visible.length < 2}>
+              <ChevronUp className="size-3.5" />
+            </IconButton>
+            <span className="min-w-8 text-center font-mono text-[10px] text-ink-muted">{idx >= 0 ? `${idx + 1}/${visible.length}` : "–"}</span>
+            <IconButton label="Next file (j)" onClick={() => go(1)} disabled={visible.length < 2}>
+              <ChevronDown className="size-3.5" />
+            </IconButton>
+          </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-[11px] leading-relaxed">
-          {!selected ? <p className="text-ink-muted">Pick a changed file to see its diff.</p> : null}
-          {selected && !loading && diff === "" ? <p className="text-ink-muted">No diff (untracked or unchanged content).</p> : null}
-          {lines.map((l, i) => (
-            <div
-              key={i}
-              className={cn(
-                "whitespace-pre-wrap break-all rounded-sm px-1",
-                l.kind === "add" && "bg-success/10 text-success",
-                l.kind === "del" && "bg-destructive/10 text-destructive line-through decoration-destructive/40",
-                l.kind === "hunk" && "bg-info/10 text-info",
-                l.kind === "meta" && "text-ink-muted/70",
-                l.kind === "ctx" && "text-ink-muted",
-              )}
-            >
-              {l.text || " "}
+        <div className="min-h-0 flex-1 overflow-auto p-3">
+          {!selected || !current ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-ink-muted">
+              <FileDiff_ className="size-8 opacity-40" />
+              <p className="text-[12px]">{files.length === 0 && isRepo ? "No changes to show" : "Pick a changed file to see its diff"}</p>
             </div>
-          ))}
+          ) : (
+            <FileDiff
+              key={current.path}
+              filename={current.path}
+              hunks={loading ? [] : hunks}
+              additions={current.additions ?? undefined}
+              deletions={current.deletions ?? undefined}
+              split={mode === "split"}
+              wrap={wrap}
+              emptyMessage={loading ? "Loading diff…" : kindOf(current) === "untracked" ? "New untracked file — no diff available." : "No textual diff (binary, empty or unchanged content)."}
+            />
+          )}
         </div>
       </div>
     </div>

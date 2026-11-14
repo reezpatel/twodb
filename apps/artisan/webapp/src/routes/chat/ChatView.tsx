@@ -9,12 +9,13 @@ import { ChatHeader, ChatHeaderTitle, ChatHeaderStatus, ChatHeaderActions, ChatH
 import { ChatFooter, ChatFooterNotice, ChatReconnecting, ChatStatusBar } from "./partials/ChatFooter.js";
 import { AttachmentChips, MentionPopup, QueuePills } from "./partials/ChatAttachments.js";
 import { useDirectoryFiles, useSkills, uploadAttachment } from "./hooks/useDirectoryFiles.js";
-import { SlashPopup, useSlashCommands } from "./partials/SlashCommands.js";
+import { BUILTIN_COMMANDS, filterCommands, SlashPopup, useSlashCommands } from "./partials/SlashCommands.js";
 import { useWorkspaceWs } from "../../lib/workspace-ws.js";
 import { SquareDashed } from "lucide-react";
-import { ChatComposer, ChatComposerInput, ChatComposerActions, ChatComposerSpacer, ChatComposerSend, ChatComposerStop } from "./partials/ChatComposer.js";
+import { ChatComposer, ChatComposerRichInput, type InlineToken, ChatComposerActions, ChatComposerSpacer, ChatComposerSend, ChatComposerStop } from "./partials/ChatComposer.js";
 import { ChatUsage, ChatUsageStat, ChatUsageContext, ChatUsageSpacer } from "./partials/ChatUsage.js";
 import { ChatMessage } from "./partials/ChatMessage.js";
+import { ChatProgress } from "./partials/ChatProgress.js";
 import { AskWidget } from "./partials/AskWidget.js";
 import { ModelPicker, type ModelProvider, type ModelEntry, type TraceNode } from "@twodb/blocks";
 import { apiFetch } from "../../lib/artisan-client.js";
@@ -29,19 +30,76 @@ function fmtTokens(n: number): string {
 /** Stable wrappers so the transcript map doesn't create new component types
  *  each render (which would remount blocks and drop their expansion state). */
 const AssistantMarkdown = (p: { text: string }) => (
-  <ChatMessage variant="assistant"><Markdown text={p.text} /></ChatMessage>
+  <ChatMessage variant="assistant">
+    <Markdown text={p.text} />
+  </ChatMessage>
 );
 const AssistantError = (p: { text: string }) => (
-  <ChatMessage variant="assistant"><p className="text-destructive">{p.text}</p></ChatMessage>
+  <ChatMessage variant="assistant">
+    <p className="text-destructive">{p.text}</p>
+  </ChatMessage>
 );
 const PersistedTrace = (p: { nodes: TraceNode[]; forceExpanded?: boolean }) => (
   <ThinkingState nodes={p.nodes} autoPlay={false} forceExpanded={p.forceExpanded} />
 );
 
+type ChatMsg = ReturnType<typeof useSessionChat>["messages"][number];
+type LiveTool = ReturnType<typeof useSessionChat>["toolEvents"][number];
+type ThreadItem =
+  | { key: string; kind: "user"; m: ChatMsg }
+  | { key: string; kind: "note"; m: ChatMsg }
+  | { key: string; kind: "assistant"; trace: TraceNode[]; text: string; error: boolean };
+
+/**
+ * Persisted rounds are one message each. A round with tool calls but no text
+ * would otherwise render its own "Worked" block; fold consecutive text-less
+ * assistant rounds into one trace, closed out by the next message that has text
+ * (or by a user/system message, or the end of the transcript).
+ */
+function groupThread(messages: ChatMsg[], live: Map<string, LiveTool>): ThreadItem[] {
+  const items: ThreadItem[] = [];
+  let pending: TraceNode[] = [];
+  let pendingKey = "";
+  const flush = () => {
+    if (pending.length > 0) items.push({ key: `trace-${pendingKey}`, kind: "assistant", trace: pending, text: "", error: false });
+    pending = [];
+    pendingKey = "";
+  };
+  for (const m of messages) {
+    if (m.role === "user") {
+      flush();
+      items.push({ key: m.id, kind: "user", m });
+    } else if (m.role === "compaction" || m.role === "system") {
+      flush();
+      items.push({ key: m.id, kind: "note", m });
+    } else {
+      const calls = (m.meta?.toolCalls as ToolCallMeta[] | undefined) ?? [];
+      const thinking = (m.meta?.thinking as ThinkingMeta[] | undefined) ?? [];
+      const nodes: TraceNode[] = [
+        ...thinking.filter((t) => t.text?.trim()).map((t, ti) => thinkingToNode({ ...t, id: `think-${m.id}-${ti}` })),
+        // A tool still running is not finished in the saved row yet — show its live state in place.
+        ...calls.map((tc) => {
+          const ev = tc.output == null && tc.ok == null ? live.get(tc.id) : undefined;
+          return ev ? liveToolToNode(ev) : toolToNode(tc);
+        }),
+      ];
+      if (!pendingKey) pendingKey = m.id;
+      pending.push(...nodes);
+      if (m.content) {
+        items.push({ key: m.id, kind: "assistant", trace: pending, text: m.content, error: !!m.meta?.error });
+        pending = [];
+        pendingKey = "";
+      }
+    }
+  }
+  flush();
+  return items;
+}
+
 /** Context chars → tokens estimate → % of the model's window. */
-function contextPercent(usage: { inputTokens: number } | null, contextWindow: number | null): number | null {
-  if (!usage || !contextWindow) return null;
-  return Math.min(100, Math.round((usage.inputTokens / contextWindow) * 100));
+function contextPercent(usage: { contextTokens?: number } | null, contextWindow: number | null): number | null {
+  if (!usage?.contextTokens || !contextWindow) return null;
+  return Math.min(100, Math.round((usage.contextTokens / contextWindow) * 100));
 }
 
 /**
@@ -55,7 +113,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
   const catalog = useCatalog();
   const [draft, setDraft] = useState("");
   const [tokPerSec, setTokPerSec] = useState<number | null>(null);
-  /** Cmd/Ctrl+0 → 1 = expand all, 0 = collapse all, null = manual per-block. */
+  /** Cmd/Ctrl+O → 1 = expand all, 0 = collapse all, null = manual per-block. */
   const [expandAll, setExpandAll] = useState<null | 1 | 0>(null);
 
   const liveDeltaRef = useRef({ count: 0, startedAt: 0 });
@@ -81,9 +139,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
     const m = /(?:^|\s)@(\S*)$/.exec(draft);
     return m ? m[1] : null;
   })();
-  const mentionMatches = mentionQuery === null
-    ? []
-    : files.filter((f) => f.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 8);
+  const mentionMatches = mentionQuery === null ? [] : files.filter((f) => f.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 8);
 
   // Trailing `/query` (null when not slashing) — but not when mentioning (@ wins).
   const slashQuery = (() => {
@@ -91,32 +147,37 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
     const m = /(?:^|\s)\/(\S*)$/.exec(draft);
     return m ? m[1] : null;
   })();
-  const slashMatches = slashQuery === null
-    ? []
-    : slashCommands.filter((c) => !slashQuery || c.label.toLowerCase().includes(slashQuery.toLowerCase()) || c.description.toLowerCase().includes(slashQuery.toLowerCase())).slice(0, 9);
+  const slashMatches =
+    slashQuery === null
+      ? []
+      : filterCommands(slashCommands, slashQuery);
 
+  // A picked mention stays in the text as `@path ` (highlighted) — the agent reads it from there.
   const pickMention = (index: number) => {
     const path = mentionMatches[index];
     if (!path) return;
-    setDraft((d) => d.replace(/(?:^|\s)@\S*$/, " ").replace(/\s+$/, " "));
-    setAttachments((prev) => (prev.some((a) => a.path === path) ? prev : [...prev, { path }]));
+    setDraft((d) => d.replace(/(^|\s)@\S*$/, `$1@${path} `));
     setMentionIndex(0);
   };
 
+  // A picked command / skill stays in the text as `/name ` (highlighted); it takes effect on send.
   const pickSlash = (index: number) => {
     const item = slashMatches[index];
     if (!item) return;
-    setDraft((d) => d.replace(/(?:^|\s)\/\S*$/, " ").replace(/\s+$/, " "));
+    setDraft((d) => d.replace(/(^|\s)\/\S*$/, `$1/${item.label} `));
     setSlashIndex(0);
-    if (item.id === "cmd:compact") void chat.compact();
-    else if (item.id === "cmd:clear") void chat.clearThread();
-    else if (item.id === "cmd:new") void chat.newThread();
-    else if (item.content) {
-      // skill: attach as a fenced block on send
-      setAttachments((prev) => [...prev, { path: `skill:${item.label}`, uploaded: true, name: `${item.label} (skill)` }]);
-      setSkillContent((prev) => ({ ...prev, [`skill:${item.label}`]: item.content ?? "" }));
-    }
   };
+
+  const commandNames = useMemo(() => new Set(BUILTIN_COMMANDS.map((c) => c.label)), []);
+  const skillByName = useMemo(() => new Map(skills.map((s) => [s.name, s])), [skills]);
+  const fileSet = useMemo(() => new Set(files), [files]);
+  const tokens = useMemo<InlineToken[]>(
+    () => [
+      { test: (t) => t.startsWith("@") && fileSet.has(t.slice(1)), className: "bg-surface-muted ring-1 ring-outline" },
+      { test: (t) => t.startsWith("/") && (commandNames.has(t.slice(1)) || skillByName.has(t.slice(1))), className: "bg-primary/15 ring-1 ring-primary/30" },
+    ],
+    [fileSet, commandNames, skillByName],
+  );
 
   const onPickFiles = async (list: FileList | null) => {
     if (!list || list.length === 0) return;
@@ -141,7 +202,21 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
       pickSlash(slashIndex);
       return;
     }
-    const text = draft.trim();
+    let text = draft.trim();
+    // Built-in commands run instead of sending: `/compact`, `/clear`, `/new`.
+    const cmd = /^\/(compact|clear|new)(?:\s|$)/.exec(text);
+    if (cmd) {
+      setDraft("");
+      if (cmd[1] === "compact") void chat.compact();
+      else if (cmd[1] === "clear") void chat.clearThread();
+      else void chat.newThread();
+      return;
+    }
+    // Skill tokens expand to <skill> blocks in the message, like the legacy composer.
+    text = text.replace(/(^|\s)\/([\w][\w.-]*)/g, (m, lead: string, name: string) => {
+      const skill = skillByName.get(name);
+      return skill?.content ? `${lead}<skill name="${name}">\n${skill.content.slice(0, 20_000)}\n</skill>` : m;
+    });
     if (!text && attachments.length === 0) return;
     // Resolve attachment bodies: uploaded files read from disk, skills from cached content.
     void (async () => {
@@ -172,6 +247,16 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
 
   const plan = detail?.plan ?? null;
 
+  // Tool calls already saved on a message render there (in order, with that round);
+  // the live block only shows calls the transcript hasn't caught up with yet.
+  const liveById = useMemo(() => new Map(chat.toolEvents.map((t) => [t.id, t])), [chat.toolEvents]);
+  const savedToolIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const m of chat.messages) for (const tc of (m.meta?.toolCalls as ToolCallMeta[] | undefined) ?? []) ids.add(tc.id);
+    return ids;
+  }, [chat.messages]);
+  const pendingTools = useMemo(() => chat.toolEvents.filter((t) => !savedToolIds.has(t.id)), [chat.toolEvents, savedToolIds]);
+
   // Group models into providers for the picker.
   const providers = useMemo<ModelProvider[]>(() => {
     const byConn = new Map<string, ModelEntry[]>();
@@ -194,7 +279,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
   const ctxPct = contextPercent(chat.usage, modelInfo?.contextWindow ?? null);
   const cacheHit = chat.usage && chat.usage.inputTokens > 0 ? `${Math.round((chat.usage.cachedTokens / chat.usage.inputTokens) * 100)}%` : "—";
 
-  // App-wide Cmd/Ctrl+0 (wired in App.tsx) → toggle expand/collapse all thinking/tool blocks.
+  // App-wide Cmd/Ctrl+O (wired in App.tsx) → toggle expand/collapse all thinking/tool blocks.
   useEffect(() => {
     const onToggle = () => setExpandAll((prev) => (prev === 1 ? 0 : 1));
     window.addEventListener("artisan:toggle-expand", onToggle);
@@ -222,74 +307,50 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
   return (
     <ChatShell>
       {props.noHeader ? null : (
-      <ChatHeader>
-        <ChatHeaderTitle
-          title={detail?.title ?? props.sessionId.slice(-8)}
-          sub={detail ? `${detail.runner}:${detail.directory}` : undefined}
-        />
-        {chat.running ? <span className="ml-2 flex items-center gap-1.5 text-xs text-ink-muted"><span className="size-1.5 animate-pulse rounded-full bg-success" />running</span> : null}
-        <ChatHeaderActions>
-          <ChatHeaderAction icon={<Sparkles className="size-3.5" />} label="New thread (/new)" onClick={() => void chat.newThread()} />
-          <ChatHeaderAction icon={<Scissors className="size-3.5" />} label="Compact context (/compact)" onClick={() => void chat.compact()} />
-        </ChatHeaderActions>
-      </ChatHeader>
+        <ChatHeader>
+          <ChatHeaderTitle title={detail?.title ?? props.sessionId.slice(-8)} sub={detail ? `${detail.runner}:${detail.directory}` : undefined} />
+          {chat.running ? (
+            <span className="ml-2 flex items-center gap-1.5 text-xs text-ink-muted">
+              <span className="size-1.5 animate-pulse rounded-full bg-success" />
+              running
+            </span>
+          ) : null}
+          <ChatHeaderActions>
+            <ChatHeaderAction icon={<Sparkles className="size-3.5" />} label="New thread (/new)" onClick={() => void chat.newThread()} />
+            <ChatHeaderAction icon={<Scissors className="size-3.5" />} label="Compact context (/compact)" onClick={() => void chat.compact()} />
+          </ChatHeaderActions>
+        </ChatHeader>
       )}
 
-      {plan && plan.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-outline bg-surface-muted/50 px-4 py-1.5">
-          {plan.map((step, i) => (
-            <span
-              key={i}
-              className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
-                step.status === "done" ? "text-ink-muted line-through" : step.status === "in_progress" ? "bg-info/15 text-ink" : "text-ink-muted"
-              }`}
-            >
-              {step.status === "done" ? "✓" : step.status === "in_progress" ? "▸" : "·"} {step.description}
-            </span>
-          ))}
-        </div>
-      ) : null}
-
       <ChatThread className="overflow-y-auto" ref={chat.scroller}>
-        {chat.messages.map((m) => (
-          <ChatThreadRow key={m.id}>
-            {m.role === "user" ? (
-              <ChatMessage variant="user">{m.content}</ChatMessage>
-            ) : m.role === "compaction" || m.role === "system" ? (
-              <ChatThreadHeader>{m.content.slice(0, 240)}</ChatThreadHeader>
+        {groupThread(chat.messages, liveById).map((it) => (
+          <ChatThreadRow key={it.key}>
+            {it.kind === "user" ? (
+              <ChatMessage variant="user">
+                <Markdown text={it.m.content} />
+              </ChatMessage>
+            ) : it.kind === "note" ? (
+              <ChatThreadHeader>{it.m.content.slice(0, 240)}</ChatThreadHeader>
             ) : (
               <>
-                {(() => {
-                  const calls = (m.meta?.toolCalls as ToolCallMeta[] | undefined) ?? [];
-                  const thinking = (m.meta?.thinking as ThinkingMeta[] | undefined) ?? [];
-                  const trace: TraceNode[] = [
-                    ...thinking.filter((t) => t.text?.trim()).map((t, ti) => thinkingToNode({ ...t, id: `think-${m.id}-${ti}` })),
-                    ...calls.map((tc) => toolToNode(tc)),
-                  ];
-                  if (trace.length === 0) return null;
-                  return <PersistedTrace nodes={trace} forceExpanded={expandAll === null ? undefined : expandAll === 1} />;
-                })()}
-                {m.content ? (
-                  m.meta?.error ? <AssistantError text={m.content} /> : <AssistantMarkdown text={m.content} />
-                ) : null}
+                {it.trace.length > 0 ? <PersistedTrace nodes={it.trace} forceExpanded={expandAll === null ? undefined : expandAll === 1} /> : null}
+                {it.text ? it.error ? <AssistantError text={it.text} /> : <AssistantMarkdown text={it.text} /> : null}
               </>
             )}
           </ChatThreadRow>
         ))}
 
         {/* live run: thinking, tools, streaming text */}
-        {chat.running || chat.toolEvents.length > 0 || chat.streamText ? (
+        {chat.running || chat.compacting || pendingTools.length > 0 || chat.streamText ? (
           <ChatThreadRow>
-            {chat.thinking || chat.toolEvents.length > 0 ? (
+            {chat.compacting ? <ChatProgress>compacting context…</ChatProgress> : null}
+            {chat.thinking || pendingTools.length > 0 ? (
               <ThinkingState
                 autoPlay={false}
                 defaultExpanded
                 forceExpanded={expandAll === null ? undefined : expandAll === 1}
-                workingLabel={chat.toolEvents.length > 0 ? "Working…" : "Thinking…"}
-                nodes={[
-                  ...(chat.thinking ? [thinkingToNode({ text: chat.thinking }, true)] : []),
-                  ...chat.toolEvents.map((t) => liveToolToNode(t)),
-                ]}
+                workingLabel={pendingTools.length > 0 ? "Working…" : "Thinking…"}
+                nodes={[...(chat.thinking ? [thinkingToNode({ text: chat.thinking }, true)] : []), ...pendingTools.map((t) => liveToolToNode(t))]}
               />
             ) : null}
             {chat.streamText ? (
@@ -298,7 +359,8 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
                 <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-ink align-middle" />
               </ChatMessage>
             ) : null}
-            {chat.status ? <p className="px-1 text-[11px] text-ink-muted">{chat.status}</p> : null}
+            {chat.running && !chat.compacting && !chat.streamText ? <ChatProgress look={{ state: "reasoning" }}>thinking</ChatProgress> : null}
+            {chat.status && !chat.compacting ? <ChatProgress look={{}}>{chat.status}</ChatProgress> : null}
           </ChatThreadRow>
         ) : null}
       </ChatThread>
@@ -308,7 +370,11 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
         {!connected ? <ChatReconnecting /> : null}
         <QueuePills items={chat.queue} onRemove={chat.removeQueued} onSendNow={chat.sendQueuedNow} />
         {chat.ask ? (
-          <AskWidget questions={chat.ask.questions} onAnswer={(answers) => chat.answer(chat.ask!.askId, answers)} onCancel={() => chat.cancelAsk(chat.ask!.askId)} />
+          <AskWidget
+            questions={chat.ask.questions}
+            onAnswer={(answers) => chat.answer(chat.ask!.askId, answers)}
+            onCancel={() => chat.cancelAsk(chat.ask!.askId)}
+          />
         ) : (
           <ChatComposer busy={chat.running}>
             <MentionPopup
@@ -326,7 +392,8 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
               onHover={setSlashIndex}
             />
             <AttachmentChips items={attachments} onRemove={(p) => setAttachments((prev) => prev.filter((x) => x.path !== p))} />
-            <ChatComposerInput
+            <ChatComposerRichInput
+              tokens={tokens}
               value={draft}
               placeholder={detail ? `Message ${detail.title}…  (@ file, / command)` : "Message…"}
               onChange={(e) => {
@@ -373,13 +440,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
               }}
             />
             <ChatComposerActions>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                hidden
-                onChange={(e) => void onPickFiles(e.target.files)}
-              />
+              <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => void onPickFiles(e.target.files)} />
               <button
                 type="button"
                 data-slot="chat-attach"
@@ -405,10 +466,13 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
             <ChatUsageStat title="Cache hit — cached input / total input">⚡ {cacheHit}</ChatUsageStat>
             <ChatUsageContext
               percent={ctxPct}
-              label={chat.usage ? `${fmtTokens(chat.usage.inputTokens)}${modelInfo?.contextWindow ? ` / ${fmtTokens(modelInfo.contextWindow)}` : ""}` : "context —"}
-              title="Context consumed vs the model's context window"
+              label={
+                chat.usage?.contextTokens ? `${fmtTokens(chat.usage.contextTokens)}${modelInfo?.contextWindow ? ` / ${fmtTokens(modelInfo.contextWindow)}` : ""}` : "context —"
+              }
+              title="Size of the latest request vs the model's context window"
               breakdown={[
-                { label: "input", value: fmtTokens(chat.usage?.inputTokens ?? 0) },
+                { label: "in context now", value: fmtTokens(chat.usage?.contextTokens ?? 0) },
+                { label: "input (total)", value: fmtTokens(chat.usage?.inputTokens ?? 0) },
                 { label: "cached", value: fmtTokens(chat.usage?.cachedTokens ?? 0) },
                 { label: "output", value: fmtTokens(chat.usage?.outputTokens ?? 0) },
                 { label: "model calls", value: String(chat.usage?.calls ?? 0) },

@@ -1,90 +1,63 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label } from "@twodb/blocks";
-import { artisanClient, type SkillInfo } from "../../../lib/artisan-client.js";
+import { artisanClient, type AgentInfo, type SkillInfo, type SkillScope, type SpaceInfo } from "../../../lib/artisan-client.js";
+import { AvailabilityPicker, DEFAULT_SCOPE, scopeValid } from "./AvailabilityPicker.js";
 
-export interface SkillDialogProps {
-  skill: SkillInfo | null;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-}
-
-/** Create/edit a skill: name, description, content, directory pin, tags. */
-export function SkillDialog(props: SkillDialogProps) {
-  const editing = props.skill;
-  const [name, setName] = useState(editing?.name ?? "");
-  const [description, setDescription] = useState(editing?.description ?? "");
-  const [content, setContent] = useState((editing as SkillInfo & { content?: string })?.content ?? "");
-  const [directory, setDirectory] = useState(editing?.directory ?? "");
-  const [tags, setTags] = useState((editing?.tags ?? ["default"]).join(", "));
-  const [error, setError] = useState<string | null>(null);
+/** New skill: name, description and where it is available. The content is written on the skill's page. */
+export function SkillDialog({ agents, onClose, onCreated }: { agents: AgentInfo[]; onClose: () => void; onCreated: (skill: SkillInfo) => Promise<void> }) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [scope, setScope] = useState<SkillScope>(DEFAULT_SCOPE);
+  const [spaces, setSpaces] = useState<SpaceInfo[]>([]);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const save = async () => {
-    setError(null);
-    if (!name.trim() || !content.trim()) {
-      setError("name and content are required");
-      return;
-    }
+  useEffect(() => {
+    artisanClient.listSpaces().then(setSpaces).catch(() => setSpaces([]));
+  }, []);
+
+  const valid = Boolean(name.trim()) && scopeValid(scope);
+  const create = async () => {
+    if (!valid || busy) return;
     setBusy(true);
+    setError(null);
     try {
-      const body = {
-        name: name.trim(),
-        description: description.trim(),
-        content,
-        directory: directory.trim() || null,
-        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-      };
-      if (editing) await artisanClient.updateSkill(editing.id, body);
-      else await artisanClient.createSkill(body);
-      await props.onSaved();
+      const skill = await artisanClient.createSkill({ name: name.trim(), description: description.trim(), scope });
+      await onCreated(skill);
     } catch (e) {
       setError((e as Error).message);
-    } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) props.onClose(); }}>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>{editing ? `Edit ${editing.name}` : "New skill"}</DialogTitle>
+          <DialogTitle>New skill</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Name (what the agent calls)</Label>
-              <Input value={name} placeholder="release-checklist" className="font-mono text-[12px]" onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Directory pin (empty = whole space)</Label>
-              <Input value={directory} placeholder="/srv/api" className="font-mono text-[12px]" onChange={(e) => setDirectory(e.target.value)} />
-            </div>
+        <div className="flex flex-col gap-4 py-1">
+          <div className="flex flex-col gap-1.5">
+            <Label>Name</Label>
+            <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="release-checklist" onKeyDown={(e) => { if (e.key === "Enter") void create(); }} />
+            <p className="text-[11px] text-ink-muted">Agents load the skill by this name (read_skill).</p>
           </div>
-          <div className="space-y-1.5">
-            <Label>Description (one line, shown in the system prompt)</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} />
+          <div className="flex flex-col gap-1.5">
+            <Label>Description <span className="font-normal text-ink-muted">(listed in the agent's prompt — say when to use it)</span></Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Steps to cut and verify a release" />
           </div>
-          <div className="space-y-1.5">
-            <Label>Tags (comma-separated; "default" = always visible)</Label>
-            <Input value={tags} onChange={(e) => setTags(e.target.value)} className="font-mono text-[12px]" />
+          <div className="flex flex-col gap-1.5">
+            <Label>Available to</Label>
+            <AvailabilityPicker scope={scope} onChange={setScope} agents={agents} spaces={spaces} />
           </div>
-          <div className="space-y-1.5">
-            <Label>Content (the full skill, loaded by read_skill)</Label>
-            <textarea
-              value={content}
-              rows={10}
-              className="w-full resize-none rounded-md border border-outline bg-paper px-2.5 py-2 font-mono text-[12px] outline-none"
-              onChange={(e) => setContent(e.target.value)}
-            />
-          </div>
-          {error ? <p className="text-[12px] text-destructive">{error}</p> : null}
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={props.onClose}>Cancel</Button>
-            <Button size="sm" variant="primary" disabled={busy} onClick={() => void save()}>
-              {busy ? "Saving…" : editing ? "Save" : "Create"}
-            </Button>
-          </div>
+        </div>
+        {error ? <p className="text-[12px] text-destructive">{error}</p> : null}
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => void create()} disabled={!valid || busy}>
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : null} Create skill
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** A drag-resizable panel width, clamped to [min,max], persisted to localStorage. */
-export function useResizableWidth(key: string, initial: number, min = 160, max = 560) {
+export function useResizableWidth(key: string, initial: number, min = 160, max: number | (() => number) = 560) {
+  const resolveMax = () => (typeof max === "function" ? max() : max);
   const [width, setWidth] = useState<number>(() => {
     try {
       const raw = localStorage.getItem(key);
       if (raw) {
         const n = Number(raw);
-        if (Number.isFinite(n) && n >= min && n <= max) return n;
+        if (Number.isFinite(n) && n >= min && n <= (typeof max === "function" ? Infinity : max)) return n;
       }
     } catch {
       /* ignore */
@@ -33,7 +34,7 @@ export function useResizableWidth(key: string, initial: number, min = 160, max =
       const move = (ev: PointerEvent) => {
         if (!dragging.current) return;
         const next = startW + dir * (ev.clientX - startX);
-        setWidth(Math.min(max, Math.max(min, next)));
+        setWidth(Math.min(resolveMax(), Math.max(min, next)));
       };
       const up = () => {
         dragging.current = false;
@@ -47,6 +48,7 @@ export function useResizableWidth(key: string, initial: number, min = 160, max =
       document.body.style.cursor = "col-resize";
       document.body.style.userSelect = "none";
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [key, width, min, max],
   );
 

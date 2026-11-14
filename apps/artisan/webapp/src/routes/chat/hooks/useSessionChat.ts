@@ -18,6 +18,7 @@ export function useSessionChat(sessionId: string) {
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [compacting, setCompacting] = useState(false);
   const [queue, setQueue] = useState<Array<{ id: string; content: string }>>([]);
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -110,9 +111,15 @@ export function useSessionChat(sessionId: string) {
           setToolEvents((prev) => prev.map((t) => (t.id === frame.id ? { ...t, output: String(frame.output ?? ""), ok: Boolean(frame.ok) } : t)));
           break;
         case "message_done":
-          setStreamText("");
-          setThinking("");
-          void refresh();
+          // Swap the streamed text for the saved message in one render, so the
+          // text never disappears (or shows twice) while the transcript reloads.
+          void artisanClient.getSession(sessionId).then((d) => {
+            setDetail(d);
+            setUsage(d.usage);
+            setRunning(d.running);
+            setStreamText("");
+            setThinking("");
+          }).catch(() => { setStreamText(""); setThinking(""); });
           break;
         case "ask_user":
           setAsk({ askId: String(frame.askId), questions: (frame.questions as NonNullable<typeof ask>["questions"]) ?? [] });
@@ -124,7 +131,8 @@ export function useSessionChat(sessionId: string) {
           setUsage(frame.usage as UsageInfo);
           break;
         case "status":
-          setStatus(String(frame.text ?? ""));
+          if (/compacting/i.test(String(frame.text ?? ""))) setCompacting(true);
+          else setStatus(String(frame.text ?? ""));
           break;
         case "session_renamed":
           setDetail((d) => (d ? { ...d, title: String(frame.title) } : d));
@@ -133,17 +141,25 @@ export function useSessionChat(sessionId: string) {
           setDetail((d) => (d ? { ...d, plan: (frame.plan as SessionDetail["plan"]) ?? null } : d));
           break;
         case "compaction_done":
-          setStatus(`context summarized (${String(frame.summary ?? "").length} chars)`);
+          setCompacting(false);
+          setStatus(null);
           void refresh();
           break;
         case "error":
           setError(String(frame.message ?? "error"));
           break;
         case "done":
-          setRunning(false);
+          setCompacting(false);
           setStatus(null);
-          void refresh();
-          flushQueue();
+          // Saved messages now carry every tool call — drop the live copies once loaded.
+          void artisanClient.getSession(sessionId).then((d) => {
+            setDetail(d);
+            setUsage(d.usage);
+            setRunning(false);
+            setToolEvents([]);
+            setStreamText("");
+            setThinking("");
+          }).catch(() => { setRunning(false); setToolEvents([]); }).finally(flushQueue);
           break;
       }
     });
@@ -175,7 +191,12 @@ export function useSessionChat(sessionId: string) {
   }, [sessionId, refresh]);
 
   const compact = useCallback(async () => {
-    await artisanClient.compact(sessionId);
+    setCompacting(true);
+    try {
+      await artisanClient.compact(sessionId);
+    } finally {
+      setCompacting(false);
+    }
     void refresh();
   }, [sessionId, refresh]);
 
@@ -184,7 +205,7 @@ export function useSessionChat(sessionId: string) {
   }, [sessionId]);
 
   return {
-    detail, error, running, status, streamText, thinking, toolEvents, ask, usage,
+    detail, error, running, compacting, status, streamText, thinking, toolEvents, ask, usage,
     queue,
     messages: detail?.messages ?? [] as MessageInfo[],
     scroller, send, removeQueued, sendQueuedNow, answer, cancelAsk, newThread, clearThread, compact, abort, refresh,

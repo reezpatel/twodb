@@ -265,16 +265,13 @@ func (r *runner) doProxyWsOpen(f frame) {
 	wsTunnels[callID] = conn
 	wsTunnelsMu.Unlock()
 	_ = r.send(frame{"type": "proxyWsOpenResult", "callId": callID, "ok": true})
-	println("[proxyws] open ok", callID)
 
 	go func() {
 		for {
 			mt, data, err := conn.ReadMessage()
 			if err != nil {
-				println("[proxyws] cs read err", callID, err.Error())
 				break
 			}
-			println("[proxyws] cs->relay", callID, len(data), "bytes")
 			if mt == websocket.BinaryMessage {
 				_ = r.send(frame{"type": "proxyWsData", "callId": callID, "dataBase64": b64Encode(data)})
 			} else {
@@ -298,10 +295,8 @@ func (r *runner) doProxyWsWrite(f frame) {
 	}
 	b, err := b64Decode(f.str("dataBase64"))
 	if err != nil || len(b) == 0 {
-		println("[proxyws] write decode fail", callID)
 		return
 	}
-	println("[proxyws] write", callID, len(b), "bytes")
 	_ = conn.WriteMessage(websocket.BinaryMessage, b)
 }
 

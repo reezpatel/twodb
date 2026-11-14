@@ -1,7 +1,10 @@
 import type { Kysely } from "kysely";
 import { sql } from "kysely";
+import { createHash } from "node:crypto";
 import { ulid } from "ulid";
-import type { AgentRow, ArtisanDb, CheckpointRow, DirectoryRow, MessageRow, SessionRow, SessionUsageRow, SkillRow, ThreadRow } from "./schema.js";
+import type { SkillScope } from "../skills.js";
+import type { McpScope } from "../mcp.js";
+import type { AgentRow, ArtisanDb, CheckpointRow, DirectoryRow, McpServerRow, MemoryRow, MessageRow, SessionRow, SessionUsageRow, SkillRow, ThreadRow } from "./schema.js";
 
 export function newId(): string {
   return ulid().toLowerCase();
@@ -20,12 +23,15 @@ export interface ArtisanRepo {
     directoryId?: string | null;
   }): Promise<SessionRow>;
   getSession(workspaceId: string, id: string): Promise<SessionRow | undefined>;
-  listSessions(workspaceId: string, filter?: { type?: string; runner?: string; directory?: string; spaceId?: string; parentSessionId?: string }): Promise<SessionRow[]>;
+  listSessions(workspaceId: string, filter?: { type?: string; runner?: string; directory?: string; spaceId?: string; parentSessionId?: string; agentId?: string; archived?: "include" | "only" }): Promise<SessionRow[]>;
   /** Unfiltered (every type) — admin/parent views. */
   listSessionsAll(workspaceId: string, parentSessionId?: string): Promise<SessionRow[]>;
   touchSession(id: string): Promise<void>;
   renameSession(workspaceId: string, id: string, title: string): Promise<void>;
   setSessionThinkingLevel(workspaceId: string, id: string, level: string | null): Promise<void>;
+  setSessionArchived(workspaceId: string, id: string, archived: boolean): Promise<void>;
+  /** Deletes the session with its threads, messages, usage and checkpoints. */
+  deleteSession(workspaceId: string, id: string): Promise<boolean>;
   setSessionModel(workspaceId: string, id: string, model: string): Promise<void>;
   setSessionPlan(id: string, plan: Array<{ description: string; status: string }> | null): Promise<void>;
 
@@ -45,28 +51,31 @@ export interface ArtisanRepo {
 
   // agents
   createAgent(input: {
-    workspaceId: string; spaceId: string; type: string; name: string; description?: string;
+    workspaceId: string; spaceId: string; spaceIds?: string[]; type: string; name: string; description?: string;
     instruction: string; model?: string | null; tools?: string[]; skillTags?: string[];
     tags?: string[]; runner?: string | null; directory?: string | null;
   }): Promise<AgentRow>;
   getAgent(workspaceId: string, id: string): Promise<AgentRow | undefined>;
+  /** Agents visible in a space (an agent can belong to several). */
   listAgents(workspaceId: string, spaceId?: string): Promise<AgentRow[]>;
   /** Directory agent config for (runner, directory) — auto-created on first use. */
   getOrCreateDirectoryAgent(workspaceId: string, spaceId: string, runner: string, directory: string): Promise<AgentRow>;
   updateAgent(workspaceId: string, id: string, patch: Partial<{
-    name: string; description: string; instruction: string; model: string | null;
+    name: string; spaceIds: string[]; description: string; instruction: string; model: string | null;
     tools: string[]; skillTags: string[]; tags: string[]; runner: string | null; directory: string | null;
   }>): Promise<AgentRow | undefined>;
   deleteAgent(workspaceId: string, id: string): Promise<boolean>;
 
   // skills
   createSkill(input: {
-    workspaceId: string; spaceId: string; directory?: string | null; name: string;
-    description: string; content: string; tags?: string[];
+    workspaceId: string; name: string;
+    description: string; content: string; scope: SkillScope;
   }): Promise<SkillRow>;
-  listSkills(workspaceId: string, spaceId: string): Promise<SkillRow[]>;
+  /** Every skill in the workspace — availability is applied by the caller (skills.ts). */
+  listSkills(workspaceId: string): Promise<SkillRow[]>;
+  getSkill(workspaceId: string, id: string): Promise<SkillRow | undefined>;
   updateSkill(workspaceId: string, id: string, patch: Partial<{
-    name: string; description: string; content: string; directory: string | null; tags: string[];
+    name: string; description: string; content: string; scope: SkillScope;
   }>): Promise<SkillRow | undefined>;
   deleteSkill(workspaceId: string, id: string): Promise<boolean>;
 
@@ -83,6 +92,45 @@ export interface ArtisanRepo {
   listCheckpoints(workspaceId: string, sessionId: string): Promise<CheckpointRow[]>;
   getCheckpoint(workspaceId: string, id: string): Promise<CheckpointRow | undefined>;
   deleteCheckpoint(workspaceId: string, id: string): Promise<boolean>;
+
+  // inspector (short-lived request snapshots)
+  saveInspectRound(input: {
+    sessionId: string; round: number;
+    messages: Array<{ role: string; content: string | null; toolCallId?: string; toolCalls?: unknown }>;
+    toolsJson: string;
+  }): Promise<string>;
+  getInspectRound(sessionId: string, id: string): Promise<{
+    id: string; round: number; createdAt: string;
+    messages: Array<{ role: string; content: string | null; toolCallId?: string; toolCalls?: unknown }>;
+    tools: unknown;
+  } | undefined>;
+  /** Deletes snapshot rows and blobs not touched since `before` (ISO). Returns rows removed. */
+  // workspace settings
+  getSetting(workspaceId: string, key: string): Promise<{ value: string; updatedAt: string } | undefined>;
+  setSetting(workspaceId: string, key: string, value: string): Promise<{ value: string; updatedAt: string }>;
+
+  // mcp servers
+  listMcpServers(workspaceId: string): Promise<McpServerRow[]>;
+  getMcpServer(workspaceId: string, id: string): Promise<McpServerRow | undefined>;
+  createMcpServer(input: {
+    workspaceId: string; name: string; url: string; transport: string; headers: Record<string, string>;
+    enabled: boolean; scope: McpScope;
+  }): Promise<McpServerRow>;
+  updateMcpServer(workspaceId: string, id: string, patch: Partial<{
+    name: string; url: string; transport: string; headers: Record<string, string>; enabled: boolean; scope: McpScope;
+  }>): Promise<McpServerRow | undefined>;
+  deleteMcpServer(workspaceId: string, id: string): Promise<boolean>;
+
+  // memories
+  /** Memories at the given owners (organization always; the rest only when an id is passed). */
+  listMemories(workspaceId: string, owners: { directoryId?: string | null; agentId?: string | null; sessionId?: string | null }): Promise<MemoryRow[]>;
+  /** Every memory in the workspace (management UI). */
+  listAllMemories(workspaceId: string): Promise<MemoryRow[]>;
+  getMemory(workspaceId: string, id: string): Promise<MemoryRow | undefined>;
+  createMemory(input: { workspaceId: string; level: string; directoryId?: string | null; agentId?: string | null; sessionId?: string | null; title: string; content: string }): Promise<MemoryRow>;
+  updateMemory(workspaceId: string, id: string, patch: { title?: string; content?: string }): Promise<MemoryRow | undefined>;
+  deleteMemory(workspaceId: string, id: string): Promise<boolean>;
+  purgeInspection(before: string): Promise<{ rounds: number; blobs: number }>;
 
   // usage
   incrementUsage(sessionId: string, add: { inputTokens: number; outputTokens: number; cachedTokens: number; costUsd: number | null }): Promise<void>;
@@ -117,7 +165,7 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
         adhoc_prompt: input.adhocPrompt ?? null,
         depth: input.depth ?? 0,
         plan_json: null,
-        thinking_level: null,
+        thinking_level: null, archived_at: null,
         created_at: now(),
         updated_at: now(),
       };
@@ -133,11 +181,14 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
     async listSessions(workspaceId, filter) {
       let q = db.selectFrom("session").selectAll().where("workspace_id", "=", workspaceId);
       if (filter?.type) q = q.where("type", "=", filter.type);
-      else q = q.where("type", "=", "directory");
+      else if (!filter?.agentId) q = q.where("type", "=", "directory");
+      if (filter?.agentId) q = q.where("agent_id", "=", filter.agentId);
       if (filter?.runner) q = q.where("runner", "=", filter.runner);
       if (filter?.directory) q = q.where("directory", "=", filter.directory);
       if (filter?.spaceId) q = q.where("space_id", "=", filter.spaceId);
       if (filter?.parentSessionId) q = q.where("parent_session_id", "=", filter.parentSessionId);
+      if (filter?.archived === "only") q = q.where("archived_at", "is not", null);
+      else if (filter?.archived !== "include") q = q.where("archived_at", "is", null);
       return q.orderBy("updated_at", "desc").execute();
     },
 
@@ -157,6 +208,24 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
 
     async setSessionThinkingLevel(workspaceId, id, level) {
       await db.updateTable("session").set({ thinking_level: level, updated_at: now() }).where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
+    },
+
+    async setSessionArchived(workspaceId, id, archived) {
+      await db.updateTable("session").set({ archived_at: archived ? now() : null }).where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
+    },
+
+    async deleteSession(workspaceId, id) {
+      const s = await db.selectFrom("session").select("id").where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
+      if (!s) return false;
+      await db.deleteFrom("message").where("session_id", "=", id).execute();
+      await db.deleteFrom("thread").where("session_id", "=", id).execute();
+      await db.deleteFrom("session_usage").where("session_id", "=", id).execute();
+      await db.deleteFrom("checkpoint").where("session_id", "=", id).execute();
+      await db.deleteFrom("inspect_round").where("session_id", "=", id).execute();
+      await db.deleteFrom("inspect_blob").where("session_id", "=", id).execute();
+      await db.deleteFrom("memory").where("level", "=", "session").where("session_id", "=", id).execute();
+      await db.deleteFrom("session").where("id", "=", id).execute();
+      return true;
     },
 
     async setSessionModel(workspaceId, id, model) {
@@ -196,13 +265,13 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
     },
 
     async addMessage(input) {
-      const cnt = await db.selectFrom("message").select((eb) => eb.fn.countAll<number>().as("n"))
+      const last = await db.selectFrom("message").select((eb) => eb.fn.max("idx").as("m"))
         .where("thread_id", "=", input.threadId).executeTakeFirst();
       const row: MessageRow = {
         id: newId(),
         thread_id: input.threadId,
         session_id: input.sessionId,
-        idx: Number(cnt?.n ?? 0),
+        idx: last?.m === null || last?.m === undefined ? 0 : Number(last.m) + 1,
         role: input.role,
         content: input.content,
         meta_json: JSON.stringify(input.meta ?? {}),
@@ -213,7 +282,7 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
     },
 
     async listThreadMessages(threadId) {
-      return db.selectFrom("message").selectAll().where("thread_id", "=", threadId).orderBy("idx", "asc").execute();
+      return db.selectFrom("message").selectAll().where("thread_id", "=", threadId).orderBy("idx", "asc").orderBy("created_at", "asc").execute();
     },
 
     async listSessionMessages(sessionId) {
@@ -230,7 +299,8 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
       const row: AgentRow = {
         id: newId(),
         workspace_id: input.workspaceId,
-        space_id: input.spaceId,
+        space_id: (input.spaceIds?.[0] ?? input.spaceId),
+        space_ids_json: JSON.stringify(input.spaceIds?.length ? input.spaceIds : [input.spaceId]),
         type: input.type,
         name: input.name,
         description: input.description ?? "",
@@ -254,7 +324,7 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
 
     async listAgents(workspaceId, spaceId) {
       let q = db.selectFrom("agent").selectAll().where("workspace_id", "=", workspaceId);
-      if (spaceId) q = q.where("space_id", "=", spaceId);
+      if (spaceId) q = q.where((eb) => eb.or([eb("space_id", "=", spaceId), eb("space_ids_json", "like", `%"${spaceId.replace(/[^A-Za-z0-9_-]/g, "")}"%`)]));
       return q.orderBy("created_at", "asc").execute();
     },
 
@@ -272,6 +342,7 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
         id: newId(),
         workspace_id: workspaceId,
         space_id: spaceId,
+        space_ids_json: JSON.stringify([spaceId]),
         type: "directory",
         name,
         description: `Default agent for ${directory} on ${runner}`,
@@ -292,6 +363,10 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
     async updateAgent(workspaceId, id, patch) {
       const set: Record<string, string | null> = { updated_at: now() };
       if (patch.name !== undefined) set.name = patch.name;
+      if (patch.spaceIds?.length) {
+        set.space_id = patch.spaceIds[0];
+        set.space_ids_json = JSON.stringify(patch.spaceIds);
+      }
       if (patch.description !== undefined) set.description = patch.description;
       if (patch.instruction !== undefined) set.instruction = patch.instruction;
       if (patch.model !== undefined) set.model = patch.model;
@@ -307,19 +382,24 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
     async deleteAgent(workspaceId, id) {
       const rows = await db.deleteFrom("agent").where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
       const res = Array.isArray(rows) ? rows[0] : rows;
-      return Number(res?.numDeletedRows ?? 0) > 0;
+      const ok = Number(res?.numDeletedRows ?? 0) > 0;
+      if (ok) await db.deleteFrom("memory").where("level", "=", "self").where("agent_id", "=", id).execute();
+      return ok;
     },
 
     async createSkill(input) {
       const row: SkillRow = {
         id: newId(),
         workspace_id: input.workspaceId,
-        space_id: input.spaceId,
-        directory: input.directory ?? null,
+        space_id: null,
+        directory: null,
         name: input.name,
         description: input.description,
         content: input.content,
-        tags_json: JSON.stringify(input.tags ?? ["default"]),
+        tags_json: "[\"default\"]",
+        scope_mode: input.scope.mode,
+        scope_all: input.scope.all || input.scope.mode === "global" ? 1 : 0,
+        scope_ids_json: JSON.stringify(input.scope.all ? [] : input.scope.ids),
         created_at: now(),
         updated_at: now(),
       };
@@ -327,10 +407,12 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
       return row;
     },
 
-    async listSkills(workspaceId, spaceId) {
-      return db.selectFrom("skill").selectAll()
-        .where("workspace_id", "=", workspaceId).where("space_id", "=", spaceId)
-        .orderBy("name", "asc").execute();
+    async listSkills(workspaceId) {
+      return db.selectFrom("skill").selectAll().where("workspace_id", "=", workspaceId).orderBy("name", "asc").execute();
+    },
+
+    async getSkill(workspaceId, id) {
+      return db.selectFrom("skill").selectAll().where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
     },
 
     async updateSkill(workspaceId, id, patch) {
@@ -338,8 +420,11 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
       if (patch.name !== undefined) set.name = patch.name;
       if (patch.description !== undefined) set.description = patch.description;
       if (patch.content !== undefined) set.content = patch.content;
-      if (patch.directory !== undefined) set.directory = patch.directory;
-      if (patch.tags !== undefined) set.tags_json = JSON.stringify(patch.tags);
+      if (patch.scope) {
+        set.scope_mode = patch.scope.mode;
+        set.scope_all = (patch.scope.all || patch.scope.mode === "global" ? 1 : 0) as never;
+        set.scope_ids_json = JSON.stringify(patch.scope.all ? [] : patch.scope.ids);
+      }
       await db.updateTable("skill").set(set).where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
       return db.selectFrom("skill").selectAll().where("id", "=", id).executeTakeFirst();
     },
@@ -391,7 +476,9 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
     async deleteDirectory(workspaceId, id) {
       const rows = await db.deleteFrom("directory").where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
       const res = Array.isArray(rows) ? rows[0] : rows;
-      return Number(res?.numDeletedRows ?? 0) > 0;
+      const ok = Number(res?.numDeletedRows ?? 0) > 0;
+      if (ok) await db.deleteFrom("memory").where("level", "=", "code_directory").where("directory_id", "=", id).execute();
+      return ok;
     },
 
     async addCheckpoint(input) {
@@ -417,6 +504,184 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
 
     async getCheckpoint(workspaceId, id) {
       return db.selectFrom("checkpoint").selectAll().where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
+    },
+
+    async saveInspectRound(input) {
+      const ts = now();
+      const blobs = new Map<string, string>();
+      const put = (content: string): string => {
+        const hash = createHash("sha1").update(content).digest("hex");
+        blobs.set(hash, content);
+        return hash;
+      };
+      const refs = input.messages.map((m) => ({
+        role: m.role,
+        hash: m.content == null ? null : put(m.content),
+        ...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
+        ...(m.toolCalls ? { toolCalls: m.toolCalls } : {}),
+      }));
+      const toolsHash = put(input.toolsJson);
+      const rows = [...blobs].map(([hash, content]) => ({ session_id: input.sessionId, hash, content, last_used_at: ts }));
+      for (let i = 0; i < rows.length; i += 200) {
+        await db.insertInto("inspect_blob").values(rows.slice(i, i + 200))
+          .onConflict((oc) => oc.columns(["session_id", "hash"]).doUpdateSet({ last_used_at: ts })).execute();
+      }
+      const id = newId();
+      await db.insertInto("inspect_round").values({
+        id, session_id: input.sessionId, round: input.round,
+        request_json: JSON.stringify({ messages: refs, toolsHash }), created_at: ts,
+      }).execute();
+      return id;
+    },
+
+    async getInspectRound(sessionId, id) {
+      const row = await db.selectFrom("inspect_round").selectAll().where("session_id", "=", sessionId).where("id", "=", id).executeTakeFirst();
+      if (!row) return undefined;
+      const req = JSON.parse(row.request_json) as {
+        messages: Array<{ role: string; hash: string | null; toolCallId?: string; toolCalls?: unknown }>;
+        toolsHash: string;
+      };
+      const hashes = [...new Set([...req.messages.map((m) => m.hash).filter((h): h is string => !!h), req.toolsHash])];
+      const content = new Map<string, string>();
+      for (let i = 0; i < hashes.length; i += 500) {
+        const blobs = await db.selectFrom("inspect_blob").select(["hash", "content"])
+          .where("session_id", "=", sessionId).where("hash", "in", hashes.slice(i, i + 500)).execute();
+        for (const b of blobs) content.set(b.hash, b.content);
+      }
+      let tools: unknown = [];
+      try { tools = JSON.parse(content.get(req.toolsHash) ?? "[]"); } catch { /* keep [] */ }
+      return {
+        id: row.id, round: row.round, createdAt: row.created_at, tools,
+        messages: req.messages.map((m) => ({
+          role: m.role,
+          content: m.hash == null ? null : (content.get(m.hash) ?? "(expired)"),
+          ...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
+          ...(m.toolCalls ? { toolCalls: m.toolCalls } : {}),
+        })),
+      };
+    },
+
+    async getSetting(workspaceId, key) {
+      const r = await db.selectFrom("workspace_setting").selectAll().where("workspace_id", "=", workspaceId).where("key", "=", key).executeTakeFirst();
+      return r ? { value: r.value, updatedAt: r.updated_at } : undefined;
+    },
+
+    async setSetting(workspaceId, key, value) {
+      const updated_at = now();
+      await db
+        .insertInto("workspace_setting")
+        .values({ workspace_id: workspaceId, key, value, updated_at })
+        .onConflict((oc) => oc.columns(["workspace_id", "key"]).doUpdateSet({ value, updated_at }))
+        .execute();
+      return { value, updatedAt: updated_at };
+    },
+
+    async listMcpServers(workspaceId) {
+      return db.selectFrom("mcp_server").selectAll().where("workspace_id", "=", workspaceId).orderBy("name", "asc").execute();
+    },
+
+    async getMcpServer(workspaceId, id) {
+      return db.selectFrom("mcp_server").selectAll().where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
+    },
+
+    async createMcpServer(input) {
+      const row: McpServerRow = {
+        id: newId(),
+        workspace_id: input.workspaceId,
+        name: input.name,
+        url: input.url,
+        transport: input.transport,
+        headers_json: JSON.stringify(input.headers),
+        enabled: input.enabled ? 1 : 0,
+        scope_mode: input.scope.mode,
+        scope_all: input.scope.all || input.scope.mode === "global" ? 1 : 0,
+        scope_ids_json: JSON.stringify(input.scope.all ? [] : input.scope.ids),
+        created_at: now(),
+        updated_at: now(),
+      };
+      await db.insertInto("mcp_server").values(row).execute();
+      return row;
+    },
+
+    async updateMcpServer(workspaceId, id, p) {
+      const set: Record<string, string | number> = { updated_at: now() };
+      if (p.name !== undefined) set.name = p.name;
+      if (p.url !== undefined) set.url = p.url;
+      if (p.transport !== undefined) set.transport = p.transport;
+      if (p.headers !== undefined) set.headers_json = JSON.stringify(p.headers);
+      if (p.enabled !== undefined) set.enabled = p.enabled ? 1 : 0;
+      if (p.scope) {
+        set.scope_mode = p.scope.mode;
+        set.scope_all = p.scope.all || p.scope.mode === "global" ? 1 : 0;
+        set.scope_ids_json = JSON.stringify(p.scope.all ? [] : p.scope.ids);
+      }
+      await db.updateTable("mcp_server").set(set).where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
+      return db.selectFrom("mcp_server").selectAll().where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
+    },
+
+    async deleteMcpServer(workspaceId, id) {
+      const rows = await db.deleteFrom("mcp_server").where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
+      const res = Array.isArray(rows) ? rows[0] : rows;
+      return Number(res?.numDeletedRows ?? 0) > 0;
+    },
+
+    async listMemories(workspaceId, owners) {
+      return db
+        .selectFrom("memory")
+        .selectAll()
+        .where("workspace_id", "=", workspaceId)
+        .where((eb) =>
+          eb.or([
+            eb("level", "=", "organization"),
+            ...(owners.directoryId ? [eb.and([eb("level", "=", "code_directory"), eb("directory_id", "=", owners.directoryId)])] : []),
+            ...(owners.agentId ? [eb.and([eb("level", "=", "self"), eb("agent_id", "=", owners.agentId)])] : []),
+            ...(owners.sessionId ? [eb.and([eb("level", "=", "session"), eb("session_id", "=", owners.sessionId)])] : []),
+          ]),
+        )
+        .orderBy("created_at", "asc")
+        .execute();
+    },
+
+    async listAllMemories(workspaceId) {
+      return db.selectFrom("memory").selectAll().where("workspace_id", "=", workspaceId).orderBy("created_at", "asc").execute();
+    },
+
+    async getMemory(workspaceId, id) {
+      return db.selectFrom("memory").selectAll().where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
+    },
+
+    async createMemory(input) {
+      const row: MemoryRow = {
+        id: newId(),
+        workspace_id: input.workspaceId,
+        level: input.level,
+        directory_id: input.level === "code_directory" ? (input.directoryId ?? null) : null,
+        agent_id: input.level === "self" ? (input.agentId ?? null) : null,
+        session_id: input.level === "session" ? (input.sessionId ?? null) : null,
+        title: input.title,
+        content: input.content,
+        created_at: now(),
+        updated_at: now(),
+      };
+      await db.insertInto("memory").values(row).execute();
+      return row;
+    },
+
+    async updateMemory(workspaceId, id, patchBody) {
+      await db.updateTable("memory").set({ ...patchBody, updated_at: now() }).where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
+      return db.selectFrom("memory").selectAll().where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
+    },
+
+    async deleteMemory(workspaceId, id) {
+      const rows = await db.deleteFrom("memory").where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
+      const res = Array.isArray(rows) ? rows[0] : rows;
+      return Number(res?.numDeletedRows ?? 0) > 0;
+    },
+
+    async purgeInspection(before) {
+      const r = await db.deleteFrom("inspect_round").where("created_at", "<", before).executeTakeFirst();
+      const b = await db.deleteFrom("inspect_blob").where("last_used_at", "<", before).executeTakeFirst();
+      return { rounds: Number(r.numDeletedRows ?? 0), blobs: Number(b.numDeletedRows ?? 0) };
     },
 
     async deleteCheckpoint(workspaceId, id) {

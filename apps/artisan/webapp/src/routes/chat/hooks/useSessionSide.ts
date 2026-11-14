@@ -8,9 +8,11 @@ import { apiFetch } from "../../../lib/artisan-client.js";
 export interface GitInfo {
   git: boolean;
   branch?: string;
+  ahead?: number | null;
+  behind?: number | null;
   additions?: number;
   deletions?: number;
-  files?: Array<{ path: string; status: string }>;
+  files?: Array<{ path: string; status: string; additions: number | null; deletions: number | null }>;
 }
 
 export interface ChildSession {

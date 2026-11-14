@@ -1,16 +1,18 @@
 import type { SessionDetail } from "../../../lib/artisan-client.js";
-import { useState } from "react";
 import type { ChildSession, GitInfo, JobRow as JobRowT } from "../hooks/useSessionSide.js";
-import { SideSection, SubagentRow, GitFileRow, JobRow } from "./SidePanel.js";
+import { SideSection, SubagentRow, JobRow } from "./SidePanel.js";
+import { GitSection } from "./GitSection.js";
+import { MemoriesSection } from "./MemoriesSection.js";
 import { PlanList, type PlanStep } from "../../../components/ui/plan-list.js";
 
 export interface SessionSidebarProps {
+  sessionId: string;
   plan: SessionDetail["plan"];
   children: ChildSession[];
   git: GitInfo | null;
   jobs: JobRowT[];
   busy: boolean;
-  onCommit: (message: string) => Promise<string | null>;
+  onRefreshGit: () => void;
   onOpenChild: (sessionId: string) => void;
 }
 
@@ -25,21 +27,8 @@ export function SessionSidebar(props: SessionSidebarProps) {
     status: s.status === "in_progress" ? "in_progress" : s.status === "done" ? "done" : s.status === "blocked" ? "blocked" : s.status === "failed" ? "failed" : "pending",
   }));
   const git = props.git;
-  const [message, setMessage] = useState("");
-  const [commitError, setCommitError] = useState<string | null>(null);
-  const dirty = (git?.files ?? []).length > 0;
-
-  const doCommit = async () => {
-    const msg = message.trim();
-    if (!msg) return;
-    setCommitError(null);
-    const err = await props.onCommit(msg);
-    if (err) setCommitError(err);
-    else setMessage("");
-  };
-
   return (
-    <div data-slot="session-sidebar" className="flex h-full min-h-0 w-64 shrink-0 flex-col overflow-y-auto border-l border-outline">
+    <div data-slot="session-sidebar" className="flex h-full min-h-0 w-full flex-col overflow-y-auto border-l border-outline">
       {props.children.length > 0 ? (
         <SideSection title="Subagents" count={props.children.length}>
           {props.children.map((c) => (
@@ -52,43 +41,9 @@ export function SessionSidebar(props: SessionSidebarProps) {
         <PlanList items={planSteps} hideHeader collapsible={false} empty="No plan yet — the agent uses update_plan." />
       </SideSection>
 
-      <SideSection title="Git" defaultOpen>
-        {!git || git.git === false ? (
-          <p className="text-[11px] text-ink-muted">not a git repository</p>
-        ) : (
-          <>
-            <p className="mb-1 flex items-center gap-2 font-mono text-[11px]">
-              <span className="text-ink">{git.branch}</span>
-              {git.additions ? <span className="text-success">+{git.additions}</span> : null}
-              {git.deletions ? <span className="text-destructive">−{git.deletions}</span> : null}
-            </p>
-            {(git.files ?? []).map((f) => (
-              <GitFileRow key={f.path} path={f.path} status={f.status} />
-            ))}
-            {(git.files ?? []).length === 0 ? <p className="text-[11px] text-ink-muted">clean</p> : null}
-            <div className="mt-2 flex items-center gap-1.5">
-              <input
-                value={message}
-                placeholder="commit message"
-                className="h-7 min-w-0 flex-1 rounded-md border border-outline bg-paper px-2 text-[11px] outline-none placeholder:text-ink-muted"
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void doCommit();
-                }}
-              />
-              <button
-                type="button"
-                disabled={!dirty || !message.trim() || props.busy}
-                className="h-7 shrink-0 rounded-md bg-primary px-2.5 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
-                onClick={() => void doCommit()}
-              >
-                Commit
-              </button>
-            </div>
-            {commitError ? <p className="mt-1 text-[10px] text-destructive">{commitError}</p> : null}
-          </>
-        )}
-      </SideSection>
+      <MemoriesSection sessionId={props.sessionId} />
+
+      <GitSection git={git} refreshing={props.busy} onRefresh={props.onRefreshGit} />
 
       {props.jobs.length > 0 ? (
         <SideSection title="Background jobs" count={props.jobs.length}>

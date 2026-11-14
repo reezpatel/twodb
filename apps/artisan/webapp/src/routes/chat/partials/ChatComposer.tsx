@@ -25,6 +25,56 @@ export function ChatComposerInput({ className, ...props }: ComponentProps<"texta
   );
 }
 
+export interface InlineToken {
+  /** Matches the token text exactly, e.g. "@src/app.ts" or "/compact". */
+  test: (token: string) => boolean;
+  className: string;
+}
+
+const TOKEN_RE = /(^|\s)([@/][^\s]*)/g;
+
+/** Splits text into plain runs and highlighted `@file` / `/command` tokens. */
+function tokenize(text: string, tokens: InlineToken[]): Array<{ text: string; className?: string }> {
+  const out: Array<{ text: string; className?: string }> = [];
+  let last = 0;
+  for (const m of text.matchAll(TOKEN_RE)) {
+    const start = (m.index ?? 0) + m[1].length;
+    const hit = tokens.find((t) => t.test(m[2]));
+    if (!hit) continue;
+    if (start > last) out.push({ text: text.slice(last, start) });
+    out.push({ text: m[2], className: hit.className });
+    last = start + m[2].length;
+  }
+  if (last < text.length) out.push({ text: text.slice(last) });
+  return out;
+}
+
+const INPUT_BOX = "px-1.5 py-1 text-sm";
+
+/**
+ * Textarea whose `@file` and `/command` tokens are highlighted in place, like the
+ * legacy composer's mention chips. The text stays plain — what you see is what is sent.
+ * A mirrored layer sits behind the transparent textarea and gives it its auto-grow height.
+ */
+export function ChatComposerRichInput({ className, tokens, value, ...props }: ComponentProps<"textarea"> & { tokens: InlineToken[]; value: string }) {
+  const parts = tokenize(value, tokens);
+  return (
+    <div className={cn("relative grid max-h-48 min-h-6 overflow-y-auto", className)}>
+      <div aria-hidden="true" className={cn("pointer-events-none col-start-1 row-start-1 whitespace-pre-wrap break-words text-transparent", INPUT_BOX)}>
+        {parts.map((p, i) => (p.className ? <span key={i} className={cn("rounded-[5px]", p.className)}>{p.text}</span> : <span key={i}>{p.text}</span>))}
+        {"\n"}
+      </div>
+      <textarea
+        data-slot="chat-composer-input"
+        rows={1}
+        value={value}
+        className={cn("col-start-1 row-start-1 min-h-6 w-full resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent outline-none placeholder:text-ink-muted", INPUT_BOX)}
+        {...props}
+      />
+    </div>
+  );
+}
+
 export function ChatComposerActions({ className, ...props }: ComponentProps<"div">) {
   return <div data-slot="chat-composer-actions" className={cn("flex items-center gap-1.5 px-0.5", className)} {...props} />;
 }

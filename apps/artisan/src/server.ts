@@ -7,6 +7,8 @@ import { WebSocket } from "ws";
 import { createPgDb } from "@twodb/core-data/db";
 
 import { applySchema } from "./db/schema.js";
+import { memoryTools } from "./ws/tools/memory.js";
+import { isLevel, normalizeContent, normalizeTitle, resolveMemoryContext, sessionMemories, titleTaken } from "./memory.js";
 import { createArtisanRepo, newId } from "./db/repository.js";
 import { loadArtisanConfig, type ArtisanConfig } from "./config.js";
 import { gunzipSync } from "node:zlib";
@@ -16,9 +18,17 @@ import { TworouteClient } from "./tworoute-client.js";
 import { DispatchClient } from "./dispatch-client.js";
 import { WorkspaceHub } from "./ws/hub.js";
 import { registerWorkspaceWs } from "./ws/workspace-ws.js";
-import { runAgentLoop, isSessionRunning, type RunDeps } from "./ws/agent-loop.js";
+import { scopeOf, validateScope, type SkillMode, type SkillScope } from "./skills.js";
+import { MCP_TRANSPORTS, NAME_RE, mcpScopeOf, parseHeaders, parseMcpServersJson, validateMcpScope, validUrl, type McpMode, type McpScope } from "./mcp.js";
+import type { McpServerRow, MemoryRow, SkillRow } from "./db/schema.js";
+import { runAgentLoop, isSessionRunning, fileTools, type RunDeps } from "./ws/agent-loop.js";
+import { subagentTools } from "./ws/tools/subagents.js";
+import { askUserTool } from "./ws/tools/ask-user.js";
 import { runCompaction } from "./ws/compaction.js";
 import type { FastifyReply, FastifyRequest } from "fastify";
+
+/** How long inspector request snapshots are kept. */
+export const INSPECT_RETENTION_DAYS = 3;
 
 export async function buildServer(config: ArtisanConfig) {
   const app = Fastify({ logger: true });
@@ -29,6 +39,15 @@ export async function buildServer(config: ArtisanConfig) {
   const HOP_BY_HOP = new Set(["connection","keep-alive","transfer-encoding","te","trailer","upgrade","proxy-authenticate","proxy-authorization","content-length"]);
   const repo = createArtisanRepo(db as never);
   const hub = new WorkspaceHub();
+
+  // Inspector snapshots are short-lived: purge on boot, then hourly.
+  const purgeInspection = () =>
+    repo.purgeInspection(new Date(Date.now() - INSPECT_RETENTION_DAYS * 86_400_000).toISOString())
+      .then((r) => { if (r.rounds || r.blobs) app.log.info(`inspector purge: ${r.rounds} rounds, ${r.blobs} blobs`); })
+      .catch((err) => app.log.warn({ err }, "inspector purge failed"));
+  const purgeTimer = setInterval(purgeInspection, 3_600_000);
+  purgeTimer.unref();
+  app.addHook("onClose", async () => clearInterval(purgeTimer));
 
   // Workspace API key for TwoRoute/Dispatch calls — from the forwarded
   // x-api-key when present (gateway forwards it) or the provision token env.
@@ -77,8 +96,10 @@ export async function buildServer(config: ArtisanConfig) {
       if (existing) directoryId = existing.id;
     }
     const dirRow = directoryId ? await repo.getDirectory(ctx.workspaceId, directoryId) : undefined;
-    const spaceId = body.spaceId ?? dirRow?.space_id ?? ctx.spaceIds[0];
-    if (!spaceId) return reply.code(400).send({ error: "no space" });
+    // Space: explicit → the directory's → the agent's own (first of its spaces) → the caller's.
+    const agentRow = body.agentId ? await repo.getAgent(ctx.workspaceId, body.agentId) : undefined;
+    const spaceId = body.spaceId ?? dirRow?.space_id ?? agentRow?.space_id ?? ctx.spaceIds[0];
+    if (!spaceId) return reply.code(400).send({ error: "no space — pass spaceId, or use a registered directory or an agent that has one" });
     const model = body.model ?? dirRow?.default_model ?? process.env.ARTISAN_DEFAULT_MODEL ?? "";
     if (!body.runner || !body.directory) return reply.code(400).send({ error: "runner and directory required" });
     if (!model) return reply.code(400).send({ error: "model required (no default configured)" });
@@ -136,10 +157,11 @@ export async function buildServer(config: ArtisanConfig) {
   app.get("/sessions", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
-    const q = req.query as { type?: string; runner?: string; directory?: string; spaceId?: string; all?: string; archived?: string };
-    const filter: { type?: string; runner?: string; directory?: string; spaceId?: string; archived?: "include" | "only" } = {};
+    const q = req.query as { type?: string; runner?: string; directory?: string; spaceId?: string; all?: string; archived?: string; agentId?: string };
+    const filter: { type?: string; runner?: string; directory?: string; spaceId?: string; agentId?: string; archived?: "include" | "only" } = {};
+    if (q.agentId) filter.agentId = q.agentId;
     if (q.archived === "include") filter.archived = "include";
-    if (q.all !== "1") filter.type = q.type ?? "directory";
+    if (q.all !== "1" && !q.agentId) filter.type = q.type ?? "directory";
     else if (q.type) filter.type = q.type;
     if (q.runner) filter.runner = q.runner;
     if (q.directory) filter.directory = q.directory;
@@ -156,12 +178,31 @@ export async function buildServer(config: ArtisanConfig) {
     if (!session) return reply.code(404).send({ error: "not found" });
     const messages = await repo.listSessionMessages(id);
     const usageRow = await repo.getUsage(id);
+    // Context fill = prompt size of the most recent request, not the lifetime sum.
+    let contextTokens = 0;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role !== "assistant") continue;
+      const u = (JSON.parse(messages[i].meta_json || "{}") as { usage?: { prompt_tokens?: number } | null }).usage;
+      if (u?.prompt_tokens) { contextTokens = u.prompt_tokens; break; }
+    }
     const usage = usageRow ? {
       inputTokens: usageRow.input_tokens, outputTokens: usageRow.output_tokens,
-      cachedTokens: usageRow.cached_tokens, calls: usageRow.calls, costUsd: usageRow.cost_usd,
+      cachedTokens: usageRow.cached_tokens, contextTokens, calls: usageRow.calls, costUsd: usageRow.cost_usd,
     } : null;
     const plan = session.plan_json ? JSON.parse(session.plan_json) : null;
     return { ...sessionOut(session), plan, running: isSessionRunning(id), usage, messages: messages.map(messageOut) };
+  });
+
+  // Inspector: the exact request sent for one round (kept INSPECT_RETENTION_DAYS days).
+  app.get("/sessions/:id/inspect/:inspectId", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id, inspectId } = req.params as { id: string; inspectId: string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const snap = await repo.getInspectRound(id, inspectId);
+    if (!snap) return reply.code(404).send({ error: "expired", retentionDays: INSPECT_RETENTION_DAYS });
+    return snap;
   });
 
   app.patch("/sessions/:id", async (req, reply) => {
@@ -193,6 +234,7 @@ export async function buildServer(config: ArtisanConfig) {
     if (!ctx) return reply;
     const { id } = req.params as { id: string };
     const body = (req.body ?? {}) as { message: string };
+    if (typeof body.message !== "string" || !body.message.trim()) return reply.code(400).send({ error: "message is required" });
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
     if (isSessionRunning(id)) return reply.code(409).send({ error: "session running" });
@@ -249,17 +291,18 @@ export async function buildServer(config: ArtisanConfig) {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const body = (req.body ?? {}) as {
-      spaceId?: string; type?: string; name?: string; description?: string; instruction?: string;
+      spaceId?: string; spaceIds?: string[]; type?: string; name?: string; description?: string; instruction?: string;
       model?: string | null; tools?: string[]; skillTags?: string[]; tags?: string[]; runner?: string | null; directory?: string | null;
     };
-    if (!body.name || !body.instruction || !body.type) return reply.code(400).send({ error: "name, type, instruction required" });
+    if (!body.name?.trim() || !body.type) return reply.code(400).send({ error: "name and type required" });
     const agent = await repo.createAgent({
       workspaceId: ctx.workspaceId,
-      spaceId: body.spaceId ?? ctx.spaceIds[0],
+      spaceId: body.spaceIds?.[0] ?? body.spaceId ?? ctx.spaceIds[0],
+      spaceIds: body.spaceIds?.length ? body.spaceIds : undefined,
       type: body.type,
       name: body.name,
       description: body.description ?? "",
-      instruction: body.instruction,
+      instruction: body.instruction ?? "",
       model: body.model ?? null,
       tools: body.tools ?? [],
       skillTags: body.skillTags ?? ["default"],
@@ -278,21 +321,42 @@ export async function buildServer(config: ArtisanConfig) {
     return rows.map(agentOut);
   });
 
+  app.get("/agents/:id", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const agent = await repo.getAgent(ctx.workspaceId, id);
+    return agent ? agentOut(agent) : reply.code(404).send({ error: "not found" });
+  });
+
+  /** Tool catalogue an agent can be given (name + description). */
+  app.get("/tools", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const all = [...fileTools(depsFor(req).dispatch), ...subagentTools(), ...memoryTools(), askUserTool()];
+    return all.map((t) => ({ name: t.name, description: t.description }));
+  });
+
   app.patch("/agents/:id", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const { id } = req.params as { id: string };
     const body = (req.body ?? {}) as Record<string, unknown>;
+    // Directory agents are fixed to their runner + directory + space.
+    const current = await repo.getAgent(ctx.workspaceId, id);
+    if (!current) return reply.code(404).send({ error: "not found" });
+    const fixed = current.type === "directory";
     const agent = await repo.updateAgent(ctx.workspaceId, id, {
       name: body.name as string | undefined,
+      spaceIds: fixed ? undefined : (body.spaceIds as string[] | undefined) ?? (typeof body.spaceId === "string" ? [body.spaceId] : undefined),
       description: body.description as string | undefined,
       instruction: body.instruction as string | undefined,
       model: body.model as string | null | undefined,
       tools: body.tools as string[] | undefined,
       skillTags: body.skillTags as string[] | undefined,
       tags: body.tags as string[] | undefined,
-      runner: body.runner as string | null | undefined,
-      directory: body.directory as string | null | undefined,
+      runner: fixed ? undefined : (body.runner as string | null | undefined),
+      directory: fixed ? undefined : (body.directory as string | null | undefined),
     });
     return agent ? agentOut(agent) : reply.code(404).send({ error: "not found" });
   });
@@ -304,33 +368,258 @@ export async function buildServer(config: ArtisanConfig) {
     return { ok: await repo.deleteAgent(ctx.workspaceId, id) };
   });
 
+  // --- global instruction: base rules prepended to every agent's prompt ------
+  const MAX_GLOBAL_INSTRUCTION = 20_000;
+  app.get("/settings/global-instruction", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const s = await repo.getSetting(ctx.workspaceId, "global_instruction");
+    return { content: s?.value ?? "", updatedAt: s?.updatedAt ?? null };
+  });
+  app.put("/settings/global-instruction", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const content = (req.body as { content?: unknown } | null)?.content;
+    if (typeof content !== "string") return reply.code(400).send({ error: "content must be a string" });
+    if (content.length > MAX_GLOBAL_INSTRUCTION) return reply.code(400).send({ error: `too long (max ${MAX_GLOBAL_INSTRUCTION} characters)` });
+    const s = await repo.setSetting(ctx.workspaceId, "global_instruction", content);
+    return { content: s.value, updatedAt: s.updatedAt };
+  });
+
+  // --- MCP servers (config only — not injected into agents yet) --------------
+  const parseMcpScope = (raw: unknown): McpScope | { error: string } => {
+    const r = (raw ?? {}) as Partial<McpScope>;
+    const scope: McpScope = { mode: (r.mode ?? "global") as McpMode, all: Boolean(r.all), ids: Array.isArray(r.ids) ? r.ids.map(String) : [] };
+    const err = validateMcpScope(scope);
+    return err ? { error: err } : scope;
+  };
+  /** Name must be unique in the workspace (case-insensitive) — it becomes the tool prefix mcp__<name>__. */
+  const mcpNameTaken = async (workspaceId: string, name: string, exceptId?: string) =>
+    (await repo.listMcpServers(workspaceId)).some((r) => r.id !== exceptId && r.name.toLowerCase() === name.toLowerCase());
+
+  app.get("/mcp", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    return (await repo.listMcpServers(ctx.workspaceId)).map(mcpOut);
+  });
+
+  app.get("/mcp/:id", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const row = await repo.getMcpServer(ctx.workspaceId, (req.params as { id: string }).id);
+    return row ? mcpOut(row) : reply.code(404).send({ error: "not found" });
+  });
+
+  app.post("/mcp", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const name = typeof b.name === "string" ? b.name.trim() : "";
+    if (!NAME_RE.test(name)) return reply.code(400).send({ error: "name must be letters, digits, _ or - (it prefixes the tool names)" });
+    const url = validUrl(b.url);
+    if (!url) return reply.code(400).send({ error: "url must be an http(s) URL" });
+    const transport = b.transport === undefined ? "auto" : String(b.transport);
+    if (!(MCP_TRANSPORTS as readonly string[]).includes(transport)) return reply.code(400).send({ error: "transport must be auto, http or sse" });
+    const headers = parseHeaders(b.headers);
+    if (headers === "invalid") return reply.code(400).send({ error: "headers must be an object of strings" });
+    const scope = parseMcpScope(b.scope);
+    if ("error" in scope) return reply.code(400).send({ error: scope.error });
+    if (await mcpNameTaken(ctx.workspaceId, name)) return reply.code(409).send({ error: `an MCP server named "${name}" already exists` });
+    const row = await repo.createMcpServer({ workspaceId: ctx.workspaceId, name, url, transport, headers: headers ?? {}, enabled: b.enabled !== false, scope });
+    return mcpOut(row);
+  });
+
+  app.patch("/mcp/:id", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (!(await repo.getMcpServer(ctx.workspaceId, id))) return reply.code(404).send({ error: "not found" });
+    const p: Parameters<typeof repo.updateMcpServer>[2] = {};
+    if (b.name !== undefined) {
+      const name = typeof b.name === "string" ? b.name.trim() : "";
+      if (!NAME_RE.test(name)) return reply.code(400).send({ error: "name must be letters, digits, _ or -" });
+      if (await mcpNameTaken(ctx.workspaceId, name, id)) return reply.code(409).send({ error: `an MCP server named "${name}" already exists` });
+      p.name = name;
+    }
+    if (b.url !== undefined) {
+      const url = validUrl(b.url);
+      if (!url) return reply.code(400).send({ error: "url must be an http(s) URL" });
+      p.url = url;
+    }
+    if (b.transport !== undefined) {
+      if (!(MCP_TRANSPORTS as readonly string[]).includes(String(b.transport))) return reply.code(400).send({ error: "transport must be auto, http or sse" });
+      p.transport = String(b.transport);
+    }
+    if (b.headers !== undefined) {
+      const headers = parseHeaders(b.headers);
+      if (headers === "invalid" || !headers) return reply.code(400).send({ error: "headers must be an object of strings" });
+      p.headers = headers;
+    }
+    if (b.enabled !== undefined) p.enabled = Boolean(b.enabled);
+    if (b.scope !== undefined) {
+      const scope = parseMcpScope(b.scope);
+      if ("error" in scope) return reply.code(400).send({ error: scope.error });
+      p.scope = scope;
+    }
+    if (Object.keys(p).length === 0) return reply.code(400).send({ error: "nothing to update" });
+    const row = await repo.updateMcpServer(ctx.workspaceId, id, p);
+    return row ? mcpOut(row) : reply.code(404).send({ error: "not found" });
+  });
+
+  app.delete("/mcp/:id", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    return (await repo.deleteMcpServer(ctx.workspaceId, (req.params as { id: string }).id)) ? { ok: true } : reply.code(404).send({ error: "not found" });
+  });
+
+  /** Parses an mcpServers JSON paste without writing — the dialog's preview. */
+  app.post("/mcp/import/preview", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const parsed = parseMcpServersJson((req.body as { json?: unknown } | null)?.json);
+    return "error" in parsed ? reply.code(400).send(parsed) : parsed;
+  });
+
+  /** Bulk create from an mcpServers paste; every server gets the same availability. Name clashes are reported, not overwritten. */
+  app.post("/mcp/import", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const b = (req.body ?? {}) as { json?: unknown; scope?: unknown };
+    const parsed = parseMcpServersJson(b.json);
+    if ("error" in parsed) return reply.code(400).send(parsed);
+    const scope = parseMcpScope(b.scope);
+    if ("error" in scope) return reply.code(400).send({ error: scope.error });
+    const taken = new Set((await repo.listMcpServers(ctx.workspaceId)).map((r) => r.name.toLowerCase()));
+    const created: ReturnType<typeof mcpOut>[] = [];
+    const conflicts: string[] = [];
+    for (const d of parsed.drafts) {
+      if (taken.has(d.name.toLowerCase())) { conflicts.push(d.name); continue; }
+      taken.add(d.name.toLowerCase());
+      created.push(mcpOut(await repo.createMcpServer({ workspaceId: ctx.workspaceId, ...d, enabled: true, scope })));
+    }
+    return { created, conflicts, skipped: parsed.skipped };
+  });
+
   // --- skills ----------------------------------------------------------------
+  const parseScope = (raw: unknown): SkillScope | { error: string } => {
+    const r = (raw ?? {}) as Partial<SkillScope>;
+    const scope: SkillScope = { mode: (r.mode ?? "global") as SkillMode, all: Boolean(r.all), ids: Array.isArray(r.ids) ? r.ids.map(String) : [] };
+    const err = validateScope(scope);
+    return err ? { error: err } : scope;
+  };
+
   app.post("/skills", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
-    const body = (req.body ?? {}) as {
-      spaceId?: string; directory?: string | null; name?: string; description?: string; content?: string; tags?: string[];
-    };
-    if (!body.name || !body.content) return reply.code(400).send({ error: "name and content required" });
+    const body = (req.body ?? {}) as { name?: string; description?: string; content?: string; scope?: unknown };
+    if (!body.name?.trim()) return reply.code(400).send({ error: "name required" });
+    const scope = parseScope(body.scope);
+    if ("error" in scope) return reply.code(400).send({ error: scope.error });
     const skill = await repo.createSkill({
       workspaceId: ctx.workspaceId,
-      spaceId: body.spaceId ?? ctx.spaceIds[0],
-      directory: body.directory ?? null,
-      name: body.name,
+      name: body.name.trim(),
       description: body.description ?? "",
-      content: body.content,
-      tags: body.tags ?? ["default"],
+      content: body.content ?? "",
+      scope,
     });
-    return skillOut(skill);
+    return skillOut(skill, true);
   });
 
   app.get("/skills", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
-    const q = req.query as { spaceId?: string; content?: string };
-    const rows = await repo.listSkills(ctx.workspaceId, q.spaceId ?? ctx.spaceIds[0]);
-    if (q.content === "1") return rows.map((r) => ({ ...skillOut(r), content: r.content }));
-    return rows.map(skillOut);
+    const q = req.query as { content?: string };
+    const rows = await repo.listSkills(ctx.workspaceId);
+    return rows.map((r) => skillOut(r, q.content === "1"));
+  });
+
+  // --- memories --------------------------------------------------------------
+  // ?sessionId= → what that session's agent sees; otherwise every memory in the workspace.
+  app.get("/memories", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { sessionId } = req.query as { sessionId?: string };
+    const rows = sessionId ? await sessionMemories(repo, ctx.workspaceId, sessionId) : await repo.listAllMemories(ctx.workspaceId);
+    return rows.map(memoryOut);
+  });
+
+  app.post("/memories", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const body = (req.body ?? {}) as { level?: string; title?: unknown; content?: unknown; directoryId?: string; agentId?: string; sessionId?: string };
+    const level = body.level ?? "organization";
+    if (!isLevel(level)) return reply.code(400).send({ error: "level must be organization, code_directory, self or session" });
+    const t = normalizeTitle(body.title);
+    if (!t.ok) return reply.code(400).send({ error: t.error });
+    const c = normalizeContent(body.content);
+    if (!c.ok) return reply.code(400).send({ error: c.error });
+    const place = { level, directory_id: null as string | null, agent_id: null as string | null, session_id: null as string | null };
+    // With a sessionId the owner is derived from that session (sub-agents resolve to their caller).
+    const mctx = body.sessionId ? await resolveMemoryContext(repo, ctx.workspaceId, body.sessionId) : null;
+    if (mctx) {
+      if (level === "code_directory") body.directoryId ??= mctx.directoryId ?? undefined;
+      if (level === "self") body.agentId ??= mctx.selfAgentId ?? undefined;
+      if (level === "session") body.sessionId = mctx.sessionId;
+    }
+    if (level === "code_directory") {
+      if (!body.directoryId || !(await repo.getDirectory(ctx.workspaceId, body.directoryId))) return reply.code(400).send({ error: "this session has no registered directory" });
+      place.directory_id = body.directoryId;
+    } else if (level === "self") {
+      const a = body.agentId ? await repo.getAgent(ctx.workspaceId, body.agentId) : undefined;
+      if (!a) return reply.code(400).send({ error: "only persona and collaborator agents have their own memory" });
+      if (a.type === "sub_agent" || a.type === "directory") return reply.code(400).send({ error: "only persona and collaborator agents have their own memory" });
+      place.agent_id = a.id;
+    } else if (level === "session") {
+      if (!body.sessionId || !(await repo.getSession(ctx.workspaceId, body.sessionId))) return reply.code(400).send({ error: "sessionId required" });
+      place.session_id = body.sessionId;
+    }
+    if (titleTaken(await repo.listAllMemories(ctx.workspaceId), place, t.title)) return reply.code(409).send({ error: `a memory titled "${t.title}" already exists at that level` });
+    const row = await repo.createMemory({
+      workspaceId: ctx.workspaceId, level, title: t.title, content: c.content,
+      directoryId: place.directory_id, agentId: place.agent_id, sessionId: place.session_id,
+    });
+    return memoryOut(row);
+  });
+
+  app.patch("/memories/:id", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const body = (req.body ?? {}) as { title?: unknown; content?: unknown };
+    const row = await repo.getMemory(ctx.workspaceId, id);
+    if (!row) return reply.code(404).send({ error: "not found" });
+    const patchBody: { title?: string; content?: string } = {};
+    if (body.title !== undefined) {
+      const t = normalizeTitle(body.title);
+      if (!t.ok) return reply.code(400).send({ error: t.error });
+      if (t.title.toLowerCase() !== row.title.toLowerCase() && titleTaken(await repo.listAllMemories(ctx.workspaceId), row, t.title, row.id)) {
+        return reply.code(409).send({ error: `a memory titled "${t.title}" already exists at that level` });
+      }
+      patchBody.title = t.title;
+    }
+    if (body.content !== undefined) {
+      const c = normalizeContent(body.content);
+      if (!c.ok) return reply.code(400).send({ error: c.error });
+      patchBody.content = c.content;
+    }
+    const updated = await repo.updateMemory(ctx.workspaceId, id, patchBody);
+    return memoryOut(updated ?? row);
+  });
+
+  app.delete("/memories/:id", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    return (await repo.deleteMemory(ctx.workspaceId, id)) ? { ok: true } : reply.code(404).send({ error: "not found" });
+  });
+
+  app.get("/skills/:id", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const skill = await repo.getSkill(ctx.workspaceId, id);
+    return skill ? skillOut(skill, true) : reply.code(404).send({ error: "not found" });
   });
 
   app.patch("/skills/:id", async (req, reply) => {
@@ -338,14 +627,19 @@ export async function buildServer(config: ArtisanConfig) {
     if (!ctx) return reply;
     const { id } = req.params as { id: string };
     const body = (req.body ?? {}) as Record<string, unknown>;
+    let scope: SkillScope | undefined;
+    if (body.scope !== undefined) {
+      const parsed = parseScope(body.scope);
+      if ("error" in parsed) return reply.code(400).send({ error: parsed.error });
+      scope = parsed;
+    }
     const skill = await repo.updateSkill(ctx.workspaceId, id, {
       name: body.name as string | undefined,
       description: body.description as string | undefined,
       content: body.content as string | undefined,
-      directory: body.directory as string | null | undefined,
-      tags: body.tags as string[] | undefined,
+      scope,
     });
-    return skill ? skillOut(skill) : reply.code(404).send({ error: "not found" });
+    return skill ? skillOut(skill, true) : reply.code(404).send({ error: "not found" });
   });
 
   app.delete("/skills/:id", async (req, reply) => {
@@ -868,8 +1162,11 @@ echo saved`;
       // base64-encode the frame (Buffer or string); upstream→client we base64-
       // DECODE back to raw bytes and forward as binary. String(raw) on a Buffer
       // would mangle the frame and stall VS Code's handshake.
-      const toB64 = (raw: unknown): string => (typeof raw === "string" ? raw : Buffer.from(raw as Buffer).toString("base64"));
-      const fromB64 = (raw: unknown): Buffer => (typeof raw === "string" ? Buffer.from(raw, "base64") : Buffer.from(raw as Buffer));
+      // NB: ws v8 delivers EVERY message (text frames too) as a Buffer, so never
+      // sniff typeof === "string". Upstream (dispatch) frames are always base64
+      // TEXT → always decode; browser frames are raw bytes → always encode.
+      const toB64 = (raw: unknown): string => (typeof raw === "string" ? Buffer.from(raw).toString("base64") : Buffer.from(raw as Buffer).toString("base64"));
+      const fromB64 = (raw: unknown): Buffer => Buffer.from(typeof raw === "string" ? raw : (raw as Buffer).toString("latin1"), "base64");
       upstream.on("message", (raw: unknown) => { if (socket.readyState === socket.OPEN) socket.send(fromB64(raw)); });
       upstream.on("close", () => { if (socket.readyState === socket.OPEN) socket.close(); });
       upstream.on("error", () => { if (socket.readyState === socket.OPEN) socket.close(1011, "upstream"); });
@@ -1051,6 +1348,61 @@ echo saved`;
     return runners.filter((r) => r.status === "online");
   });
 
+  // --- microvms (via dispatch) --------------------------------------------------
+  app.get("/microvms", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const vms = await depsFor(req).dispatch.listMicrovms();
+    return vms.filter((v) => v.status !== "archived" && v.status !== "failed");
+  });
+
+  app.post("/microvms", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const body = (req.body ?? {}) as { name?: string; memMb?: number; vcpu?: number };
+    const slug = (body.name ?? "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
+    const identifier = slug || `vm-${newId().slice(-8)}`;
+    try {
+      const vm = await depsFor(req).dispatch.bootMicrovm({ identifier, memMb: body.memMb, vcpu: body.vcpu });
+      return vm;
+    } catch (e) {
+      return reply.code(502).send({ error: (e as Error).message });
+    }
+  });
+
+  // --- runner filesystem browser (directory picker) -----------------------------
+  app.get("/runners/:runner/fs", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { runner } = req.params as { runner: string };
+    const raw = ((req.query as { path?: string }).path ?? "~").trim() || "~";
+    const cd = raw === "~" ? `cd "$HOME"` : raw.startsWith("~/") ? `cd "$HOME"/${shellQuote(raw.slice(2))}` : `cd ${shellQuote(raw)}`;
+    try {
+      const res = await depsFor(req).dispatch.exec(runner, `${cd} && pwd && ls -1Ap`, "/", 15_000);
+      if (res.exitCode !== 0) return reply.code(400).send({ error: (res.stderr || res.stdout || "cannot open directory").trim().split("\n").pop() });
+      const [cwd, ...lines] = res.stdout.split("\n");
+      const entries = lines.filter(Boolean).map((l) => (l.endsWith("/") ? { name: l.slice(0, -1), dir: true } : { name: l.replace(/[@*|=]$/, ""), dir: false }));
+      return { path: cwd, entries };
+    } catch (e) {
+      return reply.code(502).send({ error: (e as Error).message });
+    }
+  });
+
+  app.post("/runners/:runner/fs/mkdir", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { runner } = req.params as { runner: string };
+    const body = (req.body ?? {}) as { path?: string };
+    if (!body.path || !body.path.startsWith("/")) return reply.code(400).send({ error: "absolute path required" });
+    try {
+      const res = await depsFor(req).dispatch.exec(runner, `mkdir -p ${shellQuote(body.path)} && echo ok`, "/", 15_000);
+      if (res.exitCode !== 0) return reply.code(400).send({ error: (res.stderr || "mkdir failed").trim() });
+      return { ok: true, path: body.path };
+    } catch (e) {
+      return reply.code(502).send({ error: (e as Error).message });
+    }
+  });
+
   // --- workspace WS -------------------------------------------------------------
   registerWorkspaceWs(app, hub, repo, { repo, hub, tworoute: new TworouteClient(config, process.env.WORKSPACE_API_KEY ?? ""), dispatch: new DispatchClient(config, process.env.WORKSPACE_API_KEY ?? "") });
 
@@ -1063,13 +1415,14 @@ echo saved`;
     await app.register(fastifyStatic, { root: webappDist, wildcard: false, index: false });
     app.setNotFoundHandler((req, reply) => {
       const pathname = new URL(req.url, "http://internal").pathname;
-      const isApi = /^\/(sessions|agents|skills|directories|models|runners|ws|internal|healthz)(\/|$)/.test(pathname);
+      const isApi = /^\/(sessions|agents|tools|skills|mcp|memories|settings|directories|models|runners|microvms|ws|internal|healthz)(\/|$)/.test(pathname);
       if (req.method === "GET" && !isApi) return reply.sendFile("index.html");
       return reply.code(404).send({ error: "not found" });
     });
   }
 
   await applySchema(db as never);
+  void purgeInspection(); // after the tables exist
 
   return app;
 }
@@ -1094,17 +1447,33 @@ function messageOut(m: { id: string; role: string; content: string; meta_json: s
   return { id: m.id, role: m.role, content: m.content, meta: JSON.parse(m.meta_json), createdAt: m.created_at };
 }
 
-function agentOut(a: { id: string; type: string; name: string; description: string; model: string | null; tools_json: string; skill_tags_json: string; tags_json: string; runner: string | null; directory: string | null; space_id: string }) {
+function agentOut(a: { id: string; type: string; name: string; description: string; instruction?: string; model: string | null; tools_json: string; skill_tags_json: string; tags_json: string; runner: string | null; directory: string | null; space_id: string; space_ids_json?: string }) {
+  const ids = a.space_ids_json ? (JSON.parse(a.space_ids_json) as string[]) : [];
+  const spaceIds = ids.length ? ids : [a.space_id];
   return {
-    id: a.id, type: a.type, name: a.name, description: a.description, model: a.model,
+    id: a.id, type: a.type, name: a.name, description: a.description, instruction: a.instruction ?? "", model: a.model,
     tools: JSON.parse(a.tools_json), skillTags: JSON.parse(a.skill_tags_json), tags: JSON.parse(a.tags_json),
-    runner: a.runner, directory: a.directory, spaceId: a.space_id,
+    runner: a.runner, directory: a.directory, spaceId: spaceIds[0], spaceIds,
   };
 }
 
-function skillOut(s: { id: string; name: string; description: string; directory: string | null; tags_json: string; space_id: string }) {
+function memoryOut(m: MemoryRow) {
   return {
-    id: s.id, name: s.name, description: s.description, directory: s.directory,
-    tags: JSON.parse(s.tags_json), spaceId: s.space_id,
+    id: m.id, level: m.level, title: m.title, content: m.content,
+    directoryId: m.directory_id, agentId: m.agent_id, sessionId: m.session_id,
+    createdAt: m.created_at, updatedAt: m.updated_at,
+  };
+}
+
+function mcpOut(r: McpServerRow) {
+  let headers: Record<string, string> = {};
+  try { headers = JSON.parse(r.headers_json) as Record<string, string>; } catch { /* keep {} */ }
+  return { id: r.id, name: r.name, url: r.url, transport: r.transport, headers, enabled: Number(r.enabled) === 1, scope: mcpScopeOf(r), createdAt: r.created_at, updatedAt: r.updated_at };
+}
+
+function skillOut(s: SkillRow, withContent = false) {
+  return {
+    id: s.id, name: s.name, description: s.description, scope: scopeOf(s),
+    ...(withContent ? { content: s.content } : {}),
   };
 }

@@ -497,7 +497,16 @@ type MdBlock =
   | { kind: "code"; text: string }
   | { kind: "quote"; text: string }
   | { kind: "ul"; items: string[] }
-  | { kind: "ol"; items: string[] };
+  | { kind: "ol"; items: string[] }
+  | { kind: "hr" }
+  | { kind: "table"; head: string[]; align: Array<"left" | "center" | "right">; rows: string[][] };
+
+/** Split a GFM table row on unescaped pipes, dropping the optional outer pipes. */
+function splitRow(line: string): string[] {
+  const t = line.trim().replace(/^\|/, "").replace(/(?<!\\)\|$/, "");
+  return t.split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, "|"));
+}
+const TABLE_SEP = /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)+\|?\s*$|^\s*\|\s*:?-{1,}:?\s*\|?\s*$/;
 
 function parseBlocks(src: string): MdBlock[] {
   const lines = src.split("\n");
@@ -527,6 +536,25 @@ function parseBlocks(src: string): MdBlock[] {
       while (i < lines.length && /^>\s?/.test(lines[i])) { buf.push(lines[i].replace(/^>\s?/, "")); i++; }
       blocks.push({ kind: "quote", text: buf.join("\n") });
       continue;
+    }
+    if (/^\s{0,3}([-*_])(\s*\1){2,}\s*$/.test(line)) { flush(); blocks.push({ kind: "hr" }); i++; continue; }
+    if (line.includes("|") && i + 1 < lines.length && TABLE_SEP.test(lines[i + 1])) {
+      const head = splitRow(line);
+      const sep = splitRow(lines[i + 1]);
+      if (head.length === sep.length) {
+        flush();
+        const align = sep.map((c) => (c.startsWith(":") && c.endsWith(":") ? "center" : c.endsWith(":") ? "right" : "left") as "left" | "center" | "right");
+        const rows: string[][] = [];
+        i += 2;
+        // rows run until a blank line / non-pipe line; mid-stream partial rows are padded
+        while (i < lines.length && lines[i].trim() !== "" && lines[i].includes("|")) {
+          const cells = splitRow(lines[i]);
+          rows.push(head.map((_, k) => cells[k] ?? ""));
+          i++;
+        }
+        blocks.push({ kind: "table", head, align, rows });
+        continue;
+      }
     }
     const ul = line.match(/^\s*[-*]\s+(.*)$/);
     const ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
@@ -561,6 +589,30 @@ export function Markdown({ text, className }: { text: string; className?: string
             const cls = b.level <= 1 ? "text-[18px] leading-[26px] font-semibold text-ink" : b.level === 2 ? "text-[16px] leading-[24px] font-semibold text-ink" : "text-[14.5px] leading-[22px] font-semibold text-ink";
             return <p key={i} className={cls}>{renderInline(b.text)}</p>;
           }
+          case "hr": return <hr key={i} className="border-outline" />;
+          case "table":
+            return (
+              <div key={i} className="max-w-full overflow-x-auto rounded-[8px] border border-outline">
+                <table className="w-full border-collapse text-left">
+                  <thead className="bg-stone/60">
+                    <tr>
+                      {b.head.map((h, j) => (
+                        <th key={j} style={{ textAlign: b.align[j] }} className="border-b border-outline px-3 py-1.5 font-semibold text-ink">{renderInline(h)}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline">
+                    {b.rows.map((r, ri) => (
+                      <tr key={ri}>
+                        {r.map((c, ci) => (
+                          <td key={ci} style={{ textAlign: b.align[ci] }} className="px-3 py-1.5 align-top">{renderInline(c)}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
           case "code": return <CodeBlock key={i} code={b.text} className="bg-stone/40" />;
           case "quote": return <blockquote key={i} className="border-l-2 border-outline pl-3 text-muted-foreground">{renderInline(b.text)}</blockquote>;
           case "ul":
@@ -605,6 +657,7 @@ export function NestedReasoningBlock({
   onFinished,
   first,
   last,
+  forceOpen,
 }: {
   sentences: string[];
   delays?: number[];
@@ -614,6 +667,8 @@ export function NestedReasoningBlock({
   onFinished?: () => void;
   first: boolean;
   last: boolean;
+  /** Overrides the manual open state (expand/collapse-all). */
+  forceOpen?: boolean;
 }) {
   const [revealed, setRevealed] = React.useState(isFinished ? sentences.length : 0);
   const [manualOpen, setManualOpen] = React.useState(false);
@@ -656,10 +711,10 @@ export function NestedReasoningBlock({
   }, [isActive, isFinished]);
   const shownSecs = isFinished ? (liveSecs > 0 ? liveSecs : durationSeconds) : liveSecs;
 
-  const open = isFinished ? manualOpen : true;
+  const open = forceOpen !== undefined ? forceOpen : isFinished ? manualOpen : true;
   const count = isFinished ? sentences.length : revealed;
   const capped = contentH > THOUGHT_MAX_H;
-  const scrollable = isFinished && manualOpen;
+  const scrollable = isFinished && open;
   React.useEffect(() => {
     const el = viewportRef.current;
     if (!scrollable || !el) return;
@@ -682,7 +737,7 @@ export function NestedReasoningBlock({
       isActive={isActive}
       expandable
       open={open}
-      onToggle={() => isFinished && setManualOpen((v) => !v)}
+      onToggle={forceOpen === undefined ? () => isFinished && setManualOpen((v) => !v) : undefined}
       bodyPadLeft={ACTIVITY_ICON_LEFT + ACTIVITY_ICON_SIZE}
       body={
         <div className="py-1 pl-3">
@@ -1069,6 +1124,7 @@ export const ThinkingState = React.forwardRef<HTMLDivElement, ThinkingStateProps
                       onFinished={advanceStep}
                       first={idx === 0}
                       last={idx === total - 1}
+                      forceOpen={forceExpanded}
                     />
                   );
                 }

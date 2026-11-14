@@ -24,6 +24,22 @@ export function useSlashCommands(skills: Array<{ id: string; name: string; descr
   ];
 }
 
+/** Name matches first (prefix before substring), then description matches; stable within each tier. */
+export function filterCommands(items: SlashCommandItem[], query: string, limit = 9): SlashCommandItem[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return items.slice(0, limit);
+  const rank = (c: SlashCommandItem) => {
+    const l = c.label.toLowerCase();
+    return l.startsWith(q) ? 0 : l.includes(q) ? 1 : c.description.toLowerCase().includes(q) ? 2 : 3;
+  };
+  return items
+    .map((c, i) => ({ c, i, r: rank(c) }))
+    .filter((x) => x.r < 3)
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .slice(0, limit)
+    .map((x) => x.c);
+}
+
 /** `/` slash palette: filtered skills + commands, keyboard navigable. */
 export function SlashPopup(props: {
   query: string;
@@ -32,8 +48,7 @@ export function SlashPopup(props: {
   onPick: (index: number) => void;
   onHover: (index: number) => void;
 }) {
-  const q = props.query.trim().toLowerCase();
-  const matches = props.items.filter((c) => !q || c.label.toLowerCase().includes(q) || c.description.toLowerCase().includes(q)).slice(0, 9);
+  const matches = filterCommands(props.items, props.query);
   if (matches.length === 0) return null;
   let lastGroup: string | null = null;
   return (

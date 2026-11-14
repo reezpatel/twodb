@@ -153,6 +153,13 @@ func (r *runner) connect() error {
 			r.dispatchResult(f)
 			continue
 		}
+		// Tunnel writes must reach the upstream in arrival order (VS Code's framed
+		// protocol breaks on reordering), so handle them inline on the read loop —
+		// a conn.WriteMessage is quick. Everything else runs concurrently.
+		if t := f.str("type"); t == "proxyWsWrite" || t == "proxyWsClose" {
+			r.handle(f)
+			continue
+		}
 		go r.handle(f)
 	}
 }

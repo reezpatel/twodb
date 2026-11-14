@@ -55,11 +55,11 @@ export async function runCompaction(
   // Close the current thread with the summary; open the next with it.
   const thread = await deps.repo.currentThread(session.id);
   if (thread) {
-    // Merge with a previous summary if this is a repeat compaction.
-    const prior = thread.summary;
-    const merged = prior ? `${summary}\n\n--- previous segment summary ---\n${prior}` : summary;
+    // The new thread's summary covers only the segment just closed. Earlier segments stay in
+    // their own threads' summaries, which buildContext replays in order — merging them here too
+    // made every summary appear twice and grow with each compaction.
     await deps.repo.closeThread(thread.id);
-    await deps.repo.openThread(session.id, merged);
+    await deps.repo.openThread(session.id, summary);
   }
   return summary;
 }

@@ -7,7 +7,7 @@ export function askUserTool(): ToolSpec {
     description:
       "Asks the user one or more questions and waits for answers. Use when a decision, choice, or " +
       "clarification is needed instead of guessing. Each question may offer options; the user can " +
-      "always answer freely.",
+      "always answer freely, and may skip any question — skipped questions come back as \"(skipped…)\".",
     parameters: {
       type: "object",
       properties: {
@@ -34,7 +34,12 @@ export function askUserTool(): ToolSpec {
       const res = await ctx.askUser(questions);
       if (res.cancelled) return "the user cancelled this question — proceed with your best judgment";
       if (!res.answers) return "no answer received (no viewer) — proceed with your best judgment";
-      return questions.map((q, i) => `Q: ${q.question}\nA: ${res.answers?.[i] ?? "(skipped)"}`).join("\n\n");
+      // An empty string / empty list means the user skipped that question.
+      const fmt = (a: string | string[] | undefined): string => {
+        const parts = (Array.isArray(a) ? a : [a ?? ""]).map((x) => x.trim()).filter(Boolean);
+        return parts.length ? parts.join(", ") : "(skipped by the user — use your best judgment)";
+      };
+      return questions.map((q, i) => `Q: ${q.question}\nA: ${fmt(res.answers?.[i])}`).join("\n\n");
     },
   };
 }

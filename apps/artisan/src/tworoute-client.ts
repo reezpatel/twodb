@@ -40,6 +40,8 @@ export interface ChatUsage {
   prompt_tokens?: number;
   completion_tokens?: number;
   cached_tokens?: number;
+  /** OpenAI-style location of the cached count (what TwoRoute actually returns). */
+  prompt_tokens_details?: { cached_tokens?: number } | null;
 }
 
 interface ChatChoice {
@@ -61,13 +63,25 @@ export interface ChatChunk {
   usage?: ChatUsage | null;
 }
 
+const MODEL_CACHE = new Map<string, { at: number; models: ModelInfo[] }>();
+
 export class TworouteClient {
   constructor(
     private readonly config: ArtisanConfig,
     private readonly apiKey: string,
   ) {}
 
+  /** Model list cached per (url, key) for a minute — it was refetched on every call. */
   async listModels(): Promise<ModelInfo[]> {
+    const key = `${this.config.TWOROUTE_URL}|${this.apiKey}`;
+    const hit = MODEL_CACHE.get(key);
+    if (hit && Date.now() - hit.at < 60_000) return hit.models;
+    const models = await this.fetchModels();
+    MODEL_CACHE.set(key, { at: Date.now(), models });
+    return models;
+  }
+
+  private async fetchModels(): Promise<ModelInfo[]> {
     const res = await fetch(`${this.config.TWOROUTE_URL}/v1/models`, {
       headers: { authorization: `Bearer ${this.apiKey}` },
     });
@@ -151,7 +165,10 @@ export class TworouteClient {
         try {
           const raw = JSON.parse(data) as { choices?: ChatChoice[]; usage?: ChatUsage };
           const choice = raw.choices?.[0];
-          yield { delta: choice?.delta, finish_reason: choice?.finish_reason ?? null, usage: raw.usage ?? null };
+          const usage = raw.usage
+            ? { ...raw.usage, cached_tokens: raw.usage.cached_tokens ?? raw.usage.prompt_tokens_details?.cached_tokens ?? 0 }
+            : null;
+          yield { delta: choice?.delta, finish_reason: choice?.finish_reason ?? null, usage };
         } catch {
           // skip malformed keepalives
         }

@@ -13,9 +13,12 @@
     "core-async"
   ],
   "basePath": "/apps/artisan",
-  "generatedAt": "2026-11-12T03:54:51.312Z",
+  "generatedAt": "2026-11-14T21:48:00.318Z",
   "websocketPaths": [
-    "/ws"
+    "/ws",
+    "/sessions/:id/term",
+    "/sessions/:id/editor-ws",
+    "/sessions/:id/editor-ws/:path"
   ],
   "endpoints": [
     {
@@ -152,6 +155,9 @@
             "type": "string"
           },
           "all": {
+            "type": "string"
+          },
+          "agentId": {
             "type": "string"
           }
         },
@@ -385,6 +391,275 @@
           "running",
           "usage",
           "messages"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getInspectRound",
+      "method": "GET",
+      "path": "/sessions/:id/inspect/:inspectId",
+      "auth": "session-or-apiKey",
+      "description": "Inspector: the exact request (system prompt, history, tool schemas) sent for one round. Kept 3 days, then 404 { error: 'expired' }.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "inspectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "inspectId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "round": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "tools": {},
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "toolCallId": {
+                  "type": "string"
+                },
+                "toolCalls": {}
+              },
+              "required": [
+                "role",
+                "content"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "round",
+          "createdAt",
+          "tools",
+          "messages"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listMicrovms",
+      "method": "GET",
+      "path": "/microvms",
+      "auth": "session-or-apiKey",
+      "description": "Dispatch microvms usable as a session runner (address them as `microvm:<identifier>`).",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "identifier": {
+              "type": "string"
+            },
+            "runnerId": {
+              "type": "string"
+            },
+            "runnerName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "bootCount": {
+              "type": "number"
+            },
+            "lastActiveAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "identifier",
+            "runnerId",
+            "runnerName",
+            "status",
+            "bootCount",
+            "lastActiveAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createMicrovm",
+      "method": "POST",
+      "path": "/microvms",
+      "auth": "session-or-apiKey",
+      "description": "Boots a new microvm through dispatch. Optional name becomes the identifier.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "memMb": {
+            "type": "number"
+          },
+          "vcpu": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "runnerId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "identifier",
+          "runnerId",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listRunnerDir",
+      "method": "GET",
+      "path": "/runners/:runner/fs",
+      "auth": "session-or-apiKey",
+      "description": "Lists a directory on a runner or microvm (directory picker). `path` may start with ~.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "runner": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "runner"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "dir": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "dir"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "path",
+          "entries"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "makeRunnerDir",
+      "method": "POST",
+      "path": "/runners/:runner/fs/mkdir",
+      "auth": "session-or-apiKey",
+      "description": "mkdir -p an absolute path on a runner or microvm.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "runner": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "runner",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "path"
         ],
         "additionalProperties": false
       }
@@ -691,6 +966,12 @@
           "spaceId": {
             "type": "string"
           },
+          "spaceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "type": {
             "type": "string"
           },
@@ -742,8 +1023,7 @@
         },
         "required": [
           "type",
-          "name",
-          "instruction"
+          "name"
         ],
         "additionalProperties": false
       },
@@ -759,6 +1039,121 @@
           "ok"
         ],
         "additionalProperties": false
+      }
+    },
+    {
+      "name": "getAgent",
+      "method": "GET",
+      "path": "/agents/:id",
+      "auth": "session-or-apiKey",
+      "description": "One agent including its instruction (system prompt).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "instruction": {
+            "type": "string"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "runner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "directory": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "spaceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "name",
+          "description",
+          "instruction",
+          "model",
+          "tools",
+          "runner",
+          "directory",
+          "spaceId",
+          "spaceIds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listTools",
+      "method": "GET",
+      "path": "/tools",
+      "auth": "session-or-apiKey",
+      "description": "The tools an agent can be allowed to use (name + description).",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "description"
+          ],
+          "additionalProperties": false
+        }
       }
     },
     {
@@ -923,20 +1318,11 @@
       "method": "POST",
       "path": "/skills",
       "auth": "session-or-apiKey",
-      "description": "Creates a space-scoped skill with optional directory pin and tags.",
+      "description": "Creates a skill. `scope` = one availability mode: global | agents | spaces | types, each (except global) either `all` or a list of ids (agent ids, space ids, or agent types).",
       "request": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
-          "spaceId": {
-            "type": "string"
-          },
-          "directory": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "name": {
             "type": "string"
           },
@@ -946,17 +1332,39 @@
           "content": {
             "type": "string"
           },
-          "tags": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "scope": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "agents",
+                  "spaces",
+                  "types"
+                ]
+              },
+              "all": {
+                "type": "boolean"
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "mode",
+              "all",
+              "ids"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
           "name",
-          "description",
-          "content"
+          "scope"
         ],
         "additionalProperties": false
       },
@@ -964,12 +1372,53 @@
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
-          "ok": {
-            "type": "boolean"
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "agents",
+                  "spaces",
+                  "types"
+                ]
+              },
+              "all": {
+                "type": "boolean"
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "mode",
+              "all",
+              "ids"
+            ],
+            "additionalProperties": false
+          },
+          "content": {
+            "type": "string"
           }
         },
         "required": [
-          "ok"
+          "id",
+          "name",
+          "description",
+          "scope"
         ],
         "additionalProperties": false
       }
@@ -979,12 +1428,12 @@
       "method": "GET",
       "path": "/skills",
       "auth": "session-or-apiKey",
-      "description": "Skills in a space.",
+      "description": "All skills in the workspace with their availability scope (?content=1 includes the content).",
       "request": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
-          "spaceId": {
+          "content": {
             "type": "string"
           }
         },
@@ -1005,19 +1454,36 @@
             "description": {
               "type": "string"
             },
-            "directory": {
-              "type": [
-                "string",
-                "null"
-              ]
+            "scope": {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "global",
+                    "agents",
+                    "spaces",
+                    "types"
+                  ]
+                },
+                "all": {
+                  "type": "boolean"
+                },
+                "ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "mode",
+                "all",
+                "ids"
+              ],
+              "additionalProperties": false
             },
-            "tags": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "spaceId": {
+            "content": {
               "type": "string"
             }
           },
@@ -1025,12 +1491,84 @@
             "id",
             "name",
             "description",
-            "directory",
-            "tags",
-            "spaceId"
+            "scope"
           ],
           "additionalProperties": false
         }
+      }
+    },
+    {
+      "name": "getSkill",
+      "method": "GET",
+      "path": "/skills/:id",
+      "auth": "session-or-apiKey",
+      "description": "One skill including its content.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "agents",
+                  "spaces",
+                  "types"
+                ]
+              },
+              "all": {
+                "type": "boolean"
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "mode",
+              "all",
+              "ids"
+            ],
+            "additionalProperties": false
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "scope"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -1038,7 +1576,119 @@
       "method": "PATCH",
       "path": "/skills/:id",
       "auth": "session-or-apiKey",
-      "description": "Updates a skill.",
+      "description": "Updates a skill's name, description, content or availability scope.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "agents",
+                  "spaces",
+                  "types"
+                ]
+              },
+              "all": {
+                "type": "boolean"
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "mode",
+              "all",
+              "ids"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "agents",
+                  "spaces",
+                  "types"
+                ]
+              },
+              "all": {
+                "type": "boolean"
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "mode",
+              "all",
+              "ids"
+            ],
+            "additionalProperties": false
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "scope"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteSkill",
+      "method": "DELETE",
+      "path": "/skills/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a skill.",
       "request": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -1067,11 +1717,1165 @@
       }
     },
     {
-      "name": "deleteSkill",
-      "method": "DELETE",
-      "path": "/skills/:id",
+      "name": "getGlobalInstruction",
+      "method": "GET",
+      "path": "/settings/global-instruction",
       "auth": "session-or-apiKey",
-      "description": "Deletes a skill.",
+      "description": "The workspace's global instruction — base rules added to every agent's system prompt.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "content",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "setGlobalInstruction",
+      "method": "PUT",
+      "path": "/settings/global-instruction",
+      "auth": "session-or-apiKey",
+      "description": "Sets the global instruction (max 20,000 characters; empty clears it). Applies from each agent's next run.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "content",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listMcpServers",
+      "method": "GET",
+      "path": "/mcp",
+      "auth": "session-or-apiKey",
+      "description": "MCP server configs (remote http/sse). Config only — not yet offered to agents.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "transport": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "http",
+                "sse"
+              ]
+            },
+            "headers": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "scope": {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "global",
+                    "agents",
+                    "spaces",
+                    "directories",
+                    "types"
+                  ]
+                },
+                "all": {
+                  "type": "boolean"
+                },
+                "ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "mode",
+                "all",
+                "ids"
+              ],
+              "additionalProperties": false
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "url",
+            "transport",
+            "headers",
+            "enabled",
+            "scope",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "getMcpServer",
+      "method": "GET",
+      "path": "/mcp/:id",
+      "auth": "session-or-apiKey",
+      "description": "One MCP server config.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "http",
+              "sse"
+            ]
+          },
+          "headers": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "agents",
+                  "spaces",
+                  "directories",
+                  "types"
+                ]
+              },
+              "all": {
+                "type": "boolean"
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "mode",
+              "all",
+              "ids"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url",
+          "transport",
+          "headers",
+          "enabled",
+          "scope",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createMcpServer",
+      "method": "POST",
+      "path": "/mcp",
+      "auth": "session-or-apiKey",
+      "description": "Registers an MCP server. Name is unique and prefixes tool names (mcp__<name>__<tool>); header values may use <ENV_NAME> placeholders. Availability: global, agents, spaces, directories or agent types.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "http",
+              "sse"
+            ]
+          },
+          "headers": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "agents",
+                  "spaces",
+                  "directories",
+                  "types"
+                ]
+              },
+              "all": {
+                "type": "boolean"
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "mode",
+              "all",
+              "ids"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "http",
+              "sse"
+            ]
+          },
+          "headers": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "agents",
+                  "spaces",
+                  "directories",
+                  "types"
+                ]
+              },
+              "all": {
+                "type": "boolean"
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "mode",
+              "all",
+              "ids"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url",
+          "transport",
+          "headers",
+          "enabled",
+          "scope",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateMcpServer",
+      "method": "PATCH",
+      "path": "/mcp/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates an MCP server's name, url, transport, headers, enabled flag or availability.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "http",
+              "sse"
+            ]
+          },
+          "headers": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "agents",
+                  "spaces",
+                  "directories",
+                  "types"
+                ]
+              },
+              "all": {
+                "type": "boolean"
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "mode",
+              "all",
+              "ids"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "http",
+              "sse"
+            ]
+          },
+          "headers": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "agents",
+                  "spaces",
+                  "directories",
+                  "types"
+                ]
+              },
+              "all": {
+                "type": "boolean"
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "mode",
+              "all",
+              "ids"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url",
+          "transport",
+          "headers",
+          "enabled",
+          "scope",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteMcpServer",
+      "method": "DELETE",
+      "path": "/mcp/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes an MCP server config.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "previewMcpImport",
+      "method": "POST",
+      "path": "/mcp/import/preview",
+      "auth": "session-or-apiKey",
+      "description": "Parses an mcpServers JSON paste (VS Code / Claude Desktop / Cursor) without saving. stdio entries are skipped.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "drafts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "transport": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "http",
+                    "sse"
+                  ]
+                },
+                "headers": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "url",
+                "transport",
+                "headers"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "drafts",
+          "skipped"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "importMcpServers",
+      "method": "POST",
+      "path": "/mcp/import",
+      "auth": "session-or-apiKey",
+      "description": "Creates one MCP server per entry of an mcpServers JSON paste, all with the given availability. Existing names are reported as conflicts.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "agents",
+                  "spaces",
+                  "directories",
+                  "types"
+                ]
+              },
+              "all": {
+                "type": "boolean"
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "mode",
+              "all",
+              "ids"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "json",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "transport": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "http",
+                    "sse"
+                  ]
+                },
+                "headers": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "scope": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "global",
+                        "agents",
+                        "spaces",
+                        "directories",
+                        "types"
+                      ]
+                    },
+                    "all": {
+                      "type": "boolean"
+                    },
+                    "ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "all",
+                    "ids"
+                  ],
+                  "additionalProperties": false
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "url",
+                "transport",
+                "headers",
+                "enabled",
+                "scope",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "created",
+          "conflicts",
+          "skipped"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listMemories",
+      "method": "GET",
+      "path": "/memories",
+      "auth": "session-or-apiKey",
+      "description": "Memories. With sessionId: what that session's agent sees (organization + directory + own + session; sub-agents inherit their caller's). Without: every memory in the workspace.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "level": {
+              "type": "string",
+              "enum": [
+                "organization",
+                "code_directory",
+                "self",
+                "session"
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "directoryId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "agentId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sessionId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "level",
+            "title",
+            "content",
+            "directoryId",
+            "agentId",
+            "sessionId",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createMemory",
+      "method": "POST",
+      "path": "/memories",
+      "auth": "session-or-apiKey",
+      "description": "Creates a memory at a level. code_directory needs directoryId, self needs agentId (persona/collaborator), session needs sessionId. Titles are unique per level and owner.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "organization",
+              "code_directory",
+              "self",
+              "session"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "directoryId": {
+            "type": "string"
+          },
+          "agentId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "organization",
+              "code_directory",
+              "self",
+              "session"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "directoryId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "agentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sessionId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "level",
+          "title",
+          "content",
+          "directoryId",
+          "agentId",
+          "sessionId",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateMemory",
+      "method": "PATCH",
+      "path": "/memories/:id",
+      "auth": "session-or-apiKey",
+      "description": "Renames a memory and/or replaces its content.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "organization",
+              "code_directory",
+              "self",
+              "session"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "directoryId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "agentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sessionId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "level",
+          "title",
+          "content",
+          "directoryId",
+          "agentId",
+          "sessionId",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteMemory",
+      "method": "DELETE",
+      "path": "/memories/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a memory.",
       "request": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",

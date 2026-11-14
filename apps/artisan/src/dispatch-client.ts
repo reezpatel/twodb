@@ -12,6 +12,19 @@ export interface RunnerInfo {
   kind: "host" | "microvm-host";
 }
 
+export interface MicrovmInfo {
+  id: string;
+  identifier: string;
+  runnerId: string;
+  runnerName: string | null;
+  status: "running" | "idle-stopped" | "archived" | "failed";
+  bootCount: number;
+  lastActiveAt: string;
+}
+
+/** Runner names of the form `microvm:<identifier>` address a Firecracker microvm. */
+export const MICROVM_PREFIX = "microvm:";
+
 export interface ExecResult {
   stdout: string;
   stderr: string;
@@ -59,13 +72,38 @@ export class DispatchClient {
   }
 
   /** One-shot exec with cwd — files, quick reads. */
+  async listMicrovms(): Promise<MicrovmInfo[]> {
+    return this.get<MicrovmInfo[]>("/microvms");
+  }
+
+  async bootMicrovm(input: { identifier: string; runnerId?: string; memMb?: number; vcpu?: number }): Promise<MicrovmInfo> {
+    return this.post<MicrovmInfo>("/microvms/boot", input);
+  }
+
+  private async execMicrovm(identifier: string, command: string, cwd: string, timeoutMs: number): Promise<ExecResult> {
+    const vm = (await this.listMicrovms()).find((v) => v.identifier === identifier);
+    if (!vm) throw new Error(`microvm ${identifier} not found`);
+    // Dispatch exec does not resume idle VMs on its own — boot/resume first.
+    if (vm.status !== "running") await this.bootMicrovm({ identifier, runnerId: vm.runnerName ?? vm.runnerId });
+    return this.post<ExecResult>("/microvms/exec", { runnerId: vm.runnerName ?? vm.runnerId, identifier, command, cwd, timeoutMs: Math.min(timeoutMs, 600_000) });
+  }
+
   async exec(runner: string, command: string, cwd: string, timeoutMs = 60_000): Promise<ExecResult> {
+    if (runner.startsWith(MICROVM_PREFIX)) return this.execMicrovm(runner.slice(MICROVM_PREFIX.length), command, cwd, timeoutMs);
     return this.post<ExecResult>("/exec", { runnerId: runner, command, cwd, timeoutMs });
   }
 
   /** Streamed call — yields output chunks; the last yield carries done/exitCode.
    *  Dispatch SSE uses `event:` lines (output|done|error) with `chunk` payloads. */
   async *call(runner: string, command: string, cwd: string, timeoutMs = 600_000): AsyncGenerator<{ stream: "stdout" | "stderr"; data: string; done?: boolean; exitCode?: number | null }> {
+    if (runner.startsWith(MICROVM_PREFIX)) {
+      // microvms expose buffered exec only — emit the whole output as one chunk.
+      const r = await this.execMicrovm(runner.slice(MICROVM_PREFIX.length), command, cwd, timeoutMs);
+      if (r.stdout) yield { stream: "stdout", data: r.stdout };
+      if (r.stderr) yield { stream: "stderr", data: r.stderr };
+      yield { stream: "stdout", data: "", done: true, exitCode: r.exitCode };
+      return;
+    }
     const { callId } = await this.post<{ callId: string }>("/calls", { runnerId: runner, command, cwd, timeoutMs });
     const res = await fetch(`${this.config.DISPATCH_URL}/calls/${callId}/stream`, {
       headers: { authorization: `Bearer ${this.apiKey}` },

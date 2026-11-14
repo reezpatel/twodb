@@ -37,6 +37,9 @@
   /* Popover/menu surface: a touch lighter than stone so floating panels read as raised, not flat */
   --popover: #f8f6f1;
 
+  /* User-message bubble tint — light equals the previous `bg-primary/15` (ink @15%). */
+  --bubble: color-mix(in oklab, var(--ink) 15%, transparent);
+
   --destructive: #c8323f;
   --destructive-foreground: #f2efe8;
   --success: #3f8a5c;
@@ -97,6 +100,19 @@
   --warning-foreground: oklch(0.187 0 0);
   --info: var(--ion-deep);
   --info-foreground: oklch(0.187 0 0);
+
+  /*
+   * Legacy desktop-app surfaces (dark only — light intentionally leaves these unset,
+   * so `bg-surface*` stays transparent there exactly as before):
+   *   surface        = legacy card / popover / header   (oklch .196)
+   *   surface-muted  = legacy muted / accent / composer (oklch .244)
+   *   outline-strong = legacy secondary                 (oklch .306)
+   *   bubble         = legacy `bg-primary/15` (lavender primary @15%)
+   */
+  --surface: oklch(0.196 0 0);
+  --surface-muted: oklch(0.244 0 0);
+  --outline-strong: oklch(0.306 0.005 286.1);
+  --bubble: color-mix(in oklab, oklch(0.734 0.067 295.7) 15%, transparent);
 }
 
 /* Follow the OS when no explicit theme is set */
@@ -127,6 +143,19 @@
     --warning-foreground: oklch(0.187 0 0);
     --info: var(--ion-deep);
     --info-foreground: oklch(0.187 0 0);
+
+    /*
+     * Legacy desktop-app surfaces (dark only — light intentionally leaves these unset,
+     * so `bg-surface*` stays transparent there exactly as before):
+     *   surface        = legacy card / popover / header   (oklch .196)
+     *   surface-muted  = legacy muted / accent / composer (oklch .244)
+     *   outline-strong = legacy secondary                 (oklch .306)
+     *   bubble         = legacy `bg-primary/15` (lavender primary @15%)
+     */
+    --surface: oklch(0.196 0 0);
+    --surface-muted: oklch(0.244 0 0);
+    --outline-strong: oklch(0.306 0.005 286.1);
+    --bubble: color-mix(in oklab, oklch(0.734 0.067 295.7) 15%, transparent);
   }
 }
 
@@ -174,6 +203,11 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--paper-grid);
   --color-accent-foreground: var(--ink);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-outline-strong: var(--outline-strong);
+  --color-bubble: var(--bubble);
+
   --color-border: var(--outline);
   --color-input: var(--outline);
   --color-ring: var(--ion-deep);
@@ -186,6 +220,24 @@
 
   /* One step past Tailwind's max 7xl (80rem) — used by wide registry grids. */
   --container-8xl: 90rem;
+}
+
+/* Legacy default border colour. Tailwind v4's preflight leaves borders at
+   currentColor, which reads as bright ink in dark; the legacy app set
+   `* { border-color: var(--border) }`. Dark only — light is untouched. */
+@layer base {
+  [data-theme="dark"] *,
+  [data-theme="dark"] ::before,
+  [data-theme="dark"] ::after {
+    border-color: var(--outline);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) *,
+    :root:not([data-theme="light"]) ::before,
+    :root:not([data-theme="light"]) ::after {
+      border-color: var(--outline);
+    }
+  }
 }
 
 body {
