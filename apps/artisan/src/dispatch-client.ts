@@ -122,7 +122,12 @@ export class DispatchClient {
       headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
       body: JSON.stringify(req),
     });
-    if (!res.ok) throw new Error(`proxy-http ${res.status}`);
+    // Pass the upstream status through verbatim: code-server legitimately
+    // answers 404 for files that don't ship in the standalone tarball (browser
+    // extension entry points, notebook webview preloads), and the workbench
+    // falls back on a clean 404 — a 502 would read as "server dead". Only 5xx
+    // from dispatch itself (runner unreachable / proxy failed) is an error.
+    if (res.status >= 500) throw new Error(`proxy-http ${res.status}`);
     const headers: Record<string, string> = {};
     res.headers.forEach((v, k) => { headers[k] = v; });
     const buf = Buffer.from(await res.arrayBuffer());
