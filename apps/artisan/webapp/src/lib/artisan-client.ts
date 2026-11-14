@@ -247,12 +247,15 @@ export class WorkspaceSocket {
 
   connect(): void {
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
-    this.ws = new WebSocket(`${proto}://${window.location.host}/apps/artisan/ws`);
-    this.ws.onopen = () => {
+    const ws = new WebSocket(`${proto}://${window.location.host}/apps/artisan/ws`);
+    this.ws = ws;
+    ws.onopen = () => {
+      // Ignore a stale open (a newer connect superseded this socket).
+      if (this.ws !== ws) return;
       this.retryMs = 1000;
-      for (const raw of this.queue.splice(0)) this.ws!.send(raw);
+      for (const raw of this.queue.splice(0)) ws.send(raw);
     };
-    this.ws.onmessage = (ev) => {
+    ws.onmessage = (ev) => {
       try {
         const frame = JSON.parse(ev.data as string) as ServerFrame;
         for (const l of this.listeners) l(frame);
@@ -260,7 +263,8 @@ export class WorkspaceSocket {
         // malformed
       }
     };
-    this.ws.onclose = () => {
+    ws.onclose = () => {
+      if (this.ws !== ws) return; // superseded by a newer connect
       this.ws = null;
       setTimeout(() => this.connect(), this.retryMs);
       this.retryMs = Math.min(this.retryMs * 2, 15_000);
