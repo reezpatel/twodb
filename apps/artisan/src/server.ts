@@ -798,6 +798,8 @@ echo saved`;
     const headers: Record<string, string> = {};
     for (const [k, v] of Object.entries(req.headers)) if (!HOP_BY_HOP.has(k.toLowerCase())) headers[k] = typeof v === "string" ? v : String(v ?? "");
     delete headers["host"]; delete headers["content-length"]; delete headers["connection"];
+    // force identity so code-server returns plain text — the base64 WS relay corrupts gzip bytes
+    headers["accept-encoding"] = "identity";
     const hasBody = !["GET", "HEAD"].includes(req.method);
     const rawBody: unknown = hasBody ? await (req as { body?: unknown }).body : undefined;
     const bodyBuf = hasBody ? Buffer.from((rawBody as Buffer | undefined) ?? Buffer.alloc(0)) : undefined;
