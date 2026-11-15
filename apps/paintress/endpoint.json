@@ -13,8 +13,8 @@
     "core-platform",
     "core-async"
   ],
-  "basePath": "/apps/paintress",
-  "generatedAt": "2026-11-15T05:05:17.930Z",
+  "basePath": "/apps/paintress/api",
+  "generatedAt": "2026-11-15T19:04:19.066Z",
   "websocketPaths": [
     "/boards/:id/ws"
   ],
@@ -431,7 +431,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -727,7 +728,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -862,7 +864,8 @@
                             "edge",
                             "sticky",
                             "text",
-                            "image"
+                            "image",
+                            "draw"
                           ]
                         },
                         "parentId": {
@@ -1062,7 +1065,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -1180,7 +1184,8 @@
                             "edge",
                             "sticky",
                             "text",
-                            "image"
+                            "image",
+                            "draw"
                           ]
                         },
                         "parentId": {
@@ -1384,7 +1389,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -1485,7 +1491,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -1603,7 +1610,8 @@
                             "edge",
                             "sticky",
                             "text",
-                            "image"
+                            "image",
+                            "draw"
                           ]
                         },
                         "parentId": {
@@ -1879,7 +1887,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -1997,7 +2006,8 @@
                             "edge",
                             "sticky",
                             "text",
-                            "image"
+                            "image",
+                            "draw"
                           ]
                         },
                         "parentId": {
@@ -2224,7 +2234,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -2342,7 +2353,8 @@
                             "edge",
                             "sticky",
                             "text",
-                            "image"
+                            "image",
+                            "draw"
                           ]
                         },
                         "parentId": {
@@ -2598,7 +2610,8 @@
                           "edge",
                           "sticky",
                           "text",
-                          "image"
+                          "image",
+                          "draw"
                         ]
                       },
                       "parentId": {
@@ -2716,7 +2729,8 @@
                                   "edge",
                                   "sticky",
                                   "text",
-                                  "image"
+                                  "image",
+                                  "draw"
                                 ]
                               },
                               "parentId": {
@@ -2976,7 +2990,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -3094,7 +3109,8 @@
                             "edge",
                             "sticky",
                             "text",
-                            "image"
+                            "image",
+                            "draw"
                           ]
                         },
                         "parentId": {
@@ -3543,7 +3559,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -3656,7 +3673,8 @@
                             "edge",
                             "sticky",
                             "text",
-                            "image"
+                            "image",
+                            "draw"
                           ]
                         },
                         "parentId": {
@@ -4061,7 +4079,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -4174,7 +4193,8 @@
                             "edge",
                             "sticky",
                             "text",
-                            "image"
+                            "image",
+                            "draw"
                           ]
                         },
                         "parentId": {
@@ -4547,7 +4567,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -4660,7 +4681,8 @@
                             "edge",
                             "sticky",
                             "text",
-                            "image"
+                            "image",
+                            "draw"
                           ]
                         },
                         "parentId": {
@@ -4953,7 +4975,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -5066,7 +5089,8 @@
                             "edge",
                             "sticky",
                             "text",
-                            "image"
+                            "image",
+                            "draw"
                           ]
                         },
                         "parentId": {
@@ -5338,7 +5362,8 @@
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -5451,7 +5476,8 @@
                             "edge",
                             "sticky",
                             "text",
-                            "image"
+                            "image",
+                            "draw"
                           ]
                         },
                         "parentId": {

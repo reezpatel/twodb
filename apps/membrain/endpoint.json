@@ -10,7 +10,7 @@
     "core-platform",
     "core-async"
   ],
-  "basePath": "/apps/membrain",
-  "generatedAt": "2026-11-09T12:16:47.516Z",
+  "basePath": "/apps/membrain/api",
+  "generatedAt": "2026-11-15T19:04:18.861Z",
   "endpoints": []
 }

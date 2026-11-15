@@ -1,4 +1,5 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
+import { webappRewriteUrl, registerWebapp, webappDist, appUiUrl } from "@twodb/twodb-core/webapp";
 import websocket from "@fastify/websocket";
 import multipart from "@fastify/multipart";
 import { createPgDb } from "@twodb/core-data/db";
@@ -38,7 +39,7 @@ import { collectAssetIds, collectMentions, blocksToText, messageBlocks, type Mes
 export type ServiceCaller = Pick<TwoDbRuntime, "serviceFetch" | "verifyServiceToken" | "serviceToken">;
 
 export async function buildServer(config: TwoChatConfig, opts: { twodb?: ServiceCaller } = {}) {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
   await app.register(websocket);
   await app.register(multipart, {
@@ -996,7 +997,7 @@ export async function buildServer(config: TwoChatConfig, opts: { twodb?: Service
         id: m.id,
         title: m.authorName,
         snippet: m.text.slice(0, 200),
-        url: `/apps/twochat/channel/${m.channelId}?message=${m.id}`,
+        url: appUiUrl("twochat", `/channel/${m.channelId}?message=${m.id}`),
         channelId: m.channelId,
         createdAt: m.createdAt,
       })),
@@ -1031,6 +1032,7 @@ export async function buildServer(config: TwoChatConfig, opts: { twodb?: Service
     return collab.rollbackToBefore(auth.ctx.workspaceId, message.channel_id, message.id, body.restoreFiles === true);
   });
 
+  await registerWebapp(app, { distDir: webappDist(import.meta.dirname) });
   return app;
 }
 

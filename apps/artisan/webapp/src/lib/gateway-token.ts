@@ -1,37 +1,15 @@
-/** Per-login gateway token, held in memory only (never persisted).
+/** The per-login gateway token for artisan API calls and WS upgrades (?access_token=).
  *
- * On first use (or after expiry) we exchange the browser's better-auth
- * cookie session — same-origin, credentials:include — for a gateway Bearer
- * token via the control plane's /auth/gateway-token. That token is what the
- * gateway validates uniformly for every app, so all artisan API calls (and
- * WS upgrades, via ?access_token=) send it as Authorization: Bearer.
+ * It is the session token the shared TwoDbAuthProvider obtained from the console's login flow
+ * (core/twodb-shared-frontend) — held by that provider, so there is no separate token exchange here.
  */
+import { currentToken } from "@twodb/twodb-shared-frontend";
 
-let cached: { token: string; expiresAt: number } | null = null;
-let inflight: Promise<string> | null = null;
-
-async function fetchToken(): Promise<string> {
-  const res = await fetch("/auth/gateway-token", { credentials: "include" });
-  if (!res.ok) {
-    cached = null;
-    throw new Error(`gateway-token ${res.status}`);
-  }
-  const body = (await res.json()) as { accessToken: string; expiresAt: string };
-  const expiresAt = new Date(body.expiresAt).getTime();
-  // Refresh a minute early so a long-lived page never sends a stale token.
-  cached = { token: body.accessToken, expiresAt: expiresAt - 60_000 };
-  return body.accessToken;
-}
-
-/** Returns a valid in-memory gateway token, fetching/refreshing as needed. */
+/** Returns the current session token; rejects when signed out (RequireTwoDbAuth normally prevents that). */
 export async function gatewayToken(): Promise<string> {
-  if (cached && cached.expiresAt > Date.now()) return cached.token;
-  if (!inflight) {
-    inflight = fetchToken().finally(() => {
-      inflight = null;
-    });
-  }
-  return inflight;
+  const token = currentToken();
+  if (!token) throw new Error("not signed in");
+  return token;
 }
 
 /** Authorization header for a gateway call. */

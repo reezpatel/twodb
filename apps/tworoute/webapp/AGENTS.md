@@ -12,7 +12,7 @@ No login lives here. Identity is the shared control-plane better-auth session
 control plane's login when absent.
 
 ## API surface
-- `/tworoute-api/*` → gateway `/apps/tworoute/*` (identity forwarded as
+- `/api/*` → gateway `/apps/tworoute/api/*` (identity forwarded as
   `x-twodb-*` headers by TwoDB — never talk to better-auth or workspace
   tables here, per the backend AGENTS.md boundary).
 - `/registry/spaces` → control plane (space selector data).

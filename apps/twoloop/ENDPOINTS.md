@@ -5,11 +5,11 @@
 Workflow automation — not yet implemented. See AGENTS.md before building it out.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/twoloop`
+- **Base path (via Gateway)**: `/apps/twoloop/api`
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-09T12:16:49.191Z_
+_Generated: 2026-11-15T19:04:19.165Z_
 
 ## Endpoints
 

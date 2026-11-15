@@ -5,11 +5,11 @@
 Tasks & habits — TickTick-style boards, lists, smart lists, quick-add, recurrence, habit tracking. Implemented (v1).
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/twodoo`
+- **Base path (via Gateway)**: `/apps/twodoo/api`
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T17:41:01.442Z_
+_Generated: 2026-11-15T19:04:18.903Z_
 
 ## Endpoints
 

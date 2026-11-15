@@ -138,7 +138,7 @@ function ToolsSection({ instance, tools }: { instance: ConnectorInstance; tools:
   return (
     <div className="mx-auto max-w-3xl">
       <p className="text-[12px] text-ink-muted">
-        {tools.length} tools available on this instance. Other apps invoke them as <code className="font-mono">POST /apps/toolkit/tools/&#123;toolId&#125;/invoke</code>.
+        {tools.length} tools available on this instance. Other apps invoke them as <code className="font-mono">POST /api/tools/&#123;toolId&#125;/invoke</code>.
       </p>
       <ul className="mt-3 flex flex-col gap-2">
         {tools.map((tool) => {
@@ -224,7 +224,7 @@ function EventsSection({ instance }: { instance: ConnectorInstance }) {
 
   useEffect(() => {
     void load();
-    const es = new EventSource(`/apps/toolkit/events/stream?instanceId=${encodeURIComponent(instance.id)}&token=${encodeURIComponent(new URLSearchParams(location.search).get("token") ?? "")}`);
+    const es = new EventSource(`/api/events/stream?instanceId=${encodeURIComponent(instance.id)}&token=${encodeURIComponent(new URLSearchParams(location.search).get("token") ?? "")}`);
     es.onopen = () => setLive(true);
     es.onerror = () => setLive(false);
     es.onmessage = (m) => {
@@ -241,7 +241,7 @@ function EventsSection({ instance }: { instance: ConnectorInstance }) {
     <div className="mx-auto max-w-3xl">
       <div className="flex items-center justify-between">
         <p className="text-[12px] text-ink-muted">
-          Recent broadcasts of this instance. Listen from any app via <code className="font-mono">GET /apps/toolkit/events?instanceId=…</code> or the SSE stream.
+          Recent broadcasts of this instance. Listen from any app via <code className="font-mono">GET /api/events?instanceId=…</code> or the SSE stream.
         </p>
         <span className={cn("flex items-center gap-1 text-[11px]", live ? "text-emerald-600" : "text-ink-muted")}>
           <span className={cn("size-1.5 rounded-full", live ? "bg-emerald-500 animate-pulse" : "bg-outline-strong")} /> {live ? "live" : "offline"}
@@ -308,7 +308,7 @@ function QueuesSection({ instance }: { instance: ConnectorInstance }) {
   return (
     <div className="mx-auto max-w-3xl">
       <p className="text-[12px] text-ink-muted">
-        Durable queues other apps requested for this instance's broadcasts — every event is inserted, so nothing is lost when a live broadcast is dropped. Consume with <code className="font-mono">POST /apps/toolkit/queues/&#123;instanceId&#125;/&#123;name&#125;/next</code>.
+        Durable queues other apps requested for this instance's broadcasts — every event is inserted, so nothing is lost when a live broadcast is dropped. Consume with <code className="font-mono">POST /api/queues/&#123;instanceId&#125;/&#123;name&#125;/next</code>.
       </p>
       <div className="mt-3 flex gap-2">
         <input

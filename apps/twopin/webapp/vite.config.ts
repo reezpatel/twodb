@@ -19,10 +19,12 @@ export default defineConfig({
     port: 6510,
     strictPort: true,
     proxy: {
-      "/apps/twopin": {
+      // TwoPin's own API through the gateway: /api/* -> /apps/twopin/api/*.
+      // TWOPIN_DEV_DIRECT=1 talks to the backend itself with forged identity headers instead.
+      "/api": {
         target,
         changeOrigin: true,
-        ...(direct ? { rewrite: (path: string) => path.replace(/^\/apps\/twopin/, "") || "/" } : {}),
+        ...(direct ? {} : { rewrite: (p: string) => `/apps/twopin${p}` }),
         configure: direct
           ? (proxy) => {
               proxy.on("proxyReq", (proxyReq) => {

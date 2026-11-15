@@ -5,11 +5,11 @@
 Runner manager: remote command exec (one-shot + streamed), long-running jobs with tail/SSE follow, and ephemeral Firecracker microvms with a persistent /app that survives shutdown (zipped to S3 on shutdown, restored on resume, archived after a configurable inactivity window). Runners connect over a long-lived WebSocket and carry a friendly, workspace-unique identifier.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/dispatch`
+- **Base path (via Gateway)**: `/apps/dispatch/api`
 - **Capabilities**: exec
 - **Core deps**: core-data, core-platform
 
-_Generated: 2026-11-11T11:06:26.793Z_
+_Generated: 2026-11-15T19:04:18.716Z_
 
 ## Endpoints
 

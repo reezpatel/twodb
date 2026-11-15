@@ -45,7 +45,7 @@ export const artisanManifest = defineAppManifest({
   capabilities: ["ws"],
   websocketPaths: ["/ws", "/sessions/:id/term", "/sessions/:id/editor-ws", "/sessions/:id/editor-ws/:path"],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/artisan",
+  basePath: "/apps/artisan/api",
   endpoints: [
     defineEndpoint({
       name: "serviceInbox",

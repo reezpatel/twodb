@@ -68,7 +68,7 @@ export interface UsageTotals {
   lastUsedAt: string | null;
 }
 
-const BASE = "/tworoute-api";
+const BASE = "/api";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) throw new Error((await res.json().catch(() => ({ error: `${res.status}` }))).error ?? `${res.status}`);

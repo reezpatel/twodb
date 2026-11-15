@@ -20,9 +20,9 @@ Webapp: `pnpm --filter @twodb/app-twoday-webapp dev` (6502).
 Set `TWODAY_DATABASE_URL` or `DATABASE_URL` to the provisioned database with an
 existing `twoday` schema. Otherwise credentials are requested from TwoDB using
 `TWODB_PROVISION_TOKEN`. `TWODB_GATEWAY_URL` defaults to http://localhost:6400.
-Sign in to TwoDB with an active workspace and accessible space. The webapp proxies
-`/apps/twoday`, `/registry` and `/api` through the Gateway. Production static hosting
-must provide equivalent routes. Backend ports must remain internal: identity headers
+Sign in to TwoDB with an active workspace and accessible space. The webapp calls its
+own API at same-origin `/api` (dev proxy → Gateway `/apps/twoday/api`); in production the
+app serves the UI at `/` and the API at `/api` itself. Backend ports must remain internal: identity headers
 are trusted only because requests arrive from the Gateway.
 
 ## Verify

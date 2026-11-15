@@ -1,3 +1,4 @@
+import { appUiUrl } from "@twodb/twodb-core/webapp";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { parseRequest, requireScope } from "../http.js";
@@ -76,7 +77,7 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db) {
     const results = [];
     for (const spaceId of spaces) {
       const hits = await search(db, { workspaceId: ctx.workspaceId, spaceId, actor: ctx.actor, userId: ctx.userId }, query, { limit: 10 });
-      results.push(...hits.map((h) => ({ id: h.id, kind: h.kind, title: h.title || "Untitled", snippet: h.snippet, spaceId, url: `/apps/garden/${h.id}` })));
+      results.push(...hits.map((h) => ({ id: h.id, kind: h.kind, title: h.title || "Untitled", snippet: h.snippet, spaceId, url: appUiUrl("garden", `/${h.id}`) })));
     }
     return { results };
   });

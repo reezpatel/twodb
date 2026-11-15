@@ -51,7 +51,7 @@ export interface ConnectOptions {
   token?: string;
   /** Shared secret for self-registration. Default: env TWODB_REGISTRATION_SECRET. */
   registrationSecret?: string;
-  /** Where minted tokens are cached. Default: ./.twodb/<slug>.token (set false to disable). */
+  /** Where minted tokens are cached. Default: env TWODB_TOKEN_FILE, else ./.twodb/<slug>.token (set false to disable). */
   tokenFile?: string | false;
   /** Heartbeat period (default 10_000 — the control plane's timeout is 30s). */
   pingIntervalMs?: number;
@@ -152,7 +152,7 @@ export async function startTwoDbSession(options: ConnectOptions = {}): Promise<T
   const httpUrl = options.httpUrl ?? env.HTTP_URL;
   if (!httpUrl) throw new Error("twodb-core: httpUrl is required (option or HTTP_URL) — where the gateway reaches this app");
   const secret = options.registrationSecret ?? env.TWODB_REGISTRATION_SECRET;
-  const store = options.tokenFile === false ? null : createFileTokenStore(options.tokenFile ?? `.twodb/${slug}.token`);
+  const store = options.tokenFile === false ? null : createFileTokenStore(options.tokenFile ?? env.TWODB_TOKEN_FILE ?? `.twodb/${slug}.token`);
 
   let token: string | null = options.token ?? env.TWODB_APP_TOKEN ?? env.TWODB_PROVISION_TOKEN ?? store?.read() ?? null;
 

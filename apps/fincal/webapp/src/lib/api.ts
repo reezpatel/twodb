@@ -1,5 +1,5 @@
 // Thin client over Fincal's API — always through the gateway (dev proxy /fincal-api -> /apps/twoplan).
-const BASE = "/fincal-api";
+const BASE = "/api";
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) {

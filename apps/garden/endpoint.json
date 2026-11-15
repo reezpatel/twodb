@@ -12,8 +12,8 @@
     "core-platform",
     "core-async"
   ],
-  "basePath": "/apps/garden",
-  "generatedAt": "2026-11-12T15:35:09.332Z",
+  "basePath": "/apps/garden/api",
+  "generatedAt": "2026-11-15T19:04:18.662Z",
   "endpoints": [
     {
       "name": "getTree",

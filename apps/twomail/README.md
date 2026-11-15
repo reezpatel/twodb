@@ -36,7 +36,7 @@ pnpm --filter @twodb/app-twomail-webapp dev
 ```
 
 Backend: 6402. UI: 6501. Sign in to TwoDB with an active workspace and accessible
-space. The UI proxies `/apps/twomail`, `/registry`, and `/api` to the Gateway.
+space. The UI calls its own API at same-origin `/api` (dev proxy → Gateway `/apps/twomail/api`); in production the app serves UI at `/` and API at `/api`.
 Production hosting must provide equivalent same-origin routing over HTTPS.
 Backend ports are Gateway-internal: do not expose them to callers able to forge
 `x-twodb-*` identity headers.

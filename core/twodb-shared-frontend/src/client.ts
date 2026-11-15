@@ -3,10 +3,11 @@ import { challengeFor, randomString } from "./pkce.js";
 export interface TwoDbAuthConfig {
   /**
    * Origin of the TwoDB webapp that hosts /authorize (where the user actually signs in).
-   * Default: `import.meta.env.VITE_TWODB_UI_URL`, else http://localhost:6500.
+   * Default: runtime `window.__TWODB_CONFIG__.twodbUrl` (injected by the app backend from TWODB_CONSOLE_URL),
+   * else `import.meta.env.VITE_TWODB_UI_URL`, else console.<parent domain> of this host, else http://localhost:6500.
    */
   twodbUrl?: string;
-  /** Base of the gateway API as seen from this webapp ("" = same origin, via the dev proxy / production gateway). */
+  /** Base URL serving the auth endpoints (/registry/oauth/token, /api/auth/*). Default: the console (twodbUrl). */
   gatewayBase?: string;
   /** localStorage key prefix. */
   storageKey?: string;
@@ -26,11 +27,26 @@ interface Stored {
 
 const PENDING = "pending";
 
+/** Where the TwoDB console lives, when nothing says so explicitly: swap the first host label for "console"
+ *  (artisan.twodb.io -> console.twodb.io). Localhost / IPs / bare domains fall back to the dev console. */
+function deriveConsoleUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  const { hostname, protocol, port } = window.location;
+  const labels = hostname.split(".");
+  if (labels.length < 3 || /^\d+(\.\d+){3}$/.test(hostname)) return null;
+  return `${protocol}//console.${labels.slice(1).join(".")}${port ? `:${port}` : ""}`;
+}
+
 export function resolveConfig(c: TwoDbAuthConfig = {}) {
   const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+  // Runtime config injected into index.html by the app backend (core/twodb-core/src/webapp.ts) — one image, any domain.
+  const runtime = (typeof window !== "undefined" ? (window as unknown as { __TWODB_CONFIG__?: { twodbUrl?: string | null } }).__TWODB_CONFIG__ : undefined) ?? {};
+  const twodbUrl = (c.twodbUrl ?? runtime.twodbUrl ?? env.VITE_TWODB_UI_URL ?? deriveConsoleUrl() ?? "http://localhost:6500").replace(/\/+$/, "");
   return {
-    twodbUrl: (c.twodbUrl ?? env.VITE_TWODB_UI_URL ?? "http://localhost:6500").replace(/\/+$/, ""),
-    gatewayBase: (c.gatewayBase ?? "").replace(/\/+$/, ""),
+    twodbUrl,
+    // Where the auth endpoints (/registry/oauth/token, /api/auth/*) live: the console. An app webapp's own
+    // origin serves ITS API under /api, so auth is always a cross-origin call to the console.
+    gatewayBase: (c.gatewayBase ?? twodbUrl).replace(/\/+$/, ""),
     storageKey: c.storageKey ?? "twodb.auth",
   };
 }
@@ -117,7 +133,11 @@ export async function revokeToken(cfg: ResolvedConfig, token: string): Promise<v
   await fetch(`${cfg.gatewayBase}/api/auth/sign-out`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: "{}" }).catch(() => {});
 }
 
+// Same-origin paths that carry the session: the app's own API (/api) and, on the console, the control-plane routes.
 const GATEWAY_PATH = /^\/(apps|registry|orchestrator|search|api)(\/|$)/;
+
+// Control-plane routes that exist only on the console origin.
+const CONTROL_PLANE_PATH = /^\/(registry|orchestrator|search|cli|auth\/gateway-token|api\/auth)(\/|$)/;
 
 let tokenSource: (() => string | null) | null = null;
 let patched = false;
@@ -158,12 +178,28 @@ export function installAuthFetch(cfg: ResolvedConfig, getToken: () => string | n
     });
   }
   const original = window.fetch.bind(window);
+  const consoleOrigin = (() => {
+    try {
+      return new URL(cfg.gatewayBase).origin;
+    } catch {
+      return null;
+    }
+  })();
   window.fetch = (input, init) => {
     const token = tokenSource?.() ?? null;
+    const raw = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    const u = new URL(raw, window.location.origin);
+    const sameOrigin = u.origin === window.location.origin;
+    // An app webapp's own origin serves ITS API under /api — control-plane routes (spaces, members, session,
+    // gateway token…) live on the console, so they are redirected there transparently.
+    if (sameOrigin && consoleOrigin && consoleOrigin !== window.location.origin && CONTROL_PLANE_PATH.test(u.pathname)) {
+      const target = `${cfg.gatewayBase}${u.pathname}${u.search}`;
+      const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+      if (token && !headers.has("authorization")) headers.set("authorization", `Bearer ${token}`);
+      return original(input instanceof Request ? new Request(target, input) : target, { ...init, headers });
+    }
     if (token) {
-      const raw = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      const u = new URL(raw, window.location.origin);
-      const toGateway = cfg.gatewayBase ? raw.startsWith(cfg.gatewayBase) : u.origin === window.location.origin && GATEWAY_PATH.test(u.pathname);
+      const toGateway = (cfg.gatewayBase && raw.startsWith(cfg.gatewayBase)) || (sameOrigin && GATEWAY_PATH.test(u.pathname));
       if (toGateway) {
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
         if (!headers.has("authorization")) headers.set("authorization", `Bearer ${token}`);
@@ -172,4 +208,18 @@ export function installAuthFetch(cfg: ResolvedConfig, getToken: () => string | n
     }
     return original(input, init);
   };
+}
+
+/** The signed-in session token (or null) — for code outside React that must call the API itself. */
+export function currentToken(): string | null {
+  return tokenSource?.() ?? loadToken(resolveConfig());
+}
+
+/** Origin of another app's webapp: same parent domain with that app's slug as the first label
+ *  (twochat.twodb.io -> artisan.twodb.io); on localhost / IPs, the gateway path mount of the console. */
+export function appOrigin(slug: string): string {
+  const { hostname, protocol, port } = window.location;
+  const labels = hostname.split(".");
+  if (labels.length < 3 || /^\d+(\.\d+){3}$/.test(hostname)) return `${resolveConfig().twodbUrl}/apps/${slug}`;
+  return `${protocol}//${slug}.${labels.slice(1).join(".")}${port ? `:${port}` : ""}`;
 }

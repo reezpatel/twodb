@@ -23,7 +23,7 @@ const auth = "session-or-apiKey" as const;
 export const manifest = defineAppManifest({
   name: "TwoContacts", slug: "twocontacts", version: "0.1.0", shape: "backend+webapp",
   description: "Space-scoped address books and contacts with search and recipient suggestions.",
-  capabilities: [], coreDeps: ["core-data", "core-platform", "core-async"], basePath: "/apps/twocontacts",
+  capabilities: [], coreDeps: ["core-data", "core-platform", "core-async"], basePath: "/apps/twocontacts/api",
   endpoints: [
     defineEndpoint({ name: "listBooks", method: "GET", path: "/books", auth, description: "List address books in accessible spaces.", response: z.array(book) }),
     defineEndpoint({ name: "createBook", method: "POST", path: "/books", auth, description: "Create an address book in an accessible space.", request: bookInput, response: book }),

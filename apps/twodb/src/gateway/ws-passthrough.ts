@@ -24,7 +24,7 @@ import { isDeclaredWebsocketPath, isInternalPath } from "./ws-paths.js";
  * the socket into the ws server pair.
  */
 
-const RUNNER_KEY_UPGRADE = /^\/apps\/dispatch\/runner-ws/;
+const RUNNER_KEY_UPGRADE = /^\/apps\/dispatch\/api\/runner-ws/;
 
 interface PipedUpgrade {
   reqPath: string;
@@ -54,7 +54,14 @@ export function registerWsPassthrough(
     }
     const m = url.pathname.match(/^\/apps\/([^/]+)\/(.*)$/);
     if (!m) return; // not an app path — Fastify/other handlers own it
-    const [, slug, rest] = m;
+    const [, slug, restRaw] = m;
+    // Apps serve their API (incl. WebSockets) under /api; the manifest's websocketPaths are relative to it.
+    if (!/^api(\/|$)/.test(restRaw)) {
+      socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    const rest = restRaw.slice(3).replace(/^\//, "");
     const row = await getApp(slug).catch(() => undefined);
     if (!row) {
       socket.write("HTTP/1.1 404 Not Found\r\n\r\n");

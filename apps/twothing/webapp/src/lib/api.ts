@@ -2,7 +2,7 @@ import type { Activity, BatchCode, CodeBatch, Item, ItemInput, Place, PlaceInput
 
 // Thin client over TwoThing's API, served behind the Gateway at
 // /apps/twothing (Vite proxies in dev). Session cookies carry auth.
-export const BASE = "/apps/twothing";
+export const BASE = "/api";
 
 export class ApiError extends Error {
   constructor(

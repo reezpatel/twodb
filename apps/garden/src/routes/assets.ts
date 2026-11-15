@@ -25,7 +25,7 @@ export function registerAssetRoutes(app: FastifyInstance, db: Db, maxBytes: numb
       .insertInto("asset")
       .values({ id, workspace_id: scope.workspaceId, record_id: recordId ?? null, name, content_type: type, size: data.length, data, created_by: scope.actor, created_at: new Date() })
       .execute();
-    return reply.code(201).send({ id, url: `/apps/garden/assets/${id}` });
+    return reply.code(201).send({ id, url: `/api/assets/${id}` });
   });
 
   app.get("/assets/:id", async (req, reply) => {

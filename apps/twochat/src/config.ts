@@ -18,7 +18,7 @@ export const configSchema = z.object({
   TWOCHAT_STORAGE_BACKEND: z.enum(["local", "twodrive"]).default("local"),
   TWOCHAT_STORAGE_DIR: z.string().default("./.data/twochat/blobs"),
   /** TwoDrive S3 base URL (its gateway path) — only read when backend=twodrive. */
-  TWOCHAT_TWODRIVE_URL: z.string().default("http://localhost:6400/apps/twodrive"),
+  TWOCHAT_TWODRIVE_URL: z.string().default("http://localhost:6400/apps/twodrive/api"),
   /** Max attachment size (bytes) — 25MB, Slack-ish. */
   TWOCHAT_MAX_ATTACHMENT_BYTES: z.coerce.number().int().positive().default(25 * 1024 * 1024),
 });

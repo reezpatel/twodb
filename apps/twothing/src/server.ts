@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { createPgDb } from "@twodb/core-data/db";
 
 import { manifest } from "./manifest.js";
@@ -11,7 +12,7 @@ import { registerCodeRoutes } from "./routes/codes.js";
 import { registerMiscRoutes } from "./routes/misc.js";
 
 export async function buildServer(config: TwoThingConfig) {
-  const app = Fastify({ logger: { level: config.NODE_ENV === "production" ? "info" : "warn" }, bodyLimit: 10 * 1024 * 1024 });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: { level: config.NODE_ENV === "production" ? "info" : "warn" }, bodyLimit: 10 * 1024 * 1024 });
   // Images arrive as raw bytes; JSON keeps Fastify's default parser.
   app.addContentTypeParser(/^image\//, { parseAs: "buffer" }, (_req, body, done) => done(null, body));
   app.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
@@ -33,5 +34,6 @@ export async function buildServer(config: TwoThingConfig) {
   registerCodeRoutes(app, ctx);
   registerMiscRoutes(app, ctx);
 
+  await registerWebapp(app, { distDir: webappDist(import.meta.dirname) });
   return { app, db };
 }

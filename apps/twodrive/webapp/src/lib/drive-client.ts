@@ -1,7 +1,7 @@
 // Thin client over TwoDrive's API, served behind the Gateway at
 // /apps/twodrive (Vite proxies in dev). Session cookies carry auth.
 
-const BASE = "/apps/twodrive";
+const BASE = "/api";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);

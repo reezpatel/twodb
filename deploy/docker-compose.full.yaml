@@ -1,0 +1,425 @@
+# =============================================================================
+# TwoDB — full stack in ONE compose file
+#
+#   cp deploy/.env.full.example .env      # fill in the MANDATORY values (below)
+#   docker compose -f deploy/docker-compose.full.yaml up -d
+#
+# What runs
+#   twodb      control plane + gateway + console webapp + hidden Storybook (/storybook/)
+#   <apps>     every TwoDB app as ONE container: its React webapp (served at "/") + its API (served at "/api")
+#   postgres   shared cluster; TwoDB provisions one schema + role per app
+#   rustfs     S3-compatible object storage (MinIO replacement), bucket created by s3-init
+#
+# Routing (gateway = the ONLY published port, ${GATEWAY_PORT:-6400})
+#   Point a wildcard DNS record  *.<ROOT_DOMAIN>  (and <ROOT_DOMAIN>) at your TLS-terminating reverse proxy,
+#   which forwards every host UNCHANGED (keep the Host header!) to the gateway port. Then
+#     https://console.<ROOT_DOMAIN>   -> console (sign in, apps, admin)       https://console.<ROOT_DOMAIN>/storybook/ -> Storybook
+#     https://<slug>.<ROOT_DOMAIN>    -> that app's webapp   (e.g. artisan.<ROOT_DOMAIN>)
+#     https://<slug>.<ROOT_DOMAIN>/api/...  -> that app's API
+#   Hosts outside ROOT_DOMAIN pass through untouched, unless CATCH_ALL_SERVICE is set (see below).
+#
+# Persistent data — EVERYTHING lives under ${DATA_DIR:-./data} (relative paths are relative to THIS file;
+# set DATA_DIR to an absolute path in production). Back up this one directory:
+#   postgres/        all app databases
+#   rustfs/          all object storage (drive files, uploads, ...)
+#   twodb/           control-plane SQLite (users, passkeys, app registry, tokens)
+#   apps/<slug>/     per-app local files (registration token cache, blobs, archives)
+#
+# MANDATORY environment (compose refuses to start without them):
+#   ROOT_DOMAIN                 e.g. twodb.io  (no scheme, no leading dot)
+#   AUTH_SECRET                 >= 16 random chars; keys sessions AND encrypts per-app DB credentials / data keys.
+#                               Changing it later invalidates stored secrets — treat as permanent.
+#   TWODB_REGISTRATION_SECRET   >= 16 random chars; apps present it to self-register with the control plane
+#   POSTGRES_PASSWORD           URL-safe characters only (it is embedded in a connection URL)
+#   S3_ACCESS_KEY_ID            object-storage root access key
+#   S3_SECRET_ACCESS_KEY        object-storage root secret key
+#
+# OPTIONAL environment (defaults in the file):
+#   PUBLIC_SCHEME=https | GATEWAY_PORT=6400 | DATA_DIR=./data | TWODB_VERSION=latest | REGISTRY_OWNER=reezpatel
+#   POSTGRES_USER=twodb | POSTGRES_DB=twodb | S3_BUCKET=twodb | S3_REGION=us-east-1 | RUSTFS_VERSION
+#   TWODB_OPEN_SIGNUP=false (true = anyone can register a passkey; default: only the first user)
+#   CATCH_ALL_SERVICE=<slug>   route hosts OUTSIDE ROOT_DOMAIN (custom domains) to this app, Host header preserved
+#   CATCH_ALL_HOST_REGEX=...   restrict the catch-all to hostnames matching this regex; the rest passes through
+#   TWOMAIL_ALLOWED_HOSTS=...  IMAP/SMTP hosts TwoMail may connect to | WORKSPACE_API_KEY=... (artisan fallback key)
+#   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / POCKETID_ISSUER / POCKETID_CLIENT_ID / POCKETID_CLIENT_SECRET (social login)
+# =============================================================================
+
+name: twodb
+
+x-app: &app
+  restart: unless-stopped
+  networks: [twodb]
+  depends_on:
+    twodb:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+process.env.PORT+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
+    start_period: 30s
+
+x-app-env: &app-env
+  NODE_ENV: production
+  TWODB_GATEWAY_URL: http://twodb:6400
+  TWODB_REGISTRATION_SECRET: ${TWODB_REGISTRATION_SECRET:?TWODB_REGISTRATION_SECRET is mandatory (>=16 random chars)}
+  # Public addressing — injected into each app's webapp at runtime (login redirect) and used for cross-app links.
+  TWODB_CONSOLE_URL: ${PUBLIC_SCHEME:-https}://console.${ROOT_DOMAIN:?ROOT_DOMAIN is mandatory (e.g. twodb.io)}
+  TWODB_APP_URL_TEMPLATE: ${PUBLIC_SCHEME:-https}://{slug}.${ROOT_DOMAIN}
+  TWODB_TOKEN_FILE: /data/token # cached app token, persisted under ${DATA_DIR}/apps/<slug>
+
+services:
+  # ---------------------------------------------------------------- infra ----
+  init-data:
+    # Creates the central data layout once (RustFS runs as uid 10001 and needs ownership of its directory).
+    image: busybox:1.37
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - >-
+        mkdir -p /data/postgres /data/rustfs /data/twodb /data/apps/tworoute /data/apps/twomail /data/apps/twoday /data/apps/twocontacts /data/apps/twochat /data/apps/twodrive /data/apps/artisan /data/apps/dispatch /data/apps/tworing /data/apps/garden /data/apps/twothing /data/apps/twoloop /data/apps/membrain /data/apps/paintress /data/apps/twopin /data/apps/twodoo /data/apps/twoplan /data/apps/toolkit /data/apps/fincal &&
+        chown -R 10001:10001 /data/rustfs
+    volumes:
+      - ${DATA_DIR:-./data}:/data
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    networks: [twodb]
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-twodb}
+      POSTGRES_USER: ${POSTGRES_USER:-twodb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is mandatory (URL-safe characters)}
+      POSTGRES_INITDB_ARGS: --encoding=UTF8
+    volumes:
+      - ${DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  rustfs:
+    # S3-compatible object storage. Internal only — apps reach it at http://rustfs:9000 (path-style).
+    image: rustfs/rustfs:${RUSTFS_VERSION:-1.0.0-alpha.89}
+    restart: unless-stopped
+    networks: [twodb]
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ENABLE: "false"
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY_ID:?S3_ACCESS_KEY_ID is mandatory}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_ACCESS_KEY:?S3_SECRET_ACCESS_KEY is mandatory}
+    volumes:
+      - ${DATA_DIR:-./data}/rustfs:/data
+
+  s3-init:
+    # Creates the shared bucket (idempotent), retrying until RustFS accepts requests.
+    image: amazon/aws-cli:2.22.0
+    restart: "no"
+    networks: [twodb]
+    depends_on: [rustfs]
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-twodb}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        for i in $$(seq 1 60); do
+          if aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket "$$S3_BUCKET" >/dev/null 2>&1 \
+             || aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$$S3_BUCKET" >/dev/null 2>&1; then
+            echo "bucket $$S3_BUCKET ready"; exit 0
+          fi
+          sleep 2
+        done
+        echo "object storage never became ready" >&2; exit 1
+
+  # -------------------------------------------------- control plane + gateway ----
+  twodb:
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-twodb:${TWODB_VERSION:-latest}
+    restart: unless-stopped
+    networks: [twodb]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      s3-init:
+        condition: service_completed_successfully
+    ports:
+      - "${GATEWAY_PORT:-6400}:6400" # the ONLY published port
+    environment:
+      NODE_ENV: production
+      PORT: "6400"
+      TWODB_SQLITE_FILE: /data/twodb-control-plane.sqlite
+      # --- host-based routing: <slug>.ROOT_DOMAIN -> app, console.ROOT_DOMAIN -> console ---
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?ROOT_DOMAIN is mandatory (e.g. twodb.io)}
+      CATCH_ALL_SERVICE: ${CATCH_ALL_SERVICE:-}
+      CATCH_ALL_HOST_REGEX: ${CATCH_ALL_HOST_REGEX:-}
+      TWODB_CONSOLE_URL: ${PUBLIC_SCHEME:-https}://console.${ROOT_DOMAIN}
+      TWODB_APP_URL_TEMPLATE: ${PUBLIC_SCHEME:-https}://{slug}.${ROOT_DOMAIN}
+      # --- identity ---
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is mandatory (>=16 random chars)}
+      AUTH_BASE_URL: ${PUBLIC_SCHEME:-https}://console.${ROOT_DOMAIN}
+      AUTH_TRUSTED_ORIGINS: ${PUBLIC_SCHEME:-https}://console.${ROOT_DOMAIN}
+      PASSKEY_RP_ID: ${ROOT_DOMAIN}
+      PASSKEY_ORIGIN: ${PUBLIC_SCHEME:-https}://console.${ROOT_DOMAIN}
+      TWODB_OPEN_SIGNUP: ${TWODB_OPEN_SIGNUP:-false}
+      TWODB_REGISTRATION_SECRET: ${TWODB_REGISTRATION_SECRET:?TWODB_REGISTRATION_SECRET is mandatory (>=16 random chars)}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      POCKETID_ISSUER: ${POCKETID_ISSUER:-}
+      POCKETID_CLIENT_ID: ${POCKETID_CLIENT_ID:-}
+      POCKETID_CLIENT_SECRET: ${POCKETID_CLIENT_SECRET:-}
+      # --- Postgres: admin connection used to provision a schema + role per app ---
+      TWODB_PG_ADMIN_URL: postgres://${POSTGRES_USER:-twodb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-twodb}
+      TWODB_PG_CONTAINER_HOST: postgres
+      # --- S3 (RustFS): handed to every app via GET /registry/config, one key prefix per app ---
+      TWODB_S3_BUCKET: ${S3_BUCKET:-twodb}
+      TWODB_S3_REGION: ${S3_REGION:-us-east-1}
+      TWODB_S3_ENDPOINT: http://rustfs:9000
+      TWODB_S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      TWODB_S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      TWODB_S3_FORCE_PATH_STYLE: "true"
+    volumes:
+      - ${DATA_DIR:-./data}/twodb:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:6400/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # ----------------------------------------------------------------- apps ----
+  # Each app: its webapp at "/" and its API at "/api" on the SAME container/port; registers itself with the
+  # control plane (TWODB_REGISTRATION_SECRET), receives its Postgres/S3 config from it, and heartbeats.
+  # tworoute — OpenAI-compatible endpoint: https://tworoute.<ROOT_DOMAIN>/api/v1.
+  tworoute:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-tworoute:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6401"
+      HTTP_URL: http://tworoute:6401
+    volumes:
+      - ${DATA_DIR:-./data}/apps/tworoute:/data
+
+  # twomail
+  twomail:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-twomail:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6402"
+      HTTP_URL: http://twomail:6402
+      TWOMAIL_ALLOWED_HOSTS: ${TWOMAIL_ALLOWED_HOSTS:-}
+    volumes:
+      - ${DATA_DIR:-./data}/apps/twomail:/data
+
+  # twoday
+  twoday:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-twoday:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6403"
+      HTTP_URL: http://twoday:6403
+    volumes:
+      - ${DATA_DIR:-./data}/apps/twoday:/data
+
+  # twocontacts
+  twocontacts:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-twocontacts:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6404"
+      HTTP_URL: http://twocontacts:6404
+    volumes:
+      - ${DATA_DIR:-./data}/apps/twocontacts:/data
+
+  # twochat
+  twochat:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-twochat:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6405"
+      HTTP_URL: http://twochat:6405
+      TWOCHAT_TWODRIVE_URL: http://twodb:6400/apps/twodrive/api
+      TWOCHAT_STORAGE_DIR: /data/blobs
+    volumes:
+      - ${DATA_DIR:-./data}/apps/twochat:/data
+
+  # twodrive — S3-compatible API of TwoDrive: https://twodrive.<ROOT_DOMAIN>/api/s3/<storageId>.
+  twodrive:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-twodrive:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6406"
+      HTTP_URL: http://twodrive:6406
+    volumes:
+      - ${DATA_DIR:-./data}/apps/twodrive:/data
+
+  # artisan
+  artisan:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-artisan:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6407"
+      HTTP_URL: http://artisan:6407
+      TWOROUTE_URL: http://twodb:6400/apps/tworoute/api
+      DISPATCH_URL: http://twodb:6400/apps/dispatch/api
+      WORKSPACE_API_KEY: ${WORKSPACE_API_KEY:-}
+    volumes:
+      - ${DATA_DIR:-./data}/apps/artisan:/data
+
+  # dispatch — Runners connect from outside to wss://dispatch.<ROOT_DOMAIN>/api/runner-ws.
+  dispatch:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-dispatch:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6408"
+      HTTP_URL: http://dispatch:6408
+      DISPATCH_ARCHIVE_DIR: /data/archives
+    volumes:
+      - ${DATA_DIR:-./data}/apps/dispatch:/data
+
+  # tworing
+  tworing:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-tworing:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6409"
+      HTTP_URL: http://tworing:6409
+    volumes:
+      - ${DATA_DIR:-./data}/apps/tworing:/data
+
+  # garden
+  garden:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-garden:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6410"
+      HTTP_URL: http://garden:6410
+    volumes:
+      - ${DATA_DIR:-./data}/apps/garden:/data
+
+  # twothing
+  twothing:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-twothing:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6411"
+      HTTP_URL: http://twothing:6411
+    volumes:
+      - ${DATA_DIR:-./data}/apps/twothing:/data
+
+  # twoloop
+  twoloop:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-twoloop:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6412"
+      HTTP_URL: http://twoloop:6412
+    volumes:
+      - ${DATA_DIR:-./data}/apps/twoloop:/data
+
+  # membrain
+  membrain:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-membrain:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6413"
+      HTTP_URL: http://membrain:6413
+    volumes:
+      - ${DATA_DIR:-./data}/apps/membrain:/data
+
+  # paintress
+  paintress:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-paintress:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6414"
+      HTTP_URL: http://paintress:6414
+      LOCAL_STORAGE_DIR: /data/blobs
+    volumes:
+      - ${DATA_DIR:-./data}/apps/paintress:/data
+
+  # twopin
+  twopin:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-twopin:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6415"
+      HTTP_URL: http://twopin:6415
+    volumes:
+      - ${DATA_DIR:-./data}/apps/twopin:/data
+
+  # twodoo
+  twodoo:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-twodoo:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6416"
+      HTTP_URL: http://twodoo:6416
+    volumes:
+      - ${DATA_DIR:-./data}/apps/twodoo:/data
+
+  # twoplan
+  twoplan:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-twoplan:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6417"
+      HTTP_URL: http://twoplan:6417
+      TWOPLAN_BLOB_DIR: /data/blobs
+    volumes:
+      - ${DATA_DIR:-./data}/apps/twoplan:/data
+
+  # toolkit
+  toolkit:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-toolkit:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6418"
+      HTTP_URL: http://toolkit:6418
+    volumes:
+      - ${DATA_DIR:-./data}/apps/toolkit:/data
+
+  # fincal
+  fincal:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-fincal:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6419"
+      HTTP_URL: http://fincal:6419
+    volumes:
+      - ${DATA_DIR:-./data}/apps/fincal:/data
+
+networks:
+  twodb:
+    name: twodb-net

@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { Kysely } from "kysely";
 import type { ControlPlaneDb } from "../db/sqlite.js";
 import type { TwoDbConfig } from "../config.js";
+import { isRootDomainOrigin } from "../gateway/host-routing.js";
 
 /**
  * First-party "Login with TwoDB" (OAuth 2.0 authorization-code + PKCE/S256).
@@ -23,7 +24,7 @@ const sha256Hex = (v: string) => createHash("sha256").update(v).digest("hex");
 const b64url = (b: Buffer) => b.toString("base64url");
 
 /** Allowed redirect targets: explicit list, trusted origins, and the 6500-6599 webapp band on a trusted host. */
-export function isAllowedRedirect(uri: string, config: Pick<TwoDbConfig, "AUTH_TRUSTED_ORIGINS" | "TWODB_LOGIN_REDIRECT_ORIGINS">): boolean {
+export function isAllowedRedirect(uri: string, config: Pick<TwoDbConfig, "AUTH_TRUSTED_ORIGINS" | "TWODB_LOGIN_REDIRECT_ORIGINS"> & { ROOT_DOMAIN?: string }): boolean {
   let u: URL;
   try {
     u = new URL(uri);
@@ -34,6 +35,8 @@ export function isAllowedRedirect(uri: string, config: Pick<TwoDbConfig, "AUTH_T
   if (u.username || u.password || u.hash) return false;
   const explicit = [...config.AUTH_TRUSTED_ORIGINS, ...config.TWODB_LOGIN_REDIRECT_ORIGINS];
   if (explicit.some((o) => o === u.origin)) return true;
+  // Every <service>.<ROOT_DOMAIN> app webapp may sign in through the console.
+  if (isRootDomainOrigin(u.origin, config.ROOT_DOMAIN)) return true;
   return config.AUTH_TRUSTED_ORIGINS.some((o) => {
     try {
       const t = new URL(o);

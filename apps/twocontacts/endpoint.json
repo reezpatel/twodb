@@ -10,8 +10,8 @@
     "core-platform",
     "core-async"
   ],
-  "basePath": "/apps/twocontacts",
-  "generatedAt": "2026-11-12T17:48:54.761Z",
+  "basePath": "/apps/twocontacts/api",
+  "generatedAt": "2026-11-15T19:04:18.920Z",
   "endpoints": [
     {
       "name": "listBooks",

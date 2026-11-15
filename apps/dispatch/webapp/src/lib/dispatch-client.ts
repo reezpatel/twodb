@@ -68,7 +68,7 @@ export interface Microvm {
   archivedAt: string | null;
 }
 
-const BASE = "/dispatch-api";
+const BASE = "/api";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) throw new Error((await res.json().catch(() => ({ error: `${res.status}` }))).error ?? `${res.status}`);
@@ -206,6 +206,6 @@ export const dispatchClient = {
 
   /** Terminal/vscode relay URL — dial with a WebSocket; bytes flow raw. */
   vmStreamUrl(identifier: string, mode: "terminal" | "vscode"): string {
-    return `${window.location.origin}/apps/dispatch/microvms/${encodeURIComponent(identifier)}/stream?mode=${mode}`;
+    return `${window.location.origin}/api/microvms/${encodeURIComponent(identifier)}/stream?mode=${mode}`;
   },
 };

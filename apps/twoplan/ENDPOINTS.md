@@ -5,11 +5,11 @@
 Project management: Space → Project (KEY) → epics, milestones and tickets. Kanban/table/timeline views, sub-tasks, checklists, links, custom fields, saved views, docs, dashboards, inbox, CSV/Linear import. Workspace-level access.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/twoplan`
+- **Base path (via Gateway)**: `/apps/twoplan/api`
 - **Capabilities**: projects, tickets
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T19:34:58.910Z_
+_Generated: 2026-11-15T19:04:19.219Z_
 
 ## Endpoints
 

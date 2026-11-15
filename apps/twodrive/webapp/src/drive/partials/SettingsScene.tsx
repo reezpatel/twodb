@@ -199,7 +199,7 @@ function AccessKeysCard({ storageId, storageName }: { storageId: string; storage
         </CardTitle>
         <CardDescription>
           Credentials for the S3-compatible endpoint of this virtual storage
-          (<code className="text-[11px]">/apps/twodrive/s3/{storageId}/…</code>). The secret is shown once.
+          (<code className="text-[11px]">/api/s3/{storageId}/…</code>). The secret is shown once.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">

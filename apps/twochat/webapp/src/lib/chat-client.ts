@@ -122,7 +122,7 @@ export interface Space {
   name: string;
 }
 
-const BASE = "/twochat-api";
+const BASE = "/api";
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {

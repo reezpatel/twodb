@@ -5,11 +5,11 @@
 Knowledge base: nested notes with a block editor (TipTap) and Notion-style databases backed by real Postgres tables — table/kanban/list/gallery/calendar views, filters, sorts, relations, rollups and formulas.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/garden`
+- **Base path (via Gateway)**: `/apps/garden/api`
 - **Capabilities**: search
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T15:35:09.341Z_
+_Generated: 2026-11-15T19:04:18.681Z_
 
 ## Endpoints
 

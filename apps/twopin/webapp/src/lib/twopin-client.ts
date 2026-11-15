@@ -1,7 +1,7 @@
 // Thin client over TwoPin's API, served behind the Gateway at
 // /apps/twopin (Vite proxies in dev). Session cookies carry auth.
 
-const BASE = "/apps/twopin";
+const BASE = "/api";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {

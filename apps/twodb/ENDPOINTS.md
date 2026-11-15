@@ -9,7 +9,7 @@ The control plane: Docker-based app installation/lifecycle management, Postgres 
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-15T06:02:09.938Z_
+_Generated: 2026-11-15T19:04:17.356Z_
 
 ## Endpoints
 

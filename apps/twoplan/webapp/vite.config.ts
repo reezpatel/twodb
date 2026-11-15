@@ -27,9 +27,9 @@ export default defineConfig({
     host: true,
     ...(devHttps && hasCerts ? { https: { cert: readFileSync(certPath), key: readFileSync(keyPath) } } : {}),
     proxy: {
-      "/twoplan-api": { target: gateway, changeOrigin: true, rewrite: (p) => p.replace(/^\/twoplan-api/, "/apps/twoplan") },
-      "/api": { target: gateway, changeOrigin: true },
-      "/registry": { target: gateway, changeOrigin: true },
+      // The app's own API (REST + WS + SSE) through the gateway: /api/* -> /apps/twoplan/api/*.
+      // Auth/control-plane calls go to the console (see twodb-shared-frontend), not through this proxy.
+      "/api": { target: gateway, changeOrigin: true, ws: true, rewrite: (p: string) => `/apps/twoplan${p}` },
     },
   },
 });

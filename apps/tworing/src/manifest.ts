@@ -12,7 +12,7 @@ export const manifest = defineAppManifest({
   description: "Meetings/calls (audio/video) — not yet implemented. See AGENTS.md before building it out.",
   capabilities: [],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/tworing",
+  basePath: "/apps/tworing/api",
   endpoints: [],
 });
 

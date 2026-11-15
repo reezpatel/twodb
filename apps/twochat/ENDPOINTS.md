@@ -5,11 +5,11 @@
 Workspace chat (Slack-style): public channels, DMs, threads, reactions, pins, saved items, drafts, read state, attachments, notifications, and composed block messages (buttons, images, fields, task lists…) authored by humans AND agent bots — bots participate as first-class members via workspace API keys.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/twochat`
+- **Base path (via Gateway)**: `/apps/twochat/api`
 - **Capabilities**: search, ws
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-15T06:16:06.341Z_
+_Generated: 2026-11-15T19:04:18.786Z_
 
 ## Endpoints
 

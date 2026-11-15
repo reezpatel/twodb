@@ -5,11 +5,11 @@
 Coding agent harness — sessions on runner directories, threads, subagents, skills.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/artisan`
+- **Base path (via Gateway)**: `/apps/artisan/api`
 - **Capabilities**: ws
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-15T16:39:44.595Z_
+_Generated: 2026-11-15T19:04:19.209Z_
 
 ## Endpoints
 

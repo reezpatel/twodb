@@ -10,7 +10,7 @@
     "core-platform",
     "core-async"
   ],
-  "basePath": "/apps/twoloop",
-  "generatedAt": "2026-11-09T12:16:49.190Z",
+  "basePath": "/apps/twoloop/api",
+  "generatedAt": "2026-11-15T19:04:19.164Z",
   "endpoints": []
 }

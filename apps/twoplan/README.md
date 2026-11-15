@@ -5,7 +5,7 @@ Project management: **Space → Project (KEY) → epics / milestones / tickets**
 rich text on `@twodb/editor`. Access is workspace-level (no per-project roles).
 
 - Backend: Fastify + Kysely, schema `twoplan`, port 6417. Endpoints: `ENDPOINTS.md` (generated, `pnpm gen:docs`).
-- Webapp: Vite on 6516 (`pnpm --filter @twodb/app-twoplan-webapp dev`), proxies `/twoplan-api` → gateway `/apps/twoplan`.
+- Webapp: Vite on 6516 (`pnpm --filter @twodb/app-twoplan-webapp dev`), proxies `/api` → gateway `/apps/twoplan/api`.
 - Mapping: issue→ticket, initiative→epic, cycle→milestone (time-boxed).
 - Views: list (grouped), board (drag & drop), timeline. Saved views, filters in URL.
 - Also: sub-tasks, checklists, links, attachments, custom fields, estimates, watchers/inbox, docs/notes, dashboards,

@@ -57,7 +57,7 @@ export const toolkitManifest = defineAppManifest({
   description: "Central host for external MCP servers and API connectors — connector instances expose invocable tools and background broadcasts (with optional durable queues).",
   capabilities: [],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/toolkit",
+  basePath: "/apps/toolkit/api",
   endpoints: [
     // --- MCP ----------------------------------------------------------------
     defineEndpoint({

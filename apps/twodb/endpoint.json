@@ -11,7 +11,7 @@
     "core-async"
   ],
   "basePath": "/",
-  "generatedAt": "2026-11-15T06:02:09.934Z",
+  "generatedAt": "2026-11-15T19:04:17.351Z",
   "endpoints": [
     {
       "name": "registerApp",

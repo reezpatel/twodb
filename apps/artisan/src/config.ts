@@ -8,9 +8,9 @@ export const configSchema = z.object({
   HTTP_URL: z.string().url().default("http://localhost:6407"),
   ARTISAN_DEFAULT_MODEL: z.string().optional(),
   /** TwoRoute — models + LLM calls. */
-  TWOROUTE_URL: z.string().url().default("http://localhost:6400/apps/tworoute"),
+  TWOROUTE_URL: z.string().url().default("http://localhost:6400/apps/tworoute/api"),
   /** Dispatch — runners + exec/jobs. Reached through the gateway. */
-  DISPATCH_URL: z.string().url().default("http://localhost:6400/apps/dispatch"),
+  DISPATCH_URL: z.string().url().default("http://localhost:6400/apps/dispatch/api"),
 });
 
 export type ArtisanConfig = z.infer<typeof configSchema>;

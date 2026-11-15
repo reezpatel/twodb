@@ -12,4 +12,5 @@
 export { TwoDbAuthProvider, useTwoDbAuth, type TwoDbAuth, type AuthStatus } from "./provider.js";
 export { LoginWithTwoDbButton, RequireTwoDbAuth } from "./components.js";
 export type { TwoDbAuthConfig, TwoDbUser } from "./client.js";
+export { currentToken, appOrigin } from "./client.js";
 export { challengeFor, randomString } from "./pkce.js";

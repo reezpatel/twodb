@@ -1,13 +1,13 @@
 #!/usr/bin/env tsx
 /**
  * End-to-end smoke test against a running Paintress (direct, or through the Gateway).
- *   BASE=http://localhost:6414 tsx scripts/smoke.ts
+ *   BASE=http://localhost:6414/api tsx scripts/smoke.ts
  * Direct mode forges the x-twodb-* identity headers the Gateway would add.
- * Through the Gateway set BASE=http://localhost:6400/apps/paintress and API_KEY=<key>.
+ * Through the Gateway set BASE=http://localhost:6400/apps/paintress/api and API_KEY=<key>.
  */
 import WebSocket from "ws";
 
-const BASE = process.env.BASE ?? "http://localhost:6414";
+const BASE = process.env.BASE ?? "http://localhost:6414/api";
 const API_KEY = process.env.API_KEY;
 const WS = BASE.replace(/^http/, "ws");
 const human: Record<string, string> = { "x-twodb-auth-kind": "session", "x-twodb-user-id": "smoke-human", "x-twodb-workspace-id": "smoke-ws", "x-twodb-space-ids": "smoke-space" };

@@ -5,11 +5,11 @@
 Space-scoped address books and contacts with search and recipient suggestions.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/twocontacts`
+- **Base path (via Gateway)**: `/apps/twocontacts/api`
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T17:48:54.765Z_
+_Generated: 2026-11-15T19:04:18.924Z_
 
 ## Endpoints
 

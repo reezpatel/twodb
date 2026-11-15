@@ -54,7 +54,7 @@ export async function issueManagedToken(slug: string, opts: InstallOptions): Pro
     name: entry.name,
     version: workspaceVersion(entry),
     shape: "backend",
-    basePath: `/apps/${entry.slug}`,
+    basePath: `/apps/${entry.slug}/api`,
     hostId: "docker",
     capabilities: [],
   });
@@ -149,6 +149,9 @@ function buildContainerEnv(entry: CatalogEntry, config: TwoDbConfig, appToken: s
     // What the app tells TwoDB its reachable URL is at registration time —
     // the gateway proxies to this. See TWODB_APP_HTTP_URL_TEMPLATE.
     HTTP_URL: appHttpUrl(config, entry),
+    // Public web addressing, for the app's bundled webapp (login redirect) and cross-app links.
+    ...(config.TWODB_CONSOLE_URL ? { TWODB_CONSOLE_URL: config.TWODB_CONSOLE_URL } : {}),
+    ...(config.TWODB_APP_URL_TEMPLATE ? { TWODB_APP_URL_TEMPLATE: config.TWODB_APP_URL_TEMPLATE } : {}),
   };
 }
 

@@ -8,7 +8,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(res.status === 401 ? "Sign in to TwoDB and reload this page." : body.error ?? `Request failed (${res.status})`); }
   return res.json();
 }
-const base = "/apps/twoday";
+const base = "/api";
 export function useCalendar() {
   const [calendars, setCalendars] = useState<Calendar[]>([]), [calendarId, setCalendarId] = useState("");
   const [spaces, setSpaces] = useState<{id: string; name: string}[]>([]), [spaceId, setSpaceId] = useState("");

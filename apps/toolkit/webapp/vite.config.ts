@@ -40,12 +40,12 @@ export default defineConfig({
     host: true,
     ...(devHttps && hasCerts ? { https: { cert: readFileSync(certPath), key: readFileSync(keyPath) } } : {}),
     proxy: {
-      // Toolkit's own API, through the gateway (auth resolved there).
-      "/apps/toolkit": {
+      // Toolkit's own API (REST + SSE) through the gateway: /api/* -> /apps/toolkit/api/*.
+      // TOOLKIT_DEV_DIRECT=1 talks to the backend itself with forged identity headers instead.
+      "/api": {
         target,
         changeOrigin: true,
-        // ws: true is NOT needed here: /events/stream is SSE (plain HTTP).
-        ...(direct ? { rewrite: (p) => p.replace(/^\/apps\/toolkit/, "") || "/" } : {}),
+        ...(direct ? {} : { rewrite: (p: string) => `/apps/toolkit${p}` }),
         configure: direct
           ? (proxy) => {
               proxy.on("proxyReq", (proxyReq) => {
@@ -56,13 +56,6 @@ export default defineConfig({
             }
           : undefined,
       },
-      // Agent catalog for the access picker — artisan's own /agents, same
-      // gateway session (same SSO as everything else).
-      "/apps/artisan": direct ? undefined : { target: gateway, changeOrigin: true },
-      // Control-plane session surface (better-auth) — shared-origin SSO.
-      "/api": { target: gateway, changeOrigin: true },
-      // Spaces list (for the space selector) comes from the control plane.
-      "/registry": { target: gateway, changeOrigin: true },
     },
   },
 });

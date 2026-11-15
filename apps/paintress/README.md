@@ -28,11 +28,11 @@ GET  /groups                                            # list groups
 ## Agent quick start
 ```bash
 # 1. a board
-curl -X POST $GATEWAY/apps/paintress/boards -H "authorization: Bearer $KEY" -H 'content-type: application/json' \
+curl -X POST $GATEWAY/apps/paintress/api/boards -H "authorization: Bearer $KEY" -H 'content-type: application/json' \
   -d '{"name":"Checkout architecture","kind":"diagram","groupName":"System","spaceId":"<spaceId>"}'
 
 # 2. describe a diagram; positions are computed for you
-curl -X POST $GATEWAY/apps/paintress/boards/$ID/diagram -H "authorization: Bearer $KEY" -H 'content-type: application/json' -d '{
+curl -X POST $GATEWAY/apps/paintress/api/boards/$ID/diagram -H "authorization: Bearer $KEY" -H 'content-type: application/json' -d '{
   "label": "AI: checkout architecture",
   "groups": [{"key":"vpc","title":"VPC","style":"aws-vpc"}, {"key":"priv","title":"Private","style":"aws-subnet-private","parent":"vpc"}],
   "nodes":  [{"key":"web","label":"Web","icon":"logos:react"},
@@ -41,9 +41,9 @@ curl -X POST $GATEWAY/apps/paintress/boards/$ID/diagram -H "authorization: Beare
   "edges":  [{"from":"web","to":"api","label":"HTTPS","step":1},{"from":"api","to":"db","label":"SQL","step":2}]}'
 
 # 3. read it back as text, find icons, see all shapes / group styles
-curl $GATEWAY/apps/paintress/boards/$ID/describe
-curl "$GATEWAY/apps/paintress/icons/search?q=kafka"
-curl $GATEWAY/apps/paintress/catalog
+curl $GATEWAY/apps/paintress/api/boards/$ID/describe
+curl "$GATEWAY/apps/paintress/api/icons/search?q=kafka"
+curl $GATEWAY/apps/paintress/api/catalog
 ```
 Full reference: `ENDPOINTS.md` (generated). Mermaid import supports `flowchart`/`graph` and `erDiagram`; for other Mermaid types use a doc board.
 
@@ -65,9 +65,9 @@ scripts/             smoke.ts (API + WebSocket e2e) · ui-check.mjs (real browse
 pnpm --filter @twodb/app-twodb provision:dev paintress   # once: schema + role, prints DATABASE_URL
 # put it in the root .env as PAINTRESS_DATABASE_URL=…  (PAINTRESS_PORT=6414 already there)
 pnpm --filter @twodb/app-paintress dev                   # API
-pnpm --filter @twodb/app-paintress-webapp dev            # UI (proxies /paintress-api → gateway → /apps/paintress)
+pnpm --filter @twodb/app-paintress-webapp dev            # UI (proxies /api → gateway → /apps/paintress/api)
 ```
-Set `STORAGE=s3` to use MinIO (defaults to a local folder `./.data/blobs`). To register with the Gateway in dev, issue a token (`POST /orchestrator/apps/paintress/issue-token`) and set `TWODB_PROVISION_TOKEN`.
+Set `STORAGE=s3` to use S3 (RustFS) (defaults to a local folder `./.data/blobs`). To register with the Gateway in dev, issue a token (`POST /orchestrator/apps/paintress/issue-token`) and set `TWODB_PROVISION_TOKEN`.
 
 Without the control plane at all: `pnpm tsx scripts/dev-shim.ts` fakes session/spaces and forwards to :6414, then run the webapp with `TWODB_GATEWAY_URL=http://127.0.0.1:6499`.
 

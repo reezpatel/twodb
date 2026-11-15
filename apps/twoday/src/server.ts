@@ -1,4 +1,5 @@
 import Fastify, { type FastifyRequest } from "fastify";
+import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { createPgDb, type Kysely } from "@twodb/core-data/db";
 import { ulid } from "ulid";
 
@@ -20,7 +21,7 @@ function context(req: FastifyRequest) {
 export async function buildServer(config: { databaseUrl: string }, injectedDb?: Kysely<CalendarDb>) {
   const db = injectedDb ?? createPgDb<CalendarDb>({ connectionString: config.databaseUrl, schema: "twoday" });
   await applySchema(db);
-  const app = Fastify({ logger: !injectedDb });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: !injectedDb });
   app.addHook("onClose", async () => { if (!injectedDb) await db.destroy(); });
   app.setErrorHandler<Error & { statusCode?: number }>((error, _req, reply) => { app.log.error(error); return reply.code(error.statusCode ?? 500).send({ error: "Request failed" }); });
   app.get("/healthz", async () => ({ ok: true, app: "twoday" }));
@@ -66,5 +67,6 @@ export async function buildServer(config: { databaseUrl: string }, injectedDb?: 
       return row ? { ok: true } : reply.code(404).send({ error: "event_not_found" });
     });
   });
+  await registerWebapp(app, { distDir: webappDist(import.meta.dirname) });
   return app;
 }

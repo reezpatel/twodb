@@ -13,7 +13,9 @@ export default defineConfig({
     port: 6512,
     strictPort: true,
     proxy: {
-      "/apps/twodrive": { target: gateway, changeOrigin: true },
+      // The app's own API (REST + WS + SSE) through the gateway: /api/* -> /apps/twodrive/api/*.
+      // Auth/control-plane calls go to the console (see twodb-shared-frontend), not through this proxy.
+      "/api": { target: gateway, changeOrigin: true, ws: true, rewrite: (p: string) => `/apps/twodrive${p}` },
     },
   },
 });

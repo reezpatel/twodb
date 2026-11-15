@@ -1,4 +1,5 @@
 import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
+import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import websocket from "@fastify/websocket";
 import { createPgDb } from "@twodb/core-data/db";
 
@@ -12,9 +13,6 @@ import { DispatchHub } from "./ws/hub.js";
 import { registerRunnerWs } from "./ws/runner-ws.js";
 import { registerArchiveStore, readLatestArchive, archiveExists } from "./ws/archive-store.js";
 import * as fs from "node:fs/promises";
-import { existsSync } from "node:fs";
-import fastifyStatic from "@fastify/static";
-import * as path from "node:path";
 
 /** In-memory replay buffers per callId — bounded; enough for slow SSE joiners
  *  to see the transcript since the call started. Mirrors the legacy runner
@@ -61,7 +59,7 @@ function sseWrite(reply: FastifyReply, event: string, data: unknown): boolean {
 }
 
 export async function buildServer(config: DispatchConfig) {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
   await app.register(websocket);
 
@@ -796,18 +794,8 @@ export async function buildServer(config: DispatchConfig) {
 
   app.get("/healthz", async () => ({ ok: true }));
 
-  // --- Admin webapp: serve the built SPA when its dist exists (the release
-  // image builds it; dev uses the Vite dev server on :6514 instead).
-  const webappDist = path.join(import.meta.dirname, "../webapp/dist");
-  if (existsSync(path.join(webappDist, "index.html"))) {
-    await app.register(fastifyStatic, { root: webappDist, wildcard: false, index: false });
-    app.setNotFoundHandler((req, reply) => {
-      const pathname = new URL(req.url, "http://internal").pathname;
-      const isApi = /^\/(runners|jobs|calls|exec|microvms|vm-archive|runner-ws|internal|healthz)(\/|$)/.test(pathname);
-      if (req.method === "GET" && !isApi) return reply.sendFile("index.html");
-      return reply.code(404).send({ error: "not found" });
-    });
-  }
+  // --- webapp: the bundled SPA (apps/dispatch/webapp/dist), served outside /api
+  await registerWebapp(app, { distDir: webappDist(import.meta.dirname) });
 
   return app;
 }

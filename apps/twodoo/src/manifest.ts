@@ -509,7 +509,7 @@ export const twodooManifest = defineAppManifest({
   description: "Tasks & habits — TickTick-style boards, lists, smart lists, quick-add, recurrence, habit tracking. Implemented (v1).",
   capabilities: [],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/twodoo",
+  basePath: "/apps/twodoo/api",
   endpoints: [
     listBoards,
     createBoard,

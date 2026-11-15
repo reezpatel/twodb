@@ -8,7 +8,7 @@ export const messageQuery = z.object({ accountId:z.string().min(1), folder:z.enu
 const account = z.object({id:z.string(),spaceId:z.string(),name:z.string(),address:z.string(),createdAt:z.string()});
 const message = z.object({id:z.string(),accountId:z.string(),folder:z.string(),sender:z.string(),recipient:z.string(),subject:z.string(),text:z.string(),date:z.string(),status:z.string()});
 const auth = "session-or-apiKey" as const;
-export const manifest = defineAppManifest({name:"TwoMail",slug:"twomail",version:"0.1.0",shape:"backend+webapp",description:"IMAP inbox and SMTP mail with encrypted account credentials.",capabilities:[],coreDeps:["core-data","core-platform","core-async"],basePath:"/apps/twomail",endpoints:[
+export const manifest = defineAppManifest({name:"TwoMail",slug:"twomail",version:"0.1.0",shape:"backend+webapp",description:"IMAP inbox and SMTP mail with encrypted account credentials.",capabilities:[],coreDeps:["core-data","core-platform","core-async"],basePath: "/apps/twomail/api",endpoints:[
   defineEndpoint({name:"listAccounts",method:"GET",path:"/accounts",auth,description:"List accounts in accessible spaces; secrets never returned.",response:z.array(account)}),
   defineEndpoint({name:"createAccount",method:"POST",path:"/accounts",auth,description:"Verify IMAP and SMTP credentials, then save encrypted connection. TLS mandatory.",request:accountInput,response:account}),
   defineEndpoint({name:"syncInbox",method:"POST",path:"/accounts/:id/sync",auth,description:"Fetch latest 100 INBOX messages (max 2 MB each). Snapshot import, not full mailbox reconciliation.",response:z.object({imported:z.number()})}),

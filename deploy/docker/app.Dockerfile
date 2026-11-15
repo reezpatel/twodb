@@ -47,9 +47,12 @@ ENV APP_PKG=${APP_PKG}
 # runtime error from pnpm.
 RUN test -n "$APP_PKG" || (echo "APP_PKG build-arg is required" && exit 1)
 
-# The control-plane image also carries the built admin webapp — the server
-# serves it from apps/twodb/webapp/dist when present (see gateway/server.ts).
-RUN if [ "$APP_PKG" = "@twodb/app-twodb" ]; then pnpm --filter @twodb/app-twodb-webapp build; fi
+# Every app image bundles its React webapp (apps/<slug>/webapp -> dist), served by the app's own
+# backend outside /api (see core/twodb-core/src/webapp.ts). The control-plane image additionally
+# builds the shared Blocks Storybook, served at the hidden /storybook/ route of the console.
+RUN SLUG="${APP_PKG#@twodb/app-}"; \
+    if [ -f "apps/$SLUG/webapp/package.json" ]; then pnpm --filter "${APP_PKG}-webapp" build; fi; \
+    if [ "$SLUG" = "twodb" ]; then pnpm --filter @twodb/blocks storybook:build; fi
 
 EXPOSE 3000-9000
 

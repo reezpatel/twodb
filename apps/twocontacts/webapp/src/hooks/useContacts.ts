@@ -8,7 +8,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(res.status === 401 ? "Sign in to TwoDB, then reload this page." : body.error ?? `Request failed (${res.status})`); }
   return res.json();
 }
-const base = "/apps/twocontacts";
+const base = "/api";
 export function useContacts() {
   const [books, setBooks] = useState<Book[]>([]);
   const [spaces, setSpaces] = useState<{ id: string; name: string }[]>([]);

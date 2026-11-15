@@ -29,5 +29,5 @@ Boards sidebar + masonry pin grid, add-pin dialog with live URL preview
 ```sh
 pnpm --filter @twodb/app-twodb provision:dev twopin   # one-time: DB creds → .env
 pnpm --filter @twodb/app-twopin dev                   # backend on :6415
-pnpm --filter @twodb/app-twopin-webapp dev            # webapp on :6510 (proxies /apps/twopin → gateway)
+pnpm --filter @twodb/app-twopin-webapp dev            # webapp on :6510 (proxies /api → gateway /apps/twopin/api)
 ```

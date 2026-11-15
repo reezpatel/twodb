@@ -5,11 +5,11 @@
 Meetings/calls (audio/video) — not yet implemented. See AGENTS.md before building it out.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/tworing`
+- **Base path (via Gateway)**: `/apps/tworing/api`
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-09T12:16:49.907Z_
+_Generated: 2026-11-15T19:04:18.810Z_
 
 ## Endpoints
 

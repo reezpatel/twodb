@@ -309,7 +309,7 @@ export const manifest = defineAppManifest({
     "Personal inventory: nested places (room › shelf › box), items with specs/images/stock levels, bulk-printed random QR label codes, and camera scanning for labels and manufacturer barcodes.",
   capabilities: [],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/twothing",
+  basePath: "/apps/twothing/api",
   endpoints,
 });
 

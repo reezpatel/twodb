@@ -35,16 +35,9 @@ export default defineConfig({
     host: true,
     ...(devHttps && hasCerts ? { https: { cert: readFileSync(certPath), key: readFileSync(keyPath) } } : {}),
     proxy: {
-      // TwoRoute's own API, through the gateway (auth resolved there).
-      "/tworoute-api": {
-        target: gateway,
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/tworoute-api/, "/apps/tworoute"),
-      },
-      // Control-plane session surface (better-auth) — shared-origin SSO.
-      "/api": { target: gateway, changeOrigin: true },
-      // Spaces list (for the space selector) comes from the control plane.
-      "/registry": { target: gateway, changeOrigin: true },
+      // The app's own API (REST + WS + SSE) through the gateway: /api/* -> /apps/tworoute/api/*.
+      // Auth/control-plane calls go to the console (see twodb-shared-frontend), not through this proxy.
+      "/api": { target: gateway, changeOrigin: true, ws: true, rewrite: (p: string) => `/apps/tworoute${p}` },
     },
   },
 });

@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { createPgDb } from "@twodb/core-data/db";
 import { createLocalStorage } from "@twodb/core-data/storage";
 
@@ -9,7 +10,7 @@ import { registerRoutes } from "./lib/route.js";
 import { allRoutes } from "./routes/index.js";
 
 export async function buildServer(config: TwoPlanConfig) {
-  const app = Fastify({ logger: true, bodyLimit: 30 * 1024 * 1024 });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: 30 * 1024 * 1024 });
   // File uploads arrive as raw bodies (any non-JSON content type); JSON stays default.
   app.removeContentTypeParser("text/plain");
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
@@ -32,5 +33,6 @@ export async function buildServer(config: TwoPlanConfig) {
   app.addHook("onClose", async () => {
     await db.destroy();
   });
+  await registerWebapp(app, { distDir: webappDist(import.meta.dirname) });
   return app;
 }

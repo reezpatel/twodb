@@ -13,7 +13,7 @@ A standalone React webapp provides book creation, search, and contact editing.
 - The `twocontacts` schema must already exist (provision through TwoDB).
 - `TWODB_GATEWAY_URL` defaults to `http://localhost:6400`; register the app and
   sign in to TwoDB with an active workspace and at least one accessible space.
-- The webapp proxies `/apps/twocontacts`, `/api`, and `/registry` to the Gateway.
+- The webapp calls its own API at same-origin `/api` (dev proxy → Gateway `/apps/twocontacts/api`); in production the app serves the UI at `/` and the API at `/api`.
   Production hosting must provide equivalent same-origin proxy routing.
 
 ## Boundaries

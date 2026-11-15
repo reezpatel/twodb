@@ -54,6 +54,10 @@ export const configSchema = z.object({
   TWODB_HOST_ID: z.string().default("local"),
   /** Root DNS suffix for host-based app routing. Both ".twodb.io" and "twodb.io" are accepted. */
   ROOT_DOMAIN: z.string().optional(),
+  /** Public URL of the console (where users sign in) — handed to app webapps at runtime. Default: derived by the webapp (console.<parent domain>). */
+  TWODB_CONSOLE_URL: z.string().url().optional(),
+  /** Public web URL of an app, with a {slug} placeholder, e.g. https://{slug}.twodb.io — used for cross-app links. */
+  TWODB_APP_URL_TEMPLATE: z.string().optional(),
   /** Registered app slug that receives requests whose host is outside ROOT_DOMAIN. */
   CATCH_ALL_SERVICE: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
   /** Optional JavaScript regex restricting which outside hosts are sent to CATCH_ALL_SERVICE. */

@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 /**
  * End-to-end API smoke test against a running Garden behind the dev shim.
- *   pnpm --filter @twodb/app-garden smoke     (BASE defaults to http://127.0.0.1:6498/apps/garden)
+ *   pnpm --filter @twodb/app-garden smoke     (BASE defaults to http://127.0.0.1:6498/apps/garden/api)
  */
-const BASE = process.env.BASE ?? "http://127.0.0.1:6498/apps/garden";
+const BASE = process.env.BASE ?? "http://127.0.0.1:6498/apps/garden/api";
 const SPACE = process.env.SPACE ?? "dev-space";
 
 async function call<T = any>(method: string, path: string, body?: unknown): Promise<T> {

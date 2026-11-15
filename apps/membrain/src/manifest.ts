@@ -12,7 +12,7 @@ export const manifest = defineAppManifest({
   description: "Agent harness — not yet implemented. See AGENTS.md before building it out.",
   capabilities: [],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/membrain",
+  basePath: "/apps/membrain/api",
   endpoints: [],
 });
 

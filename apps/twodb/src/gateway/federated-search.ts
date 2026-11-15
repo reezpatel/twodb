@@ -48,7 +48,7 @@ export async function federatedSearch(
       headers.set("x-twodb-workspace-id", ctx.workspaceId);
       if (ctx.spaceIds.length) headers.set("x-twodb-space-ids", ctx.spaceIds.join(","));
 
-      const res = await dialer.fetch(searchEndpoint.path, {
+      const res = await dialer.fetch(`/api${searchEndpoint.path}`, {
         method: searchEndpoint.method,
         headers,
         body: JSON.stringify({ query, workspaceId: ctx.workspaceId, spaceIds: ctx.spaceIds }),

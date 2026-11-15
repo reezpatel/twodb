@@ -10,8 +10,8 @@
     "core-platform",
     "core-async"
   ],
-  "basePath": "/apps/twothing",
-  "generatedAt": "2026-11-12T15:54:57.787Z",
+  "basePath": "/apps/twothing/api",
+  "generatedAt": "2026-11-15T19:04:18.972Z",
   "endpoints": [
     {
       "name": "listItems",

@@ -5,11 +5,11 @@
 Personal finance per space: accounts (bank/cash/UPI/credit card), expenses, budgets, envelopes, goals, investments (stocks, mutual funds, metals, FDs, RDs, …), net-worth tracker, retirement planner, analytics and calculators. Workspace-level access.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/fincal`
+- **Base path (via Gateway)**: `/apps/fincal/api`
 - **Capabilities**: finance, budgets, investments
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-15T18:32:44.515Z_
+_Generated: 2026-11-15T19:04:19.207Z_
 
 ## Endpoints
 

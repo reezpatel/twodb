@@ -10,7 +10,9 @@ export function loadConfig<T extends ZodType>(
   schema: T,
   source: Record<string, string | undefined> = process.env,
 ): z.infer<T> {
-  const result = schema.safeParse(source);
+  // An empty value means "unset" (docker compose renders `VAR: ${VAR:-}` as ""), so optional/default fields still apply.
+  const cleaned = Object.fromEntries(Object.entries(source).filter(([, v]) => v !== ""));
+  const result = schema.safeParse(cleaned);
   if (!result.success) {
     const issues = result.error.issues
       .map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`)

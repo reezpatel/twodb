@@ -5,11 +5,11 @@
 Personal inventory: nested places (room › shelf › box), items with specs/images/stock levels, bulk-printed random QR label codes, and camera scanning for labels and manufacturer barcodes.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/twothing`
+- **Base path (via Gateway)**: `/apps/twothing/api`
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T15:54:57.793Z_
+_Generated: 2026-11-15T19:04:18.980Z_
 
 ## Endpoints
 

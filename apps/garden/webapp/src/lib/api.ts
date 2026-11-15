@@ -19,7 +19,7 @@ import type {
   ViewType,
 } from "@shared/model";
 
-export const API_BASE = (import.meta.env.VITE_GARDEN_API as string | undefined) ?? "/apps/garden";
+export const API_BASE = (import.meta.env.VITE_GARDEN_API as string | undefined) ?? "/api";
 const SPACE_KEY = "garden.space";
 
 let activeSpace: string | null = localStorage.getItem(SPACE_KEY);

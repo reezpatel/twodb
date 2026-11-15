@@ -13,8 +13,8 @@
     "core-platform",
     "core-async"
   ],
-  "basePath": "/apps/twochat",
-  "generatedAt": "2026-11-15T06:16:06.329Z",
+  "basePath": "/apps/twochat/api",
+  "generatedAt": "2026-11-15T19:04:18.765Z",
   "websocketPaths": [
     "/ws"
   ],

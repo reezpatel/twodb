@@ -5,7 +5,7 @@ member of the workspace sees every space and has full access (no per-space roles
 registry (`/registry/spaces`), like TwoPlan.
 
 - Backend: Fastify + Kysely, schema `fincal`, port 6419. Endpoints: `ENDPOINTS.md` (generated, `pnpm gen:docs`).
-- Webapp: Vite on 6519 (`pnpm --filter @twodb/app-fincal-webapp dev`), proxies `/fincal-api` → gateway `/apps/fincal`.
+- Webapp: Vite on 6519 (`pnpm --filter @twodb/app-fincal-webapp dev`), proxies `/api` → gateway `/apps/fincal/api`.
 - Dev: `pnpm --filter @twodb/app-twodb provision:dev fincal` → paste `FINCAL_PROVISION_TOKEN` into `.env`, run the gateway,
   then `pnpm --filter @twodb/app-fincal dev`.
 

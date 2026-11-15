@@ -98,7 +98,7 @@ export const dispatchManifest = defineAppManifest({
     "a long-lived WebSocket and carry a friendly, workspace-unique identifier.",
   capabilities: ["exec"],
   coreDeps: ["core-data", "core-platform"],
-  basePath: "/apps/dispatch",
+  basePath: "/apps/dispatch/api",
   endpoints: [
     // --- runners --------------------------------------------------------------
     defineEndpoint({

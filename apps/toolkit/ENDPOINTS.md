@@ -5,11 +5,11 @@
 Central host for external MCP servers and API connectors — connector instances expose invocable tools and background broadcasts (with optional durable queues).
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/toolkit`
+- **Base path (via Gateway)**: `/apps/toolkit/api`
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-15T18:11:58.570Z_
+_Generated: 2026-11-15T19:04:18.834Z_
 
 ## Endpoints
 

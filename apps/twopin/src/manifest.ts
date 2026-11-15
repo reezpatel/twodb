@@ -209,7 +209,7 @@ export const manifest = defineAppManifest({
     "fetched and stored server-side. See AGENTS.md.",
   capabilities: ["boards", "pins", "link-metadata"],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/twopin",
+  basePath: "/apps/twopin/api",
   endpoints: [
     listBoards,
     createBoard,

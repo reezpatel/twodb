@@ -5,11 +5,11 @@
 Multi-provider LLM gateway: 24 provider kinds (OAuth for Claude Code & Codex included), space-scoped connections with secrets encrypted at rest, model caching enriched from models.dev, provider quota tracking, streaming OpenAI-compatible /completions, and token-usage logging.
 
 - **Shape**: backend
-- **Base path (via Gateway)**: `/apps/tworoute`
+- **Base path (via Gateway)**: `/apps/tworoute/api`
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T19:34:56.942Z_
+_Generated: 2026-11-15T19:04:18.728Z_
 
 ## Endpoints
 

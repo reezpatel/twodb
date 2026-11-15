@@ -319,7 +319,7 @@ export const manifest = defineAppManifest({
     "Miro-like boards for diagrams (architecture, AWS/GCP, ERD, flowcharts, swimlane process maps) and Markdown+Mermaid docs. A human edits in the browser while LLM agents edit through the REST API; every change shows up live over a WebSocket.",
   capabilities: ["boards", "diagrams"],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/paintress",
+  basePath: "/apps/paintress/api",
   // GET /boards/:id/ws — live events + human edits (protocol in src/shared/model.ts: ClientMsg/ServerMsg).
   websocketPaths: ["/boards/:id/ws"],
   endpoints: [

@@ -5,11 +5,11 @@
 IMAP inbox and SMTP mail with encrypted account credentials.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/twomail`
+- **Base path (via Gateway)**: `/apps/twomail/api`
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T18:05:26.797Z_
+_Generated: 2026-11-15T19:04:18.996Z_
 
 ## Endpoints
 

@@ -114,7 +114,7 @@ export const manifest = defineAppManifest({
   description: "${app.role} — not yet implemented. See AGENTS.md before building it out.",
   capabilities: [],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/${app.slug}",
+  basePath: "/apps/${app.slug}/api", // the app serves its API under /api; its webapp is served at "/"
   endpoints: [],
 });
 
@@ -164,23 +164,20 @@ main().catch((err) => {
 // Assign the app's fixed port in apps/twodb/src/orchestrator/catalog.ts
 // (6416+) and mirror it as the fallback here. Once the app needs a database,
 // switch to \`connectTwoDb()\` (see apps/twoday/src/index.ts).
-import { serve } from "@hono/node-server";
+import Fastify from "fastify";
 import { startTwoDbSession } from "@twodb/twodb-core";
+import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { manifest } from "./manifest.js";
 
 const port = Number(process.env.PORT ?? 6417 /* TODO: this app's catalog port */);
 const httpUrl = process.env.HTTP_URL ?? \`http://localhost:\${port}\`;
 
-serve({
-  port,
-  fetch: (req) => {
-    const url = new URL(req.url);
-    if (url.pathname === "/healthz") return Response.json({ ok: true, app: manifest.slug, scaffolded: true });
-    return new Response("not found", { status: 404 });
-  },
-});
-
-console.log(\`\${manifest.name} (scaffolded) listening on :\${port}\`);
+// Contract: API routes are registered at their SHORT paths (e.g. "/boards") and reached at /api/boards —
+// webappRewriteUrl strips the /api prefix. Everything outside /api (and /healthz, /_svc/*) is the bundled webapp.
+const app = Fastify({ logger: true, rewriteUrl: webappRewriteUrl });
+app.get("/healthz", async () => ({ ok: true, app: manifest.slug, scaffolded: true }));
+await registerWebapp(app, { distDir: webappDist(import.meta.dirname) });
+await app.listen({ port, host: "0.0.0.0" });
 
 startTwoDbSession({ manifest: { ...manifest, version: "0.1.0" }, httpUrl })
   .then((session) => {
@@ -317,7 +314,14 @@ only, see the architecture decision log).
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-export default defineConfig({ plugins: [react(), tailwindcss()] });
+// Dev: the app's own API (REST + WS + SSE) goes through the gateway: /api/* -> /apps/${app.slug}/api/*.
+// Auth / control-plane calls (spaces, session) are redirected to the console by @twodb/twodb-shared-frontend.
+const gateway = process.env.TWODB_GATEWAY_URL ?? "http://localhost:6400";
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  server: { proxy: { "/api": { target: gateway, changeOrigin: true, ws: true, rewrite: (p: string) => \`/apps/${app.slug}\${p}\` } } },
+});
 `,
     );
 
@@ -411,7 +415,7 @@ Read \`blocks/CONVENTIONS.md\` before adding anything here.
   runtime once there's more than one pane type — see apps/twodb/webapp for
   the login/registry pattern this app's auth-gated routes should follow
   (this app talks to the Gateway the same way, just for its own endpoints
-  under \`/apps/${app.slug}/*\` instead of TwoDB's control-plane routes).
+  at same-origin \`/api/*\` (the dev proxy in vite.config.ts maps it to \`/apps/${app.slug}/api/*\` on the Gateway; in production the app's backend serves this webapp at \`/\` and its API at \`/api\`) instead of TwoDB's control-plane routes).
 `,
     );
   }

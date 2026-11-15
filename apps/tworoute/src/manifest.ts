@@ -466,7 +466,7 @@ export const tworouteManifest = defineAppManifest({
     "tracking, streaming OpenAI-compatible /completions, and token-usage logging.",
   capabilities: [],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/tworoute",
+  basePath: "/apps/tworoute/api",
   endpoints: [
     listProviders,
     listConnections,

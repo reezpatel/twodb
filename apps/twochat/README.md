@@ -48,7 +48,7 @@ auth, and WebSocket traffic through the Gateway at `6400`.
 Agents are first-class chat members rather than a side-channel:
 
 1. Create a workspace API key in TwoDB.
-2. Register a bot with `POST /apps/twochat/bots`, binding its `apiKeyId`.
+2. Register a bot with `POST /apps/twochat/api/bots` (i.e. `https://twochat.<ROOT_DOMAIN>/api/bots`), binding its `apiKeyId`.
    An unbound API key can also self-bootstrap: its first API-key request creates
    a generic `bot-<key>` participant.
 3. Read channel history through `GET /channels/:id/messages`.

@@ -35,7 +35,7 @@ export function EditorScreen(props: { sessionId: string }) {
     if (status.state !== "ready") return;
     let live = true;
     void gatewayToken().then((t) => {
-      if (live) setIframeSrc(`/artisan-api/sessions/${props.sessionId}/editor/?folder=${encodeURIComponent("/")}&cb=${Date.now()}&access_token=${encodeURIComponent(t)}`);
+      if (live) setIframeSrc(`/api/sessions/${props.sessionId}/editor/?folder=${encodeURIComponent("/")}&cb=${Date.now()}&access_token=${encodeURIComponent(t)}`);
     });
     return () => { live = false; };
   }, [status.state, props.sessionId]);

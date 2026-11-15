@@ -18,7 +18,7 @@ import { createOAuthFlow, OAuthError, isAllowedRedirect } from "../auth/oauth.js
 import { createCliAuthFlow } from "../auth/cli-auth.js";
 import { registerWsPassthrough } from "./ws-passthrough.js";
 import { federatedSearch } from "./federated-search.js";
-import { createHostRouter } from "./host-routing.js";
+import { createHostRouter, isRootDomainOrigin } from "./host-routing.js";
 import { ACT_SCOPE, deriveSigningKey, signServiceToken, looksLikeServiceToken, verifyServiceToken, ServiceTokenError } from "@twodb/core-platform/service-token";
 import { APP_CATALOG, getCatalogEntry } from "../orchestrator/catalog.js";
 import {
@@ -51,7 +51,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
   const app = Fastify({ logger: true, rewriteUrl: routeHost });
   await app.register(cors, {
     // Trusted origins + app webapps allowed to run "Login with TwoDB" (same rule as the redirect check).
-    origin: (origin, cb) => cb(null, !origin || config.AUTH_TRUSTED_ORIGINS.includes(origin) || isAllowedRedirect(origin, config)),
+    origin: (origin, cb) => cb(null, !origin || config.AUTH_TRUSTED_ORIGINS.includes(origin) || isRootDomainOrigin(origin, config.ROOT_DOMAIN) || isAllowedRedirect(origin, config)),
     credentials: true,
   });
 
@@ -816,7 +816,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
       (req.headers["x-twodb-space-ids"] as string) ?? null,
     );
     const subPath = req.url.replace(new RegExp(`^/apps/${slug}`), "") || "/";
-    // Anonymous read-only exception: GET /apps/<slug>/public/* (share links etc.) is proxied
+    // Anonymous read-only exception: GET /apps/<slug>/api/public/* (share links etc.) is proxied
     // WITHOUT identity — the app declares such endpoints auth:"public" and validates its own token.
     if (!ctx) {
       // App-to-app: a service token may reach only the target app's `/_svc/*` surface. The gateway
@@ -836,7 +836,11 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
           throw err;
         }
       }
-      if (req.method === "GET" && /^\/public\/[A-Za-z0-9_-]+(\?.*)?$/.test(subPath)) return proxyToApp(req, reply, app_, subPath, null);
+      // Anonymous surface, GET/HEAD only: the app's bundled SPA (everything outside /api and /_svc — HTML, JS, CSS,
+      // images; the SPA itself signs the user in) and explicitly public API routes (/api/public/<token>, share links).
+      const readOnly = req.method === "GET" || req.method === "HEAD";
+      if (readOnly && /^\/api\/public\/[A-Za-z0-9_-]+(\?.*)?$/.test(subPath)) return proxyToApp(req, reply, app_, subPath, null);
+      if (readOnly && !/^\/(api|_svc)(\/|\?|$)/.test(subPath)) return proxyToApp(req, reply, app_, subPath, null);
       return reply.code(401).send({ error: "unauthorized" });
     }
     await proxyToApp(req, reply, app_, subPath, ctx);
@@ -854,6 +858,14 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
   serverAny.__resolveContext = resolveContext as unknown as typeof serverAny.__resolveContext;
   registerWsPassthrough(app, (slug) => registry.getApp(slug), (slug, token) => registry.verifyToken(slug, token), routeHost);
 
+  // --- Storybook (hidden): the shared Blocks design-system Storybook, built into the image at
+  // blocks/storybook-static. Served at /storybook/ on the console host; deliberately not linked from any UI.
+  const storybookDir = process.env.TWODB_STORYBOOK_DIR ?? path.join(REPO_ROOT, "blocks/storybook-static");
+  if (existsSync(path.join(storybookDir, "index.html"))) {
+    await app.register(fastifyStatic, { root: storybookDir, prefix: "/storybook/", index: ["index.html"], decorateReply: false });
+    app.get("/storybook", async (_req, reply) => reply.redirect("/storybook/"));
+  }
+
   // --- Admin webapp: serve the built SPA when its dist exists (production
   // image builds it; dev uses the Vite dev server on :6500 instead).
   const webappDist = path.join(REPO_ROOT, "apps/twodb/webapp/dist");
@@ -861,7 +873,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     await app.register(fastifyStatic, { root: webappDist, wildcard: false, index: false });
     app.setNotFoundHandler((req, reply) => {
       const pathname = new URL(req.url, "http://internal").pathname;
-      const isApi = /^\/(api|registry|orchestrator|apps|search|healthz)(\/|$)/.test(pathname);
+      const isApi = /^\/(api|registry|orchestrator|apps|search|healthz|storybook)(\/|$)/.test(pathname);
       const wantsHtml =
         !isApi &&
         ((req.headers.accept ?? "").includes("text/html") || (req.method === "GET" && !path.extname(pathname)));

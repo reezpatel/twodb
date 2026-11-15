@@ -5,11 +5,11 @@
 Space-scoped calendars and local events.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/twoday`
+- **Base path (via Gateway)**: `/apps/twoday/api`
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T17:58:33.745Z_
+_Generated: 2026-11-15T19:04:18.952Z_
 
 ## Endpoints
 

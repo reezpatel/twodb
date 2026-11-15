@@ -36,14 +36,9 @@ export default defineConfig({
     fs: { allow: [path.resolve(__dirname, "../../..")] },
     ...(devHttps && hasCerts ? { https: { cert: readFileSync(certPath), key: readFileSync(keyPath) } } : {}),
     proxy: {
-      "/paintress-api": {
-        target: gateway,
-        changeOrigin: true,
-        ws: true,
-        rewrite: (p) => p.replace(/^\/paintress-api/, "/apps/paintress"),
-      },
-      "/api": { target: gateway, changeOrigin: true },
-      "/registry": { target: gateway, changeOrigin: true },
+      // The app's own API (REST + WS + SSE) through the gateway: /api/* -> /apps/paintress/api/*.
+      // Auth/control-plane calls go to the console (see twodb-shared-frontend), not through this proxy.
+      "/api": { target: gateway, changeOrigin: true, ws: true, rewrite: (p: string) => `/apps/paintress${p}` },
     },
   },
 });

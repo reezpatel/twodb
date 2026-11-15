@@ -11,8 +11,8 @@
     "core-data",
     "core-platform"
   ],
-  "basePath": "/apps/dispatch",
-  "generatedAt": "2026-11-11T11:06:26.789Z",
+  "basePath": "/apps/dispatch/api",
+  "generatedAt": "2026-11-15T19:04:18.705Z",
   "endpoints": [
     {
       "name": "createRunner",

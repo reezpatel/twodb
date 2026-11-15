@@ -42,7 +42,7 @@ cd webapp && TWODOO_API_TARGET=http://localhost:6416 pnpm dev   # UI :6511
 ```
 
 `TWODOO_API_TARGET` bypasses the gateway for the API proxy (injects dev
-identity headers). Prod always routes through the gateway (`/apps/twodoo`).
+identity headers). Prod always routes through the gateway (`/apps/twodoo/api`; on its own host: `/api`).
 Registration: `registerWithGateway` on boot with the provision token.
 
 ## Known gaps / next

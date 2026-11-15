@@ -655,7 +655,7 @@ export const twochatManifest = defineAppManifest({
     "bots participate as first-class members via workspace API keys.",
   capabilities: ["search", "ws"],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/twochat",
+  basePath: "/apps/twochat/api",
   websocketPaths: ["/ws"],
   endpoints: [
     collabStop,

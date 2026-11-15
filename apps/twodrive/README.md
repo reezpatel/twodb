@@ -45,7 +45,7 @@ pnpm --filter @twodb/app-twodb provision:dev twodrive   # once: DB + token into 
 pnpm --filter @twodb/app-twodrive dev                   # backend :6406
 pnpm --filter @twodb/app-twodrive-webapp dev            # webapp :6512 (proxies gateway)
 ```
-The webapp talks to the backend through the Gateway (`/apps/twodrive/...`),
+The webapp talks to the backend through the Gateway (`/api/...` on its own origin; `/apps/twodrive/api/...` through the Gateway path mount),
 so TwoDB must be running and TwoDrive registered for the UI to have data.
 
 ## Known gaps / next

@@ -5,11 +5,11 @@
 Drive/file explorer over multiple storage backends (S3-compatible or local). Virtual storages act as soft buckets with an S3-compatible API, plus an internal app-file API with per-app folders.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/twodrive`
+- **Base path (via Gateway)**: `/apps/twodrive/api`
 - **Capabilities**: files, storage
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T13:40:08.840Z_
+_Generated: 2026-11-15T19:04:19.032Z_
 
 ## Endpoints
 

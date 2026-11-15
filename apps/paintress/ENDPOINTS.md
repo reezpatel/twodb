@@ -5,11 +5,11 @@
 Miro-like boards for diagrams (architecture, AWS/GCP, ERD, flowcharts, swimlane process maps) and Markdown+Mermaid docs. A human edits in the browser while LLM agents edit through the REST API; every change shows up live over a WebSocket.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/paintress`
+- **Base path (via Gateway)**: `/apps/paintress/api`
 - **Capabilities**: boards, diagrams
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-15T05:05:17.940Z_
+_Generated: 2026-11-15T19:04:19.077Z_
 
 ## Endpoints
 
@@ -448,7 +448,8 @@ Returns a board with its current content: all items (diagram) or the markdown + 
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -765,7 +766,8 @@ Lists items of a diagram board. Positions are relative to the parent item (child
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -903,7 +905,8 @@ Applies a batch of create/update/delete ops in ONE transaction = ONE undo step f
                       "edge",
                       "sticky",
                       "text",
-                      "image"
+                      "image",
+                      "draw"
                     ]
                   },
                   "parentId": {
@@ -1107,7 +1110,8 @@ Applies a batch of create/update/delete ops in ONE transaction = ONE undo step f
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -1225,7 +1229,8 @@ Applies a batch of create/update/delete ops in ONE transaction = ONE undo step f
                       "edge",
                       "sticky",
                       "text",
-                      "image"
+                      "image",
+                      "draw"
                     ]
                   },
                   "parentId": {
@@ -1432,7 +1437,8 @@ Convenience wrapper over /ops: creates items. Item `data` depends on `type` — 
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -1537,7 +1543,8 @@ Convenience wrapper over /ops: creates items. Item `data` depends on `type` — 
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -1655,7 +1662,8 @@ Convenience wrapper over /ops: creates items. Item `data` depends on `type` — 
                       "edge",
                       "sticky",
                       "text",
-                      "image"
+                      "image",
+                      "draw"
                     ]
                   },
                   "parentId": {
@@ -1938,7 +1946,8 @@ Updates one item. `data` is shallow-merged (a null value removes a key). Pass `i
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -2056,7 +2065,8 @@ Updates one item. `data` is shallow-merged (a null value removes a key). Pass `i
                       "edge",
                       "sticky",
                       "text",
-                      "image"
+                      "image",
+                      "draw"
                     ]
                   },
                   "parentId": {
@@ -2290,7 +2300,8 @@ Deletes one item together with its children and attached edges.
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -2408,7 +2419,8 @@ Deletes one item together with its children and attached edges.
                       "edge",
                       "sticky",
                       "text",
-                      "image"
+                      "image",
+                      "draw"
                     ]
                   },
                   "parentId": {
@@ -2671,7 +2683,8 @@ Change log of a board (who changed what, with inverse ops). `since` returns even
                     "edge",
                     "sticky",
                     "text",
-                    "image"
+                    "image",
+                    "draw"
                   ]
                 },
                 "parentId": {
@@ -2789,7 +2802,8 @@ Change log of a board (who changed what, with inverse ops). `since` returns even
                             "edge",
                             "sticky",
                             "text",
-                            "image"
+                            "image",
+                            "draw"
                           ]
                         },
                         "parentId": {
@@ -3056,7 +3070,8 @@ Reverts one past batch by applying its stored inverse ops (itself a new, undoabl
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -3174,7 +3189,8 @@ Reverts one past batch by applying its stored inverse ops (itself a new, undoabl
                       "edge",
                       "sticky",
                       "text",
-                      "image"
+                      "image",
+                      "draw"
                     ]
                   },
                   "parentId": {
@@ -3630,7 +3646,8 @@ PRIMARY AGENT ENDPOINT for architecture, cloud (AWS/GCP), C4 and flowchart diagr
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -3743,7 +3760,8 @@ PRIMARY AGENT ENDPOINT for architecture, cloud (AWS/GCP), C4 and flowchart diagr
                       "edge",
                       "sticky",
                       "text",
-                      "image"
+                      "image",
+                      "draw"
                     ]
                   },
                   "parentId": {
@@ -4155,7 +4173,8 @@ Builds an entity-relationship diagram: `entities` with typed `columns` (pk, fk:"
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -4268,7 +4287,8 @@ Builds an entity-relationship diagram: `entities` with typed `columns` (pk, fk:"
                       "edge",
                       "sticky",
                       "text",
-                      "image"
+                      "image",
+                      "draw"
                     ]
                   },
                   "parentId": {
@@ -4648,7 +4668,8 @@ Builds a swimlane process map: `lanes`, `steps` (each in a lane, with a flowchar
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -4761,7 +4782,8 @@ Builds a swimlane process map: `lanes`, `steps` (each in a lane, with a flowchar
                       "edge",
                       "sticky",
                       "text",
-                      "image"
+                      "image",
+                      "draw"
                     ]
                   },
                   "parentId": {
@@ -5061,7 +5083,8 @@ Imports Mermaid source as native, editable items. Supported: `flowchart`/`graph`
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -5174,7 +5197,8 @@ Imports Mermaid source as native, editable items. Supported: `flowchart`/`graph`
                       "edge",
                       "sticky",
                       "text",
-                      "image"
+                      "image",
+                      "draw"
                     ]
                   },
                   "parentId": {
@@ -5453,7 +5477,8 @@ Tidy up: re-runs auto-layout over the whole board, or over the children of `grou
               "edge",
               "sticky",
               "text",
-              "image"
+              "image",
+              "draw"
             ]
           },
           "parentId": {
@@ -5566,7 +5591,8 @@ Tidy up: re-runs auto-layout over the whole board, or over the children of `grou
                       "edge",
                       "sticky",
                       "text",
-                      "image"
+                      "image",
+                      "draw"
                     ]
                   },
                   "parentId": {

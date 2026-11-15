@@ -13,8 +13,8 @@
     "core-platform",
     "core-async"
   ],
-  "basePath": "/apps/twodrive",
-  "generatedAt": "2026-11-12T13:40:08.836Z",
+  "basePath": "/apps/twodrive/api",
+  "generatedAt": "2026-11-15T19:04:19.027Z",
   "endpoints": [
     {
       "name": "listBackends",

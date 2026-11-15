@@ -12,7 +12,7 @@ export const manifest = defineAppManifest({
   description: "Workflow automation — not yet implemented. See AGENTS.md before building it out.",
   capabilities: [],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/twoloop",
+  basePath: "/apps/twoloop/api",
   endpoints: [],
 });
 

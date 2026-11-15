@@ -3,7 +3,7 @@
 // session resolved by TwoDB and forwarded as x-twodb-* headers.
 import type { Board, BoardGroup, Item, Op } from "@shared/model";
 
-export const BASE = "/paintress-api";
+export const BASE = "/api";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {

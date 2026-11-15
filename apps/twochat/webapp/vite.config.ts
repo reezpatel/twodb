@@ -37,19 +37,9 @@ export default defineConfig({
     host: true,
     ...(devHttps && hasCerts ? { https: { cert: readFileSync(certPath), key: readFileSync(keyPath) } } : {}),
     proxy: {
-      // TwoChat's own API, through the gateway (auth resolved there).
-      "/twochat-api": {
-        target: gateway,
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/twochat-api/, "/apps/twochat"),
-        // ws: true is not needed here — the chat WS connects via /apps/twochat/ws
-      },
-      // Control-plane session surface (better-auth) — shared-origin SSO.
-      "/api": { target: gateway, changeOrigin: true },
-      // Spaces list comes from the control plane.
-      "/registry": { target: gateway, changeOrigin: true },
-      // The gateway's app proxy also serves WS upgrades.
-      "/apps/twochat/ws": { target: gateway, changeOrigin: true, ws: true },
+      // The app's own API (REST + WS + SSE) through the gateway: /api/* -> /apps/twochat/api/*.
+      // Auth/control-plane calls go to the console (see twodb-shared-frontend), not through this proxy.
+      "/api": { target: gateway, changeOrigin: true, ws: true, rewrite: (p: string) => `/apps/twochat${p}` },
     },
   },
 });

@@ -38,16 +38,11 @@ export default defineConfig({
     strictPort: true,
     host: true,
     ...(devHttps && hasCerts ? { https: { cert: readFileSync(certPath), key: readFileSync(keyPath) } } : {}),
-    proxy: direct
-      ? { "/apps/twothing": { target: backend, changeOrigin: true, rewrite: (p) => p.replace(/^\/apps\/twothing/, "") } }
-      : {
-          "/apps/twothing": { target: gateway, changeOrigin: true },
-          // Control-plane session surface (better-auth) — shared-origin SSO.
-          "/api": { target: gateway, changeOrigin: true },
-          // Central login: the ?code from TwoDB's /authorize is exchanged at
-          // POST /registry/oauth/token (twodb-shared-frontend). Without this
-          // proxy Vite answers 404 and the login never completes.
-          "/registry": { target: gateway, changeOrigin: true },
-        },
+    proxy: {
+      // TwoThing's own API: through the gateway (/api/* -> /apps/twothing/api/*), or straight to the backend (TWOTHING_DIRECT=1).
+      "/api": direct
+        ? { target: backend, changeOrigin: true }
+        : { target: gateway, changeOrigin: true, rewrite: (p: string) => `/apps/twothing${p}` },
+    },
   },
 });

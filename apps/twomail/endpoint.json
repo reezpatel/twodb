@@ -10,8 +10,8 @@
     "core-platform",
     "core-async"
   ],
-  "basePath": "/apps/twomail",
-  "generatedAt": "2026-11-12T18:05:26.795Z",
+  "basePath": "/apps/twomail/api",
+  "generatedAt": "2026-11-15T19:04:18.992Z",
   "endpoints": [
     {
       "name": "listAccounts",

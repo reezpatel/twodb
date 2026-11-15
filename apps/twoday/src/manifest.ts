@@ -11,7 +11,7 @@ export const rangeQuery = z.object({ calendarId: z.string().optional(), from: da
 const calendar = calendarInput.extend({ id: z.string(), createdAt: z.string() });
 const event = eventFields.extend({ id: z.string(), createdAt: z.string(), updatedAt: z.string() });
 const auth = "session-or-apiKey" as const;
-export const manifest = defineAppManifest({ name: "TwoDay", slug: "twoday", version: "0.1.0", shape: "backend+webapp", description: "Space-scoped calendars and local events.", capabilities: [], coreDeps: ["core-data", "core-platform", "core-async"], basePath: "/apps/twoday", endpoints: [
+export const manifest = defineAppManifest({ name: "TwoDay", slug: "twoday", version: "0.1.0", shape: "backend+webapp", description: "Space-scoped calendars and local events.", capabilities: [], coreDeps: ["core-data", "core-platform", "core-async"], basePath: "/apps/twoday/api", endpoints: [
   defineEndpoint({ name: "listCalendars", method: "GET", path: "/calendars", auth, description: "List calendars in accessible spaces.", response: z.array(calendar) }),
   defineEndpoint({ name: "createCalendar", method: "POST", path: "/calendars", auth, description: "Create a calendar in an accessible space.", request: calendarInput, response: calendar }),
   defineEndpoint({ name: "listEvents", method: "GET", path: "/events", auth, description: "List overlapping events. Required from/to are YYYY-MM-DD UTC boundaries (to exclusive); optional calendarId, limit (max 500), offset. All-day overlap uses date boundaries.", response: z.array(event) }),

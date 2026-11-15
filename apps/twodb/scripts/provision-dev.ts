@@ -64,7 +64,7 @@ async function main() {
         name: slug,
         version: "dev",
         shape: "backend",
-        basePath: `/apps/${slug}`,
+        basePath: `/apps/${slug}/api`,
         hostId: "dev",
         capabilities: [],
       },

@@ -3,7 +3,7 @@
 // by TwoDB and forwarded as x-twodb-* headers. Spaces come from the control
 // plane itself (/registry/spaces).
 
-const BASE = "/apps/toolkit";
+const BASE = "/api";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -154,7 +154,7 @@ export const toolkitClient = {
   // --- spaces (control plane) + agents (artisan's own /agents, same gateway session) ---
   listSpaces: () => fetch("/registry/spaces", { credentials: "include" }).then((r) => json<{ spaces: Space[] }>(r)),
   listAgents: async (): Promise<AgentInfo[]> => {
-    const res = await fetch("/apps/artisan/agents", { credentials: "include" });
+    const res = await fetch("/api/agents", { credentials: "include" });
     if (!res.ok) {
       // fall back to toolkit's proxy (e.g. direct mode or artisan behind a different path)
       try {

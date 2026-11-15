@@ -168,7 +168,7 @@ export const manifest = defineAppManifest({
     "Knowledge base: nested notes with a block editor (TipTap) and Notion-style databases backed by real Postgres tables — table/kanban/list/gallery/calendar views, filters, sorts, relations, rollups and formulas.",
   capabilities: ["search"],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/garden",
+  basePath: "/apps/garden/api",
   endpoints,
 });
 

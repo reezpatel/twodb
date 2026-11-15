@@ -12,7 +12,7 @@ export const manifest = defineAppManifest({
     "(stocks, mutual funds, metals, FDs, RDs, …), net-worth tracker, retirement planner, analytics and calculators. Workspace-level access.",
   capabilities: ["finance", "budgets", "investments"],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/fincal",
+  basePath: "/apps/fincal/api",
   endpoints: [...allRoutes.map((r) => r.spec)],
 });
 

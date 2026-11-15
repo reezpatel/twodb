@@ -11,4 +11,4 @@ Read `blocks/CONVENTIONS.md` before adding anything here.
   runtime once there's more than one pane type — see apps/twodb/webapp for
   the login/registry pattern this app's auth-gated routes should follow
   (this app talks to the Gateway the same way, just for its own endpoints
-  under `/apps/twodrive/*` instead of TwoDB's control-plane routes).
+  at same-origin `/api/*` — dev proxy → gateway `/apps/twodrive/api/*`; in production the app serves this webapp at `/` and its API at `/api` — instead of TwoDB\'s control-plane routes).

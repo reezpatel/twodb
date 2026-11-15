@@ -5,7 +5,7 @@
 
 import { gatewayAuthHeader, gatewayToken } from "./gateway-token.js";
 
-const BASE = "/apps/artisan";
+const BASE = "/api";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -46,7 +46,7 @@ async function del<T>(path: string): Promise<T> {
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const auth = await gatewayAuthHeader();
   const headers = { ...(init.headers as Record<string, string> | undefined), ...auth };
-  return fetch(`/artisan-api${path}`, { ...init, headers });
+  return fetch(`/api${path}`, { ...init, headers });
 }
 
 /** WS URL to an artisan WS endpoint, authenticated via ?access_token= (the
@@ -55,7 +55,7 @@ export async function apiWsUrl(path: string): Promise<string> {
   const proto = window.location.protocol === "https:" ? "wss" : "ws";
   const token = await gatewayToken();
   const sep = path.includes("?") ? "&" : "?";
-  return `${proto}://${window.location.host}/artisan-api${path}${sep}access_token=${encodeURIComponent(token)}`;
+  return `${proto}://${window.location.host}/api${path}${sep}access_token=${encodeURIComponent(token)}`;
 }
 
 
@@ -437,7 +437,7 @@ export class WorkspaceSocket {
   connect(): void {
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
     void apiWsUrl("/ws")
-      .catch(() => `${proto}://${window.location.host}/apps/artisan/ws`)
+      .catch(() => `${proto}://${window.location.host}/api/ws`)
       .then((url) => this.open(url));
   }
 

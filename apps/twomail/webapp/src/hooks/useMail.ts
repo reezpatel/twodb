@@ -3,7 +3,7 @@ export interface Account{id:string;name:string;address:string}
 export interface Message{id:string;sender:string;recipient:string;subject:string;text:string;date:string;status:string}
 export interface Setup{spaceId:string;name:string;address:string;username:string;password:string;imapHost:string;smtpHost:string;smtpPort:number;smtpSecure:boolean}
 export interface Compose{requestId:string;to:string;subject:string;text:string}
-const base="/apps/twomail";
+const base="/api";
 async function api<T>(path:string,init?:RequestInit):Promise<T>{const r=await fetch(path,{credentials:"include",...init,headers:{"Content-Type":"application/json"}});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(r.status===401?"Sign in to TwoDB and reload.":b.error??`Request failed (${r.status})`);}return r.json();}
 export function useMail(){
  const [accounts,setAccounts]=useState<Account[]>([]),[accountId,setAccountId]=useState("");

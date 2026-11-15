@@ -5,11 +5,11 @@
 Pinterest-style link boards: save URLs to boards; metadata (title, description, preview image, favicon) is fetched and stored server-side. See AGENTS.md.
 
 - **Shape**: backend+webapp
-- **Base path (via Gateway)**: `/apps/twopin`
+- **Base path (via Gateway)**: `/apps/twopin/api`
 - **Capabilities**: boards, pins, link-metadata
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T15:23:54.145Z_
+_Generated: 2026-11-15T19:04:19.094Z_
 
 ## Endpoints
 

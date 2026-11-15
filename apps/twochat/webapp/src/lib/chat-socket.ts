@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import type { Message, Notification, ReactionSummary } from "./chat-client";
 
 /**
- * Live chat socket through the gateway (/apps/twochat/ws — bridged by the
+ * Live chat socket through the gateway (/api/ws — bridged by the
  * gateway's ws-passthrough). Auto-reconnects with backoff; frames mirror the
  * server's ServerFrame union (src/ws/hub.ts on the backend).
  */export type ServerFrame =
@@ -47,10 +47,10 @@ export function useChatSocketRef(enabled: boolean, handlers: ChatSocketHandlers)
       if (closed) return;
       handlersRef.current.onStatus?.("connecting");
       const proto = window.location.protocol === "https:" ? "wss" : "ws";
-      // Dev: vite proxies /apps/twochat/ws → gateway (ws: true). The gateway
+      // Dev: vite proxies /api/ws → gateway (ws: true). The gateway
       // bridges to the app after resolving the session. In prod both run at
       // the gateway origin, so the same path works.
-      const ws = new WebSocket(`${proto}://${window.location.host}/apps/twochat/ws`);
+      const ws = new WebSocket(`${proto}://${window.location.host}/api/ws`);
       wsRef.current = ws;
 
       ws.onopen = () => {

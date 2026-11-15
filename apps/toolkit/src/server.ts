@@ -1,4 +1,5 @@
 import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
+import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { createPgDb } from "@twodb/core-data/db";
 import { createAsyncEngine } from "@twodb/core-async/engine";
 
@@ -60,7 +61,7 @@ function toolsOf(row: Selectable<ConnectorInstanceRow>, template: ConnectorTempl
 }
 
 export async function buildServer(config: ToolkitConfig) {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
   const db = createPgDb<ToolkitDb>({ connectionString: config.DATABASE_URL, schema: "toolkit" });
   await applySchema(db);
   const dataKey = config.TWODB_DATA_KEY ?? "dev-only-data-key";
@@ -571,7 +572,7 @@ export async function buildServer(config: ToolkitConfig) {
     const ctx = auth(req, reply); if (!ctx) return reply;
     try {
       const res = await fetch(
-        `${config.TWODB_GATEWAY_URL ?? process.env.TWODB_GATEWAY_URL ?? "http://localhost:6400"}/apps/${ARTISAN_APP}/agents`,
+        `${config.TWODB_GATEWAY_URL ?? process.env.TWODB_GATEWAY_URL ?? "http://localhost:6400"}/apps/${ARTISAN_APP}/api/agents`,
         {
           headers: {
             ...(req.headers["x-twodb-auth-kind"] ? { "x-twodb-auth-kind": String(req.headers["x-twodb-auth-kind"]) } : {}),
@@ -683,5 +684,6 @@ export async function buildServer(config: ToolkitConfig) {
   };
   app.addHook("onClose", async () => { await close(); });
 
+  await registerWebapp(app, { distDir: webappDist(import.meta.dirname) });
   return app;
 }

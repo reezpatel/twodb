@@ -550,7 +550,7 @@ export const manifest = defineAppManifest({
     "buckets with an S3-compatible API, plus an internal app-file API with per-app folders.",
   capabilities: ["files", "storage"],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/twodrive",
+  basePath: "/apps/twodrive/api",
   endpoints: [
     listBackends,
     createBackend,

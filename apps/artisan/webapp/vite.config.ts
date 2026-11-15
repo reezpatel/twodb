@@ -32,17 +32,9 @@ export default defineConfig({
     host: true,
     ...(devHttps && hasCerts ? { https: { cert: readFileSync(certPath), key: readFileSync(keyPath) } } : {}),
     proxy: {
-      // Dispatch's own API, through the gateway (auth resolved there).
-      "/artisan-api": {
-        target: gateway,
-        changeOrigin: true,
-        ws: true, // forward WS upgrades (terminal + editor-ws relays)
-        rewrite: (p) => p.replace(/^\/artisan-api/, "/apps/artisan"),
-      },
-      "/apps": { target: gateway, changeOrigin: true, ws: true },
-      "/auth": { target: gateway, changeOrigin: true }, // /auth/gateway-token (per-login token)
-      "/api": { target: gateway, changeOrigin: true },
-      "/registry": { target: gateway, changeOrigin: true },
+      // The app's own API (REST + WS + SSE) through the gateway: /api/* -> /apps/artisan/api/*.
+      // Auth/control-plane calls go to the console (see twodb-shared-frontend), not through this proxy.
+      "/api": { target: gateway, changeOrigin: true, ws: true, rewrite: (p: string) => `/apps/artisan${p}` },
     },
   },
 });

@@ -19,8 +19,8 @@ const gateway = process.env.TWODB_GATEWAY_URL ?? "http://localhost:6400";
 const directApi = process.env.TWODOO_API_TARGET;
 const apiTarget = directApi ?? gateway;
 const apiRewrite = directApi
-  ? (p: string) => p.replace(/^\/twodoo-api/, "")
-  : (p: string) => p.replace(/^\/twodoo-api/, "/apps/twodoo");
+  ? undefined
+  : (p: string) => `/apps/twodoo${p}`;
 const apiHeaders = directApi
   ? {
       "x-twodb-auth-kind": "session",
@@ -54,18 +54,14 @@ export default defineConfig({
     host: true,
     ...(devHttps && hasCerts ? { https: { cert: readFileSync(certPath), key: readFileSync(keyPath) } } : {}),
     proxy: {
-      // TwoDoo's own API — gateway in prod, direct-to-backend in dev when
-      // TWODOO_API_TARGET is set (identity headers injected by the proxy).
-      "/twodoo-api": {
+      // TwoDoo's own API through the gateway (/api/* -> /apps/twodoo/api/*), or direct-to-backend in dev
+      // when TWODOO_API_TARGET is set (identity headers injected by the proxy).
+      "/api": {
         target: apiTarget,
         changeOrigin: true,
         rewrite: apiRewrite,
         headers: apiHeaders,
       },
-      // Control-plane session surface (better-auth) — shared-origin SSO.
-      "/api": { target: gateway, changeOrigin: true },
-      // Spaces list comes from the control plane.
-      "/registry": { target: gateway, changeOrigin: true },
     },
   },
 });

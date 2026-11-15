@@ -1,5 +1,5 @@
 // Thin client over TwoPlan's API — always through the gateway (dev proxy /twoplan-api -> /apps/twoplan).
-const BASE = "/twoplan-api";
+const BASE = "/api";
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) {

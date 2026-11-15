@@ -10,7 +10,7 @@ progress.** Two surfaces:
    manager) that users configure instances of (many per template, each with its
    own config + space scope). Each instance exposes:
    - **Commands** — execution tools other apps invoke over the API
-     (`POST /apps/toolkit/tools/:toolId/invoke` → `{ output }`);
+     (`POST /apps/toolkit/api/tools/:toolId/invoke` → `{ output }`);
    - **Broadcasts** — background activity (poller) emitting events other apps
      listen to (`GET /events`, SSE at `/events/stream`, pg_notify on the
      core-async channel) or consume durably by **requesting a queue**

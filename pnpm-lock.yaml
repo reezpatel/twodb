@@ -2203,12 +2203,18 @@ importers:
 
   core/twodb-core:
     dependencies:
+      '@fastify/static':
+        specifier: ^8.2.0
+        version: 8.3.0
       '@twodb/core-data':
         specifier: workspace:*
         version: link:../core-data
       '@twodb/core-platform':
         specifier: workspace:*
         version: link:../core-platform
+      fastify:
+        specifier: ^5.11.2
+        version: 5.11.2
       kysely:
         specifier: ^0.29.5
         version: 0.29.5

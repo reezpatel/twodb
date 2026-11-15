@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Backend library every TwoDB app imports: register with the control plane, heartbeat, fetch Postgres/S3 config, call the gateway as a verified app.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./webapp": "./src/webapp.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
@@ -15,7 +16,9 @@
   "dependencies": {
     "@twodb/core-data": "workspace:*",
     "@twodb/core-platform": "workspace:*",
-    "kysely": "^0.29.5"
+    "kysely": "^0.29.5",
+    "@fastify/static": "^8.2.0",
+    "fastify": "^5.11.2"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

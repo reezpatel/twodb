@@ -14,8 +14,8 @@
     "core-platform",
     "core-async"
   ],
-  "basePath": "/apps/twopin",
-  "generatedAt": "2026-11-12T15:23:54.142Z",
+  "basePath": "/apps/twopin/api",
+  "generatedAt": "2026-11-15T19:04:19.089Z",
   "endpoints": [
     {
       "name": "listBoards",

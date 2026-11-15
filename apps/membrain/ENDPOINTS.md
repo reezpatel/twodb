@@ -5,11 +5,11 @@
 Agent harness — not yet implemented. See AGENTS.md before building it out.
 
 - **Shape**: backend
-- **Base path (via Gateway)**: `/apps/membrain`
+- **Base path (via Gateway)**: `/apps/membrain/api`
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-09T12:16:47.517Z_
+_Generated: 2026-11-15T19:04:18.862Z_
 
 ## Endpoints
 

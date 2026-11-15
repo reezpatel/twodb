@@ -10,7 +10,7 @@
     "core-platform",
     "core-async"
   ],
-  "basePath": "/apps/tworing",
-  "generatedAt": "2026-11-09T12:16:49.907Z",
+  "basePath": "/apps/tworing/api",
+  "generatedAt": "2026-11-15T19:04:18.805Z",
   "endpoints": []
 }

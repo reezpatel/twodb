@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import websocket from "@fastify/websocket";
 import multipart from "@fastify/multipart";
 import { createPgDb } from "@twodb/core-data/db";
@@ -16,7 +17,7 @@ import { registerMiscRoutes } from "./routes/misc.js";
 import { registerBoardSocket } from "./ws.js";
 
 export async function buildServer(config: PaintressConfig, deps: { storage?: import("@twodb/core-data/storage").StorageAdapter | null } = {}) {
-  const app = Fastify({ logger: true, bodyLimit: 20 * 1024 * 1024 });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: 20 * 1024 * 1024 });
   // Tolerate an empty body under content-type: application/json (browsers send that for body-less POSTs).
   app.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
     if (!body) return done(null, {});
@@ -50,5 +51,6 @@ export async function buildServer(config: PaintressConfig, deps: { storage?: imp
     await hub.stop();
     await db.destroy();
   });
+  await registerWebapp(app, { distDir: webappDist(import.meta.dirname) });
   return { app, store, hub, db };
 }

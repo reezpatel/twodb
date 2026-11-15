@@ -17,7 +17,7 @@ export const manifest = defineAppManifest({
     "sub-tasks, checklists, links, custom fields, saved views, docs, dashboards, inbox, CSV/Linear import. Workspace-level access.",
   capabilities: ["projects", "tickets"],
   coreDeps: ["core-data", "core-platform", "core-async"],
-  basePath: "/apps/twoplan",
+  basePath: "/apps/twoplan/api",
   endpoints: [...allRoutes.map((r) => r.spec)],
 });
 

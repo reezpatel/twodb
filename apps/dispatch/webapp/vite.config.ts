@@ -32,18 +32,9 @@ export default defineConfig({
     host: true,
     ...(devHttps && hasCerts ? { https: { cert: readFileSync(certPath), key: readFileSync(keyPath) } } : {}),
     proxy: {
-      // Dispatch's own API, through the gateway (auth resolved there).
-      "/dispatch-api": {
-        target: gateway,
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/dispatch-api/, "/apps/dispatch"),
-        // ws: true not needed here — the terminal relay dials the gateway
-        // origin directly (window.location.origin), which the dev server
-        // proxies under the /apps key below.
-      },
-      "/apps": { target: gateway, changeOrigin: true, ws: true },
-      "/api": { target: gateway, changeOrigin: true },
-      "/registry": { target: gateway, changeOrigin: true },
+      // The app's own API (REST + WS + SSE) through the gateway: /api/* -> /apps/dispatch/api/*.
+      // Auth/control-plane calls go to the console (see twodb-shared-frontend), not through this proxy.
+      "/api": { target: gateway, changeOrigin: true, ws: true, rewrite: (p: string) => `/apps/dispatch${p}` },
     },
   },
 });

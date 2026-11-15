@@ -1,7 +1,5 @@
 import Fastify from "fastify";
-import fastifyStatic from "@fastify/static";
-import { existsSync } from "node:fs";
-import * as path from "node:path";
+import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import websocket from "@fastify/websocket";
 import { WebSocket } from "ws";
 import { createPgDb } from "@twodb/core-data/db";
@@ -42,7 +40,7 @@ export const INSPECT_RETENTION_DAYS = 3;
 export type ServiceCaller = Pick<TwoDbRuntime, "serviceFetch" | "verifyServiceToken" | "serviceToken" | "actAs">;
 
 export async function buildServer(config: ArtisanConfig, opts: { twodb?: ServiceCaller } = {}) {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
   await app.register(websocket);
 
@@ -1278,7 +1276,7 @@ echo saved`;
     const deps = depsFor(req);
     const status = await editorStatus(session);
     if (status.state !== "ready") return reply.code(502).send("editor not running");
-    const prefix = `/apps/artisan/sessions/${id}/editor`;
+    const prefix = `/api/sessions/${id}/editor`;
     const path = "/" + (rest ?? "");
     const headers: Record<string, string> = {};
     for (const [k, v] of Object.entries(req.headers)) if (!HOP_BY_HOP.has(k.toLowerCase())) headers[k] = typeof v === "string" ? v : String(v ?? "");
@@ -1340,7 +1338,7 @@ echo saved`;
       // Origin-RELATIVE path — the browser resolves it against its own origin,
       // so the WS goes to whatever host/port served the page (never the internal
       // artisan host that req.headers.host leaks through the proxy chain).
-      const wsBasePath = `/apps/artisan/sessions/${id}/editor-ws`;
+      const wsBasePath = `/api/sessions/${id}/editor-ws`;
       // Rewrite WS URLs and root-relative asset paths so they resolve through the
       // proxy. Replacement FUNCTIONS keep a literal "$" in the source intact. Only
       // rewrite HTML entry points (which reference the tunnel); leave JS/CSS opaque.
@@ -1494,18 +1492,8 @@ echo saved`;
 
   app.get("/healthz", async () => ({ ok: true }));
 
-  // --- webapp: serve the built SPA when its dist exists (release images build
-  // it; dev uses the Vite dev server on :6515).
-  const webappDist = path.join(import.meta.dirname, "../webapp/dist");
-  if (existsSync(path.join(webappDist, "index.html"))) {
-    await app.register(fastifyStatic, { root: webappDist, wildcard: false, index: false });
-    app.setNotFoundHandler((req, reply) => {
-      const pathname = new URL(req.url, "http://internal").pathname;
-      const isApi = /^\/(sessions|agents|tools|skills|mcp|memories|settings|directories|models|runners|microvms|ws|internal|healthz)(\/|$)/.test(pathname);
-      if (req.method === "GET" && !isApi) return reply.sendFile("index.html");
-      return reply.code(404).send({ error: "not found" });
-    });
-  }
+  // --- webapp: the bundled SPA (apps/artisan/webapp/dist), served outside /api
+  await registerWebapp(app, { distDir: webappDist(import.meta.dirname) });
 
   await applySchema(db as never);
   void purgeInspection(); // after the tables exist

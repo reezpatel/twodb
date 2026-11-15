@@ -10,8 +10,8 @@
     "core-platform",
     "core-async"
   ],
-  "basePath": "/apps/twodoo",
-  "generatedAt": "2026-11-12T17:41:01.436Z",
+  "basePath": "/apps/twodoo/api",
+  "generatedAt": "2026-11-15T19:04:18.893Z",
   "endpoints": [
     {
       "name": "listBoards",

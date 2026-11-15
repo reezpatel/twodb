@@ -75,3 +75,15 @@ export function createHostRouter(config: HostRoutingConfig): (req: Pick<Incoming
     return service ? `/apps/${service}${originalUrl.startsWith("/") ? originalUrl : `/${originalUrl}`}` : originalUrl;
   };
 }
+
+/** True for http(s) origins of the form <label>.<ROOT_DOMAIN> (the console and every app webapp). */
+export function isRootDomainOrigin(origin: string, rootDomain: string | undefined): boolean {
+  const root = normalizeRootDomain(rootDomain);
+  if (!root) return false;
+  try {
+    const u = new URL(origin);
+    return (u.protocol === "http:" || u.protocol === "https:") && u.hostname.toLowerCase().endsWith(`.${root}`);
+  } catch {
+    return false;
+  }
+}

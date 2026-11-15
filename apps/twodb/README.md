@@ -133,6 +133,7 @@ src/
 │   └── install.ts             install/start/stop/restart/upgrade/remove + pull-registration
 ├── auth/index.ts              wires core-platform/auth's engine + workspace repo
 ├── gateway/
+│   ├── host-routing.ts         ROOT_DOMAIN / CATCH_ALL_* host → /apps/<slug> rewrite (HTTP + WS)
 │   ├── server.ts               fastify app: all routes
 │   ├── proxy.ts                generic streaming reverse proxy to a registered app
 │   ├── federated-search.ts     search capability fan-out
@@ -191,6 +192,40 @@ hostnames matching that JavaScript regular expression use the catch-all;
 all others continue through the gateway unchanged. The original `Host`
 header is preserved when a request is proxied, so the target app can resolve
 the custom domain itself.
+
+### The app contract: one container = webapp at `/` + API at `/api`
+
+Every app image bundles its React webapp (`apps/<slug>/webapp` → `dist`, built by
+`deploy/docker/app.Dockerfile`) and its backend serves both on one port:
+
+| Path | What |
+|------|------|
+| `/api/*` | the app's API (REST, WebSocket, SSE). Handlers stay registered at short paths (`/boards`); `webappRewriteUrl` strips `/api` |
+| `/healthz`, `/_svc/*` | liveness probe / service-token app-to-app inbox (never prefixed) |
+| everything else | the SPA (`registerWebapp` — static assets + `index.html` fallback) |
+
+Shared code: `core/twodb-core/src/webapp.ts` (`webappRewriteUrl`, `registerWebapp`, `webappDist`, `appUiUrl`).
+The manifest `basePath` is `/apps/<slug>/api`, so the CLI, docs and federated search all resolve correctly.
+
+Gateway rules for `/apps/<slug>/*` (and therefore `<slug>.<ROOT_DOMAIN>/*`): anonymous `GET`/`HEAD` is allowed for the SPA
+(anything outside `/api` and `/_svc`) and for `/api/public/<token>`; everything under `/api` needs a session / API key.
+WebSocket upgrades must target `/api/...` and the path must be in the manifest's `websocketPaths`.
+
+Sign-in: app webapps redirect to the console (`console.<ROOT_DOMAIN>`, configured at runtime through
+`TWODB_CONSOLE_URL`, injected into `index.html` as `window.__TWODB_CONFIG__`) and exchange the code there; control-plane
+calls (`/registry/*`, `/api/auth/*`) are redirected to the console by `core/twodb-shared-frontend` automatically.
+Any `<label>.<ROOT_DOMAIN>` origin is an allowed login redirect / CORS origin.
+
+### Storybook (hidden)
+
+The image built for `@twodb/app-twodb` also builds the shared Blocks Storybook and the gateway serves it at
+`https://console.<ROOT_DOMAIN>/storybook/` (not linked from any UI; override the directory with `TWODB_STORYBOOK_DIR`).
+
+### Full stack in one compose file
+
+`deploy/docker-compose.full.yaml` (+ `deploy/.env.full.example`) runs the control plane, all apps, Postgres and RustFS
+(S3) with every piece of persistent data under one `DATA_DIR`. Only the gateway port is published. The mandatory
+environment variables are listed (and enforced with `${VAR:?}`) at the top of that file.
 
 See `ENDPOINTS.md` / `MESSAGES.md` (generated — run `pnpm gen:docs`) for
 the exact header/payload contracts.
