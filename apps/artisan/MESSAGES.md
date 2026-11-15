@@ -2,11 +2,443 @@
 
 > **Generated file — do not hand-edit.** Source of truth is `src/messages.ts` (Zod schemas via `@twodb/core-async/registry`). Regenerate with `pnpm gen:docs`.
 
-_Generated: 2026-11-14T21:48:00.325Z_
+_Generated: 2026-11-15T16:39:44.598Z_
 
 ## Queue jobs
 
-_No queue jobs declared yet._
+### `artisan.collab.run`
+
+From TwoChat: start (or resume) a collaborator's work on one task. Carries the trigger and a snapshot of the last ~50 rendered messages. Artisan runs a non-interactive session that must end with send_reply, which is relayed back as twochat.collab.reply.
+
+- **Direction**: `consumes`
+- **Retry notes**: maxAttempts 1 — a blind retry would repeat side effects. A dead worker is turned into a failure reply by the lease reaper.
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "taskId": {
+      "type": "string"
+    },
+    "epoch": {
+      "type": "number"
+    },
+    "channelId": {
+      "type": "string"
+    },
+    "agentId": {
+      "type": "string"
+    },
+    "botId": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "group"
+      ]
+    },
+    "trigger": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "message",
+            "action"
+          ]
+        },
+        "messageId": {
+          "type": "string"
+        },
+        "actionId": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "messageId"
+      ],
+      "additionalProperties": false
+    },
+    "sinceMessageId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "snapshot": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "user",
+                  "bot"
+                ]
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "at": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "interactive": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "at",
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "participants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "bot"
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "priorWorkNote": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "deadlineAt": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "runId",
+    "taskId",
+    "epoch",
+    "channelId",
+    "agentId",
+    "botId",
+    "mode",
+    "trigger",
+    "sinceMessageId",
+    "snapshot",
+    "participants",
+    "priorWorkNote",
+    "deadlineAt"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `artisan.collab.cancel`
+
+From TwoChat: stop a run (queued runs never start; a running session is aborted; files already changed stay changed).
+
+- **Direction**: `consumes`
+- **Retry notes**: Idempotent.
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "epoch": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "runId",
+    "epoch"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `artisan.collab.rollback`
+
+From TwoChat: roll a task back. Bumps the task epoch, cancels in-flight runs, rewinds the session to just before `fromRunId`, and (only when asked and the directory is a git repo) restores files from the checkpoint taken before that run.
+
+- **Direction**: `consumes`
+- **Retry notes**: Idempotent.
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string"
+    },
+    "newEpoch": {
+      "type": "number"
+    },
+    "fromRunId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "restoreFiles": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "taskId",
+    "newEpoch",
+    "fromRunId",
+    "restoreFiles"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `twochat.collab.reply`
+
+To TwoChat (via relay): the collaborator's reply for a run. `isCompleted` is authoritative for whether the task is finished.
+
+- **Direction**: `produces`
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "taskId": {
+      "type": "string"
+    },
+    "epoch": {
+      "type": "number"
+    },
+    "messageId": {
+      "type": "string"
+    },
+    "isCompleted": {
+      "type": "boolean"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "failed",
+        "stopped"
+      ]
+    }
+  },
+  "required": [
+    "runId",
+    "taskId",
+    "epoch",
+    "messageId",
+    "isCompleted",
+    "outcome"
+  ],
+  "additionalProperties": {}
+}
+```
+
+### `twochat.collab.edit`
+
+To TwoChat (via relay): the collaborator edited one of its own earlier replies.
+
+- **Direction**: `produces`
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "taskId": {
+      "type": "string"
+    },
+    "epoch": {
+      "type": "number"
+    },
+    "messageId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "runId",
+    "taskId",
+    "epoch",
+    "messageId"
+  ],
+  "additionalProperties": {}
+}
+```
+
+### `twochat.collab.status`
+
+To TwoChat (via relay): run state for the typing indicator (started | stopped | failed).
+
+- **Direction**: `produces`
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "taskId": {
+      "type": "string"
+    },
+    "epoch": {
+      "type": "number"
+    },
+    "state": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "runId",
+    "taskId",
+    "epoch",
+    "state"
+  ],
+  "additionalProperties": {}
+}
+```
+
+### `twochat.collab.bot`
+
+To TwoChat (via relay): a collaborator agent was created, changed (enabled = has a runner and directory) or deleted — TwoChat mirrors it as a bot.
+
+- **Direction**: `produces`
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "agentId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "deleted": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "agentId",
+    "name",
+    "description",
+    "enabled",
+    "deleted"
+  ],
+  "additionalProperties": false
+}
+```
 
 ## Broadcast events
 

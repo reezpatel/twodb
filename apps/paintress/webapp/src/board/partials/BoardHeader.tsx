@@ -1,23 +1,32 @@
 import { useState } from "react";
-import { Link } from "react-router";
-import { ArrowLeft, Bot, User } from "lucide-react";
+import { Bot, PanelLeftClose, PanelLeftOpen, User } from "lucide-react";
 import type { SocketStatus } from "../hooks/useBoardSocket";
 
-/** Top bar: back to the list, board name (click to rename), connection state and who else is on the board. */
+/** Top bar: sidebar toggle, board name (click to rename), connection state and who else is on the board. */
 export function BoardHeader(props: {
   name: string;
   status: SocketStatus;
   presence: { actor: string; kind: "human" | "agent" }[];
   onRename(name: string): void;
+  /** When set, a button to hide/show the boards sidebar is shown. */
+  sidebar?: { open: boolean; onToggle(): void };
   right?: React.ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
   const dot = props.status === "open" ? "bg-success" : "bg-warning";
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-outline bg-popover px-3">
-      <Link to="/" aria-label="All boards" className="rounded-full p-1.5 text-ink-muted hover:bg-paper-grid">
-        <ArrowLeft className="size-4" />
-      </Link>
+      {props.sidebar && (
+        <button
+          type="button"
+          aria-label={props.sidebar.open ? "Hide sidebar" : "Show sidebar"}
+          title={props.sidebar.open ? "Hide sidebar (Ctrl+B)" : "Show sidebar (Ctrl+B)"}
+          onClick={props.sidebar.onToggle}
+          className="rounded-full p-1.5 text-ink-muted hover:bg-paper-grid"
+        >
+          {props.sidebar.open ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
+        </button>
+      )}
       {editing ? (
         <input
           autoFocus

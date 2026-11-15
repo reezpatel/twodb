@@ -40,9 +40,10 @@ export function registerWsPassthrough(
   app: FastifyInstance,
   getApp: (slug: string) => Promise<RegisteredAppRow | undefined>,
   verifyToken: (slug: string, token: string) => Promise<unknown>,
+  routeHost: (req: Pick<import("node:http").IncomingMessage, "url" | "headers">) => string = (req) => req.url ?? "/",
 ): void {
   app.server.on("upgrade", async (req, socket, head) => {
-    const url = new URL(req.url ?? "/", "http://internal");
+    const url = new URL(routeHost(req), "http://internal");
     // Browsers can't set headers on WebSocket: the webapp lib passes its session token as
     // ?access_token=. Promote it to Authorization (unless a real header is present) and never
     // forward it to the app.

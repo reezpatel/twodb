@@ -9,9 +9,55 @@ Coding agent harness — sessions on runner directories, threads, subagents, ski
 - **Capabilities**: ws
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-14T21:48:00.323Z_
+_Generated: 2026-11-15T16:39:44.595Z_
 
 ## Endpoints
+
+### `POST /_svc/inbox` — serviceInbox
+
+App-to-app message inbox (core-async relay). Authenticated by a control-plane-signed service token whose scope names the message type; the workspace comes from the token, never the body. Accepts artisan.collab.run | cancel | rollback, dedupes on dedupeKey and enqueues into Artisan's own queue.
+
+- **Auth**: `public`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string"
+    },
+    "payload": {},
+    "dedupeKey": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "payload",
+    "dedupeKey"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
 
 ### `POST /sessions` — createSession
 
@@ -405,6 +451,73 @@ Session + flat messages + usage + plan + running flag. Works for any session typ
     "messages"
   ],
   "additionalProperties": false
+}
+```
+
+### `GET /sessions/:id/canvases` — listCanvases
+
+Lists the session's Canvas documents with content fetched from Paintress. Directory-agent canvases are session-scoped; configured-agent canvases are shared across that agent's sessions.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      },
+      "type": {
+        "type": "string"
+      },
+      "resourceId": {
+        "type": "string"
+      },
+      "markdown": {
+        "type": "string"
+      },
+      "version": {
+        "type": "number"
+      },
+      "updatedAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "title",
+      "type",
+      "resourceId",
+      "markdown",
+      "version",
+      "updatedAt"
+    ],
+    "additionalProperties": false
+  }
 }
 ```
 
@@ -974,7 +1087,7 @@ Aborts a running session loop.
 
 ### `GET /ws` — workspaceWs
 
-One WS per workspace. Client frames: join/leave {sessionId}, send {sessionId,text}, answer/cancel {sessionId,askId}. Server frames all carry sessionId: joined, message, run_start, round_start, thinking_delta, delta, message_done, tool_start/output/result, ask_user, ask_resolved, status, plan, usage, compaction_done, session_renamed, error, done.
+One WS per workspace. Client frames: join/leave {sessionId}, send {sessionId,text}, answer/cancel {sessionId,askId}. Server frames all carry sessionId: joined, message, run_start, round_start, thinking_delta, delta, message_done, tool_start/output/result, ask_user, ask_resolved, status, plan, canvas, usage, compaction_done, session_renamed, error, done.
 
 - **Auth**: `session-or-apiKey`
 

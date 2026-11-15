@@ -91,6 +91,8 @@ export function useSessionSide(sessionId: string) {
       if (frame.sessionId !== sessionId) return;
       if (frame.type === "plan") {
         setPlan((frame.plan as Array<{ description: string; status: string }> | null) ?? null);
+      } else if (frame.type === "canvas") {
+        window.dispatchEvent(new CustomEvent("artisan:canvas-updated", { detail: { sessionId } }));
       } else if (frame.type === "session_renamed" || frame.type === "compaction_done" || frame.type === "done") {
         void refresh();
       }

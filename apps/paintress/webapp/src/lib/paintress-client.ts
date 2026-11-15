@@ -1,7 +1,7 @@
 // Thin client over Paintress' API — always through the gateway (dev proxy
 // /paintress-api → /apps/paintress), so identity is the shared control-plane
 // session resolved by TwoDB and forwarded as x-twodb-* headers.
-import type { Board, Item, Op } from "@shared/model";
+import type { Board, BoardGroup, Item, Op } from "@shared/model";
 
 export const BASE = "/paintress-api";
 
@@ -32,8 +32,9 @@ export interface IconHit {
 
 export const paintressClient = {
   listSpaces: () => fetch("/registry/spaces", { credentials: "include" }).then((r) => json<{ spaces: Space[] }>(r)),
-  listBoards: () => fetch(`${BASE}/boards`, init("GET")).then((r) => json<{ boards: Board[] }>(r)),
-  createBoard: (b: { name: string; kind: "diagram" | "doc"; spaceId?: string }) => fetch(`${BASE}/boards`, init("POST", b)).then((r) => json<Board>(r)),
+  listBoards: () => fetch(`${BASE}/boards`, init("GET")).then((r) => json<{ boards: Board[]; groups: BoardGroup[] }>(r)),
+  createBoard: (b: { name: string; kind: "diagram" | "doc"; groupId?: string; groupName?: string; spaceId?: string }) =>
+    fetch(`${BASE}/boards`, init("POST", b)).then((r) => json<Board>(r)),
   getBoard: (id: string) =>
     fetch(`${BASE}/boards/${id}`, init("GET")).then((r) => json<{ board: Board; items: Item[]; doc: { markdown: string; version: number } | null }>(r)),
   updateBoard: (id: string, patch: { name?: string; description?: string }) => fetch(`${BASE}/boards/${id}`, init("PATCH", patch)).then((r) => json<Board>(r)),

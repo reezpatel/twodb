@@ -3,6 +3,11 @@ import websocket from "@fastify/websocket";
 import multipart from "@fastify/multipart";
 import { createPgDb } from "@twodb/core-data/db";
 import { createAsyncEngine } from "@twodb/core-async/engine";
+import { createRelay } from "@twodb/core-async/relay";
+import { createInboxHandler, serviceDeliver, type TwoDbRuntime } from "@twodb/twodb-core";
+import { createCollabService } from "./collab/service.js";
+import { messageFormat, composeAgentMessage } from "./collab/guide.js";
+import { BOT_MSG, EDIT_MSG, REPLY_MSG, STATUS_MSG, type BotPayloadIn, type EditPayload, type ReplyPayload, type StatusPayload } from "./collab/types.js";
 
 import { twochatManifest } from "./manifest.js";
 import type { TwoChatConfig } from "./config.js";
@@ -29,7 +34,10 @@ import { collectAssetIds, collectMentions, blocksToText, messageBlocks, type Mes
  * The bot posts land in the channel, fan out over WS, and notify mentioned
  * users exactly like human messages.
  */
-export async function buildServer(config: TwoChatConfig) {
+/** What the server needs from the control-plane session to talk to other apps. */
+export type ServiceCaller = Pick<TwoDbRuntime, "serviceFetch" | "verifyServiceToken" | "serviceToken">;
+
+export async function buildServer(config: TwoChatConfig, opts: { twodb?: ServiceCaller } = {}) {
   const app = Fastify({ logger: true });
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
   await app.register(websocket);
@@ -43,6 +51,8 @@ export async function buildServer(config: TwoChatConfig) {
   const asyncEngine = createAsyncEngine({ connectionString: config.DATABASE_URL, schema: "twochat" });
   await asyncEngine.init();
   const hub = new ChatHub();
+  // Late-bound: the collab service needs publishMessage/publishToChannel, which are defined further down.
+  let collab: ReturnType<typeof createCollabService> | null = null;
   const storage: ChatStorage = createChatStorage({
     backend: config.TWOCHAT_STORAGE_BACKEND,
     dir: config.TWOCHAT_STORAGE_DIR,
@@ -67,6 +77,11 @@ export async function buildServer(config: TwoChatConfig) {
   const requireActor = async (req: FastifyRequest, reply: FastifyReply): Promise<{ ctx: ForwardedContext; actor: Actor } | null> => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return null;
+    // Service tokens act for an app, never as a participant: only users and bound API keys are chat actors.
+    if ((ctx.kind as string) === "service") {
+      void reply.code(403).send({ error: "service_tokens_cannot_chat" });
+      return null;
+    }
     if (ctx.kind === "session") {
       if (!ctx.userId) {
         void reply.code(401).send({ error: "unauthorized" });
@@ -119,6 +134,7 @@ export async function buildServer(config: TwoChatConfig) {
       channelId: result.message.channelId,
       message: result.message,
     });
+    void collab?.onMessagePosted(ctx.workspaceId, result.message).catch((err) => app.log.warn({ err }, "collab trigger failed"));
     void asyncEngine.broadcast.publish("twochat.message.posted", {
       messageId: result.message.id,
       channelId: result.message.channelId,
@@ -197,6 +213,66 @@ export async function buildServer(config: TwoChatConfig) {
   const publishToChannel = async (workspaceId: string, channelId: string, frame: Parameters<ChatHub["publish"]>[1]) => {
     hub.publishToUsers(workspaceId, await channelUserIds(workspaceId, channelId), frame);
   };
+
+  // --- collaborators: durable messaging with Artisan --------------------------------------------
+  if (opts.twodb) {
+    const twodb = opts.twodb;
+    const relay = createRelay({ engine: asyncEngine, deliver: serviceDeliver(twodb), concurrency: 4 });
+    collab = createCollabService({
+      db, repo, relay, hub,
+      log: { info: (o, m) => app.log.info(o as object, m), warn: (o, m) => app.log.warn(o as object, m) },
+      publishPosted: (workspaceId, message, notifyUserIds, notification) =>
+        publishMessage({ workspaceId } as ForwardedContext, { message, notifyUserIds, notification }),
+      publishToChannel,
+    });
+    const svc = collab;
+    const inbox = createInboxHandler({
+      caller: twodb,
+      receive: relay.receive,
+      accepts: { [REPLY_MSG]: { maxAttempts: 5 }, [EDIT_MSG]: { maxAttempts: 5 }, [STATUS_MSG]: { maxAttempts: 2 }, [BOT_MSG]: { maxAttempts: 5 } },
+    });
+    app.post("/_svc/inbox", { bodyLimit: 8 * 1024 * 1024 }, async (req, reply) => {
+      const r = await inbox(req.headers as { authorization?: string }, req.body);
+      return reply.code(r.status).send(r.body);
+    });
+
+    /** Synchronous service calls (reads/validation): authenticated by a scoped service token, nothing else. */
+    const verifySvc = async (req: FastifyRequest, reply: FastifyReply, scope: string): Promise<string | null> => {
+      const bearer = String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+      if (!bearer) { void reply.code(401).send({ error: "missing service token" }); return null; }
+      try {
+        return (await twodb.verifyServiceToken(bearer, { scope })).wid;
+      } catch (err) {
+        void reply.code(401).send({ error: (err as Error).message });
+        return null;
+      }
+    };
+    app.get("/_svc/messages/schema", async (req, reply) => {
+      if (!(await verifySvc(req, reply, "twochat.messages.schema"))) return reply;
+      return messageFormat();
+    });
+    app.post("/_svc/messages/validate", async (req, reply) => {
+      if (!(await verifySvc(req, reply, "twochat.messages.validate"))) return reply;
+      const m = (json(req.body).message ?? {}) as { text?: unknown; blocks?: unknown };
+      const r = composeAgentMessage({ text: m.text, blocks: m.blocks });
+      return "error" in r ? { ok: false, error: r.error } : { ok: true };
+    });
+
+    relay.start();
+    const handlers: Array<[string, (payload: never) => Promise<void>]> = [
+      [REPLY_MSG, (p: ReplyPayload) => svc.handleReply(p)],
+      [EDIT_MSG, (p: EditPayload) => svc.handleEdit(p)],
+      [STATUS_MSG, (p: StatusPayload) => svc.handleStatus(p)],
+      [BOT_MSG, (p: BotPayloadIn) => svc.handleBot(p)],
+    ];
+    const worker = asyncEngine.queue.worker(handlers.map(([t]) => t), async (job) => {
+      const h = handlers.find(([t]) => t === job.type);
+      if (h) await h[1](job.payload as never);
+    }, { concurrency: 4, pollIntervalMs: 300 });
+    const sweep = setInterval(() => void svc.sweep().catch((err) => app.log.warn({ err }, "collab sweep failed")), 60_000);
+    sweep.unref();
+    app.addHook("onClose", async () => { clearInterval(sweep); await relay.stop(); await worker.stop(); });
+  }
 
   // --- pull-registration ------------------------------------------------------
 
@@ -510,6 +586,7 @@ export async function buildServer(config: TwoChatConfig) {
       userId: auth.actor.id,
     });
     await asyncEngine.broadcast.publish("twochat.message.action", action);
+    void collab?.onAction(auth.ctx.workspaceId, message, actionId, action.value ?? null).catch((err) => app.log.warn({ err }, "collab action failed"));
     return reply.code(202).send(action);
   });
 
@@ -929,6 +1006,30 @@ export async function buildServer(config: TwoChatConfig) {
   // --- WS ----------------------------------------------------------------------------------------
 
   registerWs(app, hub, repo);
+
+  // --- chat collaborators (Artisan agents as bots) ----------------------------------------------
+  // Controls the user has over a collaborator that is working, or that worked: stop, and roll back to before a message.
+  app.post("/channels/:id/collab/stop", async (req, reply) => {
+    const auth = await requireActor(req, reply);
+    if (!auth) return reply;
+    const { id } = req.params as { id: string };
+    const channel = await requireChannelAccess(auth.ctx, auth.actor, id, reply);
+    if (!channel) return reply;
+    if (!collab) return reply.code(503).send({ error: "collaborators_unavailable" });
+    return { stopped: await collab.stop(auth.ctx.workspaceId, id) };
+  });
+
+  app.post("/messages/:id/rollback", async (req, reply) => {
+    const auth = await requireActor(req, reply);
+    if (!auth) return reply;
+    if (auth.ctx.kind !== "session" || auth.actor.type !== "user") return reply.code(403).send({ error: "session_required" });
+    const { id } = req.params as { id: string };
+    const message = await requireMessageAccess(auth.ctx, auth.actor, id, reply);
+    if (!message) return reply;
+    if (!collab) return reply.code(503).send({ error: "collaborators_unavailable" });
+    const body = json(req.body);
+    return collab.rollbackToBefore(auth.ctx.workspaceId, message.channel_id, message.id, body.restoreFiles === true);
+  });
 
   return app;
 }

@@ -7,7 +7,7 @@
  *
  * Port allocation (everything lives in the 64XX/65XX band):
  * - TwoDB (control plane + gateway): 6400.
- * - Installable apps: 6401+ sequentially. Reserved for future apps: 6417–6499.
+ * - Installable apps: 6401+ sequentially. Reserved for future apps: 6419–6499.
  * - Dev webapps (Vite): twodb 6500, scaffold webapps 6501+ sequentially.
  * - Storybooks: shared blocks 6520, app webapps 6521+.
  */
@@ -40,6 +40,8 @@ export const APP_CATALOG: CatalogEntry[] = [
   { slug: "twopin", name: "TwoPin", pkgName: "@twodb/app-twopin", containerPort: 6415, hostPort: 6415 },
   { slug: "twodoo", name: "TwoDoo", pkgName: "@twodb/app-twodoo", containerPort: 6416, hostPort: 6416 },
   { slug: "twoplan", name: "TwoPlan", pkgName: "@twodb/app-twoplan", containerPort: 6417, hostPort: 6417 },
+  { slug: "toolkit", name: "Toolkit", pkgName: "@twodb/app-toolkit", containerPort: 6418, hostPort: 6418 },
+  { slug: "fincal", name: "Fincal", pkgName: "@twodb/app-fincal", containerPort: 6419, hostPort: 6419 },
 ];
 
 export function getCatalogEntry(slug: string): CatalogEntry | undefined {

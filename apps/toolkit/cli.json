@@ -1,0 +1,23 @@
+{
+  "slug": "toolkit",
+  "description": "Connector tools (MCP-compatible) — list and invoke from the shell.",
+  "commands": [
+    {
+      "name": "tools",
+      "description": "Every connector tool across enabled instances; invoke one by id",
+      "call": {
+        "method": "GET",
+        "path": "/tools"
+      },
+      "listCommand": true,
+      "idFromList": "id",
+      "describeItem": "{name} — {description}",
+      "invoke": {
+        "method": "POST",
+        "path": "/tools/{id}/invoke",
+        "paramsKey": "params"
+      }
+    }
+  ],
+  "generatedAt": "2026-11-15T18:11:58.572Z"
+}

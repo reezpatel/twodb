@@ -178,6 +178,20 @@ root boots all of it via turbo.
    API key) and forwards it as `x-twodb-*` headers; the target app trusts
    those headers rather than re-verifying auth itself.
 
+### Host-based routing
+
+Set `ROOT_DOMAIN` (either `.twodb.io` or `twodb.io`) to expose registered
+apps by hostname: a request for `artisan.twodb.io/path` is handled exactly
+like `/apps/artisan/path`. `console.<root>` and `twodb.<root>` are reserved
+for the TwoDB control plane. HTTP and WebSocket requests use the same rule.
+
+For custom domains, `CATCH_ALL_SERVICE=<slug>` routes hosts outside the root
+domain to one registered app. If `CATCH_ALL_HOST_REGEX` is present, only
+hostnames matching that JavaScript regular expression use the catch-all;
+all others continue through the gateway unchanged. The original `Host`
+header is preserved when a request is proxied, so the target app can resolve
+the custom domain itself.
+
 See `ENDPOINTS.md` / `MESSAGES.md` (generated — run `pnpm gen:docs`) for
 the exact header/payload contracts.
 

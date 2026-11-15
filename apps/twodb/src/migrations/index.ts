@@ -4,6 +4,8 @@ import { up as backfillLegacyColumns } from "./0002-backfill-legacy-columns.js";
 import { up as appToken } from "./0003-app-token.js";
 import { up as platformTables } from "./0004-platform-tables.js";
 import { up as oauthCode } from "./0005-oauth-code.js";
+import { up as appCli } from "./0006-app-cli.js";
+import { up as cliCode } from "./0007-cli-code.js";
 
 // Keys sort lexicographically — prefix new migrations with the next number.
 export const migrations: Record<string, Migration> = {
@@ -12,4 +14,6 @@ export const migrations: Record<string, Migration> = {
   "0003_app_token": { up: appToken },
   "0004_platform_tables": { up: platformTables },
   "0005_oauth_code": { up: oauthCode },
+  "0006_app_cli": { up: appCli },
+  "0007_cli_code": { up: cliCode },
 };

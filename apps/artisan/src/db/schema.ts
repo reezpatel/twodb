@@ -1,5 +1,6 @@
 import { sql } from "kysely";
 import { type Kysely } from "@twodb/core-data/db";
+import { applyCollabSchema, type CollabRunRow, type CollabTaskRow } from "../collab/schema.js";
 
 /** A run context: a directory on a runner, inside a space. Sessions of the
  *  same directory share the space (skills, connectors, agent matching). */
@@ -224,7 +225,26 @@ export interface WorkspaceSettingRow {
   updated_at: string;
 }
 
+/** Artisan owns canvas metadata; content stays in the backing app (Paintress). */
+export interface CanvasRow {
+  id: string;
+  workspace_id: string;
+  /** Directory-agent canvases belong to one session. */
+  session_id: string | null;
+  /** Configured-agent canvases are shared by that agent across its sessions. */
+  agent_id: string | null;
+  type: string;
+  title: string;
+  /** Paintress board id. */
+  resource_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ArtisanDb {
+  canvas: CanvasRow;
+  collab_task: CollabTaskRow;
+  collab_run: CollabRunRow;
   workspace_setting: WorkspaceSettingRow;
   mcp_server: McpServerRow;
   memory: MemoryRow;
@@ -377,6 +397,23 @@ export async function applySchema(db: Kysely<ArtisanDb>): Promise<void> {
   }
 
   await db.schema
+    .createTable("canvas")
+    .ifNotExists()
+    .addColumn("id", "text", (c) => c.primaryKey())
+    .addColumn("workspace_id", "text", (c) => c.notNull())
+    .addColumn("session_id", "text")
+    .addColumn("agent_id", "text")
+    .addColumn("type", "text", (c) => c.notNull())
+    .addColumn("title", "text", (c) => c.notNull())
+    .addColumn("resource_id", "text", (c) => c.notNull())
+    .addColumn("created_at", "text", (c) => c.notNull())
+    .addColumn("updated_at", "text", (c) => c.notNull())
+    .execute();
+  await db.schema.createIndex("canvas_session_idx").ifNotExists().on("canvas").columns(["workspace_id", "session_id"]).execute();
+  await db.schema.createIndex("canvas_agent_idx").ifNotExists().on("canvas").columns(["workspace_id", "agent_id"]).execute();
+  await db.schema.createIndex("canvas_resource_idx").ifNotExists().on("canvas").column("resource_id").unique().execute();
+
+  await db.schema
     .createTable("checkpoint")
     .ifNotExists()
     .addColumn("id", "text", (c) => c.primaryKey())
@@ -429,6 +466,7 @@ export async function applySchema(db: Kysely<ArtisanDb>): Promise<void> {
     .addColumn("updated_at", "text", (c) => c.notNull())
     .addPrimaryKeyConstraint("workspace_setting_pk", ["workspace_id", "key"])
     .execute();
+  await applyCollabSchema(db as never);
   await db.schema
     .createTable("mcp_server")
     .ifNotExists()

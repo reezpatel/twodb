@@ -1,6 +1,8 @@
 export { RichTextEditor, type RichTextEditorProps } from "./RichTextEditor";
 export { RichTextView } from "./RichTextView";
 export { useRichTextEditor, type UseRichTextEditorOptions } from "./hooks/useRichTextEditor";
+export { MarkdownEditor, type MarkdownEditorProps } from "./MarkdownEditor";
+export { useMarkdownEditor, type UseMarkdownEditorOptions } from "./hooks/useMarkdownEditor";
 export { sanitizeHtml, isEmptyHtml } from "./lib/sanitize";
 
 // Block editor (Notion/AFFiNE-style, TipTap JSON) — import "@twodb/editor/block.css" too.

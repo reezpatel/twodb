@@ -56,6 +56,9 @@ export default defineConfig({
       "/api": { target: gateway, changeOrigin: true },
       "/registry": { target: gateway, changeOrigin: true },
       "/orchestrator": { target: gateway, changeOrigin: true },
+      // `twodb auth` consent posts here (same session cookies). NOTE the
+      // trailing slash: "/cli" would also swallow the /cli-auth SPA page.
+      "/cli/": { target: gateway, changeOrigin: true },
       // The gateway's app proxy (/apps/<slug>/<path>) doubles as the SPA's
       // /apps page route — the page is EXACTLY "/apps" (react-router), API
       // calls are always deeper (/apps/<slug>/...). Proxy only the latter;

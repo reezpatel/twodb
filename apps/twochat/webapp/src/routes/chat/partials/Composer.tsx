@@ -21,6 +21,13 @@ export interface ComposerProps {
 
 export function Composer(props: ComposerProps) {
   const [serialized, setSerialized] = useState(props.initialDraft ?? "");
+  // The mention input is uncontrolled: it reads `defaultValue` at mount only. Feeding it live state made React
+  // rewrite the editor DOM (dangerouslySetInnerHTML) on every keystroke — losing characters and resetting the
+  // caret to the start. Later value changes must go through rich.setValue, which preserves the caret.
+  const [mountValue] = useState(props.initialDraft ?? "");
+  // Latest parent callbacks without re-creating handlers: new handler identities would re-render the editor.
+  const parentRef = useRef({ draft: props.onDraftChange, typing: props.onTyping });
+  parentRef.current = { draft: props.onDraftChange, typing: props.onTyping };
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [attachments, setAttachments] = useState<Asset[]>([]);
@@ -29,33 +36,25 @@ export function Composer(props: ComposerProps) {
 
   const onRichValueChanged = useCallback((value: string) => {
     setSerialized(value);
-    props.onDraftChange(value);
+    parentRef.current.draft(value);
     const now = Date.now();
     if (now - typingRef.current > 2000) {
       typingRef.current = now;
-      props.onTyping();
+      parentRef.current.typing();
     }
-  }, [props.onDraftChange, props.onTyping]);
+  }, []);
 
   const rich = useRichMentionComposer(props.members, onRichValueChanged);
 
-  // Reinitialize the contentEditable when switching conversations. setValue
-  // is necessary because RichMentionsInput's defaultValue is intentionally
-  // mount-only in the upstream library.
+  // Draft loading is asynchronous (the composer itself is keyed per channel). Apply the loaded draft exactly
+  // once — before the user has typed anything — by tracking which draft value was already applied.
+  const appliedDraftRef = useRef<string | null>(null);
   useEffect(() => {
-    const next = props.initialDraft ?? "";
-    setSerialized(next);
-    setAttachments([]);
-    queueMicrotask(() => rich.setValue(next));
-  }, [props.channelId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Draft loading is asynchronous. Apply it only while the new editor is
-  // still empty, never over text the user has already started entering.
-  useEffect(() => {
-    if (!serialized && props.initialDraft) {
-      setSerialized(props.initialDraft);
-      rich.setValue(props.initialDraft);
-    }
+    if (!props.initialDraft || appliedDraftRef.current === props.initialDraft) return;
+    if (serialized) return; // user already typed; never overwrite
+    appliedDraftRef.current = props.initialDraft;
+    setSerialized(props.initialDraft);
+    rich.setValue(props.initialDraft);
   }, [props.initialDraft, rich.setValue, serialized]);
 
   const submit = async () => {
@@ -87,16 +86,21 @@ export function Composer(props: ComposerProps) {
     }
   };
 
-  const onEditorKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  // submit reads live state, but the key handler itself must keep a stable identity for the memoized editor.
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+  const onEditorKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
     // react-rich-mentions handles Enter/Tab first while its suggestions are
     // open and marks the event prevented. Shift+Enter keeps the browser's
     // contentEditable newline behavior; an unmodified Enter sends.
-    if (event.defaultPrevented || event.nativeEvent.isComposing) return;
+    // (nativeEvent is absent when this is a raw DOM event from RichMentionEditor's listener)
+    const native = (event as unknown as { nativeEvent?: { isComposing?: boolean } }).nativeEvent;
+    if (event.defaultPrevented || native?.isComposing) return;
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      void submit();
+      void submitRef.current();
     }
-  };
+  }, []);
 
   const pickFiles = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -151,7 +155,8 @@ export function Composer(props: ComposerProps) {
           <RichMentionEditor
             configs={rich.configs}
             contextRef={rich.contextRef}
-            defaultValue={serialized}
+            key={rich.editorKey}
+            defaultValue={serialized || mountValue}
             disabled={props.disabled}
             onInput={rich.handleInput}
             onKeyDown={onEditorKeyDown}

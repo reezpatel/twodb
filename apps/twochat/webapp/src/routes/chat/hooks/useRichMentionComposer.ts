@@ -21,6 +21,13 @@ const MENTION_SOURCE = "<@([^|>]+)\\|(user|bot)\\|([^>]+)>";
 export function useRichMentionComposer(members: Member[], onValueChange: (serialized: string) => void) {
   const contextRef = useRef<TMentionContext | null>(null);
 
+  // Identity-stable across websocket refreshes that recreate the members array: the editor memoizes on `configs`,
+  // and a new object would make react-rich-mentions re-render and rewrite the editor DOM mid-keystroke.
+  const membersKey = useMemo(
+    () => members.map((m) => `${m.type}:${m.userId ?? m.botId}`).sort().join(","),
+    [members],
+  );
+
   const mentions = useMemo<ComposerMention[]>(() => {
     const seen = new Set<string>();
     const result: ComposerMention[] = [];
@@ -33,7 +40,7 @@ export function useRichMentionComposer(members: Member[], onValueChange: (serial
       result.push({ kind: member.type, id, label: member.name || id });
     }
     return result;
-  }, [members]);
+  }, [membersKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const configs = useMemo<TMentionConfig<ComposerMention>[]>(() => [
     {
@@ -64,7 +71,10 @@ export function useRichMentionComposer(members: Member[], onValueChange: (serial
   const focus = useCallback(() => contextRef.current?.inputElement?.focus(), []);
   const handleInput = useCallback(() => onValueChange(readValue()), [onValueChange, readValue]);
 
-  return { contextRef, configs, readValue, setValue, focus, handleInput };
+  // Remount the editor only when workspace membership changes; stable otherwise so typing never re-renders it.
+  const editorKey = `v1:${membersKey}`;
+
+  return { contextRef, configs, readValue, setValue, focus, handleInput, editorKey };
 }
 
 export function parseRichMentionValue(serialized: string): {

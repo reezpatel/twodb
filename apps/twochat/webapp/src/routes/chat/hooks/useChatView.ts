@@ -147,6 +147,24 @@ export function useChatView() {
     return (chat.typingByChannel[chat.activeChannelId] ?? []).map((item) => item.actorId === chat.myUserId ? null : item.name).filter((name): name is string => !!name);
   }, [chat.typingByChannel, chat.activeChannelId, chat.myUserId]);
 
+  // A collaborator working in the active channel (bot id → its name from the member list).
+  const workingBotId = chat.activeChannelId ? chat.collabWorking[chat.activeChannelId] : undefined;
+  const working = useMemo(() => {
+    if (!workingBotId || !activeChannel) return null;
+    const bot = activeChannel.members.find((member) => member.botId === workingBotId);
+    return { name: bot?.name ?? "The collaborator", onStop: () => void chatApi.stopCollab(activeChannel.id).catch(() => {}) };
+  }, [workingBotId, activeChannel]);
+
+  /** Rolling back only makes sense in a conversation a collaborator has replied in. */
+  const hasCollaborator = messages.some((message) => !!message.collab);
+  const onRollback = useCallback(async (message: Message, restoreFiles: boolean) => {
+    if (!activeChannel) return;
+    await chatApi.rollbackTo(message.id, restoreFiles);
+    await chat.loadMessages(activeChannel.id);
+    // Edit and resend: the rolled-back text comes back as the draft.
+    if (message.text) onDraftChange(message.text);
+  }, [activeChannel, chat, onDraftChange]);
+
   const isMember = !!(activeChannel && chat.myUserId && activeChannel.members.some((member) => member.userId === chat.myUserId));
   const resolveMention = useCallback((kind: string, id: string) => {
     const hit = chat.members.find((member) => kind === "user" ? member.userId === id : member.botId === id);
@@ -187,6 +205,8 @@ export function useChatView() {
     onUpload,
     onDraftChange,
     typingNames,
+    working,
+    onRollback: hasCollaborator ? onRollback : undefined,
     isMember,
     resolveMention,
   };

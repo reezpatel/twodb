@@ -22,7 +22,7 @@ export function EditorToolbar(props: { editor: Editor; onPickImage?: () => void 
     else c().extendMarkRange("link").setLink({ href: url }).run();
   };
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-outline px-1.5 py-1">
+    <div className="twodb-editor-toolbar flex flex-wrap items-center gap-0.5 border-b border-outline px-1.5 py-1">
       <ToolbarButton label="Bold" active={s.bold} onClick={() => c().toggleBold().run()}><Bold className="size-3.5" /></ToolbarButton>
       <ToolbarButton label="Italic" active={s.italic} onClick={() => c().toggleItalic().run()}><Italic className="size-3.5" /></ToolbarButton>
       <ToolbarButton label="Underline" active={s.underline} onClick={() => c().toggleUnderline().run()}><Underline className="size-3.5" /></ToolbarButton>

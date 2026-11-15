@@ -32,6 +32,7 @@ export type ServerFrameBody =
   | { type: "ask_resolved" }
   | { type: "status"; text: string }
   | { type: "plan"; plan: Array<{ description: string; status: string }> | null }
+  | { type: "canvas"; canvasId: string }
   | { type: "usage"; usage: { inputTokens: number; outputTokens: number; cachedTokens: number; /** prompt size of the latest request = current context fill */ contextTokens?: number; calls: number; costUsd: number | null } }
   | { type: "compaction_done"; summary: string }
   | { type: "new_thread" }

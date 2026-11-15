@@ -3,10 +3,11 @@
 // inverse ops, so undo is just "apply the inverse") and NOTIFYs listeners.
 import { sql, type Kysely } from "@twodb/core-data/db";
 import { ulid } from "ulid";
-import type { PaintressDb, BoardRow, ItemRow } from "./db/schema.js";
+import type { PaintressDb, BoardGroupRow, BoardRow, ItemRow } from "./db/schema.js";
 import {
   parseItemData,
   type Board,
+  type BoardGroup,
   type BoardEvent,
   type BatchRequest,
   type BatchResult,
@@ -35,7 +36,7 @@ export function rowToBoard(r: BoardRow): Board {
   return {
     id: r.id,
     workspaceId: r.workspace_id,
-    spaceId: r.space_id,
+    groupId: r.group_id,
     kind: r.kind,
     name: r.name,
     description: r.description,
@@ -126,14 +127,56 @@ export function createStore(db: Kysely<PaintressDb>) {
 
   async function listBoards(workspaceId: string, spaceIds?: string[]): Promise<Board[]> {
     let q = db.selectFrom("boards").selectAll().where("workspace_id", "=", workspaceId).where("deleted_at", "is", null);
-    if (spaceIds?.length) q = q.where("space_id", "in", spaceIds);
+    // The space is on the group, so a space filter goes through it.
+    if (spaceIds?.length) q = q.where("group_id", "in", db.selectFrom("board_groups").select("id").where("space_id", "in", spaceIds));
     const rows = await q.orderBy("updated_at", "desc").execute();
     return rows.map(rowToBoard);
   }
 
+  function rowToGroup(r: BoardGroupRow): BoardGroup {
+    return { id: r.id, workspaceId: r.workspace_id, spaceId: r.space_id, name: r.name, createdBy: r.created_by, createdAt: iso(r.created_at), updatedAt: iso(r.updated_at) };
+  }
+
+  async function listGroups(workspaceId: string, spaceIds?: string[]): Promise<BoardGroup[]> {
+    let q = db.selectFrom("board_groups").selectAll().where("workspace_id", "=", workspaceId);
+    if (spaceIds?.length) q = q.where("space_id", "in", spaceIds);
+    return (await q.orderBy("name").execute()).map(rowToGroup);
+  }
+
+  async function getGroup(id: string, workspaceId: string): Promise<BoardGroup> {
+    const row = await db.selectFrom("board_groups").selectAll().where("id", "=", id).where("workspace_id", "=", workspaceId).executeTakeFirst();
+    if (!row) throw new HttpError(404, "group_not_found");
+    return rowToGroup(row);
+  }
+
+  /** Find-or-create by (workspace, space, name) — the unique key a group is addressed by from the API. */
+  async function getOrCreateGroup(input: { workspaceId: string; spaceId: string; name: string; actor: string }): Promise<BoardGroup> {
+    const existing = await db
+      .selectFrom("board_groups")
+      .selectAll()
+      .where("workspace_id", "=", input.workspaceId)
+      .where("space_id", "=", input.spaceId)
+      .where("name", "=", input.name)
+      .executeTakeFirst();
+    if (existing) return rowToGroup(existing);
+    await db
+      .insertInto("board_groups")
+      .values({ id: ulid(), workspace_id: input.workspaceId, space_id: input.spaceId, name: input.name, created_by: input.actor } as never)
+      .onConflict((c) => c.doNothing())
+      .execute();
+    const row = await db
+      .selectFrom("board_groups")
+      .selectAll()
+      .where("workspace_id", "=", input.workspaceId)
+      .where("space_id", "=", input.spaceId)
+      .where("name", "=", input.name)
+      .executeTakeFirstOrThrow();
+    return rowToGroup(row);
+  }
+
   async function createBoard(input: {
     workspaceId: string;
-    spaceId: string;
+    groupId: string;
     actor: string;
     name: string;
     kind: "diagram" | "doc";
@@ -145,7 +188,7 @@ export function createStore(db: Kysely<PaintressDb>) {
       .values({
         id: ulid(),
         workspace_id: input.workspaceId,
-        space_id: input.spaceId,
+        group_id: input.groupId,
         kind: input.kind,
         name: input.name,
         description: input.description ?? "",
@@ -489,6 +532,9 @@ export function createStore(db: Kysely<PaintressDb>) {
     db,
     getBoardRow,
     listBoards,
+    listGroups,
+    getGroup,
+    getOrCreateGroup,
     createBoard,
     updateBoard,
     deleteBoard,

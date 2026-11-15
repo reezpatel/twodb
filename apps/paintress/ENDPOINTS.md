@@ -9,13 +9,13 @@ Miro-like boards for diagrams (architecture, AWS/GCP, ERD, flowcharts, swimlane 
 - **Capabilities**: boards, diagrams
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T04:02:56.287Z_
+_Generated: 2026-11-15T05:05:17.940Z_
 
 ## Endpoints
 
 ### `GET /boards` — listBoards
 
-Lists boards in the caller's workspace (optionally one space). Every workspace member can read and write every board.
+Lists boards and board groups in the caller's workspace (optionally one space). Every workspace member can read and write every board.
 
 - **Auth**: `session-or-apiKey`
 
@@ -50,7 +50,7 @@ Lists boards in the caller's workspace (optionally one space). Every workspace m
           "workspaceId": {
             "type": "string"
           },
-          "spaceId": {
+          "groupId": {
             "type": "string"
           },
           "kind": {
@@ -89,7 +89,7 @@ Lists boards in the caller's workspace (optionally one space). Every workspace m
         "required": [
           "id",
           "workspaceId",
-          "spaceId",
+          "groupId",
           "kind",
           "name",
           "description",
@@ -101,10 +101,109 @@ Lists boards in the caller's workspace (optionally one space). Every workspace m
         ],
         "additionalProperties": false
       }
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "spaceId",
+          "name",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "required": [
-    "boards"
+    "boards",
+    "groups"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /groups` — listGroups
+
+Lists board groups. A group is a named collection of boards labelled with a space; boards are created into a group.
+
+- **Auth**: `session-or-apiKey`
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "spaceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "spaceId",
+          "name",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "groups"
   ],
   "additionalProperties": false
 }
@@ -112,7 +211,7 @@ Lists boards in the caller's workspace (optionally one space). Every workspace m
 
 ### `POST /boards` — createBoard
 
-Creates a board. `kind: "diagram"` is a canvas for architecture/AWS/GCP/ERD/flowchart/process diagrams; `kind: "doc"` is a Markdown document whose ```mermaid blocks render as diagrams. `spaceId` defaults to the caller's first space.
+Creates a board. `kind: "diagram"` is a canvas for architecture/AWS/GCP/ERD/flowchart/process diagrams; `kind: "doc"` is a Markdown document whose ```mermaid blocks render as diagrams. The board goes into a group: pass an existing `groupId`, or a `groupName` to find-or-create (default "General"); a new group takes `spaceId` (default: the caller's first space).
 
 - **Auth**: `session-or-apiKey`
 
@@ -139,7 +238,18 @@ Creates a board. `kind: "diagram"` is a canvas for architecture/AWS/GCP/ERD/flow
       "type": "string",
       "maxLength": 2000
     },
+    "groupId": {
+      "description": "Existing group to put the board in",
+      "type": "string"
+    },
+    "groupName": {
+      "description": "Group to find-or-create by name (default: General); ignored when groupId is given",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
     "spaceId": {
+      "description": "Space for the group — only used when a new group is created",
       "type": "string"
     },
     "markdown": {
@@ -167,7 +277,7 @@ Creates a board. `kind: "diagram"` is a canvas for architecture/AWS/GCP/ERD/flow
     "workspaceId": {
       "type": "string"
     },
-    "spaceId": {
+    "groupId": {
       "type": "string"
     },
     "kind": {
@@ -206,7 +316,7 @@ Creates a board. `kind: "diagram"` is a canvas for architecture/AWS/GCP/ERD/flow
   "required": [
     "id",
     "workspaceId",
-    "spaceId",
+    "groupId",
     "kind",
     "name",
     "description",
@@ -259,7 +369,7 @@ Returns a board with its current content: all items (diagram) or the markdown + 
         "workspaceId": {
           "type": "string"
         },
-        "spaceId": {
+        "groupId": {
           "type": "string"
         },
         "kind": {
@@ -298,7 +408,7 @@ Returns a board with its current content: all items (diagram) or the markdown + 
       "required": [
         "id",
         "workspaceId",
-        "spaceId",
+        "groupId",
         "kind",
         "name",
         "description",
@@ -496,7 +606,7 @@ Renames a board or changes its description.
     "workspaceId": {
       "type": "string"
     },
-    "spaceId": {
+    "groupId": {
       "type": "string"
     },
     "kind": {
@@ -535,7 +645,7 @@ Renames a board or changes its description.
   "required": [
     "id",
     "workspaceId",
-    "spaceId",
+    "groupId",
     "kind",
     "name",
     "description",

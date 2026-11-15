@@ -25,6 +25,9 @@ export interface ChatSceneProps {
   onSave: (message: Message) => void;
   onDelete: (message: Message) => void;
   onAction: (message: Message, actionId: string, value?: string) => void;
+  /** A collaborator is queued/working here: its name and the stop handler. */
+  working?: { name: string; onStop: () => void } | null;
+  onRollback?: (message: Message, restoreFiles: boolean) => void;
   children?: React.ReactNode;
 }
 
@@ -93,6 +96,18 @@ export function ChatScene(props: ChatSceneProps) {
         ) : null}
       </div>
 
+      {props.working ? (
+        <div className="flex items-center gap-2 px-4 pb-1 text-xs text-muted-foreground" role="status">
+          <span className="flex gap-0.5" aria-hidden="true">
+            <span className="animate-bounce" style={{ animationDelay: "0ms" }}>·</span>
+            <span className="animate-bounce" style={{ animationDelay: "150ms" }}>·</span>
+            <span className="animate-bounce" style={{ animationDelay: "300ms" }}>·</span>
+          </span>
+          {props.working.name} is working…
+          <button type="button" onClick={props.working.onStop} className="rounded border border-border px-1.5 py-0.5 text-[11px] hover:bg-muted hover:text-foreground">Stop</button>
+        </div>
+      ) : null}
+
       {props.typingNames.length ? (
         <div className="flex items-center gap-1.5 px-4 pb-1 text-xs text-muted-foreground">
           <span className="flex gap-0.5">
@@ -142,6 +157,7 @@ function MessageList(props: ChatSceneProps) {
               onSave={props.onSave}
               onDelete={props.onDelete}
               onAction={props.onAction}
+              onRollback={props.onRollback}
             />
           </div>
         );

@@ -9,9 +9,234 @@ Workspace chat (Slack-style): public channels, DMs, threads, reactions, pins, sa
 - **Capabilities**: search, ws
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-14T03:42:35.842Z_
+_Generated: 2026-11-15T06:16:06.341Z_
 
 ## Endpoints
+
+### `POST /channels/:id/collab/stop` — stopCollaborator
+
+Stops whatever collaborators (agent bots) are working on in this channel. Queued runs never start; a running one is aborted, files it already changed stay changed, and the bot posts what it did with roll-back buttons.
+
+- **Auth**: `session`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "stopped": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "stopped"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /messages/:id/rollback` — rollbackToMessage
+
+Rolls the conversation back to just before this message: it and everything after are hidden (kept, flagged), the collaborator's runs from there on are undone (its session is rewound and, with restoreFiles, its git-checkpointed files restored), and replies from cancelled runs are dropped. The client puts the message text back in the composer to edit and resend.
+
+- **Auth**: `session`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "restoreFiles": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "hidden": {
+      "type": "number"
+    },
+    "tasks": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "hidden",
+    "tasks"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /_svc/inbox` — serviceInbox
+
+App-to-app message inbox (core-async relay). Authenticated by a control-plane-signed service token whose scope names the message type; the workspace comes from the token, never the body. Accepts twochat.collab.reply | edit | status | bot, dedupes on dedupeKey and enqueues into TwoChat's own queue.
+
+- **Auth**: `public`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string"
+    },
+    "payload": {},
+    "dedupeKey": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "payload",
+    "dedupeKey"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /_svc/messages/schema` — serviceMessageSchema
+
+Service token (scope twochat.messages.schema). The message-component JSON Schema plus the agent composing guide, with a version hash — what collaborators load via describe_message_format.
+
+- **Auth**: `public`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "guide": {
+      "type": "string"
+    },
+    "schema": {}
+  },
+  "required": [
+    "version",
+    "guide",
+    "schema"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /_svc/messages/validate` — serviceMessageValidate
+
+Service token (scope twochat.messages.validate). Checks an agent's {text, blocks} against the live message schema before it is relayed.
+
+- **Auth**: `public`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "message": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "blocks": {
+          "type": "array",
+          "items": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "message"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "error": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}
+```
 
 ### `GET /channels` — listChannels
 

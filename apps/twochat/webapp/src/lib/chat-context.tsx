@@ -26,6 +26,8 @@ interface ChatState {
   unreadNotifications: number;
   online: Set<string>;
   typingByChannel: Record<string, { actorId: string; name: string; at: number }[]>;
+  /** Channels where a collaborator is queued/working: the bot id doing it. */
+  collabWorking: Record<string, string>;
   activeChannelId: string | null;
   setActiveChannel: (id: string | null) => void;
   refreshChannels: () => Promise<void>;
@@ -68,6 +70,7 @@ export function ChatProvider(props: { myUserId: string | null; myUserName: strin
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [online, setOnline] = useState<Set<string>>(new Set());
   const [typingByChannel, setTypingByChannel] = useState<Record<string, { actorId: string; name: string; at: number }[]>>({});
+  const [collabWorking, setCollabWorking] = useState<Record<string, string>>({});
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
 
   // The client overlay for user display names: server knows ids, the session
@@ -161,6 +164,21 @@ export function ChatProvider(props: { myUserId: string | null; myUserName: strin
             if (!list) return prev;
             return { ...prev, [frame.channelId]: list.map((m) => (m.id === frame.messageId ? { ...m, pinned: frame.pinned } : m)) };
           });
+          return;
+        }
+        case "collab_status": {
+          if (frame.state === "queued" || frame.state === "running") {
+            setCollabWorking((prev) => ({ ...prev, [frame.channelId]: frame.botId }));
+          } else if (frame.state === "rollback") {
+            // Messages past the rollback point are now hidden server-side: reload instead of guessing which.
+            void chatApi.listMessages(frame.channelId, null).then((res) => setMessagesByChannel((prev) => ({ ...prev, [frame.channelId]: res.messages.map(displayMessage) })));
+          } else {
+            setCollabWorking((prev) => {
+              if (!(frame.channelId in prev)) return prev;
+              const { [frame.channelId]: _gone, ...rest } = prev;
+              return rest;
+            });
+          }
           return;
         }
         case "typing": {
@@ -395,6 +413,7 @@ export function ChatProvider(props: { myUserId: string | null; myUserName: strin
     unreadNotifications,
     online,
     typingByChannel,
+    collabWorking,
     activeChannelId,
     setActiveChannel,
     refreshChannels,

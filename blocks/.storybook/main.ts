@@ -50,8 +50,17 @@ const config: StorybookConfig = {
     name: "@storybook/react-vite",
     options: {},
   },
-  viteConfig: {
-    resolve: { alias: appAliases() },
+  viteFinal: async (viteConfig) => {
+    const { mergeConfig } = await import("vite");
+    return mergeConfig(viteConfig, {
+      resolve: {
+        alias: appAliases(),
+        // Stories import workspace packages from outside blocks; keep one React dispatcher.
+        dedupe: ["react", "react-dom"],
+      },
+      // Let vite serve app sources living outside blocks/ (/@fs/...).
+      server: { fs: { strict: false } },
+    });
   },
 };
 

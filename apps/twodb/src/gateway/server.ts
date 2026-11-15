@@ -15,8 +15,11 @@ import { toWebRequest, sendWebResponse } from "./web-request.js";
 import { proxyToApp } from "./proxy.js";
 import { isInternalPath } from "./ws-paths.js";
 import { createOAuthFlow, OAuthError, isAllowedRedirect } from "../auth/oauth.js";
+import { createCliAuthFlow } from "../auth/cli-auth.js";
 import { registerWsPassthrough } from "./ws-passthrough.js";
 import { federatedSearch } from "./federated-search.js";
+import { createHostRouter } from "./host-routing.js";
+import { ACT_SCOPE, deriveSigningKey, signServiceToken, looksLikeServiceToken, verifyServiceToken, ServiceTokenError } from "@twodb/core-platform/service-token";
 import { APP_CATALOG, getCatalogEntry } from "../orchestrator/catalog.js";
 import {
   installApp,
@@ -42,7 +45,10 @@ declare module "fastify" {
 }
 
 export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfig) {
-  const app = Fastify({ logger: true });
+  // Fastify must rewrite before route lookup; an onRequest hook is too late.
+  // The same resolver is also used by the raw WebSocket upgrade bridge below.
+  const routeHost = createHostRouter(config);
+  const app = Fastify({ logger: true, rewriteUrl: routeHost });
   await app.register(cors, {
     // Trusted origins + app webapps allowed to run "Login with TwoDB" (same rule as the redirect check).
     origin: (origin, cb) => cb(null, !origin || config.AUTH_TRUSTED_ORIGINS.includes(origin) || isAllowedRedirect(origin, config)),
@@ -85,6 +91,56 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
    *  and keep the token in memory only — never persisted — then send it as
    *  `Authorization: Bearer` on every gateway call (fetch + WS ?access_token=).
    *  This is the single per-login token every app + the gateway validate. */
+  // --- `twodb auth` CLI login (consent + API-key mint; see auth/cli-auth.ts) ----
+  const cliAuth = createCliAuthFlow(db, config, {
+    issueApiKey: async (userId, name) => {
+      const workspaceId = (await workspacePlatform.listWorkspacesForUser(userId))[0]?.id;
+      if (!workspaceId) throw new Error("user has no workspace");
+      const issued = await workspacePlatform.issueApiKey(workspaceId, userId, name);
+      const userName = await (db as any)
+        .selectFrom("user")
+        .select("name")
+        .where("id", "=", userId)
+        .executeTakeFirst()
+        .then((r: { name: string } | undefined) => r?.name ?? null)
+        .catch(() => null);
+      const workspaceName = await (db as any)
+        .selectFrom("workspace")
+        .select("name")
+        .where("id", "=", workspaceId)
+        .executeTakeFirst()
+        .then((r: { name: string } | undefined) => r?.name ?? null)
+        .catch(() => null);
+      return { rawKey: issued.rawKey, workspaceId, workspaceName, userName };
+    },
+  });
+
+  /** Consent step (called by the TwoDB webapp /cli-auth page with the user's own session): mints a one-time code and returns where to send the browser. */
+  app.post("/cli/authorize", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session" || !ctx.userId) return reply.code(401).send({ error: "unauthorized" });
+    const b = (req.body ?? {}) as { redirectUri?: string; codeChallenge?: string; name?: string };
+    if (!b.redirectUri || !b.codeChallenge) return reply.code(400).send({ error: "redirectUri and codeChallenge are required" });
+    try {
+      return await cliAuth.authorize({ userId: ctx.userId, redirectUri: b.redirectUri, codeChallenge: b.codeChallenge, keyName: b.name ?? "twodb-cli" });
+    } catch (err) {
+      if (err instanceof OAuthError) return reply.code(err.status).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  /** CLI-side exchange: code + PKCE verifier → workspace API key (raw key returned exactly once). */
+  app.post("/cli/exchange", async (req, reply) => {
+    const b = (req.body ?? {}) as { code?: string; codeVerifier?: string };
+    if (!b.code || !b.codeVerifier) return reply.code(400).send({ error: "code and codeVerifier are required" });
+    try {
+      return await cliAuth.exchange({ code: b.code, codeVerifier: b.codeVerifier });
+    } catch (err) {
+      if (err instanceof OAuthError) return reply.code(err.status).send({ error: err.message });
+      throw err;
+    }
+  });
+
   app.get("/auth/gateway-token", async (req, reply) => {
     const ctx = await resolveContext(new Headers(req.headers as any)).catch(() => null);
     if (!ctx || ctx.kind !== "session" || !ctx.userId) return reply.code(401).send({ error: "unauthorized" });
@@ -192,6 +248,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
       socketPath?: string;
       capabilities?: string[];
       manifest?: unknown;
+      cli?: unknown;
     };
     const slug = body.slug?.trim().toLowerCase();
     if (!slug || !SLUG_RE.test(slug) || slug === "twodb") return reply.code(400).send({ error: "slug must be kebab-case and not reserved" });
@@ -215,6 +272,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
       socketPath: body.socketPath,
       capabilities: body.capabilities,
       manifestJson: body.manifest,
+      cliJson: body.cli,
       hostId: config.TWODB_HOST_ID,
     });
     return { ok: true, created, ...(issued ? { token: issued.token, expiresAt: issued.expiresAt } : {}) };
@@ -226,6 +284,43 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     const known = await registry.ping(req.callerApp.slug);
     if (!known) return reply.code(404).send({ error: "app not registered — call /registry/register" });
     return { ok: true, pong: true, intervalMs: 10_000, timeoutMs: config.TWODB_HEARTBEAT_TIMEOUT_MS };
+  });
+
+  // --- Service tokens (app → app, on behalf of a workspace) ---------------
+  // The control plane signs short-lived EdDSA JWTs; receivers trust the workspace id inside them
+  // because we signed it. The key is derived from AUTH_SECRET, so every instance agrees and
+  // there is nothing extra to store.
+  const serviceKey = deriveSigningKey(config.AUTH_SECRET);
+  const SVC_SCOPE_RE = /^[a-z0-9][a-z0-9._-]*$/;
+  /** `caller>target` pairs allowed to act in a workspace (scope gateway.act). Checked at issue time AND at use time. */
+  const actGrants = new Set(config.TWODB_SERVICE_ACT_GRANTS.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
+
+  /** Public keys receivers use to verify service tokens. Public by design. */
+  app.get("/registry/jwks", async (_req, reply) => {
+    reply.header("cache-control", "public, max-age=300");
+    return { keys: [serviceKey.jwk] };
+  });
+
+  /**
+   * An authenticated app (its app token) asks for a token addressed to another app, for one
+   * workspace. `scopes` are the message types it intends to send; receivers check them.
+   */
+  app.post("/registry/service-token", async (req, reply) => {
+    const caller = req.callerApp.slug;
+    if (!req.callerApp.verified || !caller) return reply.code(401).send({ error: "invalid app token" });
+    const b = (req.body ?? {}) as { workspaceId?: string; audience?: string; scopes?: string[]; act?: { type?: string; id?: string } };
+    const audience = b.audience?.trim().toLowerCase();
+    if (!b.workspaceId || typeof b.workspaceId !== "string") return reply.code(400).send({ error: "workspaceId is required" });
+    if (!audience || !SLUG_RE.test(audience)) return reply.code(400).send({ error: "audience must be an app slug" });
+    if (!(await registry.getApp(audience))) return reply.code(404).send({ error: `app "${audience}" is not registered` });
+    const scopes = (b.scopes ?? []).filter((s) => typeof s === "string" && SVC_SCOPE_RE.test(s)).slice(0, 32);
+    if (scopes.includes(ACT_SCOPE) && !actGrants.has(`${caller}>${audience}`)) {
+      return reply.code(403).send({ error: `app "${caller}" may not act in a workspace toward "${audience}"` });
+    }
+    const act = b.act?.type && b.act.id ? { type: String(b.act.type).slice(0, 20), id: String(b.act.id).slice(0, 80) } : undefined;
+    const { token, claims } = signServiceToken(serviceKey, { sub: caller, aud: audience, wid: b.workspaceId, scp: scopes, act });
+    reply.header("cache-control", "no-store");
+    return { token, expiresAt: new Date(claims.exp * 1000).toISOString() };
   });
 
   /**
@@ -408,6 +503,55 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     } catch {
       return reply.code(404).send({ error: "not found" });
     }
+  });
+
+  // --- CLI surface: the twodb CLI fetches { cli, manifest } per app in one call.
+  // cli comes from the registration payload when the app declares one, else
+  // the checked-in apps/<slug>/cli.json, else null (the CLI falls back to
+  // endpoint-derived commands). manifest is the same object endpoint.json serves.
+  app.get("/registry/apps/:slug/cli.json", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    const row = await registry.getApp(slug);
+    if (!row) return reply.code(404).send({ error: "not found" });
+
+    let cli: unknown = null;
+    if (row.cli_json) {
+      try {
+        cli = JSON.parse(row.cli_json);
+      } catch {
+        cli = null;
+      }
+    }
+    if (!cli) {
+      // Fall back to the app's checked-in cli.json in TwoDB's monorepo checkout.
+      try {
+        const file = path.join(REPO_ROOT, "apps", slug, "cli.json");
+        cli = JSON.parse(await fs.readFile(file, "utf8"));
+      } catch {
+        cli = null;
+      }
+    }
+
+    let manifest: unknown = null;
+    if (row.manifest_json) {
+      try {
+        manifest = JSON.parse(row.manifest_json);
+      } catch {
+        manifest = null;
+      }
+    }
+    if (!manifest) {
+      try {
+        const file = path.join(REPO_ROOT, "apps", slug, "endpoint.json");
+        manifest = JSON.parse(await fs.readFile(file, "utf8"));
+      } catch {
+        manifest = null;
+      }
+    }
+    reply.type("application/json");
+    return { cli, manifest };
   });
 
   // Messages contract (jobs + broadcast events) isn't part of the
@@ -675,6 +819,23 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     // Anonymous read-only exception: GET /apps/<slug>/public/* (share links etc.) is proxied
     // WITHOUT identity — the app declares such endpoints auth:"public" and validates its own token.
     if (!ctx) {
+      // App-to-app: a service token may reach only the target app's `/_svc/*` surface. The gateway
+      // checks signature + audience here; the receiving app verifies again (scope, workspace) itself.
+      const bearer = String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+      if (bearer && looksLikeServiceToken(bearer)) {
+        try {
+          const claims = verifyServiceToken(bearer, { keys: [serviceKey.jwk], audience: slug });
+          if (/^\/_svc\//.test(subPath)) return proxyToApp(req, reply, app_, subPath, null);
+          // Act-as-workspace: only for granted pairs, and only the workspace the control plane signed into the token.
+          if (claims.scp.includes(ACT_SCOPE) && actGrants.has(`${claims.sub}>${slug}`)) {
+            return proxyToApp(req, reply, app_, subPath, { kind: "service", userId: null, workspaceId: claims.wid, spaceIds: [], serviceApp: claims.sub });
+          }
+          return reply.code(403).send({ error: "service token is not allowed to call this route" });
+        } catch (err) {
+          if (err instanceof ServiceTokenError) return reply.code(401).send({ error: err.message });
+          throw err;
+        }
+      }
       if (req.method === "GET" && /^\/public\/[A-Za-z0-9_-]+(\?.*)?$/.test(subPath)) return proxyToApp(req, reply, app_, subPath, null);
       return reply.code(401).send({ error: "unauthorized" });
     }
@@ -691,7 +852,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     __resolveContext: (h: Headers, a?: string | null, b?: string | null) => Promise<unknown>;
   };
   serverAny.__resolveContext = resolveContext as unknown as typeof serverAny.__resolveContext;
-  registerWsPassthrough(app, (slug) => registry.getApp(slug), (slug, token) => registry.verifyToken(slug, token));
+  registerWsPassthrough(app, (slug) => registry.getApp(slug), (slug, token) => registry.verifyToken(slug, token), routeHost);
 
   // --- Admin webapp: serve the built SPA when its dist exists (production
   // image builds it; dev uses the Vite dev server on :6500 instead).

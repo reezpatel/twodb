@@ -1,0 +1,2931 @@
+{
+  "name": "Fincal",
+  "slug": "fincal",
+  "version": "0.1.0",
+  "shape": "backend+webapp",
+  "description": "Personal finance per space: accounts (bank/cash/UPI/credit card), expenses, budgets, envelopes, goals, investments (stocks, mutual funds, metals, FDs, RDs, …), net-worth tracker, retirement planner, analytics and calculators. Workspace-level access.",
+  "capabilities": [
+    "finance",
+    "budgets",
+    "investments"
+  ],
+  "coreDeps": [
+    "core-data",
+    "core-platform",
+    "core-async"
+  ],
+  "basePath": "/apps/fincal",
+  "generatedAt": "2026-11-15T18:32:44.510Z",
+  "endpoints": [
+    {
+      "name": "listAccounts",
+      "method": "GET",
+      "path": "/accounts",
+      "auth": "session-or-apiKey",
+      "description": "Accounts of a space with live balance. Credit cards add due / available / utilizationPct (balance is negative when money is owed).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "includeArchived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    {
+      "name": "createAccount",
+      "method": "POST",
+      "path": "/accounts",
+      "auth": "session-or-apiKey",
+      "description": "Creates account in a space.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "cash",
+              "upi",
+              "credit_card",
+              "wallet",
+              "other"
+            ]
+          },
+          "institution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "openingBalance": {
+            "type": "number"
+          },
+          "creditLimit": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "statementDay": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dueDay": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "includeInNetworth": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "spaceId",
+          "name",
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateAccount",
+      "method": "PATCH",
+      "path": "/accounts/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates account.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "cash",
+              "upi",
+              "credit_card",
+              "wallet",
+              "other"
+            ]
+          },
+          "institution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "openingBalance": {
+            "type": "number"
+          },
+          "creditLimit": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "statementDay": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dueDay": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "includeInNetworth": {
+            "type": "boolean"
+          },
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteAccount",
+      "method": "DELETE",
+      "path": "/accounts/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes account. Fails with 409 if still referenced.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listCategories",
+      "method": "GET",
+      "path": "/categories",
+      "auth": "session-or-apiKey",
+      "description": "Income/expense categories of a space (default set is seeded on first use).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ]
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    {
+      "name": "createCategory",
+      "method": "POST",
+      "path": "/categories",
+      "auth": "session-or-apiKey",
+      "description": "Creates categorie in a space.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        },
+        "required": [
+          "spaceId",
+          "name",
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateCategory",
+      "method": "PATCH",
+      "path": "/categories/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates categorie.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteCategory",
+      "method": "DELETE",
+      "path": "/categories/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes categorie. Fails with 409 if still referenced.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listTransactions",
+      "method": "GET",
+      "path": "/transactions",
+      "auth": "session-or-apiKey",
+      "description": "Transactions of a space, newest first, with filters (date range, account, category, envelope, kind, method, tag, text). Returns totals for the filtered set.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "from": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "envelopeId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income",
+              "transfer"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "upi",
+              "card",
+              "cash",
+              "netbanking",
+              "cheque",
+              "auto_debit",
+              "other"
+            ]
+          },
+          "tag": {
+            "type": "string"
+          },
+          "q": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "income": {
+            "type": "number"
+          },
+          "expense": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "income",
+          "expense"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createTransaction",
+      "method": "POST",
+      "path": "/transactions",
+      "auth": "session-or-apiKey",
+      "description": "Records an expense, income or transfer. Transfers move money between two accounts (a credit-card payment is a transfer from a bank account to the card).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income",
+              "transfer"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "categoryId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "toAccountId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "upi",
+                  "card",
+                  "cash",
+                  "netbanking",
+                  "cheque",
+                  "auto_debit",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tags": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30
+            }
+          },
+          "envelopeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "spaceId",
+          "accountId",
+          "kind",
+          "amount",
+          "date"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateTransaction",
+      "method": "PATCH",
+      "path": "/transactions/:id",
+      "auth": "session-or-apiKey",
+      "description": "Edits a transaction (any field).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income",
+              "transfer"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "categoryId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "toAccountId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "upi",
+                  "card",
+                  "cash",
+                  "netbanking",
+                  "cheque",
+                  "auto_debit",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tags": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30
+            }
+          },
+          "envelopeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteTransaction",
+      "method": "DELETE",
+      "path": "/transactions/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a transaction.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listPayees",
+      "method": "GET",
+      "path": "/payees",
+      "auth": "session-or-apiKey",
+      "description": "Distinct payees and tags used in a space (for autocomplete).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "payees": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "payees",
+          "tags"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listBudgets",
+      "method": "GET",
+      "path": "/budgets",
+      "auth": "session-or-apiKey",
+      "description": "Monthly budgets with spending for a month (default current). Also returns spending in categories that have no budget.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$"
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "unbudgeted": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "totals": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "month",
+          "items",
+          "unbudgeted",
+          "totals"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "setBudget",
+      "method": "PUT",
+      "path": "/budgets",
+      "auth": "session-or-apiKey",
+      "description": "Creates or updates the monthly budget for an expense category.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "spaceId",
+          "categoryId",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteBudget",
+      "method": "DELETE",
+      "path": "/budgets/:id",
+      "auth": "session-or-apiKey",
+      "description": "Removes a category budget.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listEnvelopes",
+      "method": "GET",
+      "path": "/envelopes",
+      "auth": "session-or-apiKey",
+      "description": "Envelopes with funded / spent / balance. `unallocated` = spendable account money (bank, cash, UPI, wallet) not yet assigned to an envelope.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "includeArchived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "totalBalance": {
+            "type": "number"
+          },
+          "unallocated": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "totalBalance",
+          "unallocated"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createEnvelope",
+      "method": "POST",
+      "path": "/envelopes",
+      "auth": "session-or-apiKey",
+      "description": "Creates envelope in a space.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "target": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "monthlyFill": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "spaceId",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateEnvelope",
+      "method": "PATCH",
+      "path": "/envelopes/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates envelope.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "target": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "monthlyFill": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteEnvelope",
+      "method": "DELETE",
+      "path": "/envelopes/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes envelope. Fails with 409 if still referenced.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "allocateEnvelope",
+      "method": "POST",
+      "path": "/envelopes/:id/allocate",
+      "auth": "session-or-apiKey",
+      "description": "Funds an envelope (positive amount) or releases money from it (negative).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "transferBetweenEnvelopes",
+      "method": "POST",
+      "path": "/envelopes/transfer",
+      "auth": "session-or-apiKey",
+      "description": "Moves allocated money from one envelope to another.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fromId": {
+            "type": "string"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "spaceId",
+          "fromId",
+          "toId",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "fillEnvelopes",
+      "method": "POST",
+      "path": "/envelopes/fill",
+      "auth": "session-or-apiKey",
+      "description": "Adds each envelope's monthly fill amount (the monthly top-up ritual).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "filled": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "filled",
+          "total"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "envelopeHistory",
+      "method": "GET",
+      "path": "/envelopes/:id/history",
+      "auth": "session-or-apiKey",
+      "description": "Allocations and tagged expenses of one envelope, newest first.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "allocations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "expenses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "allocations",
+          "expenses"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteEnvelopeAllocation",
+      "method": "DELETE",
+      "path": "/envelope-allocations/:id",
+      "auth": "session-or-apiKey",
+      "description": "Removes one allocation entry.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listGoals",
+      "method": "GET",
+      "path": "/goals",
+      "auth": "session-or-apiKey",
+      "description": "Savings goals with saved amount, progress and the monthly saving needed to hit the target date.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "includeArchived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    {
+      "name": "createGoal",
+      "method": "POST",
+      "path": "/goals",
+      "auth": "session-or-apiKey",
+      "description": "Creates goal in a space.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "savings",
+              "retirement",
+              "emergency",
+              "other"
+            ]
+          },
+          "targetAmount": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "targetDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "spaceId",
+          "name",
+          "targetAmount"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateGoal",
+      "method": "PATCH",
+      "path": "/goals/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates goal.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "savings",
+              "retirement",
+              "emergency",
+              "other"
+            ]
+          },
+          "targetAmount": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "targetDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteGoal",
+      "method": "DELETE",
+      "path": "/goals/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes goal. Fails with 409 if still referenced.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "addGoalContribution",
+      "method": "POST",
+      "path": "/goals/:id/contributions",
+      "auth": "session-or-apiKey",
+      "description": "Adds money to a goal (negative amount withdraws).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "listGoalContributions",
+      "method": "GET",
+      "path": "/goals/:id/contributions",
+      "auth": "session-or-apiKey",
+      "description": "Contribution history of a goal.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    {
+      "name": "deleteGoalContribution",
+      "method": "DELETE",
+      "path": "/goal-contributions/:id",
+      "auth": "session-or-apiKey",
+      "description": "Removes one contribution.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listHoldings",
+      "method": "GET",
+      "path": "/holdings",
+      "auth": "session-or-apiKey",
+      "description": "Investments with computed invested / value / gain. FDs and RDs are valued from their terms (principal, rate, compounding, dates) and show maturity value; stocks/funds/metals use quantity × current price; PPF/EPF/NPS/real-estate use the manual current value.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "assetClass": {
+            "type": "string"
+          },
+          "includeArchived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "summary": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "items",
+          "summary"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "createHolding",
+      "method": "POST",
+      "path": "/holdings",
+      "auth": "session-or-apiKey",
+      "description": "Creates holding in a space.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "assetClass": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "mutual_fund",
+              "etf",
+              "gold",
+              "silver",
+              "platinum",
+              "fd",
+              "rd",
+              "ppf",
+              "epf",
+              "nps",
+              "bond",
+              "crypto",
+              "real_estate",
+              "other"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "institution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "avgCost": {
+            "type": "number"
+          },
+          "currentPrice": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "principal": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "currentValue": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "interestRate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "compounding": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
+          },
+          "installment": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maturityDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retirement": {
+            "type": "boolean"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "spaceId",
+          "assetClass",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateHolding",
+      "method": "PATCH",
+      "path": "/holdings/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates holding.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "assetClass": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "mutual_fund",
+              "etf",
+              "gold",
+              "silver",
+              "platinum",
+              "fd",
+              "rd",
+              "ppf",
+              "epf",
+              "nps",
+              "bond",
+              "crypto",
+              "real_estate",
+              "other"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "institution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "avgCost": {
+            "type": "number"
+          },
+          "currentPrice": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "principal": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "currentValue": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "interestRate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "compounding": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
+          },
+          "installment": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maturityDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retirement": {
+            "type": "boolean"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteHolding",
+      "method": "DELETE",
+      "path": "/holdings/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes holding. Fails with 409 if still referenced.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateHoldingPrices",
+      "method": "POST",
+      "path": "/holdings/prices",
+      "auth": "session-or-apiKey",
+      "description": "Bulk-updates current prices / NAVs (e.g. after copying quotes). Items: [{id, price}].",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prices": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "price": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "id",
+                "price"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "spaceId",
+          "prices"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "updated"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "tradeHolding",
+      "method": "POST",
+      "path": "/holdings/:id/trade",
+      "auth": "session-or-apiKey",
+      "description": "Records a buy (weighted-average cost updates) or sell on a quantity-based holding (stock, fund, metal, crypto…). Also sets the current price to the trade price.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "quantity": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0
+          },
+          "fees": {
+            "type": "number",
+            "minimum": 0
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        },
+        "required": [
+          "id",
+          "side",
+          "quantity",
+          "price"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "listHoldingTrades",
+      "method": "GET",
+      "path": "/holdings/:id/trades",
+      "auth": "session-or-apiKey",
+      "description": "Buy/sell history of a holding.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    {
+      "name": "listLiabilities",
+      "method": "GET",
+      "path": "/liabilities",
+      "auth": "session-or-apiKey",
+      "description": "Lists liabilities (loans) of a space.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "includeArchived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    {
+      "name": "createLiability",
+      "method": "POST",
+      "path": "/liabilities",
+      "auth": "session-or-apiKey",
+      "description": "Creates liabilities (loans) in a space.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "home_loan",
+              "car_loan",
+              "personal_loan",
+              "education_loan",
+              "credit_card",
+              "other"
+            ]
+          },
+          "principal": {
+            "type": "number"
+          },
+          "outstanding": {
+            "type": "number"
+          },
+          "interestRate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "emi": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "endDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "spaceId",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateLiability",
+      "method": "PATCH",
+      "path": "/liabilities/:id",
+      "auth": "session-or-apiKey",
+      "description": "Updates liabilities (loans).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "home_loan",
+              "car_loan",
+              "personal_loan",
+              "education_loan",
+              "credit_card",
+              "other"
+            ]
+          },
+          "principal": {
+            "type": "number"
+          },
+          "outstanding": {
+            "type": "number"
+          },
+          "interestRate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "emi": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "endDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "deleteLiability",
+      "method": "DELETE",
+      "path": "/liabilities/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes liabilities (loans). Fails with 409 if still referenced.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "getSettings",
+      "method": "GET",
+      "path": "/settings",
+      "auth": "session-or-apiKey",
+      "description": "Space settings: currency and net-worth target.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "updateSettings",
+      "method": "PUT",
+      "path": "/settings",
+      "auth": "session-or-apiKey",
+      "description": "Updates the space's currency (ISO code) and/or net-worth target (null clears).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "networthTarget": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "getNetWorth",
+      "method": "GET",
+      "path": "/networth",
+      "auth": "session-or-apiKey",
+      "description": "Net worth now (assets − liabilities, with breakdown), saved daily snapshots (history), 12-month net-cash trend rebuilt from transactions, and progress toward the target.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "saveNetWorthSnapshot",
+      "method": "POST",
+      "path": "/networth/snapshot",
+      "auth": "session-or-apiKey",
+      "description": "Stores today's net-worth snapshot (idempotent; one per day).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "getRetirement",
+      "method": "GET",
+      "path": "/retirement",
+      "auth": "session-or-apiKey",
+      "description": "Saved retirement plan (or defaults), retirement corpus built from flagged holdings (+PPF/EPF/NPS) and the projection: required corpus, projected corpus, shortfall, saving needed, year-by-year series.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "saveRetirement",
+      "method": "PUT",
+      "path": "/retirement",
+      "auth": "session-or-apiKey",
+      "description": "Saves the retirement plan assumptions (partial update).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "currentAge": {
+            "type": "integer",
+            "minimum": 14,
+            "maximum": 100
+          },
+          "retirementAge": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 100
+          },
+          "lifeExpectancy": {
+            "type": "integer",
+            "minimum": 16,
+            "maximum": 120
+          },
+          "monthlyExpense": {
+            "type": "number",
+            "minimum": 0
+          },
+          "inflation": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "preReturn": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 40
+          },
+          "postReturn": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "monthlySaving": {
+            "type": "number",
+            "minimum": 0
+          },
+          "stepUp": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "otherCorpus": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "projectRetirement",
+      "method": "POST",
+      "path": "/retirement/project",
+      "auth": "session-or-apiKey",
+      "description": "What-if projection with overridden assumptions; nothing is saved.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "currentAge": {
+            "type": "integer",
+            "minimum": 14,
+            "maximum": 100
+          },
+          "retirementAge": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 100
+          },
+          "lifeExpectancy": {
+            "type": "integer",
+            "minimum": 16,
+            "maximum": 120
+          },
+          "monthlyExpense": {
+            "type": "number",
+            "minimum": 0
+          },
+          "inflation": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "preReturn": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 40
+          },
+          "postReturn": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "monthlySaving": {
+            "type": "number",
+            "minimum": 0
+          },
+          "stepUp": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 30
+          },
+          "otherCorpus": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "getOverview",
+      "method": "GET",
+      "path": "/overview",
+      "auth": "session-or-apiKey",
+      "description": "Dashboard for a month (default current): income/expense/net, month-end spending projection, budget status, net worth, accounts, credit-card dues, top categories, recent transactions.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$"
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "getAnalytics",
+      "method": "GET",
+      "path": "/analytics",
+      "auth": "session-or-apiKey",
+      "description": "Spending analytics over a range (default last 12 months): monthly income/expense/savings, category breakdown and trend, payment-method and account split, top payees, weekday pattern, recurring payees, and a 3-month forecast from the completed-month trend.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "from": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    }
+  ]
+}

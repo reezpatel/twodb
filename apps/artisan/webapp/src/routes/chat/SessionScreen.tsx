@@ -7,6 +7,7 @@ import { TerminalScreen } from "./TerminalScreen.js";
 import { CheckpointsScreen } from "./CheckpointsScreen.js";
 import { InspectorScreen } from "./InspectorScreen.js";
 import { ChangesScreen } from "./ChangesScreen.js";
+import { CanvasScreen } from "./CanvasScreen.js";
 import { SessionTabs, type SessionTabId } from "./partials/SessionTabs.js";
 import { SessionSidebar } from "./partials/SessionSidebar.js";
 import { useSessionSide } from "./hooks/useSessionSide.js";
@@ -27,7 +28,7 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
   useEffect(() => {
     const onOpen = (e: Event) => {
       const t = (e as CustomEvent<SessionTabId>).detail;
-      if (t === "terminal" || t === "editor" || t === "changes" || t === "chat" || t === "checkpoints" || t === "inspector") setTab(t);
+      if (t === "terminal" || t === "editor" || t === "changes" || t === "chat" || t === "checkpoints" || t === "canvas" || t === "inspector") setTab(t);
     };
     window.addEventListener("artisan:open-tab", onOpen);
     return () => window.removeEventListener("artisan:open-tab", onOpen);
@@ -74,6 +75,7 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
           {tab === "terminal" ? <TerminalScreen sessionId={props.sessionId} /> : null}
           {tab === "changes" ? <ChangesScreen sessionId={props.sessionId} /> : null}
           {tab === "checkpoints" ? <CheckpointsScreen sessionId={props.sessionId} /> : null}
+          {tab === "canvas" ? <CanvasScreen sessionId={props.sessionId} /> : null}
           {tab === "inspector" ? <InspectorScreen sessionId={props.sessionId} /> : null}
         </div>
       </div>

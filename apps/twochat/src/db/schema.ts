@@ -1,4 +1,5 @@
 import { sql, type Kysely } from "@twodb/core-data/db";
+import { applyCollabSchema, type CollabRunRow, type CollabTaskRow } from "../collab/schema.js";
 
 /**
  * TwoChat's single Postgres schema ("twochat", provisioned by TwoDB).
@@ -65,6 +66,10 @@ export interface MessageRow {
   blocks: string | null;
   /** Parent message id — single-level replies, clamped to roots. */
   reply_to_id: string | null;
+  /** Set on collaborator replies: {taskId, runId, sessionId, outcome} — drives "View code session" / stop UI. */
+  collab: string | null;
+  /** Hidden by a rollback (kept, not deleted). */
+  rolled_back_at: string | null;
   edited_at: string | null;
   deleted_at: string | null;
   created_at: string;
@@ -138,6 +143,11 @@ export interface BotRow {
   api_key_id: string | null;
   avatar_emoji: string | null;
   description: string | null;
+  /** Set for bots backed by another app (e.g. "artisan" + the agent id): messages to them start runs there. */
+  runtime_app: string | null;
+  runtime_ref: string | null;
+  /** A runtime bot that can currently run (collaborator has a runner + directory). */
+  enabled: boolean;
   created_at: string;
 }
 
@@ -201,6 +211,8 @@ export interface TwoChatDb {
   notification: NotificationRow;
   message_action: MessageActionRow;
   conversation_list: ConversationListRow;
+  collab_task: CollabTaskRow;
+  collab_run: CollabRunRow;
 }
 
 const now = sql`now()`;
@@ -472,6 +484,7 @@ export async function applySchema(db: Kysely<TwoChatDb>): Promise<void> {
   await sql`alter table message add column if not exists source_url text`.execute(db);
   await sql`create index if not exists channel_list_idx on channel (list_id, position)`.execute(db);
   await sql`create unique index if not exists message_channel_external_idx on message (channel_id, external_id) where external_id is not null`.execute(db);
+  await applyCollabSchema(db as never);
 
 
 }

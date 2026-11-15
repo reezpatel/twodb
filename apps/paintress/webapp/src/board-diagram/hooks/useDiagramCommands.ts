@@ -1,5 +1,15 @@
 import { useCallback, useRef, type MutableRefObject } from "react";
-import type { Node, Connection } from "@xyflow/react";
+/** Structural stand-ins (were @xyflow/react types); the SVG canvas passes the same shapes. */
+export interface FlowConnection {
+  source: string;
+  target: string;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
+}
+export interface DragNode {
+  id: string;
+  position: { x: number; y: number };
+}
 import type { BatchResult, Item, ItemPatch, NewItem, Op } from "@shared/model";
 import { LAYOUT, entityHeight, findShape, getGroupStyle } from "@shared/shapes";
 import { absPosition, adoptVersions, applyOpsLocal, newId, type ItemMap } from "../../lib/item-store";
@@ -7,6 +17,7 @@ import { cloneOps, containerAt } from "../../lib/containers";
 import { handleToColumn } from "../../lib/flow-graph";
 import { paintressClient } from "../../lib/paintress-client";
 import type { useHistory } from "./useHistory";
+import type { ArmedSpec, FlowRect } from "./usePlacement";
 
 export interface CommandDeps {
   boardId: string;
@@ -21,7 +32,16 @@ export interface CommandDeps {
   toFlow(p: { x: number; y: number }): { x: number; y: number };
 }
 
-type Placeable = Omit<NewItem, "x" | "y" | "parentId"> & { width: number; height: number };
+type Placeable = Omit<NewItem, "x" | "y" | "parentId"> & { width: number; height: number; minW?: number; minH?: number };
+
+export interface PlaceOpts {
+  /** Flow-space point the item is centred on. */
+  at?: { x: number; y: number };
+  /** Dragged rectangle (flow space): overrides size and is centred on itself. */
+  rect?: { x: number; y: number; width: number; height: number };
+}
+
+const snap8 = (v: number) => Math.max(8, Math.round(v / 8) * 8);
 
 /**
  * Business hook: every way the human changes the board. Each command is ONE
@@ -85,16 +105,18 @@ export function useDiagramCommands(deps: CommandDeps) {
     [commit],
   );
 
-  /** Create one item at a flow-space point (or the viewport centre), inside whatever group/lane is under it. */
+  /** Create one item at a flow-space point/rect (or the viewport centre), inside whatever group/lane is under it. */
   const place = useCallback(
-    (item: Placeable, at?: { x: number; y: number }, label = "Add item") => {
+    (item: Placeable, opts: PlaceOpts = {}, label = "Add item") => {
       const m = d.current.itemsRef.current;
-      const point = at ?? d.current.toFlow({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+      const point = opts.rect ? { x: opts.rect.x + opts.rect.width / 2, y: opts.rect.y + opts.rect.height / 2 } : (opts.at ?? d.current.toFlow({ x: window.innerWidth / 2, y: window.innerHeight / 2 }));
+      const width = opts.rect ? snap8(Math.max(item.minW ?? 40, opts.rect.width)) : item.width;
+      const height = opts.rect ? snap8(Math.max(item.minH ?? 30, opts.rect.height)) : item.height;
       const container = item.type === "pool" ? null : containerAt(m, point, new Set());
       const base = container ? absPosition(m, container) : { x: 0, y: 0 };
       const id = item.id ?? newId();
       void commit(
-        [{ op: "create", item: { ...item, id, x: point.x - item.width / 2 - base.x, y: point.y - item.height / 2 - base.y, parentId: container?.id ?? null, pinned: true } }],
+        [{ op: "create", item: { ...item, id, width, height, x: point.x - width / 2 - base.x, y: point.y - height / 2 - base.y, parentId: container?.id ?? null, pinned: true } }],
         label,
       );
       return id;
@@ -102,31 +124,83 @@ export function useDiagramCommands(deps: CommandDeps) {
     [commit],
   );
 
-  const addShape = (pack: string, shape: string, at?: { x: number; y: number }) => {
+  const addShape = (pack: string, shape: string, opts: PlaceOpts = {}) => {
     const def = findShape(shape, pack) ?? findShape("rectangle")!;
-    return place({ type: "shape", width: def.w, height: def.h, data: { pack: def.pack, shape: def.id, text: def.label === "Rectangle" ? "" : def.label } }, at, `Add ${def.label.toLowerCase()}`);
+    return place({ type: "shape", width: def.w, height: def.h, minW: 24, minH: 24, data: { pack: def.pack, shape: def.id, text: def.label === "Rectangle" ? "" : def.label } }, opts, `Add ${def.label.toLowerCase()}`);
   };
-  const addGroup = (styleId: string, at?: { x: number; y: number }) => {
+  const addGroup = (styleId: string, opts: PlaceOpts = {}) => {
     const s = getGroupStyle(styleId);
-    return place({ type: "group", width: 420, height: 300, data: { pack: s.pack, kind: s.id, title: s.label } }, at, `Add ${s.label}`);
+    return place({ type: "group", width: 420, height: 300, minW: 120, minH: 80, data: { pack: s.pack, kind: s.id, title: s.label } }, opts, `Add ${s.label}`);
   };
-  const addEntity = (at?: { x: number; y: number }) =>
+  const addEntity = (opts: PlaceOpts = {}) =>
     place(
-      { type: "entity", width: LAYOUT.entityWidth, height: entityHeight(2), data: { name: "table", columns: [{ id: "id", name: "id", type: "uuid", pk: true }, { id: "name", name: "name", type: "text" }] } },
-      at,
+      { type: "entity", width: LAYOUT.entityWidth, height: entityHeight(2), minW: 180, minH: entityHeight(2), data: { name: "table", columns: [{ id: "id", name: "id", type: "uuid", pk: true }, { id: "name", name: "name", type: "text" }] } },
+      opts,
       "Add table",
     );
-  const addSticky = (at?: { x: number; y: number }) => place({ type: "sticky", width: 180, height: 180, data: { text: "", color: "#fde68a" } }, at, "Add note");
-  const addText = (at?: { x: number; y: number }) => place({ type: "text", width: 220, height: 40, data: { text: "Text", fontSize: 18, align: "left" } }, at, "Add text");
-  const addIcon = (icon: string, label: string, at?: { x: number; y: number }) =>
-    place({ type: "shape", width: 120, height: 100, data: { pack: "basic", shape: "icon-card", text: label, icon } }, at, `Add ${label}`);
+  const addSticky = (opts: PlaceOpts = {}, color = "#fde68a") => place({ type: "sticky", width: 180, height: 180, minW: 80, minH: 60, data: { text: "", color } }, opts, "Add note");
+  const addText = (opts: PlaceOpts = {}) => place({ type: "text", width: 220, height: 40, minW: 40, minH: 20, data: { text: "Text", fontSize: 18, align: "left" } }, opts, "Add text");
+  const addIcon = (icon: string, label: string, opts: PlaceOpts = {}) =>
+    place({ type: "shape", width: 120, height: 100, minW: 72, minH: 64, data: { pack: "basic", shape: "icon-card", text: label, icon } }, opts, `Add ${label}`);
 
-  const addPool = (at?: { x: number; y: number }) => {
+  /** Palette placement: create the armed item at a dragged rect, or default size at a click point. */
+  const placeArmed = (spec: ArmedSpec, rect: FlowRect | null, point: { x: number; y: number }) => {
+    const opts: PlaceOpts = rect ? { rect } : { at: point };
+    switch (spec.kind) {
+      case "shape":
+        return addShape(spec.pack, spec.shape, opts);
+      case "group":
+        return addGroup(spec.style, opts);
+      case "icon":
+        return addIcon(spec.icon, spec.label, opts);
+      case "entity":
+        return addEntity(opts);
+      case "pool":
+        return addPool(opts);
+      case "sticky":
+        return addSticky(opts, spec.color);
+      case "text":
+        return addText(opts);
+    }
+  };
+
+  /** A finished freehand stroke: bbox becomes the item rect, points stored relative to it. */
+  const addDraw = (points: { x: number; y: number }[], drawTool: "pen" | "highlighter", color: string) => {
+    if (points.length < 2) return;
+    const xs = points.map((p) => p.x);
+    const ys = points.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const w = Math.max(1, Math.max(...xs) - minX);
+    const h = Math.max(1, Math.max(...ys) - minY);
+    const flat = points.flatMap((p) => [Math.round((p.x - minX) * 10) / 10, Math.round((p.y - minY) * 10) / 10]);
+    void commit(
+      [
+        {
+          op: "create",
+          item: {
+            id: newId(),
+            type: "draw",
+            x: minX,
+            y: minY,
+            width: w,
+            height: h,
+            parentId: null,
+            pinned: true,
+            data: { points: flat, color, width: drawTool === "highlighter" ? 16 : 3, tool: drawTool, nw: w, nh: h },
+          },
+        },
+      ],
+      drawTool === "highlighter" ? "Highlight" : "Draw",
+    );
+  };
+
+  const addPool = (opts: PlaceOpts = {}) => {
     const m = d.current.itemsRef.current;
     void m;
-    const point = at ?? d.current.toFlow({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+    const point = opts.rect ? { x: opts.rect.x + opts.rect.width / 2, y: opts.rect.y + opts.rect.height / 2 } : (opts.at ?? d.current.toFlow({ x: window.innerWidth / 2, y: window.innerHeight / 2 }));
     const pool = newId();
-    const w = 900;
+    const w = opts.rect ? snap8(Math.max(300, opts.rect.width)) : 900;
     const laneH = LAYOUT.laneMinH;
     void commit(
       [
@@ -163,14 +237,14 @@ export function useDiagramCommands(deps: CommandDeps) {
         img.src = paintressClient.assetUrl(asset.id);
       });
       const scale = Math.min(1, 480 / size.w);
-      place({ type: "image", width: Math.round(size.w * scale), height: Math.round(size.h * scale), data: { assetId: asset.id, alt: file.name } }, at, "Add image");
+      place({ type: "image", width: Math.round(size.w * scale), height: Math.round(size.h * scale), data: { assetId: asset.id, alt: file.name } }, { at }, "Add image");
     } catch (e) {
       d.current.notify(`Upload failed: ${(e as Error).message}`);
     }
   };
 
   const connect = useCallback(
-    (c: Connection) => {
+    (c: FlowConnection) => {
       const m = d.current.itemsRef.current;
       const from = m.get(c.source);
       const to = m.get(c.target);
@@ -192,7 +266,7 @@ export function useDiagramCommands(deps: CommandDeps) {
 
   /** After a drag: commit new positions, moving items into/out of the group or lane they were dropped on. */
   const dragEnded = useCallback(
-    (nodes: Node[]) => {
+    (nodes: DragNode[]) => {
       const m = d.current.itemsRef.current;
       const moving = new Set(nodes.map((n) => n.id));
       const ops: Op[] = [];
@@ -290,5 +364,5 @@ export function useDiagramCommands(deps: CommandDeps) {
     }
   }, []);
 
-  return { commit, patch, resized, addShape, addGroup, addEntity, addSticky, addText, addIcon, addPool, addLane, addImage, connect, dragEnded, deleteIds, duplicate, copy, paste, undo, redo, tidy };
+  return { commit, patch, resized, addShape, addGroup, addEntity, addSticky, addText, addIcon, addPool, addLane, addImage, addDraw, placeArmed, connect, dragEnded, deleteIds, duplicate, copy, paste, undo, redo, tidy };
 }

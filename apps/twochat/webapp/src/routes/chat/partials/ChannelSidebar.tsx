@@ -1,5 +1,5 @@
 import { Bell, Hash, LockKeyhole, Plus, Search } from "lucide-react";
-import { Button, Input, cn } from "@twodb/blocks";
+import { Input, cn } from "@twodb/blocks";
 import type { Channel, ConversationList, Member } from "../../../lib/chat-client";
 import { ListGroupTabs } from "./ListGroupTabs";
 import { PresenceDot, type PresenceStatus } from "./PresenceDot";
@@ -32,20 +32,21 @@ export function ChannelSidebar(props: ChannelSidebarProps) {
     !query || props.channelTitle(conversation).toLowerCase().includes(query) || conversation.topic?.toLowerCase().includes(query) || conversation.members.some((member) => member.name.toLowerCase().includes(query));
   const groups = props.conversations.filter((conversation) => conversation.kind === "channel" && matches(conversation));
   const dms = props.conversations.filter((conversation) => conversation.kind === "dm" && matches(conversation));
+  const activeListName = props.lists.find((list) => list.id === props.activeListId)?.name ?? "Chats";
 
   return (
-    <aside aria-label="Chats" className="flex h-full w-72 shrink-0 flex-col overflow-hidden border-r border-border bg-card" role="complementary">
-      <header className="flex items-center justify-between border-b border-border px-4 py-3">
-        <div className="flex min-w-0 flex-col"><h1 className="truncate text-lg font-semibold leading-tight">Chats</h1><span className="text-[11px] text-muted-foreground">TwoChat workspace</span></div>
-        <nav aria-label="Chat actions" className="flex items-center gap-1">
-          <Button aria-label="Start a new direct message" size="sm" type="button" variant="ghost" onClick={props.onStartDm}><Plus size={16} /></Button>
-          <Button aria-label="Open notifications" size="sm" type="button" variant="ghost" onClick={props.onOpenNotifications} className="relative"><Bell size={16} />{props.unreadNotifications > 0 ? <span className="absolute right-0.5 top-0.5 size-2 rounded-full bg-primary ring-2 ring-card" /> : null}</Button>
+    <aside aria-label="Chats" className="flex h-full w-72 shrink-0 flex-col overflow-hidden border-r border-outline/50 bg-card/50 p-3" role="complementary">
+      <header className="flex shrink-0 items-center justify-between gap-2 px-1 pb-2">
+        <span className="min-w-0 flex-1 truncate px-1.5 font-sans text-[13px] font-medium text-ink">{activeListName}</span>
+        <nav aria-label="Chat actions" className="flex shrink-0 items-center">
+          <button type="button" aria-label="Start a new direct message" title="Start a new direct message" onClick={props.onStartDm} className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-paper-grid hover:text-ink"><Plus className="size-4" strokeWidth={1.5} /></button>
+          <button type="button" aria-label="Open notifications" title="Open notifications" onClick={props.onOpenNotifications} className="relative flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-paper-grid hover:text-ink"><Bell className="size-4" strokeWidth={1.5} />{props.unreadNotifications > 0 ? <span className="absolute right-0.5 top-0.5 size-2 rounded-full bg-primary ring-2 ring-card" /> : null}</button>
         </nav>
       </header>
 
       <ListGroupTabs lists={props.lists} activeId={props.activeListId} onSelect={props.onListChange} onAdd={props.onAddList} />
 
-      <div className="px-3 py-3">
+      <div className="pb-2">
         <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Search conversations" className="h-9 w-full pl-9 text-sm" inputMode="search" onChange={(event) => props.onSearchChange(event.target.value)} placeholder="Search this list…" type="search" value={props.search} /></div>
       </div>
 
@@ -79,7 +80,7 @@ export function ChannelSidebar(props: ChannelSidebarProps) {
 
 function ChatSection(props: { label: string; addLabel: string; onAdd: () => void; children: React.ReactNode }) {
   const id = `sidebar-${props.label.toLowerCase().replaceAll(" ", "-")}`;
-  return <section aria-labelledby={id} className="flex flex-col gap-1"><div className="flex items-center justify-between px-3"><h2 id={id} className="text-xs font-semibold text-muted-foreground">{props.label}</h2><button type="button" aria-label={props.addLabel} onClick={props.onAdd} className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"><Plus size={13} /></button></div><ul className="flex flex-col gap-0.5">{props.children}</ul></section>;
+  return <section aria-labelledby={id} className="flex flex-col gap-1"><div className="group/header flex items-center px-1 pr-1.5"><h2 id={id} className="min-w-0 flex-1 truncate px-1.5 pb-1 font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/50">{props.label}</h2><button type="button" aria-label={props.addLabel} title={props.addLabel} onClick={props.onAdd} className="grid size-6 shrink-0 place-items-center rounded-sm text-muted-foreground/60 opacity-0 transition-opacity hover:bg-paper-grid hover:text-ink focus-visible:opacity-100 group-hover/header:opacity-100"><Plus size={13} /></button></div><ul className="flex flex-col gap-0.5">{props.children}</ul></section>;
 }
 
 function ConversationAvatar({ conversation }: { conversation: Channel }) {

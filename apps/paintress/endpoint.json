@@ -14,7 +14,7 @@
     "core-async"
   ],
   "basePath": "/apps/paintress",
-  "generatedAt": "2026-11-12T04:02:56.277Z",
+  "generatedAt": "2026-11-15T05:05:17.930Z",
   "websocketPaths": [
     "/boards/:id/ws"
   ],
@@ -24,7 +24,7 @@
       "method": "GET",
       "path": "/boards",
       "auth": "session-or-apiKey",
-      "description": "Lists boards in the caller's workspace (optionally one space). Every workspace member can read and write every board.",
+      "description": "Lists boards and board groups in the caller's workspace (optionally one space). Every workspace member can read and write every board.",
       "request": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -50,7 +50,7 @@
                 "workspaceId": {
                   "type": "string"
                 },
-                "spaceId": {
+                "groupId": {
                   "type": "string"
                 },
                 "kind": {
@@ -89,7 +89,7 @@
               "required": [
                 "id",
                 "workspaceId",
-                "spaceId",
+                "groupId",
                 "kind",
                 "name",
                 "description",
@@ -101,10 +101,106 @@
               ],
               "additionalProperties": false
             }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "workspaceId": {
+                  "type": "string"
+                },
+                "spaceId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "createdBy": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "workspaceId",
+                "spaceId",
+                "name",
+                "createdBy",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
-          "boards"
+          "boards",
+          "groups"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listGroups",
+      "method": "GET",
+      "path": "/groups",
+      "auth": "session-or-apiKey",
+      "description": "Lists board groups. A group is a named collection of boards labelled with a space; boards are created into a group.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "workspaceId": {
+                  "type": "string"
+                },
+                "spaceId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "createdBy": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "workspaceId",
+                "spaceId",
+                "name",
+                "createdBy",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "groups"
         ],
         "additionalProperties": false
       }
@@ -114,7 +210,7 @@
       "method": "POST",
       "path": "/boards",
       "auth": "session-or-apiKey",
-      "description": "Creates a board. `kind: \"diagram\"` is a canvas for architecture/AWS/GCP/ERD/flowchart/process diagrams; `kind: \"doc\"` is a Markdown document whose ```mermaid blocks render as diagrams. `spaceId` defaults to the caller's first space.",
+      "description": "Creates a board. `kind: \"diagram\"` is a canvas for architecture/AWS/GCP/ERD/flowchart/process diagrams; `kind: \"doc\"` is a Markdown document whose ```mermaid blocks render as diagrams. The board goes into a group: pass an existing `groupId`, or a `groupName` to find-or-create (default \"General\"); a new group takes `spaceId` (default: the caller's first space).",
       "request": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -136,7 +232,18 @@
             "type": "string",
             "maxLength": 2000
           },
+          "groupId": {
+            "description": "Existing group to put the board in",
+            "type": "string"
+          },
+          "groupName": {
+            "description": "Group to find-or-create by name (default: General); ignored when groupId is given",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
           "spaceId": {
+            "description": "Space for the group — only used when a new group is created",
             "type": "string"
           },
           "markdown": {
@@ -160,7 +267,7 @@
           "workspaceId": {
             "type": "string"
           },
-          "spaceId": {
+          "groupId": {
             "type": "string"
           },
           "kind": {
@@ -199,7 +306,7 @@
         "required": [
           "id",
           "workspaceId",
-          "spaceId",
+          "groupId",
           "kind",
           "name",
           "description",
@@ -245,7 +352,7 @@
               "workspaceId": {
                 "type": "string"
               },
-              "spaceId": {
+              "groupId": {
                 "type": "string"
               },
               "kind": {
@@ -284,7 +391,7 @@
             "required": [
               "id",
               "workspaceId",
-              "spaceId",
+              "groupId",
               "kind",
               "name",
               "description",
@@ -475,7 +582,7 @@
           "workspaceId": {
             "type": "string"
           },
-          "spaceId": {
+          "groupId": {
             "type": "string"
           },
           "kind": {
@@ -514,7 +621,7 @@
         "required": [
           "id",
           "workspaceId",
-          "spaceId",
+          "groupId",
           "kind",
           "name",
           "description",

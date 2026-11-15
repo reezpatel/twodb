@@ -1,66 +1,36 @@
-import { Background, BackgroundVariant, ConnectionMode, Controls, MiniMap, ReactFlow } from "@xyflow/react";
 import { DiagramContext } from "./DiagramContext";
-import { Palette } from "./Palette";
+import { ToolDock } from "./ToolDock";
 import { useBoardDiagram } from "./hooks/useBoardDiagram";
-import { edgeTypes } from "./edges";
-import { nodeTypes } from "./nodes";
 import { Inspector } from "./partials/Inspector";
 import { Toast } from "./partials/Toast";
 import { Toolbar } from "./partials/Toolbar";
 import { BoardHeader } from "../board/partials/BoardHeader";
+import { Canvas } from "../svg-canvas/Canvas";
 
-/** The canvas: React Flow wired to the live board, plus palette, toolbar and inspector. */
-export function DiagramCanvas({ boardId, name, onRename }: { boardId: string; name: string; onRename(name: string): void }) {
+/** The board screen: header + SVG canvas + palette, toolbar and inspector. */
+export function DiagramCanvas({ boardId, name, sidebar, onRename }: { boardId: string; name: string; sidebar?: { open: boolean; onToggle(): void }; onRename(name: string): void }) {
   const b = useBoardDiagram(boardId);
   const { cmd } = b;
   return (
     <DiagramContext.Provider value={b.actions}>
       <div className="flex h-full flex-col">
-        <BoardHeader name={name} status={b.status} presence={b.presence} onRename={onRename} />
+        <BoardHeader name={name} status={b.status} presence={b.presence} onRename={onRename} sidebar={sidebar} />
         <div className="relative min-h-0 flex-1" onDrop={b.onDrop} onDragOver={b.onDragOver}>
-          <ReactFlow
-            nodes={b.nodes}
-            edges={b.edges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            onNodesChange={b.onNodesChange}
-            onEdgesChange={b.onEdgesChange}
-            onConnect={cmd.connect}
-            onNodeDragStop={(_e, _n, dragged) => cmd.dragEnded(dragged)}
-            connectionMode={ConnectionMode.Loose}
-            deleteKeyCode={null}
-            selectionOnDrag={b.tool === "select"}
-            panOnDrag={b.tool === "hand" ? true : [1, 2]}
-            panActivationKeyCode="Space"
-            nodesDraggable={b.tool === "select" && b.canEdit}
-            nodesConnectable={b.canEdit}
-            snapToGrid
-            snapGrid={[8, 8]}
-            minZoom={0.1}
-            maxZoom={2.5}
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1.4} />
-            <MiniMap pannable zoomable className="!bottom-3 !right-3" style={{ marginRight: b.selectedItem ? 272 : 0 }} />
-            <Controls showInteractive={false} className="!bottom-3 !left-72" />
-          </ReactFlow>
-
-          <Palette
-            disabled={!b.canEdit}
-            actions={{
-              addShape: (p, s) => cmd.addShape(p, s),
-              addGroup: (s) => cmd.addGroup(s),
-              addIcon: (i, l) => cmd.addIcon(i, l),
-              addEntity: () => cmd.addEntity(),
-              addPool: () => cmd.addPool(),
-              addSticky: () => cmd.addSticky(),
-              addText: () => cmd.addText(),
-              addImage: (f) => void cmd.addImage(f),
-            }}
-          />
-          <Toolbar
+          <Canvas
+            items={b.items}
+            canEdit={b.canEdit}
             tool={b.tool}
-            onTool={b.setTool}
+            penColor={b.penColor}
+            armed={b.armed}
+            flash={b.flash}
+            selection={b.selection}
+            setSelection={b.setSelection}
+            fitSignal={b.fitSignal}
+            cmd={b.canvas}
+          />
+
+          <ToolDock disabled={!b.canEdit} tool={b.tool} onTool={b.setTool} armed={b.armed} arm={b.arm} addImage={(f) => void cmd.addImage(f)} />
+          <Toolbar
             canUndo={b.history.canUndo}
             canRedo={b.history.canRedo}
             undoLabel={b.history.undoLabel}
@@ -80,6 +50,11 @@ export function DiagramCanvas({ boardId, name, onRename }: { boardId: string; na
               onDuplicate={() => cmd.duplicate([b.selectedItem!.id])}
               onAddLane={() => cmd.addLane(b.selectedItem!.id)}
             />
+          )}
+          {b.armed && (
+            <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-outline bg-popover px-3 py-1 text-[12px] text-ink-muted shadow-lg">
+              Drag on the canvas to size it — click to place, Esc to cancel
+            </div>
           )}
           {!b.loaded && <div className="absolute inset-0 z-30 flex items-center justify-center bg-paper/70 text-ink-muted">Loading board…</div>}
           {b.loaded && b.status !== "open" && (

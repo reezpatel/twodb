@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBoardSocket } from "../../board/hooks/useBoardSocket";
 
-export type DocView = "split" | "edit" | "preview";
 interface Conflict {
   markdown: string;
   version: number;
@@ -15,7 +14,6 @@ interface Conflict {
  */
 export function useBoardDoc(boardId: string) {
   const [text, setText] = useState("");
-  const [view, setView] = useState<DocView>("split");
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState<Conflict | null>(null);
@@ -93,8 +91,6 @@ export function useBoardDoc(boardId: string) {
 
   return {
     text,
-    view,
-    setView,
     loaded,
     saving,
     dirty: text !== saved.current,

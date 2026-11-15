@@ -1,0 +1,28 @@
+import Fastify from "fastify";
+import { createPgDb } from "@twodb/core-data/db";
+import type { FincalConfig } from "./config.js";
+import { applySchema, type Db } from "./db/schema.js";
+import { registerRoutes } from "./lib/route.js";
+import { allRoutes } from "./routes/index.js";
+
+export async function buildServer(config: FincalConfig) {
+  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
+  // Tolerate bodiless DELETE/POST that still carry a JSON content-type.
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
+    try {
+      done(null, body ? JSON.parse(body as string) : {});
+    } catch (e) {
+      done(Object.assign(e as Error, { statusCode: 400 }), undefined);
+    }
+  });
+
+  const db = createPgDb<any>({ connectionString: config.DATABASE_URL, schema: "fincal" }) as Db;
+  await applySchema(db);
+
+  app.get("/healthz", async () => ({ ok: true, app: "fincal" }));
+  registerRoutes(app, { db }, allRoutes);
+  app.addHook("onClose", async () => {
+    await db.destroy();
+  });
+  return app;
+}

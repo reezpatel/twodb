@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { applyEdgeChanges, applyNodeChanges, useReactFlow, type Edge, type EdgeChange, type Node, type NodeChange } from "@xyflow/react";
 import { actorKind, type Board, type Item } from "@shared/model";
-import { applyEvent, type ItemMap } from "../../lib/item-store";
-import { toFlowEdges, toFlowNodes } from "../../lib/flow-graph";
+import { applyEvent, absPosition, type ItemMap } from "../../lib/item-store";
 import { useBoardSocket } from "../../board/hooks/useBoardSocket";
+import { useCanvasTheme } from "../../lib/canvas-theme";
+import type { Rect } from "../../svg-canvas/lib/geometry";
+import type { CanvasTool } from "../../svg-canvas/hooks/useInteractions";
+import { sameSpec, type ArmedSpec } from "./usePlacement";
 import { useAgentActivity } from "./useAgentActivity";
 import { useDiagramCommands } from "./useDiagramCommands";
 import { useHistory } from "./useHistory";
 import { useShortcuts } from "./useShortcuts";
 import { useToast } from "./useToast";
 
-export type Tool = "select" | "hand";
+export type Tool = CanvasTool;
 
-/** Holding hook for DiagramCanvas: board state, live sync, React Flow wiring, commands. */
+/** Holding hook for BoardDiagram: board state, live sync, selection, canvas commands. */
 export function useBoardDiagram(boardId: string) {
-  const rf = useReactFlow();
   const [items, setItemsState] = useState<ItemMap>(new Map());
   const itemsRef = useRef<ItemMap>(items);
   const setItems = useCallback((fn: (m: ItemMap) => ItemMap) => {
@@ -25,13 +26,24 @@ export function useBoardDiagram(boardId: string) {
   const [loaded, setLoaded] = useState(false);
   const [presence, setPresence] = useState<{ actor: string; kind: "human" | "agent" }[]>([]);
   const [tool, setTool] = useState<Tool>("select");
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
+  const [selection, setSelection] = useState<string[]>([]);
+  const [fitSignal, setFitSignal] = useState(0);
   const history = useHistory();
   const toast = useToast();
   const activity = useAgentActivity();
+  const theme = useCanvasTheme();
   const clientRef = useRef("");
-  const firstFit = useRef(true);
+  const [armed, setArmed] = useState<ArmedSpec | null>(null);
+  // Arming an item drops back to the select tool; picking a draw tool disarms.
+  const arm = useCallback((spec: ArmedSpec) => {
+    setTool("select");
+    setArmed((cur) => (sameSpec(cur, spec) ? null : spec));
+  }, []);
+  const disarm = useCallback(() => setArmed(null), []);
+  const setToolMode = useCallback((t: Tool) => {
+    if (t !== "select") setArmed(null);
+    setTool(t);
+  }, []);
 
   const socket = useBoardSocket(boardId, {
     onSnapshot: (m) => {
@@ -42,11 +54,9 @@ export function useBoardDiagram(boardId: string) {
     },
     onEvents: ({ events }) => {
       for (const ev of events) {
-        // Our own batches are already on screen (optimistic); only others' changes need applying.
         if (ev.origin === clientRef.current) continue;
         setItems((m) => applyEvent(m, ev));
         if (actorKind(ev.actor) === "agent") {
-          // AI edits join the human's undo stack, so Ctrl+Z reverts them.
           history.record({ label: ev.label ?? "AI change", ops: ev.inverse });
           activity.flashIds(ev.upserts.map((i) => i.id));
           toast.notify(ev.label ?? "An agent changed the board");
@@ -68,44 +78,97 @@ export function useBoardDiagram(boardId: string) {
     canEdit,
     notify: toast.notify,
     resync: socket.resync,
-    toFlow: rf.screenToFlowPosition,
+    toFlow: (p) => p, // unused by the SVG canvas (it converts itself)
   });
 
-  // items → React Flow (keeps selection and in-flight drags)
+  // Esc cancels an armed placement, else drops back to the select tool.
   useEffect(() => {
-    setNodes((prev) => toFlowNodes(items, prev, activity.flash));
-    setEdges((prev) => toFlowEdges(items, prev));
-  }, [items, activity.flash]);
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (armed) disarm();
+      else if (tool !== "select") setTool("select");
+    };
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [armed, disarm, tool]);
 
+  // Prune selection as items vanish (deleted by an agent, undo…).
   useEffect(() => {
-    if (loaded && firstFit.current && nodes.length) {
-      firstFit.current = false;
-      setTimeout(() => void rf.fitView({ padding: 0.2, duration: 200 }), 60);
-    }
-  }, [loaded, nodes.length, rf]);
+    setSelection((sel) => {
+      const kept = sel.filter((id) => items.has(id));
+      return kept.length === sel.length ? sel : kept;
+    });
+  }, [items]);
 
-  const onNodesChange = useCallback((c: NodeChange[]) => setNodes((ns) => applyNodeChanges(c, ns)), []);
-  const onEdgesChange = useCallback((c: EdgeChange[]) => setEdges((es) => applyEdgeChanges(c, es)), []);
-
-  const selectedIds = useMemo(() => [...nodes.filter((n) => n.selected).map((n) => n.id), ...edges.filter((e) => e.selected).map((e) => e.id)], [nodes, edges]);
+  const selectedIds = selection;
   const selectedItem: Item | null = selectedIds.length === 1 ? (items.get(selectedIds[0]!) ?? null) : null;
 
+  // ---- canvas gestures → commands -------------------------------------------
+
+  const moveEnded = useCallback(
+    (ids: string[], abs: Map<string, { x: number; y: number }>) => {
+      // Mimic the old drag: build pseudo "nodes" with absolute positions.
+      const m = itemsRef.current;
+      const pseudo = ids.map((id) => {
+        const item = m.get(id)!;
+        const parent = item.parentId ? m.get(item.parentId) : undefined;
+        const base = parent ? absPosition(m, parent) : { x: 0, y: 0 };
+        const a = abs.get(id)!;
+        return { id, position: { x: a.x - base.x, y: a.y - base.y } };
+      });
+      cmd.dragEnded(pseudo as never);
+    },
+    [cmd],
+  );
+
+  const resizeEnded = useCallback((id: string, rect: Rect) => cmd.resized(id, { x: rect.x, y: rect.y, width: rect.width, height: rect.height }), [cmd]);
+
+  const connect = useCallback(
+    (fromId: string, fromHandle: string, toId: string | null, toHandle: string | null) => {
+      if (!toId) return;
+      cmd.connect({ source: fromId, target: toId, sourceHandle: fromHandle, targetHandle: toHandle } as never);
+    },
+    [cmd],
+  );
+
+  const createAt = useCallback(
+    (rect: Rect | null, point: { x: number; y: number }) => {
+      if (!armed) return;
+      cmd.placeArmed(armed, rect, point);
+      disarm();
+    },
+    [armed, cmd, disarm],
+  );
+
+  const drawEnded = useCallback(
+    (points: { x: number; y: number }[], drawTool: "pen" | "highlighter") => {
+      cmd.addDraw(points, drawTool, theme.shapeStroke);
+    },
+    [cmd, theme],
+  );
+  const eraseHit = useCallback((id: string) => cmd.deleteIds([id]), [cmd]);
+
+  // palette drag-and-drop (HTML5) still works alongside click-to-arm
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       const raw = e.dataTransfer.getData("application/paintress");
       if (!raw) return;
-      const at = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-      const p = JSON.parse(raw) as { kind: string; pack?: string; shape?: string; style?: string; icon?: string; label?: string };
-      if (p.kind === "shape") cmd.addShape(p.pack!, p.shape!, at);
-      else if (p.kind === "group") cmd.addGroup(p.style!, at);
-      else if (p.kind === "icon") cmd.addIcon(p.icon!, p.label!, at);
-      else if (p.kind === "entity") cmd.addEntity(at);
-      else if (p.kind === "sticky") cmd.addSticky(at);
-      else if (p.kind === "text") cmd.addText(at);
-      else if (p.kind === "pool") cmd.addPool(at);
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const at = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const p = JSON.parse(raw) as { kind: string; pack?: string; shape?: string; style?: string; icon?: string; label?: string; color?: string };
+      const place = (fn: (opts: { at: { x: number; y: number } }) => void) => fn({ at });
+      if (p.kind === "shape") place((o) => cmd.addShape(p.pack!, p.shape!, o));
+      else if (p.kind === "group") place((o) => cmd.addGroup(p.style!, o));
+      else if (p.kind === "icon") place((o) => cmd.addIcon(p.icon!, p.label!, o));
+      else if (p.kind === "entity") place((o) => cmd.addEntity(o));
+      else if (p.kind === "sticky") place((o) => cmd.addSticky(o, p.color));
+      else if (p.kind === "text") place((o) => cmd.addText(o));
+      else if (p.kind === "pool") place((o) => cmd.addPool(o));
     },
-    [rf, cmd],
+    [cmd],
   );
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -119,7 +182,7 @@ export function useBoardDiagram(boardId: string) {
     duplicate: () => cmd.duplicate(selectedIds),
     copy: () => cmd.copy(selectedIds),
     paste: cmd.paste,
-    fit: () => void rf.fitView({ padding: 0.2, duration: 200 }),
+    fit: () => setFitSignal((n) => n + 1),
     selectTool: () => setTool("select"),
     handTool: () => setTool("hand"),
     addSticky: () => cmd.addSticky(),
@@ -138,19 +201,24 @@ export function useBoardDiagram(boardId: string) {
     canEdit,
     presence,
     tool,
-    setTool,
-    nodes,
-    edges,
-    onNodesChange,
-    onEdgesChange,
-    onDrop,
-    onDragOver,
-    selectedIds,
+    setTool: setToolMode,
+    penColor: theme.shapeStroke,
+    dark: theme.dark,
+    items,
+    selection: selectedIds,
+    setSelection,
     selectedItem,
+    armed,
+    arm,
+    fitSignal,
+    flash: activity.flash,
     history,
     toast,
     cmd,
     actions,
-    fit: () => void rf.fitView({ padding: 0.2, duration: 200 }),
+    canvas: { moveEnded, resizeEnded, connect, createAt, drawEnded, eraseHit },
+    onDrop,
+    onDragOver,
+    fit: () => setFitSignal((n) => n + 1),
   };
 }

@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { ulid } from "ulid";
 import type { SkillScope } from "../skills.js";
 import type { McpScope } from "../mcp.js";
-import type { AgentRow, ArtisanDb, CheckpointRow, DirectoryRow, McpServerRow, MemoryRow, MessageRow, SessionRow, SessionUsageRow, SkillRow, ThreadRow } from "./schema.js";
+import type { AgentRow, ArtisanDb, CanvasRow, CheckpointRow, DirectoryRow, McpServerRow, MemoryRow, MessageRow, SessionRow, SessionUsageRow, SkillRow, ThreadRow } from "./schema.js";
 
 export function newId(): string {
   return ulid().toLowerCase();
@@ -34,6 +34,12 @@ export interface ArtisanRepo {
   deleteSession(workspaceId: string, id: string): Promise<boolean>;
   setSessionModel(workspaceId: string, id: string, model: string): Promise<void>;
   setSessionPlan(id: string, plan: Array<{ description: string; status: string }> | null): Promise<void>;
+
+  // canvases (metadata only; content is owned by Paintress)
+  listCanvases(workspaceId: string, owner: { sessionId?: string; agentId?: string }): Promise<CanvasRow[]>;
+  findCanvas(workspaceId: string, owner: { sessionId?: string; agentId?: string }, title: string): Promise<CanvasRow | undefined>;
+  createCanvas(input: { workspaceId: string; sessionId?: string | null; agentId?: string | null; type: string; title: string; resourceId: string }): Promise<CanvasRow>;
+  touchCanvas(id: string, title?: string): Promise<void>;
 
   // threads
   openThread(sessionId: string, summary?: string | null): Promise<ThreadRow>;
@@ -221,6 +227,7 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
       await db.deleteFrom("thread").where("session_id", "=", id).execute();
       await db.deleteFrom("session_usage").where("session_id", "=", id).execute();
       await db.deleteFrom("checkpoint").where("session_id", "=", id).execute();
+      await db.deleteFrom("canvas").where("session_id", "=", id).execute();
       await db.deleteFrom("inspect_round").where("session_id", "=", id).execute();
       await db.deleteFrom("inspect_blob").where("session_id", "=", id).execute();
       await db.deleteFrom("memory").where("level", "=", "session").where("session_id", "=", id).execute();
@@ -234,6 +241,37 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
 
     async setSessionPlan(id, plan) {
       await db.updateTable("session").set({ plan_json: plan ? JSON.stringify(plan) : null, updated_at: now() }).where("id", "=", id).execute();
+    },
+
+    async listCanvases(workspaceId, owner) {
+      let q = db.selectFrom("canvas").selectAll().where("workspace_id", "=", workspaceId);
+      if (owner.agentId) q = q.where("agent_id", "=", owner.agentId);
+      else if (owner.sessionId) q = q.where("session_id", "=", owner.sessionId);
+      else return [];
+      return q.orderBy("updated_at", "desc").execute();
+    },
+
+    async findCanvas(workspaceId, owner, title) {
+      let q = db.selectFrom("canvas").selectAll().where("workspace_id", "=", workspaceId).where("title", "=", title);
+      if (owner.agentId) q = q.where("agent_id", "=", owner.agentId);
+      else if (owner.sessionId) q = q.where("session_id", "=", owner.sessionId);
+      else return undefined;
+      return q.executeTakeFirst();
+    },
+
+    async createCanvas(input) {
+      const row: CanvasRow = {
+        id: newId(), workspace_id: input.workspaceId,
+        session_id: input.sessionId ?? null, agent_id: input.agentId ?? null,
+        type: input.type, title: input.title, resource_id: input.resourceId,
+        created_at: now(), updated_at: now(),
+      };
+      await db.insertInto("canvas").values(row).execute();
+      return row;
+    },
+
+    async touchCanvas(id, title) {
+      await db.updateTable("canvas").set({ ...(title ? { title } : {}), updated_at: now() }).where("id", "=", id).execute();
     },
 
     async openThread(sessionId, summary) {
@@ -383,7 +421,10 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
       const rows = await db.deleteFrom("agent").where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
       const res = Array.isArray(rows) ? rows[0] : rows;
       const ok = Number(res?.numDeletedRows ?? 0) > 0;
-      if (ok) await db.deleteFrom("memory").where("level", "=", "self").where("agent_id", "=", id).execute();
+      if (ok) {
+        await db.deleteFrom("memory").where("level", "=", "self").where("agent_id", "=", id).execute();
+        await db.deleteFrom("canvas").where("workspace_id", "=", workspaceId).where("agent_id", "=", id).execute();
+      }
       return ok;
     },
 

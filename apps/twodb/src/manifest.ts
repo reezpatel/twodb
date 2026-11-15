@@ -269,6 +269,31 @@ const installApp = defineEndpoint({
   response: z.object({ ok: z.literal(true), status: z.literal("installing") }),
 });
 
+const serviceTokenEp = defineEndpoint({
+  name: "issueServiceToken",
+  method: "POST",
+  path: "/registry/service-token",
+  auth: "public",
+  description:
+    "App-to-app identity. An authenticated app (x-twodb-app + x-twodb-token) gets a 5-minute EdDSA JWT addressed to another app " +
+    "for one workspace (`wid`), with `scp` = the message types it will send. The receiver trusts `wid` because the control plane signed it. " +
+    "Service tokens reach the target app's `/_svc/*` routes through the gateway. With scope `gateway.act` the token instead lets the " +
+    "caller act inside that workspace as itself (no user, all spaces) toward the audience app — what headless runs use to call TwoRoute/Dispatch " +
+    "without a stored API key. Issued only for pairs listed in TWODB_SERVICE_ACT_GRANTS (default `artisan>tworoute,artisan>dispatch`); otherwise 403.",
+  request: z.object({ workspaceId: z.string(), audience: z.string(), scopes: z.array(z.string()).optional(), act: z.object({ type: z.string(), id: z.string() }).optional() }),
+  response: z.object({ token: z.string(), expiresAt: z.string() }),
+});
+
+const jwksEp = defineEndpoint({
+  name: "getServiceJwks",
+  method: "GET",
+  path: "/registry/jwks",
+  auth: "public",
+  description: "Public keys (JWKS, Ed25519) for verifying service tokens. Cache for 5 minutes.",
+  request: z.object({}),
+  response: z.object({ keys: z.array(z.object({ kty: z.string(), crv: z.string(), x: z.string(), kid: z.string(), alg: z.string(), use: z.string() })) }),
+});
+
 const issueToken = defineEndpoint({
   name: "issueAppToken",
   method: "POST",
@@ -408,6 +433,8 @@ export const twodbManifest = defineAppManifest({
     registerApp,
     pingApp,
     getAppConfig,
+    serviceTokenEp,
+    jwksEp,
     oauthAuthorize,
     oauthToken,
     createAppToken,

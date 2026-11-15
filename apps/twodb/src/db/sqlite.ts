@@ -24,6 +24,7 @@ export interface RegisteredAppRow {
   host_id: string;
   capabilities: string; // JSON string[]
   manifest_json: string; // the app's full endpoint.json, cached — empty string until the app actually registers
+  cli_json: string; // the app's cli.json (declared CLI commands), cached — empty string when the app declares none
   pg_schema: string | null;
   pg_role: string | null;
   /** Encrypted full Postgres connection string (AES-256-GCM, keyed off AUTH_SECRET) — needed again every container (re)start. */
@@ -76,10 +77,22 @@ export interface OAuthCodeRow {
   used_at: string | null;
 }
 
+/** Single-use code of the twodb CLI login flow (hash only), binding the PKCE challenge and the localhost redirect. */
+export interface CliCodeRow {
+  code_hash: string;
+  user_id: string;
+  code_challenge: string;
+  redirect_uri: string;
+  key_name: string;
+  expires_at: string;
+  used_at: string | null;
+}
+
 export interface ControlPlaneDb extends AuthPlatformDb {
   oauth_code: OAuthCodeRow;
   registered_app: RegisteredAppRow;
   app_token: AppTokenRow;
+  cli_code: CliCodeRow;
 }
 
 export function openControlPlaneDb(file: string): Kysely<ControlPlaneDb> {

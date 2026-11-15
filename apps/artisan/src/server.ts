@@ -5,6 +5,11 @@ import * as path from "node:path";
 import websocket from "@fastify/websocket";
 import { WebSocket } from "ws";
 import { createPgDb } from "@twodb/core-data/db";
+import { createAsyncEngine } from "@twodb/core-async/engine";
+import { createRelay } from "@twodb/core-async/relay";
+import { createInboxHandler, serviceDeliver, type TwoDbRuntime } from "@twodb/twodb-core";
+import { createCollabService } from "./collab/service.js";
+import { CANCEL_JOB, ROLLBACK_JOB, RUN_JOB, type CancelPayload, type RollbackPayload, type RunPayload } from "./collab/types.js";
 
 import { applySchema } from "./db/schema.js";
 import { memoryTools } from "./ws/tools/memory.js";
@@ -20,7 +25,10 @@ import { WorkspaceHub } from "./ws/hub.js";
 import { registerWorkspaceWs } from "./ws/workspace-ws.js";
 import { scopeOf, validateScope, type SkillMode, type SkillScope } from "./skills.js";
 import { MCP_TRANSPORTS, NAME_RE, mcpScopeOf, parseHeaders, parseMcpServersJson, validateMcpScope, validUrl, type McpMode, type McpScope } from "./mcp.js";
+import { createToolkitClient } from "./toolkit-client.js";
 import type { McpServerRow, MemoryRow, SkillRow } from "./db/schema.js";
+import { canvasTools, listCanvasContent } from "./canvas.js";
+import { toolkitTools } from "./ws/tools/toolkit.js";
 import { runAgentLoop, isSessionRunning, fileTools, type RunDeps } from "./ws/agent-loop.js";
 import { subagentTools } from "./ws/tools/subagents.js";
 import { askUserTool } from "./ws/tools/ask-user.js";
@@ -30,7 +38,10 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 /** How long inspector request snapshots are kept. */
 export const INSPECT_RETENTION_DAYS = 3;
 
-export async function buildServer(config: ArtisanConfig) {
+/** What the server needs from the control-plane session to talk to other apps. */
+export type ServiceCaller = Pick<TwoDbRuntime, "serviceFetch" | "verifyServiceToken" | "serviceToken" | "actAs">;
+
+export async function buildServer(config: ArtisanConfig, opts: { twodb?: ServiceCaller } = {}) {
   const app = Fastify({ logger: true });
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
   await app.register(websocket);
@@ -39,6 +50,50 @@ export async function buildServer(config: ArtisanConfig) {
   const HOP_BY_HOP = new Set(["connection","keep-alive","transfer-encoding","te","trailer","upgrade","proxy-authenticate","proxy-authorization","content-length"]);
   const repo = createArtisanRepo(db as never);
   const hub = new WorkspaceHub();
+
+  // --- chat collaborators: durable messaging with TwoChat ----------------------
+  // Everything below is skipped when the server runs without a control-plane session (tests).
+  const collabCleanup: Array<() => Promise<void> | void> = [];
+  const collab = opts.twodb ? await (async () => {
+    const twodb = opts.twodb!;
+    const engine = createAsyncEngine({ connectionString: config.DATABASE_URL, schema: "artisan" });
+    await engine.init();
+    const relay = createRelay({ engine, deliver: serviceDeliver(twodb), concurrency: 4 });
+    const svc = createCollabService({
+      db: db as never, repo, hub, config, relay, serviceFetch: twodb.serviceFetch, actAs: twodb.actAs,
+      log: { info: (o, m) => app.log.info(o as object, m), warn: (o, m) => app.log.warn(o as object, m), error: (o, m) => app.log.error(o as object, m) },
+    });
+    const inbox = createInboxHandler({
+      caller: twodb,
+      receive: async (input) => {
+        await svc.beforeReceive(input.type, input.workspaceId, input.payload);
+        return relay.receive(input);
+      },
+      accepts: {
+        [RUN_JOB]: { maxAttempts: 1, leaseMs: 60_000 }, // never blindly retried: a re-run repeats side effects
+        [CANCEL_JOB]: { maxAttempts: 3 },
+        [ROLLBACK_JOB]: { maxAttempts: 3 },
+      },
+    });
+    app.post("/_svc/inbox", { bodyLimit: 8 * 1024 * 1024 }, async (req, reply) => {
+      const r = await inbox(req.headers as { authorization?: string }, req.body);
+      return reply.code(r.status).send(r.body);
+    });
+
+    relay.start();
+    engine.queue.onDead([RUN_JOB], (job, error) => svc.onRunDead(job.payload, error));
+    const runWorker = engine.queue.worker([RUN_JOB], async (job) => svc.runJob(job.payload as RunPayload), { concurrency: 4, pollIntervalMs: 500 });
+    const ctlWorker = engine.queue.worker([CANCEL_JOB, ROLLBACK_JOB], async (job) => {
+      if (job.type === CANCEL_JOB) await svc.cancelRun(job.payload as CancelPayload);
+      else await svc.rollback(job.payload as RollbackPayload);
+    }, { concurrency: 2, pollIntervalMs: 300 });
+    const sweep = setInterval(() => void svc.failStaleRuns().catch(() => undefined), 60_000);
+    sweep.unref();
+    void svc.syncAllBots().then((n) => { if (n) app.log.info(`collab: synced ${n} collaborator(s) to TwoChat`); }).catch((err) => app.log.warn({ err }, "collab bot sync failed"));
+    collabCleanup.push(() => clearInterval(sweep), () => relay.stop(), () => runWorker.stop(), () => ctlWorker.stop(), () => engine.close());
+    return svc;
+  })() : null;
+  app.addHook("onClose", async () => { for (const c of collabCleanup) await c(); });
 
   // Inspector snapshots are short-lived: purge on boot, then hourly.
   const purgeInspection = () =>
@@ -66,6 +121,8 @@ export async function buildServer(config: ArtisanConfig) {
       repo, hub,
       tworoute: new TworouteClient(config, key),
       dispatch: new DispatchClient(config, key),
+      serviceFetch: opts.twodb?.serviceFetch,
+      ...(opts.twodb?.serviceFetch ? { toolkit: createToolkitClient(opts.twodb.serviceFetch) } : {}),
     };
   };
 
@@ -193,6 +250,21 @@ export async function buildServer(config: ArtisanConfig) {
     return { ...sessionOut(session), plan, running: isSessionRunning(id), usage, messages: messages.map(messageOut) };
   });
 
+  // Canvas metadata lives in Artisan; document content is fetched from Paintress.
+  app.get("/sessions/:id/canvases", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    if (!opts.twodb?.serviceFetch) return reply.code(503).send({ error: "Paintress integration unavailable" });
+    const { id } = req.params as { id: string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const agent = session.agent_id
+      ? await repo.getAgent(ctx.workspaceId, session.agent_id)
+      : await repo.getOrCreateDirectoryAgent(ctx.workspaceId, session.space_id, session.runner, session.directory);
+    if (!agent) return reply.code(404).send({ error: "agent not found" });
+    return listCanvasContent({ repo, serviceFetch: opts.twodb.serviceFetch, session, agent });
+  });
+
   // Inspector: the exact request sent for one round (kept INSPECT_RETENTION_DAYS days).
   app.get("/sessions/:id/inspect/:inspectId", async (req, reply) => {
     const ctx = requireCtx(req, reply);
@@ -310,6 +382,7 @@ export async function buildServer(config: ArtisanConfig) {
       runner: body.runner ?? null,
       directory: body.directory ?? null,
     });
+    void collab?.syncBot(agent).catch((err) => app.log.warn({ err }, "collab bot sync failed"));
     return agentOut(agent);
   });
 
@@ -333,7 +406,8 @@ export async function buildServer(config: ArtisanConfig) {
   app.get("/tools", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
-    const all = [...fileTools(depsFor(req).dispatch), ...subagentTools(), ...memoryTools(), askUserTool()];
+    const deps = depsFor(req);
+    const all = [...fileTools(deps.dispatch), ...subagentTools(), ...memoryTools(), ...(deps.serviceFetch ? canvasTools(deps.serviceFetch) : []), ...(deps.toolkit ? toolkitTools(deps.toolkit) : []), askUserTool()];
     return all.map((t) => ({ name: t.name, description: t.description }));
   });
 
@@ -358,6 +432,7 @@ export async function buildServer(config: ArtisanConfig) {
       runner: fixed ? undefined : (body.runner as string | null | undefined),
       directory: fixed ? undefined : (body.directory as string | null | undefined),
     });
+    if (agent) void collab?.syncBot(agent).catch((err) => app.log.warn({ err }, "collab bot sync failed"));
     return agent ? agentOut(agent) : reply.code(404).send({ error: "not found" });
   });
 
@@ -365,7 +440,10 @@ export async function buildServer(config: ArtisanConfig) {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const { id } = req.params as { id: string };
-    return { ok: await repo.deleteAgent(ctx.workspaceId, id) };
+    const existing = await repo.getAgent(ctx.workspaceId, id);
+    const ok = await repo.deleteAgent(ctx.workspaceId, id);
+    if (ok && existing?.type === "collaborator") void collab?.removeBot(ctx.workspaceId, id).catch((err) => app.log.warn({ err }, "collab bot removal failed"));
+    return { ok };
   });
 
   // --- global instruction: base rules prepended to every agent's prompt ------
@@ -1404,7 +1482,15 @@ echo saved`;
   });
 
   // --- workspace WS -------------------------------------------------------------
-  registerWorkspaceWs(app, hub, repo, { repo, hub, tworoute: new TworouteClient(config, process.env.WORKSPACE_API_KEY ?? ""), dispatch: new DispatchClient(config, process.env.WORKSPACE_API_KEY ?? "") });
+  registerWorkspaceWs(app, hub, repo, (() => {
+    const key = process.env.WORKSPACE_API_KEY ?? "";
+    return {
+      repo, hub,
+      tworoute: new TworouteClient(config, key),
+      dispatch: new DispatchClient(config, key),
+      ...(opts.twodb?.serviceFetch ? { toolkit: createToolkitClient(opts.twodb.serviceFetch) } : {}),
+    };
+  })());
 
   app.get("/healthz", async () => ({ ok: true }));
 

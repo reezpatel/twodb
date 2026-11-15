@@ -9,7 +9,7 @@ export function ColorSwatches(props: { value?: string; onPick(c: string | null):
           type="button"
           aria-label={`Colour ${c}`}
           onClick={() => props.onPick(c)}
-          className={`size-5 rounded-full border ${props.value === c ? "border-ink ring-2 ring-ion-deep" : "border-slate-300"}`}
+          className={`size-5 rounded-full border ${props.value === c ? "border-ink ring-2 ring-ion-deep" : "border-outline"}`}
           style={{ background: c }}
         />
       ))}

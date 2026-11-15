@@ -18,7 +18,8 @@ import type { Message, Notification, ReactionSummary } from "./chat-client";
   | { type: "channel_created"; channel: unknown }
   | { type: "channel_updated"; channel: unknown }
   | { type: "channel_deleted"; id: string }
-  | { type: "notification"; notification: Notification };
+  | { type: "notification"; notification: Notification }
+  | { type: "collab_status"; channelId: string; botId: string; taskId: string | null; runId: string | null; state: "queued" | "running" | "idle" | "stopped" | "failed" | "rollback" };
 
 export type ConnectionStatus = "connecting" | "open" | "closed";
 

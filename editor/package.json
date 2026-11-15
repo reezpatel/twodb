@@ -18,6 +18,7 @@
     "@tiptap/extension-mention": "3.33.1",
     "@tiptap/extension-table": "3.33.1",
     "@tiptap/extensions": "^3.33.1",
+    "@tiptap/markdown": "3.33.1",
     "@tiptap/pm": "^3.33.1",
     "@tiptap/react": "^3.33.1",
     "@tiptap/starter-kit": "^3.33.1",

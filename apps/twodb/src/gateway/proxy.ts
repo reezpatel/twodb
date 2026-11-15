@@ -42,6 +42,7 @@ export async function proxyToApp(
     headers.set("x-twodb-workspace-id", ctx.workspaceId);
     if (ctx.spaceIds.length) headers.set("x-twodb-space-ids", ctx.spaceIds.join(","));
     if (ctx.apiKeyId) headers.set("x-twodb-api-key-id", ctx.apiKeyId);
+    if (ctx.serviceApp) headers.set("x-twodb-service-app", ctx.serviceApp);
   }
 
   // req.url carries the query string (Fastify's req.url is the full URL), so

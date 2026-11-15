@@ -6,7 +6,7 @@ export const BOARD_KINDS = ["diagram", "doc"] as const;
 export const BoardKind = z.enum(BOARD_KINDS);
 export type BoardKind = z.infer<typeof BoardKind>;
 
-export const ITEM_TYPES = ["shape", "group", "pool", "lane", "entity", "edge", "sticky", "text", "image"] as const;
+export const ITEM_TYPES = ["shape", "group", "pool", "lane", "entity", "edge", "sticky", "text", "image", "draw"] as const;
 export const ItemType = z.enum(ITEM_TYPES);
 export type ItemType = z.infer<typeof ItemType>;
 
@@ -88,6 +88,17 @@ export const TextData = z.object({
 });
 export const ImageData = z.object({ assetId: z.string(), alt: z.string().optional() });
 
+/** A freehand stroke (pen / highlighter). Points are flattened [x,y,…] relative to the item's x/y. */
+export const DrawData = z.object({
+  points: z.array(z.number()).default([]),
+  color: color.default("#1e293b"),
+  width: z.number().default(3),
+  tool: z.enum(["pen", "highlighter"]).default("pen"),
+  /** Natural stroke bounding box, so resizing scales instead of clipping. */
+  nw: z.number().optional(),
+  nh: z.number().optional(),
+});
+
 export const DATA_SCHEMAS = {
   shape: ShapeData,
   group: GroupData,
@@ -98,6 +109,7 @@ export const DATA_SCHEMAS = {
   sticky: StickyData,
   text: TextData,
   image: ImageData,
+  draw: DrawData,
 } as const satisfies Record<ItemType, z.ZodType>;
 
 /** Validate (and apply defaults to) an item's data for its type. Throws ZodError. */
@@ -208,7 +220,8 @@ export type BatchResult = z.infer<typeof BatchResult>;
 export const Board = z.object({
   id: z.string(),
   workspaceId: z.string(),
-  spaceId: z.string(),
+  /** The group this board lives in. The space is on the group, not the board. */
+  groupId: z.string(),
   kind: BoardKind,
   name: z.string(),
   description: z.string(),
@@ -220,11 +233,25 @@ export const Board = z.object({
 });
 export type Board = z.infer<typeof Board>;
 
+/** A named collection of boards, labelled with a space. */
+export const BoardGroup = z.object({
+  id: z.string(),
+  workspaceId: z.string(),
+  spaceId: z.string(),
+  name: z.string(),
+  createdBy: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type BoardGroup = z.infer<typeof BoardGroup>;
+
 export const CreateBoard = z.object({
   name: z.string().min(1).max(200),
   kind: BoardKind.default("diagram"),
   description: z.string().max(2000).optional(),
-  spaceId: z.string().optional(),
+  groupId: z.string().optional().describe("Existing group to put the board in"),
+  groupName: z.string().min(1).max(100).optional().describe("Group to find-or-create by name (default: General); ignored when groupId is given"),
+  spaceId: z.string().optional().describe("Space for the group — only used when a new group is created"),
   markdown: z.string().optional().describe("Initial markdown (doc boards only)"),
 });
 

@@ -16,6 +16,11 @@ export const configSchema = z.object({
   TWODB_PG_ADMIN_URL: z.string().url().default("postgres://twodb:twodb@localhost:5432/twodb"), // dev default — set explicitly in production
   /** Hostname installed-app containers use to reach Postgres — "localhost" (TwoDB's own view) is never reachable from inside a container. Defaults to the service name docker-compose.db.yaml gives the Postgres container. */
   TWODB_PG_CONTAINER_HOST: z.string().default("twodb-postgres"),
+  /**
+   * Which apps may act in a workspace as themselves (service token scope `gateway.act`) toward which other app, as
+   * comma-separated `caller>target` pairs. Default: Artisan's headless runs calling TwoRoute (LLM) and Dispatch (runners).
+   */
+  TWODB_SERVICE_ACT_GRANTS: z.string().default("artisan>tworoute,artisan>dispatch,artisan>toolkit"),
   AUTH_SECRET: z.string().min(16).default("dev-only-secret-change-me-0000"), // dev default — MUST be set in production
   AUTH_BASE_URL: z.string().url().default("http://localhost:6400"),
   AUTH_TRUSTED_ORIGINS: z.string().default("http://localhost:6500").transform((v) => v.split(",")),
@@ -47,6 +52,12 @@ export const configSchema = z.object({
     .default("true")
     .transform((v) => v === "true"),
   TWODB_HOST_ID: z.string().default("local"),
+  /** Root DNS suffix for host-based app routing. Both ".twodb.io" and "twodb.io" are accepted. */
+  ROOT_DOMAIN: z.string().optional(),
+  /** Registered app slug that receives requests whose host is outside ROOT_DOMAIN. */
+  CATCH_ALL_SERVICE: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
+  /** Optional JavaScript regex restricting which outside hosts are sent to CATCH_ALL_SERVICE. */
+  CATCH_ALL_HOST_REGEX: z.string().optional(),
   /**
    * Shared secret every app presents (header `x-twodb-registration-secret`)
    * to self-register and mint a 30-day app token. Unset = app-initiated

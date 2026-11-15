@@ -1,4 +1,5 @@
 import type { ArtisanConfig } from "./config.js";
+import type { Credential } from "./tworoute-client.js";
 
 /**
  * Dispatch client — runners + exec/calls/jobs. Artisan calls dispatch with
@@ -42,15 +43,19 @@ export interface JobInfo {
 }
 
 export class DispatchClient {
+  private async token(): Promise<string> {
+    return typeof this.credential === "string" ? this.credential : this.credential();
+  }
+
   constructor(
     private readonly config: ArtisanConfig,
-    private readonly apiKey: string,
+    private readonly credential: Credential,
   ) {}
 
   private async post<T>(path: string, body: unknown): Promise<T> {
     const res = await fetch(`${this.config.DISPATCH_URL}${path}`, {
       method: "POST",
-      headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${await this.token()}`, "content-type": "application/json" },
       body: JSON.stringify(body),
     });
     const json = (await res.json().catch(() => ({}))) as T & { error?: string; message?: string };
@@ -60,7 +65,7 @@ export class DispatchClient {
 
   private async get<T>(path: string): Promise<T> {
     const res = await fetch(`${this.config.DISPATCH_URL}${path}`, {
-      headers: { authorization: `Bearer ${this.apiKey}` },
+      headers: { authorization: `Bearer ${await this.token()}` },
     });
     const json = (await res.json().catch(() => ({}))) as T & { error?: string; message?: string };
     if (!res.ok) throw new Error(`dispatch ${path} ${res.status}: ${json.error ?? json.message ?? ""}`);
@@ -106,7 +111,7 @@ export class DispatchClient {
     }
     const { callId } = await this.post<{ callId: string }>("/calls", { runnerId: runner, command, cwd, timeoutMs });
     const res = await fetch(`${this.config.DISPATCH_URL}/calls/${callId}/stream`, {
-      headers: { authorization: `Bearer ${this.apiKey}` },
+      headers: { authorization: `Bearer ${await this.token()}` },
     });
     if (!res.ok || !res.body) throw new Error(`dispatch stream ${res.status}`);
     const reader = res.body.getReader();
@@ -157,7 +162,7 @@ export class DispatchClient {
   async proxyHttp(runner: string, req: { port: number; method: string; path: string; headers?: Record<string, string>; bodyBase64?: string }): Promise<{ status: number; headers: Record<string, string>; body: string }> {
     const res = await fetch(`${this.config.DISPATCH_URL}/runners/${encodeURIComponent(runner)}/proxy-http`, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
+      headers: { "content-type": "application/json", authorization: `Bearer ${await this.token()}` },
       body: JSON.stringify(req),
     });
     // Pass the upstream status through verbatim: code-server legitimately
@@ -199,14 +204,14 @@ export class DispatchClient {
   async terminateJob(id: string): Promise<void> {
     await fetch(`${this.config.DISPATCH_URL}/jobs/${id}/terminate`, {
       method: "POST",
-      headers: { authorization: `Bearer ${this.apiKey}` },
+      headers: { authorization: `Bearer ${await this.token()}` },
     });
   }
 
   async jobInput(id: string, data: string, eof?: boolean): Promise<void> {
     await fetch(`${this.config.DISPATCH_URL}/jobs/${id}/input`, {
       method: "POST",
-      headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${await this.token()}`, "content-type": "application/json" },
       body: JSON.stringify(eof ? { eof: true } : { data }),
     });
   }

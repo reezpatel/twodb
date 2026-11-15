@@ -9,7 +9,7 @@ The control plane: Docker-based app installation/lifecycle management, Postgres 
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-12T19:52:06.915Z_
+_Generated: 2026-11-15T06:02:09.938Z_
 
 ## Endpoints
 
@@ -217,6 +217,141 @@ Runtime config for the calling app (auth: x-twodb-app + x-twodb-token): its Post
     "slug",
     "postgres",
     "s3"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /registry/service-token` — issueServiceToken
+
+App-to-app identity. An authenticated app (x-twodb-app + x-twodb-token) gets a 5-minute EdDSA JWT addressed to another app for one workspace (`wid`), with `scp` = the message types it will send. The receiver trusts `wid` because the control plane signed it. Service tokens reach the target app's `/_svc/*` routes through the gateway. With scope `gateway.act` the token instead lets the caller act inside that workspace as itself (no user, all spaces) toward the audience app — what headless runs use to call TwoRoute/Dispatch without a stored API key. Issued only for pairs listed in TWODB_SERVICE_ACT_GRANTS (default `artisan>tworoute,artisan>dispatch`); otherwise 403.
+
+- **Auth**: `public`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "workspaceId": {
+      "type": "string"
+    },
+    "audience": {
+      "type": "string"
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "act": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "workspaceId",
+    "audience"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "token": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "token",
+    "expiresAt"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /registry/jwks` — getServiceJwks
+
+Public keys (JWKS, Ed25519) for verifying service tokens. Cache for 5 minutes.
+
+- **Auth**: `public`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "keys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kty": {
+            "type": "string"
+          },
+          "crv": {
+            "type": "string"
+          },
+          "x": {
+            "type": "string"
+          },
+          "kid": {
+            "type": "string"
+          },
+          "alg": {
+            "type": "string"
+          },
+          "use": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kty",
+          "crv",
+          "x",
+          "kid",
+          "alg",
+          "use"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "keys"
   ],
   "additionalProperties": false
 }

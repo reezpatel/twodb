@@ -68,6 +68,8 @@ export interface Message {
   reactions: ReactionSummary[];
   pinned: boolean;
   saved: boolean;
+  /** Set on a collaborator's replies: which task/session produced it. */
+  collab?: { taskId: string; runId: string; sessionId: string | null; outcome: "ok" | "failed" | "stopped" | string } | null;
 }
 
 export interface Notification {
@@ -88,6 +90,10 @@ export interface Bot {
   avatarEmoji: string | null;
   description: string | null;
   createdAt: string;
+  /** "artisan" for collaborators (agents that do work); null for plain bots. */
+  runtimeApp?: string | null;
+  /** False when a collaborator cannot run yet (no runner/directory). */
+  enabled?: boolean;
 }
 
 export interface Asset {
@@ -132,6 +138,13 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const chatApi = {
+  /** Stop whatever collaborators are working on in this channel. */
+  stopCollab: (channelId: string) => call<{ stopped: number }>(`/channels/${channelId}/collab/stop`, { method: "POST", body: "{}" }),
+
+  /** Roll the conversation back to just before `messageId` (later messages hidden, the collaborator's work undone). */
+  rollbackTo: (messageId: string, restoreFiles: boolean) =>
+    call<{ hidden: number; tasks: number }>(`/messages/${messageId}/rollback`, { method: "POST", body: JSON.stringify({ restoreFiles }) }),
+
   listChannels: () => call<Channel[]>("/channels"),
 
   createChannel: (input: { name: string; topic?: string; listId?: string; botIds?: string[] }) =>

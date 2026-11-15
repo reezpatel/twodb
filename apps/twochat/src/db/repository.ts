@@ -96,6 +96,8 @@ export interface MessagePayload {
   reactions: ReactionSummary[];
   pinned: boolean;
   saved: boolean;
+  /** Present on collaborator replies. */
+  collab: { taskId: string; runId: string; sessionId: string | null; outcome: string } | null;
 }
 
 export interface NotificationPayload {
@@ -116,6 +118,10 @@ export interface BotPayload {
   avatarEmoji: string | null;
   description: string | null;
   createdAt: string;
+  /** Another app runs this bot ("artisan" for collaborators); null for plain webhook/API bots. */
+  runtimeApp?: string | null;
+  /** False for a collaborator that cannot run right now (no runner/directory yet, or deleted). */
+  enabled?: boolean;
 }
 
 export interface AssetPayload {
@@ -176,6 +182,10 @@ export interface PostMessageInput {
   text: string;
   blocks?: MessageBlock[] | null;
   replyToId?: string | null;
+  /** Caller-chosen id (collaborator replies pick theirs so they can edit them later). Must be unique. */
+  id?: string;
+  /** Collaborator metadata stored with the message. */
+  collab?: { taskId: string; runId: string; sessionId: string | null; outcome: string } | null;
 }
 
 export interface PostMessageResult {
@@ -652,8 +662,19 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
         reactions: [...byEmoji.values()],
         pinned: pinSet.has(r.id),
         saved: savedSet.has(r.id),
+        collab: parseCollab(r.collab),
       };
     });
+  }
+
+  function parseCollab(raw: unknown): MessagePayload["collab"] {
+    if (!raw) return null;
+    try {
+      const v = typeof raw === "string" ? JSON.parse(raw) : raw;
+      return v && typeof v === "object" ? (v as MessagePayload["collab"]) : null;
+    } catch {
+      return null;
+    }
   }
 
   function parseBlocks(raw: unknown): MessageBlock[] | null {
@@ -668,7 +689,7 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
 
   async function listMessages(workspaceId: string, channelId: string, viewer: Actor, opts: PostOpts = {}) {
     const limit = Math.min(opts.limit ?? 50, 100);
-    let query = db.selectFrom("message").selectAll().where("channel_id", "=", channelId);
+    let query = db.selectFrom("message").selectAll().where("channel_id", "=", channelId).where("rolled_back_at", "is", null);
     if (opts.before) {
       const [isoTs, id] = opts.before.split("~");
       const at = new Date(isoTs);
@@ -702,7 +723,7 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
       replyToId = target.reply_to_id ?? target.id;
     }
 
-    const id = ulid();
+    const id = input.id ?? ulid();
     await db
       .insertInto("message")
       .values({
@@ -719,6 +740,8 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
         text: input.text,
         blocks: input.blocks ? JSON.stringify(input.blocks) : null,
         reply_to_id: replyToId,
+        collab: input.collab ? JSON.stringify(input.collab) : null,
+        rolled_back_at: null,
         edited_at: null,
         deleted_at: null,
         created_at: new Date().toISOString(),
@@ -905,7 +928,7 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
 
   async function listBots(workspaceId: string): Promise<BotPayload[]> {
     const rows = await db.selectFrom("bot").selectAll().where("workspace_id", "=", workspaceId).orderBy("created_at", "asc").execute();
-    return rows.map((b) => ({ id: b.id, name: b.name, kind: b.kind, avatarEmoji: b.avatar_emoji, description: b.description, createdAt: isoReq(b.created_at) }));
+    return rows.map((b) => ({ id: b.id, name: b.name, kind: b.kind, avatarEmoji: b.avatar_emoji, description: b.description, createdAt: isoReq(b.created_at), runtimeApp: b.runtime_app, enabled: b.enabled }));
   }
 
   async function createBot(workspaceId: string, input: { name: string; kind?: string; apiKeyId?: string | null; avatarEmoji?: string | null; description?: string | null }): Promise<BotPayload> {
@@ -921,6 +944,9 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
         api_key_id: input.apiKeyId ?? null,
         avatar_emoji: input.avatarEmoji ?? null,
         description: input.description ?? null,
+        runtime_app: null,
+        runtime_ref: null,
+        enabled: true,
         created_at: new Date().toISOString(),
       })
       .execute();

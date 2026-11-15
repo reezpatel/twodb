@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { TwoDbAuthProvider, RequireTwoDbAuth } from "@twodb/twodb-shared-frontend";
 import "@twodb/blocks/styles.css";
-import "@xyflow/react/dist/style.css";
+import "@twodb/editor/styles.css";
 import "./paintress.css";
 import { App } from "./App";
 

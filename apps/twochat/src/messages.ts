@@ -73,10 +73,34 @@ export const sweepReadStateJob = defineJob({
   retryNotes: "Idempotent; safe to retry.",
 });
 
+const collabIn = (type: string, description: string, payload: z.ZodType) =>
+  defineJob({ type, description, direction: "consumes", payload, retryNotes: "Delivered by the core-async relay (at-least-once); every handler is idempotent on its dedupe key." });
+
+export const collabReplyJob = collabIn(
+  "twochat.collab.reply",
+  "From Artisan: a collaborator's reply for a run. Posted as the bot; `isCompleted` is authoritative for closing the task. Dropped when its epoch is older than the task's (rolled back).",
+  z.object({ runId: z.string(), taskId: z.string(), epoch: z.number(), messageId: z.string(), isCompleted: z.boolean(), outcome: z.enum(["ok", "failed", "stopped"]) }).passthrough(),
+);
+export const collabEditJob = collabIn(
+  "twochat.collab.edit",
+  "From Artisan: the collaborator edited one of its own earlier replies in the same task.",
+  z.object({ runId: z.string(), taskId: z.string(), epoch: z.number(), messageId: z.string() }).passthrough(),
+);
+export const collabStatusJob = collabIn(
+  "twochat.collab.status",
+  "From Artisan: run state (started | stopped | failed) driving the 'is working' indicator.",
+  z.object({ runId: z.string(), taskId: z.string(), epoch: z.number(), state: z.string() }).passthrough(),
+);
+export const collabBotJob = collabIn(
+  "twochat.collab.bot",
+  "From Artisan: a collaborator agent was created, changed or deleted — mirrored here as a bot (enabled only while it has a runner and directory).",
+  z.object({ agentId: z.string(), name: z.string(), description: z.string(), enabled: z.boolean(), deleted: z.boolean() }),
+);
+
 export const messages = defineAppMessages({
   name: "TwoChat",
   slug: "twochat",
-  jobs: [sweepReadStateJob],
+  jobs: [sweepReadStateJob, collabReplyJob, collabEditJob, collabStatusJob, collabBotJob],
   events: [messagePostedEvent, messageActionEvent, conversationImportedEvent, notificationCreatedEvent],
 });
 

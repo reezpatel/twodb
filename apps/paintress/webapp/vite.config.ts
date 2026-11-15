@@ -23,7 +23,11 @@ const hasCerts = existsSync(certPath) && existsSync(keyPath);
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  resolve: { alias: { "@shared": path.resolve(__dirname, "../src/shared") } },
+  resolve: {
+    alias: { "@shared": path.resolve(__dirname, "../src/shared") },
+    // Shared workspace UI packages must use the app's React dispatcher.
+    dedupe: ["react", "react-dom"],
+  },
   // Webapp fixed dev port — webapps own 65XX.
   server: {
     port: 6507,

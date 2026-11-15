@@ -43,6 +43,8 @@ export function Chat() {
         myUserId={chat.myUserId}
         readOnly={view.activeChannel?.isReadOnly}
         typingNames={view.activeChannel?.isReadOnly ? [] : view.typingNames}
+        working={view.working}
+        onRollback={view.onRollback}
         resolveMention={view.resolveMention}
         onLoadMore={() => chat.activeChannelId && void chat.loadMore(chat.activeChannelId)}
         onReact={(message, emoji) => !view.activeChannel?.isReadOnly && void chat.react(message, emoji)}
@@ -59,6 +61,7 @@ export function Chat() {
           </div>
         ) : view.activeChannel ? (
           <Composer
+            key={view.activeChannel.id}
             channelId={view.activeChannel.id}
             members={view.activeChannel.members}
             replyTo={view.replyTo}

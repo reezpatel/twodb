@@ -24,7 +24,9 @@ export type ServerFrame =
   | { type: "channel_created"; channel: unknown }
   | { type: "channel_updated"; channel: unknown }
   | { type: "channel_deleted"; id: string }
-  | { type: "notification"; notification: unknown };
+  | { type: "notification"; notification: unknown }
+  /** A collaborator run changed state — drives the typing/stop UI. `rollback` tells clients to refetch the channel. */
+  | { type: "collab_status"; channelId: string; botId: string; taskId: string | null; runId: string | null; state: "queued" | "running" | "idle" | "stopped" | "failed" | "rollback" };
 
 export type ClientFrame =
   | { type: "typing"; channelId: string }

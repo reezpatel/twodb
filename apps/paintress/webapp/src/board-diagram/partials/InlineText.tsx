@@ -11,7 +11,7 @@ export function InlineText(props: { value: string; onCommit(v: string): void; on
     <textarea
       ref={ref}
       defaultValue={props.value}
-      className={`nodrag nopan nowheel resize-none rounded-sm border border-ion-deep bg-white p-1 text-center outline-none ${props.className ?? ""}`}
+      className={`nodrag nopan nowheel resize-none rounded-sm border border-ion-deep bg-popover p-1 text-center text-ink outline-none ${props.className ?? ""}`}
       style={props.style}
       onBlur={(e) => props.onCommit(e.currentTarget.value)}
       onKeyDown={(e) => {

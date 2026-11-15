@@ -16,6 +16,11 @@ const sessionOut = z.object({
   updatedAt: z.string(),
 });
 
+const canvasOut = z.object({
+  id: z.string(), title: z.string(), type: z.string(), resourceId: z.string(),
+  markdown: z.string(), version: z.number(), updatedAt: z.string(),
+});
+
 const skillScope = z.object({ mode: z.enum(["global", "agents", "spaces", "types"]), all: z.boolean(), ids: z.array(z.string()) });
 const memoryOut = z.object({
   id: z.string(), level: z.enum(["organization", "code_directory", "self", "session"]), title: z.string(), content: z.string(),
@@ -42,6 +47,17 @@ export const artisanManifest = defineAppManifest({
   coreDeps: ["core-data", "core-platform", "core-async"],
   basePath: "/apps/artisan",
   endpoints: [
+    defineEndpoint({
+      name: "serviceInbox",
+      method: "POST",
+      path: "/_svc/inbox",
+      auth: "public",
+      description:
+        "App-to-app message inbox (core-async relay). Authenticated by a control-plane-signed service token whose scope names the message type; " +
+        "the workspace comes from the token, never the body. Accepts artisan.collab.run | cancel | rollback, dedupes on dedupeKey and enqueues into Artisan's own queue.",
+      request: z.object({ type: z.string(), payload: z.unknown(), dedupeKey: z.string() }),
+      response: z.object({ ok: z.boolean() }),
+    }),
     defineEndpoint({
       name: "createSession",
       method: "POST",
@@ -83,6 +99,15 @@ export const artisanManifest = defineAppManifest({
         usage: z.object({ inputTokens: z.number(), outputTokens: z.number(), cachedTokens: z.number(), calls: z.number(), costUsd: z.number().nullable() }).nullable(),
         messages: z.array(z.object({ id: z.string(), role: z.string(), content: z.string(), meta: z.unknown(), createdAt: z.string() })),
       }),
+    }),
+    defineEndpoint({
+      name: "listCanvases",
+      method: "GET",
+      path: "/sessions/:id/canvases",
+      auth: "session-or-apiKey",
+      description: "Lists the session's Canvas documents with content fetched from Paintress. Directory-agent canvases are session-scoped; configured-agent canvases are shared across that agent's sessions.",
+      request: z.object({ id: z.string() }),
+      response: z.array(canvasOut),
     }),
     defineEndpoint({
       name: "getInspectRound",
@@ -181,7 +206,7 @@ export const artisanManifest = defineAppManifest({
       method: "GET",
       path: "/ws",
       auth: "session-or-apiKey",
-      description: "One WS per workspace. Client frames: join/leave {sessionId}, send {sessionId,text}, answer/cancel {sessionId,askId}. Server frames all carry sessionId: joined, message, run_start, round_start, thinking_delta, delta, message_done, tool_start/output/result, ask_user, ask_resolved, status, plan, usage, compaction_done, session_renamed, error, done.",
+      description: "One WS per workspace. Client frames: join/leave {sessionId}, send {sessionId,text}, answer/cancel {sessionId,askId}. Server frames all carry sessionId: joined, message, run_start, round_start, thinking_delta, delta, message_done, tool_start/output/result, ask_user, ask_resolved, status, plan, canvas, usage, compaction_done, session_renamed, error, done.",
       request: z.object({}),
       response: z.object({}),
     }),

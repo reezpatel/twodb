@@ -65,15 +65,22 @@ export interface ChatChunk {
 
 const MODEL_CACHE = new Map<string, { at: number; models: ModelInfo[] }>();
 
+/** A fixed key (user requests) or a provider yielding a fresh token per call (headless runs, see TwoDbSession.actAs). */
+export type Credential = string | (() => string | Promise<string>);
+
 export class TworouteClient {
+  private async token(): Promise<string> {
+    return typeof this.credential === "string" ? this.credential : this.credential();
+  }
+
   constructor(
     private readonly config: ArtisanConfig,
-    private readonly apiKey: string,
+    private readonly credential: Credential,
   ) {}
 
   /** Model list cached per (url, key) for a minute — it was refetched on every call. */
   async listModels(): Promise<ModelInfo[]> {
-    const key = `${this.config.TWOROUTE_URL}|${this.apiKey}`;
+    const key = `${this.config.TWOROUTE_URL}|${typeof this.credential === "string" ? this.credential : "provider"}`;
     const hit = MODEL_CACHE.get(key);
     if (hit && Date.now() - hit.at < 60_000) return hit.models;
     const models = await this.fetchModels();
@@ -83,7 +90,7 @@ export class TworouteClient {
 
   private async fetchModels(): Promise<ModelInfo[]> {
     const res = await fetch(`${this.config.TWOROUTE_URL}/v1/models`, {
-      headers: { authorization: `Bearer ${this.apiKey}` },
+      headers: { authorization: `Bearer ${await this.token()}` },
     });
     if (!res.ok) throw new Error(`tworoute /v1/models ${res.status}`);
     const body = (await res.json()) as {
@@ -134,15 +141,30 @@ export class TworouteClient {
     if (input.maxTokens) body.max_tokens = input.maxTokens;
     if (input.effort) body.effort = input.effort;
 
-    const res = await fetch(`${this.config.TWOROUTE_URL}/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${this.apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-      signal: input.signal,
-    });
+    // The connection phase is retried (a restarting TwoRoute/gateway, a 5xx, a rate limit): nothing has been streamed yet,
+    // so a retry cannot duplicate output, and a long run is not lost to one blip. A user stop still wins immediately.
+    const payload = JSON.stringify(body);
+    const delays = [1_500, 4_000, 10_000];
+    let res: Response | undefined;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        res = await fetch(`${this.config.TWOROUTE_URL}/v1/chat/completions`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${await this.token()}`, "content-type": "application/json" },
+          body: payload,
+          signal: input.signal,
+        });
+        const transient = res.status >= 500 || res.status === 429;
+        if (!transient || attempt >= delays.length) break;
+        await res.body?.cancel().catch(() => undefined);
+      } catch (err) {
+        if (input.signal?.aborted || attempt >= delays.length) throw err;
+      }
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(resolve, delays[attempt]);
+        input.signal?.addEventListener("abort", () => { clearTimeout(t); reject(new Error("aborted")); }, { once: true });
+      });
+    }
     if (!res.ok || !res.body) {
       const text = await res.text().catch(() => "");
       throw new Error(`tworoute chat ${res.status}: ${text.slice(0, 300)}`);

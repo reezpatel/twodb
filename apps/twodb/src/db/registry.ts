@@ -68,6 +68,7 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
             http_url: "",
             socket_path: null,
             manifest_json: "",
+            cli_json: "",
             pg_schema: null,
             pg_role: null,
             pg_connection_string_encrypted: null,
@@ -214,6 +215,7 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
       socketPath?: string;
       capabilities?: string[];
       manifestJson: unknown;
+      cliJson?: unknown;
       hostId: string;
     }): Promise<{ created: boolean }> {
       const now = new Date().toISOString();
@@ -222,6 +224,7 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
         http_url: input.httpUrl.replace(/\/+$/, ""),
         socket_path: input.socketPath ?? null,
         manifest_json: JSON.stringify(input.manifestJson ?? {}),
+        cli_json: input.cliJson === undefined ? "" : JSON.stringify(input.cliJson ?? null),
         status: "active",
         registered_at: now,
         last_seen_at: now,
@@ -325,6 +328,7 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
         host_id: "external",
         capabilities: JSON.stringify(input.capabilities ?? []),
         manifest_json: input.manifestJson ? JSON.stringify(input.manifestJson) : "",
+        cli_json: "",
         install_status: "external" as InstallStatus,
         managed: 0,
         registered_at: now,
@@ -406,6 +410,7 @@ export function createRegistryRepo(db: Kysely<ControlPlaneDb>) {
           .values({
             ...row,
             slug: input.slug,
+            cli_json: "",
             socket_path: null,
             pg_schema: null,
             pg_role: null,

@@ -297,6 +297,58 @@ const invokeMessageAction = defineEndpoint({
   response: messageAction,
 });
 
+const collabStop = defineEndpoint({
+  name: "stopCollaborator",
+  method: "POST",
+  path: "/channels/:id/collab/stop",
+  auth: "session",
+  description: "Stops whatever collaborators (agent bots) are working on in this channel. Queued runs never start; a running one is aborted, files it already changed stay changed, and the bot posts what it did with roll-back buttons.",
+  request: z.object({ id: z.string() }),
+  response: z.object({ stopped: z.number() }),
+});
+
+const collabRollback = defineEndpoint({
+  name: "rollbackToMessage",
+  method: "POST",
+  path: "/messages/:id/rollback",
+  auth: "session",
+  description:
+    "Rolls the conversation back to just before this message: it and everything after are hidden (kept, flagged), the collaborator's runs from there on are undone (its session is rewound and, with restoreFiles, its git-checkpointed files restored), and replies from cancelled runs are dropped. The client puts the message text back in the composer to edit and resend.",
+  request: z.object({ id: z.string(), restoreFiles: z.boolean().optional() }),
+  response: z.object({ hidden: z.number(), tasks: z.number() }),
+});
+
+const svcInbox = defineEndpoint({
+  name: "serviceInbox",
+  method: "POST",
+  path: "/_svc/inbox",
+  auth: "public",
+  description:
+    "App-to-app message inbox (core-async relay). Authenticated by a control-plane-signed service token whose scope names the message type; the workspace comes from the token, never the body. Accepts twochat.collab.reply | edit | status | bot, dedupes on dedupeKey and enqueues into TwoChat's own queue.",
+  request: z.object({ type: z.string(), payload: z.unknown(), dedupeKey: z.string() }),
+  response: z.object({ ok: z.boolean() }),
+});
+
+const svcMessageSchema = defineEndpoint({
+  name: "serviceMessageSchema",
+  method: "GET",
+  path: "/_svc/messages/schema",
+  auth: "public",
+  description: "Service token (scope twochat.messages.schema). The message-component JSON Schema plus the agent composing guide, with a version hash — what collaborators load via describe_message_format.",
+  request: z.object({}),
+  response: z.object({ version: z.string(), guide: z.string(), schema: z.unknown() }),
+});
+
+const svcMessageValidate = defineEndpoint({
+  name: "serviceMessageValidate",
+  method: "POST",
+  path: "/_svc/messages/validate",
+  auth: "public",
+  description: "Service token (scope twochat.messages.validate). Checks an agent's {text, blocks} against the live message schema before it is relayed.",
+  request: z.object({ message: z.object({ text: z.string().optional(), blocks: z.array(z.unknown()).optional() }) }),
+  response: z.object({ ok: z.boolean(), error: z.string().optional() }),
+});
+
 const togglePin = defineEndpoint({
   name: "togglePin",
   method: "POST",
@@ -606,6 +658,11 @@ export const twochatManifest = defineAppManifest({
   basePath: "/apps/twochat",
   websocketPaths: ["/ws"],
   endpoints: [
+    collabStop,
+    collabRollback,
+    svcInbox,
+    svcMessageSchema,
+    svcMessageValidate,
     listChannels,
     createChannel,
     getChannel,

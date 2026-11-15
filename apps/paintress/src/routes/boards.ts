@@ -11,19 +11,33 @@ export function registerBoardRoutes(app: FastifyInstance, store: Store): void {
   app.get("/boards", async (req) => {
     const ctx = requireCtx(req);
     const q = parseRequest(z.object({ spaceId: z.string().optional() }), req);
-    return { boards: await store.listBoards(ctx.workspaceId, q.spaceId ? [q.spaceId] : undefined) };
+    const spaceIds = q.spaceId ? [q.spaceId] : undefined;
+    return { boards: await store.listBoards(ctx.workspaceId, spaceIds), groups: await store.listGroups(ctx.workspaceId, spaceIds) };
+  });
+
+  app.get("/groups", async (req) => {
+    const ctx = requireCtx(req);
+    return { groups: await store.listGroups(ctx.workspaceId) };
   });
 
   app.post("/boards", async (req, reply) => {
     const ctx = requireCtx(req);
     const b = parseRequest(CreateBoard, req);
-    // Space is a label on the board; it must be one the caller belongs to.
-    const spaceId = b.spaceId ?? ctx.spaceIds[0];
-    if (!spaceId) throw new HttpError(400, "space_required", "spaceId is required (the caller has no default space)");
-    if (ctx.spaceIds.length && !ctx.spaceIds.includes(spaceId)) throw new HttpError(403, "forbidden_space");
+    // A board lives in a group; the group carries the space. Either an existing
+    // group by id, or a name to find-or-create (which needs a space).
+    let groupId: string;
+    if (b.groupId) {
+      groupId = (await store.getGroup(b.groupId, ctx.workspaceId)).id;
+    } else {
+      const spaceId = b.spaceId ?? ctx.spaceIds[0];
+      if (!spaceId) throw new HttpError(400, "space_required", "spaceId is required for a new group (the caller has no default space)");
+      if (ctx.spaceIds.length && !ctx.spaceIds.includes(spaceId)) throw new HttpError(403, "forbidden_space");
+      const group = await store.getOrCreateGroup({ workspaceId: ctx.workspaceId, spaceId, name: (b.groupName ?? "General").trim(), actor: ctx.actor });
+      groupId = group.id;
+    }
     const board = await store.createBoard({
       workspaceId: ctx.workspaceId,
-      spaceId,
+      groupId,
       actor: ctx.actor,
       name: b.name,
       kind: b.kind,

@@ -1,8 +1,9 @@
-import type { MutableRefObject, KeyboardEvent, FormEvent } from "react";
+import { memo, useContext, useEffect, useRef } from "react";
+import type { KeyboardEvent } from "react";
 import {
   RichMentionsAutocomplete,
-  RichMentionsInput,
   RichMentionsProvider,
+  RichMentionsContext,
   type TMentionConfig,
   type TMentionContext,
 } from "react-rich-mentions";
@@ -68,10 +69,77 @@ const RICH_MENTION_STYLES = `
 }
 `;
 
-/** Content-editable mention input and keyboard-navigable member suggestions. */
-export function RichMentionEditor(props: {
+/**
+ * The editable div itself. Must be a child of RichMentionsProvider so it can take the library context from
+ * useContext — the contextRef the parent holds is only populated in the provider's own effect, which runs
+ * after child effects on mount, so reading it during mount would race in production builds.
+ */
+function EditableDiv(props: {
+  contextRef: { current: TMentionContext | null };
+  defaultValue?: string;
+  disabled?: boolean;
+  onInput: () => void;
+  onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
+}) {
+  const ctx = useContext(RichMentionsContext);
+  const divRef = useRef<HTMLDivElement | null>(null);
+  // Keep the latest handlers without re-attaching listeners.
+  const handlersRef = useRef(props);
+  handlersRef.current = props;
+
+  useEffect(() => {
+    const div = divRef.current;
+    if (!div) return;
+    ctx.setInputElement(div);
+    div.innerHTML = ctx.getInitialHTML?.(props.defaultValue ?? "") ?? "";
+    const onBeforeInput = (event: Event) => ctx.onBeforeChanges(event as never);
+    const onInput = (event: Event) => {
+      handlersRef.current.onInput();
+      ctx.onChanges(event as never);
+    };
+    const onKeyDown = (event: Event) => {
+      ctx.onKeyDown(event as never);
+      handlersRef.current.onKeyDown(event as unknown as KeyboardEvent<HTMLDivElement>);
+    };
+    div.addEventListener("beforeinput", onBeforeInput);
+    div.addEventListener("input", onInput);
+    div.addEventListener("keydown", onKeyDown);
+    return () => {
+      div.removeEventListener("beforeinput", onBeforeInput);
+      div.removeEventListener("input", onInput);
+      div.removeEventListener("keydown", onKeyDown);
+      ctx.setInputElement(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div
+      ref={divRef}
+      role="textbox"
+      aria-label="Message"
+      aria-multiline="true"
+      contentEditable={!props.disabled}
+      aria-disabled={props.disabled ? "true" : undefined}
+      tabIndex={props.disabled ? -1 : 0}
+      data-placeholder={props.disabled ? "You're not a member of this conversation" : "Message… (@ to mention)"}
+      className="twochat-rich-editor min-w-0 flex-1 bg-transparent px-3 py-2 text-sm leading-5 text-foreground"
+    />
+  );
+}
+
+/**
+ * Content-editable mention input and keyboard-navigable member suggestions.
+ *
+ * Replaces the library's <RichMentionsInput> with our own div wired straight to its context. That component
+ * re-applies dangerouslySetInnerHTML on every render (a fresh {__html} object, so React always treats it as
+ * changed): with React 19 every provider re-render — autocomplete opening, results loading — rewrote the editor
+ * DOM, destroying the pending "@" fragment and the caret mid-keystroke. Here the editable content lives only in
+ * the DOM; React never manages this div's children, so no render can wipe it.
+ */
+export const RichMentionEditor = memo(function RichMentionEditor(props: {
   configs: TMentionConfig<ComposerMention>[];
-  contextRef: MutableRefObject<TMentionContext | null>;
+  contextRef: { current: TMentionContext | null };
   defaultValue?: string;
   disabled?: boolean;
   onInput: () => void;
@@ -80,19 +148,14 @@ export function RichMentionEditor(props: {
   return (
     <RichMentionsProvider configs={props.configs} getContext={props.contextRef}>
       <style dangerouslySetInnerHTML={{ __html: RICH_MENTION_STYLES }} />
-      <RichMentionsInput
-        defaultValue={props.defaultValue ?? ""}
-        role="textbox"
-        aria-label="Message"
-        aria-multiline="true"
-        aria-disabled={props.disabled ? "true" : undefined}
-        tabIndex={props.disabled ? -1 : 0}
-        data-placeholder={props.disabled ? "You're not a member of this conversation" : "Message… (@ to mention)"}
-        className="twochat-rich-editor min-w-0 flex-1 bg-transparent px-3 py-2 text-sm leading-5 text-foreground"
-        onInput={props.onInput as unknown as (event: FormEvent<HTMLDivElement>) => void}
+      <EditableDiv
+        contextRef={props.contextRef}
+        defaultValue={props.defaultValue}
+        disabled={props.disabled}
+        onInput={props.onInput}
         onKeyDown={props.onKeyDown}
       />
       <RichMentionsAutocomplete fixed />
     </RichMentionsProvider>
   );
-}
+}, (prev, next) => prev.configs === next.configs && prev.disabled === next.disabled);

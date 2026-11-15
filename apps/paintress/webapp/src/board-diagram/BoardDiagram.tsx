@@ -1,10 +1,5 @@
-import { ReactFlowProvider } from "@xyflow/react";
 import { DiagramCanvas } from "./DiagramCanvas";
 
-export function BoardDiagram(props: { boardId: string; name: string; onRename(name: string): void }) {
-  return (
-    <ReactFlowProvider>
-      <DiagramCanvas {...props} />
-    </ReactFlowProvider>
-  );
+export function BoardDiagram(props: { boardId: string; name: string; sidebar?: { open: boolean; onToggle(): void }; onRename(name: string): void }) {
+  return <DiagramCanvas {...props} />;
 }

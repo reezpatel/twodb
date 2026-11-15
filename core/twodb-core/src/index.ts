@@ -15,6 +15,7 @@ import type { Kysely } from "kysely";
 import { createPgDb } from "@twodb/core-data/db";
 import { createS3Storage, type StorageAdapter } from "@twodb/core-data/storage";
 import { toEndpointJson, type AppManifestSpec } from "@twodb/core-platform/manifest";
+import { toCliJson, type AppCliSpec } from "@twodb/core-platform/cli";
 import {
   APP_HEADER,
   TOKEN_HEADER,
@@ -25,13 +26,19 @@ import {
   withNetworkRetry,
 } from "./client.js";
 
+import { ACT_SCOPE, verifyServiceToken, ServiceTokenError, type Jwk, type ServiceTokenClaims } from "@twodb/core-platform/service-token";
+
 export { APP_HEADER, TOKEN_HEADER, VERIFIED_HEADER, TwoDbHttpError };
+export { ServiceTokenError, type ServiceTokenClaims };
+export { serviceDeliver, createInboxHandler, type ServiceCaller, type InboxHandlerOptions } from "./relay.js";
 
 export interface ConnectOptions {
   /** Defaults to manifest.slug / TWODB_APP_SLUG. */
   slug?: string;
   /** Used for registration; the manifest is sent as the app's endpoint.json. */
   manifest?: AppManifestSpec;
+  /** Declared CLI surface (cli.json) — sent at registration so `twodb <slug>` exposes these commands. */
+  cli?: AppCliSpec;
   /** Display name when no manifest is given. */
   name?: string;
   version?: string;
@@ -82,6 +89,11 @@ export interface TwoDbRuntime {
   gatewayFetch(path: string, init?: RequestInit): Promise<Response>;
   /** Current app token (may change after a re-registration). */
   token(): string;
+  /** Service-token helpers (see TwoDbSession). */
+  serviceToken: TwoDbSession["serviceToken"];
+  actAs: TwoDbSession["actAs"];
+  serviceFetch: TwoDbSession["serviceFetch"];
+  verifyServiceToken: TwoDbSession["verifyServiceToken"];
   /** Stops the heartbeat and closes the DB pool. */
   close(): Promise<void>;
 }
@@ -108,6 +120,21 @@ export interface TwoDbSession {
   gatewayFetch(path: string, init?: RequestInit): Promise<Response>;
   /** Fetches the runtime config (provisions Postgres on first call for a new app). */
   fetchConfig(): Promise<TwoDbAppConfig>;
+  /**
+   * A control-plane-signed JWT addressed to `audience` (an app slug) for one workspace. Cached ~4 minutes per
+   * (audience, workspace, scopes). `scopes` are the message types you will send with it.
+   */
+  serviceToken(audience: string, workspaceId: string, opts?: { scopes?: string[]; act?: { type: string; id: string } }): Promise<string>;
+  /**
+   * A credential provider for calling another app (e.g. "tworoute", "dispatch") as THIS app, inside `workspaceId`, with
+   * no user and no stored API key. Returns a function yielding a fresh bearer token (cached ~4 minutes, so it is safe to
+   * call per request, including for runs that last an hour). The control plane must grant this app → audience.
+   */
+  actAs(audience: string, workspaceId: string): () => Promise<string>;
+  /** `fetch` to another app's `/_svc/*` surface through the gateway, authenticated as this app for `workspaceId`. */
+  serviceFetch(audience: string, workspaceId: string, path: string, init?: RequestInit & { scopes?: string[]; act?: { type: string; id: string } }): Promise<Response>;
+  /** Verify a service token addressed to THIS app (signature via the control plane's JWKS, audience, expiry, optional scope). */
+  verifyServiceToken(token: string, opts?: { scope?: string }): Promise<ServiceTokenClaims>;
   /** Stops the heartbeat. */
   close(): Promise<void>;
 }
@@ -150,6 +177,7 @@ export async function startTwoDbSession(options: ConnectOptions = {}): Promise<T
         capabilities: options.manifest?.capabilities ?? options.capabilities,
         httpUrl,
         manifest: options.manifest ? toEndpointJson(options.manifest) : {},
+        ...(options.cli ? { cli: toCliJson(options.cli) } : {}),
       }),
     });
     if (!res.ok) throw new TwoDbHttpError(res.status, await res.text(), `register(${slug})`);
@@ -195,9 +223,59 @@ export async function startTwoDbSession(options: ConnectOptions = {}): Promise<T
   }, pingMs);
   timer.unref();
 
+  // --- service tokens ----------------------------------------------------
+  const tokenCache = new Map<string, { token: string; until: number }>();
+  let jwks: { keys: Jwk[]; at: number } | null = null;
+
+  async function loadJwks(force = false): Promise<Jwk[]> {
+    if (!force && jwks && Date.now() - jwks.at < 5 * 60_000) return jwks.keys;
+    const res = await withNetworkRetry(() => fetch(url("/registry/jwks")), { attempts: 3, intervalMs: 500 });
+    if (!res.ok) throw new TwoDbHttpError(res.status, await res.text(), "fetch jwks");
+    jwks = { keys: ((await res.json()) as { keys: Jwk[] }).keys, at: Date.now() };
+    return jwks.keys;
+  }
+
+  async function serviceToken(audience: string, workspaceId: string, opts: { scopes?: string[]; act?: { type: string; id: string } } = {}): Promise<string> {
+    const scopes = [...(opts.scopes ?? [])].sort();
+    const key = `${audience}|${workspaceId}|${scopes.join(",")}|${opts.act?.type ?? ""}:${opts.act?.id ?? ""}`;
+    const hit = tokenCache.get(key);
+    if (hit && hit.until > Date.now()) return hit.token;
+    const res = await fetch(url("/registry/service-token"), {
+      method: "POST",
+      headers: { ...authHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ workspaceId, audience, scopes, act: opts.act }),
+    });
+    if (res.status === 401) await registerAuto().catch(() => undefined);
+    if (!res.ok) throw new TwoDbHttpError(res.status, await res.text(), `service-token(${audience})`);
+    const body = (await res.json()) as { token: string; expiresAt: string };
+    // Reuse for at most 4 minutes, and never past 30s before it expires.
+    tokenCache.set(key, { token: body.token, until: Math.min(Date.now() + 4 * 60_000, Date.parse(body.expiresAt) - 30_000) });
+    return body.token;
+  }
+
   return {
     slug,
     token: () => token ?? "",
+    serviceToken,
+    actAs: (audience, workspaceId) => () => serviceToken(audience, workspaceId, { scopes: [ACT_SCOPE] }),
+    async serviceFetch(audience, workspaceId, p, init = {}) {
+      const { scopes, act, ...rest } = init;
+      const jwt = await serviceToken(audience, workspaceId, { scopes, act });
+      const headers = new Headers(rest.headers);
+      headers.set("authorization", `Bearer ${jwt}`);
+      return fetch(url(`/apps/${audience}${p}`), { ...rest, headers });
+    },
+    async verifyServiceToken(jwt, opts = {}) {
+      try {
+        return verifyServiceToken(jwt, { keys: await loadJwks(), audience: slug, scope: opts.scope });
+      } catch (err) {
+        // Unknown key after a rotation: refresh once and retry.
+        if (err instanceof ServiceTokenError && /unknown signing key/.test(err.message)) {
+          return verifyServiceToken(jwt, { keys: await loadJwks(true), audience: slug, scope: opts.scope });
+        }
+        throw err;
+      }
+    },
     gatewayFetch(p, init = {}) {
       const headers = new Headers(init.headers);
       for (const [k, v] of Object.entries(authHeaders())) headers.set(k, v);
@@ -248,6 +326,10 @@ export async function connectTwoDb(options: ConnectOptions = {}): Promise<TwoDbR
     },
     storage,
     gatewayFetch: session.gatewayFetch,
+    serviceToken: session.serviceToken,
+    actAs: session.actAs,
+    serviceFetch: session.serviceFetch,
+    verifyServiceToken: session.verifyServiceToken,
     token: session.token,
     async close() {
       await session.close();

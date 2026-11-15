@@ -2,6 +2,7 @@ import { Search } from "lucide-react";
 import type { IconHit } from "../../lib/paintress-client";
 import { paintressClient } from "../../lib/paintress-client";
 import { PaletteItem } from "./PaletteItem";
+import { sameSpec, type ArmedSpec } from "../hooks/usePlacement";
 
 const SETS = [
   [undefined, "All"],
@@ -20,7 +21,8 @@ export function IconGrid(props: {
   onSet(s: string | undefined): void;
   icons: IconHit[];
   searching: boolean;
-  onAdd(icon: IconHit): void;
+  armed: unknown;
+  onArm(icon: IconHit): void;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -50,7 +52,7 @@ export function IconGrid(props: {
       {props.query.trim() && !props.icons.length && !props.searching && <div className="text-[11px] text-ink-muted">No icons found.</div>}
       <div className="grid grid-cols-3 gap-1">
         {props.icons.map((i) => (
-          <PaletteItem key={i.id} title={i.id} label={pretty(i.name)} payload={{ kind: "icon", icon: i.id, label: pretty(i.name) }} onClick={() => props.onAdd(i)}>
+          <PaletteItem key={i.id} title={i.id} label={pretty(i.name)} payload={{ kind: "icon", icon: i.id, label: pretty(i.name) }} active={sameSpec(props.armed as ArmedSpec | null, { kind: "icon", icon: i.id, label: pretty(i.name) })} onClick={() => props.onArm(i)}>
             <img src={paintressClient.iconUrl(i.id)} alt={i.name} loading="lazy" draggable={false} className="size-8 object-contain" />
           </PaletteItem>
         ))}

@@ -6,7 +6,7 @@ import { useBoardPage } from "./hooks/useBoardPage";
 const BoardDiagram = lazy(() => import("../board-diagram/BoardDiagram").then((m) => ({ default: m.BoardDiagram })));
 const BoardDoc = lazy(() => import("../board-doc/BoardDoc").then((m) => ({ default: m.BoardDoc })));
 
-export function BoardPage() {
+export function BoardPage(props: { sidebar?: { open: boolean; onToggle(): void } }) {
   const { id = "" } = useParams();
   const { board, error, rename } = useBoardPage(id);
   if (error)
@@ -19,10 +19,10 @@ export function BoardPage() {
       </div>
     );
   if (!board) return <div className="p-6 text-ink-muted">Loading…</div>;
-  const props = { boardId: board.id, name: board.name, onRename: (n: string) => void rename(n) };
+  const editorProps = { boardId: board.id, name: board.name, sidebar: props.sidebar, onRename: (n: string) => void rename(n) };
   return (
     <Suspense fallback={<div className="p-6 text-ink-muted">Loading editor…</div>}>
-      {board.kind === "doc" ? <BoardDoc key={board.id} {...props} /> : <BoardDiagram key={board.id} {...props} />}
+      {board.kind === "doc" ? <BoardDoc key={board.id} {...editorProps} /> : <BoardDiagram key={board.id} {...editorProps} />}
     </Suspense>
   );
 }

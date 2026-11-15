@@ -16,6 +16,12 @@
 .twodb-editor-content pre code { background: none; border: 0; padding: 0; }
 .twodb-editor-content img { max-width: 100%; border-radius: var(--radius-sm); }
 .twodb-editor-content hr { border: 0; border-top: 1px solid var(--outline); margin: 1em 0; }
+.twodb-editor-content .tableWrapper { overflow-x: auto; margin: 0.75rem 0; }
+.twodb-editor-content table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.twodb-editor-content th, .twodb-editor-content td { min-width: 5rem; border: 1px solid var(--outline); padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; position: relative; }
+.twodb-editor-content th { background: var(--stone); font-weight: 600; }
+.twodb-editor-content th p, .twodb-editor-content td p { margin: 0; }
+.twodb-editor-content .selectedCell::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: color-mix(in oklab, var(--ion) 25%, transparent); }
 .twodb-editor-content ul[data-type="taskList"] { list-style: none; padding-left: 0.2rem; }
 .twodb-editor-content ul[data-type="taskList"] li { display: flex; gap: 0.5rem; align-items: flex-start; }
 .twodb-editor-content ul[data-type="taskList"] li > label { margin-top: 0.3rem; user-select: none; }

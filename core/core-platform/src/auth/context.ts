@@ -2,13 +2,16 @@ import type { AuthEngine } from "./engine.js";
 import type { WorkspacePlatformRepo } from "./repository.js";
 
 export interface AuthContext {
-  kind: "session" | "apiKey";
+  /** "service" = another app acting in the workspace on a control-plane-signed token (no user, all spaces). */
+  kind: "session" | "apiKey" | "service";
   userId: string | null;
   workspaceId: string;
   /** Only present for session auth — the user-selected active spaces. Empty = all spaces. */
   spaceIds: string[];
   apiKeyId?: string;
   scopes?: string[];
+  /** Calling app's slug, for `kind: "service"`. */
+  serviceApp?: string;
 }
 
 export interface ResolveAuthContextOptions {

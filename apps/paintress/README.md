@@ -4,7 +4,7 @@ Miro-like boards where **a human edits in the browser while LLM agents edit thro
 
 | Board kind | What it is | Built on |
 |---|---|---|
-| `diagram` | Infinite canvas for **architecture (incl. C4), AWS / Google Cloud, ERD, flowcharts, swimlane process maps** — plus sticky notes, text and images | React Flow (`@xyflow/react`) |
+| `diagram` | Infinite canvas for **architecture (incl. C4), AWS / Google Cloud, ERD, flowcharts, swimlane process maps** — plus sticky notes, text and images | custom SVG canvas (`webapp/src/svg-canvas`) |
 | `doc` | **Markdown** document; ```` ```mermaid ```` fences render as diagrams | CodeMirror + react-markdown + mermaid |
 
 Shape: `backend+webapp` · API port `6414` · webapp port `6507`
@@ -17,13 +17,19 @@ Shape: `backend+webapp` · API port `6414` · webapp port `6507`
 - **Doc boards for agents:** `PATCH /boards/:id/doc` with `append`, `replace_section`, `replace` — edit one section without resending the document. Stale writes are `409`; the UI offers "use theirs / keep mine".
 - **Images** are stored in S3 (MinIO bucket `twodb`) under `paintress/{workspaceId}/{boardId}/{assetId}`; SVG uploads are served sandboxed.
 
-Access: every board has `workspace_id` + `space_id`; permission is by workspace only, all members read-write.
+Boards live in **groups** (named, collapsible sections in the sidebar). The space label is on the *group*, not the board. Access is by workspace only, all members read-write.
+
+```
+POST /boards { name, kind, groupId }                    # into an existing group
+POST /boards { name, kind, groupName, spaceId }         # find-or-create the group (default "General")
+GET  /groups                                            # list groups
+```
 
 ## Agent quick start
 ```bash
 # 1. a board
 curl -X POST $GATEWAY/apps/paintress/boards -H "authorization: Bearer $KEY" -H 'content-type: application/json' \
-  -d '{"name":"Checkout architecture","kind":"diagram"}'
+  -d '{"name":"Checkout architecture","kind":"diagram","groupName":"System","spaceId":"<spaceId>"}'
 
 # 2. describe a diagram; positions are computed for you
 curl -X POST $GATEWAY/apps/paintress/boards/$ID/diagram -H "authorization: Bearer $KEY" -H 'content-type: application/json' -d '{
@@ -74,3 +80,10 @@ node scripts/ui-check.mjs                   # real browser: live agent edits, un
 
 ## Not in Phase 1
 Multi-human cursors / collaborative text editing (one human + agents), read-only sharing, board thumbnails, Mermaid types beyond flowchart/erDiagram on the canvas, AWS/Azure official icon packs (Iconify's AWS service icons and Google Cloud icons are used).
+
+## Storybook
+
+`cd webapp && pnpm storybook` (port **6528**) — stories for every presentational
+component: the SVG canvas pieces, the tool dock and flyouts, inspector, doc
+editor/preview, shell. Fixtures in `webapp/src/stories/fixtures.tsx`.
+`node scripts/story-check.mjs` renders all stories headlessly.

@@ -10,7 +10,7 @@ async function main() {
   // 10s heartbeat, and receive this app's Postgres config from it — no DATABASE_URL in env.
   const twodb = await connectTwoDb({ manifest: twochatManifest, httpUrl: config.HTTP_URL, gatewayUrl: config.TWODB_GATEWAY_URL, skipConnections: true });
 
-  const server = await buildServer({ ...config, DATABASE_URL: twodb.config.postgres.connectionString, TWODB_DATA_KEY: twodb.dataKey ?? config.TWODB_DATA_KEY });
+  const server = await buildServer({ ...config, DATABASE_URL: twodb.config.postgres.connectionString, TWODB_DATA_KEY: twodb.dataKey ?? config.TWODB_DATA_KEY }, { twodb });
   await server.listen({ port: config.PORT, host: "0.0.0.0" });
   server.log.info(`TwoChat listening on :${config.PORT} (storage: ${config.TWOCHAT_STORAGE_BACKEND})`);
 }

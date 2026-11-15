@@ -1,44 +1,45 @@
-/* Paintress: canvas chrome that Tailwind tokens don't cover. */
-.react-flow { --xy-background-color: var(--paper); --xy-background-pattern-dots-color-default: var(--paper-grid); }
-.react-flow__node { font-family: inherit; }
-.react-flow__node.selected > div { outline: 0; }
-.react-flow__attribution { display: none; }
+/* Paintress: SVG canvas chrome that Tailwind tokens don't cover. */
 
 /* connection points: hidden until hover/selection/connecting */
-.pa-handle { width: 9px; height: 9px; background: #4f63ad; border: 2px solid #fff; opacity: 0; transition: opacity .12s; }
-.pa-handle-target { background: #4f63ad; pointer-events: none; }
-.react-flow__node:hover .pa-handle, .react-flow__node.selected .pa-handle, .react-flow.connecting .pa-handle { opacity: 1; }
-.react-flow__node:hover .pa-handle-target, .react-flow__node.selected .pa-handle-target { pointer-events: all; }
+.pa-svg-handle { fill: var(--ion-deep); stroke: var(--paper); stroke-width: 2; cursor: crosshair; opacity: 0; transition: opacity .12s; }
+g[data-item]:hover .pa-svg-handle, .pa-svg-handles-on .pa-svg-handle { opacity: 1; }
 
-.pa-resize-line { border-color: #4f63ad !important; }
-.pa-resize-handle { width: 9px !important; height: 9px !important; background: #fff !important; border: 1.5px solid #4f63ad !important; border-radius: 2px !important; }
+/* resize grips */
+.pa-svg-grip { fill: var(--paper); stroke: var(--ion-deep); stroke-width: 1.5; }
 
-/* selection ring on the node box (nodes draw their own shapes, so ring the wrapper) */
-.react-flow__node.selected { filter: drop-shadow(0 0 0 #4f63ad) drop-shadow(0 0 2px rgba(79, 99, 173, .9)); }
+/* marquee select + drag-create rubber band */
+.pa-svg-marquee { fill: color-mix(in oklab, var(--ion-deep) 10%, transparent); stroke: var(--ion-deep); stroke-width: 1; stroke-dasharray: 4 4; }
+.pa-svg-create { fill: color-mix(in oklab, var(--ion-deep) 12%, transparent); stroke: var(--ion-deep); stroke-width: 2; stroke-dasharray: 7 6; }
 
 /* an AI edit just landed here */
-@keyframes pa-pulse { 0% { box-shadow: 0 0 0 0 rgba(79, 99, 173, .65); } 100% { box-shadow: 0 0 0 18px rgba(79, 99, 173, 0); } }
-.pa-flash { animation: pa-pulse 1.4s ease-out 1; border-radius: 8px; }
+@keyframes pa-pulse { 0% { filter: drop-shadow(0 0 0 rgba(79, 99, 173, .8)); } 100% { filter: drop-shadow(0 0 14px rgba(79, 99, 173, 0)); } }
+.pa-svg-flash { animation: pa-pulse 1.4s ease-out 1; }
 
-.pa-vertical { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; }
+/* text inside SVG never selects; node drag handles own the pointer */
+.pa-svg-text { user-select: none; -webkit-user-select: none; pointer-events: none; white-space: pre; }
+.pa-svg-fo { width: 100%; height: 100%; overflow: hidden; white-space: pre-wrap; overflow-wrap: break-word; line-height: 1.35; }
+.pa-svg-editor { width: 100%; height: 100%; resize: none; border: 1px solid var(--ion-deep); border-radius: 4px; background: var(--popover); color: var(--ink); padding: 4px; text-align: center; outline: none; }
+.pa-svg-editor-input { width: 100%; height: 100%; border: 1px solid var(--ion-deep); border-radius: 4px; background: var(--popover); color: var(--ink); padding: 2px 6px; outline: none; }
+.pa-svg-roweditor input { height: 100%; border: 1px solid var(--ion-deep); border-radius: 3px; background: var(--popover); color: var(--ink); padding: 0 4px; font-size: 12px; outline: none; }
+.pa-svg-step { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 9999px; font-size: 11px; font-weight: 700; }
+.pa-svg-chip { border: 1px solid; border-radius: 4px; padding: 2px 6px; font-size: 11px; cursor: default; }
+.pa-svg-sticky { filter: drop-shadow(0 3px 5px rgba(0,0,0,.18)); }
+.pa-svg-entity { filter: drop-shadow(0 1px 2px rgba(0,0,0,.10)); }
+.pa-svg-addrow { cursor: pointer; opacity: 0; transition: opacity .12s; }
+g[data-item]:hover .pa-svg-addrow, g[data-item].pa-selected .pa-svg-addrow { opacity: 1; }
 
-/* markdown preview */
-.pa-prose { color: #1f2937; font-size: 15px; line-height: 1.7; }
-.pa-prose h1 { font-size: 2em; font-weight: 700; margin: 1.2em 0 .5em; border-bottom: 1px solid #e5e7eb; padding-bottom: .25em; }
-.pa-prose h2 { font-size: 1.5em; font-weight: 700; margin: 1.2em 0 .5em; border-bottom: 1px solid #eef0f3; padding-bottom: .2em; }
-.pa-prose h3 { font-size: 1.2em; font-weight: 700; margin: 1em 0 .4em; }
-.pa-prose p, .pa-prose ul, .pa-prose ol, .pa-prose blockquote, .pa-prose table, .pa-prose pre { margin: .8em 0; }
-.pa-prose ul { list-style: disc; padding-left: 1.5em; }
-.pa-prose ol { list-style: decimal; padding-left: 1.5em; }
-.pa-prose li > ul, .pa-prose li > ol { margin: .2em 0; }
-.pa-prose a { color: #2563eb; text-decoration: underline; }
-.pa-prose code { background: #f1f5f9; padding: .1em .35em; border-radius: 4px; font-size: .9em; }
-.pa-prose pre { background: #0f172a; color: #e2e8f0; padding: 1em; border-radius: 8px; overflow: auto; }
-.pa-prose pre code { background: transparent; padding: 0; color: inherit; }
-.pa-prose blockquote { border-left: 4px solid #cbd5e1; padding-left: 1em; color: #475569; }
-.pa-prose table { border-collapse: collapse; }
-.pa-prose th, .pa-prose td { border: 1px solid #e2e8f0; padding: .4em .8em; }
-.pa-prose th { background: #f8fafc; }
-.pa-prose hr { border: 0; border-top: 1px solid #e5e7eb; margin: 1.5em 0; }
-.pa-prose img { max-width: 100%; }
-.pa-mermaid svg { max-width: 100%; height: auto; }
+/* minimap */
+.pa-minimap { display: block; cursor: crosshair; border-radius: 8px; }
+.pa-minimap-bg { fill: var(--paper); }
+.pa-minimap-node { fill: var(--stone-hatch); opacity: .8; }
+.pa-minimap-group, .pa-minimap-pool, .pa-minimap-lane { fill: none; stroke: var(--stone-hatch); stroke-width: .5; }
+.pa-minimap-view { fill: color-mix(in oklab, var(--ion) 18%, transparent); stroke: var(--ion-deep); stroke-width: 1; rx: 2; }
+
+/* zoom buttons */
+.pa-zoombtn { display: flex; width: 28px; height: 28px; align-items: center; justify-content: center; border-radius: 6px; color: var(--ink); }
+.pa-zoombtn:hover { background: var(--paper-grid); }
+
+/* rich document editor */
+.pa-doc-editor .twodb-editor-content { min-height: calc(100vh - 12rem); padding: 1rem 0; font-size: 16px; line-height: 1.7; }
+.pa-doc-editor > .twodb-editor-toolbar { position: sticky; top: 0; z-index: 10; margin: -1.5rem -2rem 0; padding: .5rem 2rem; background: color-mix(in oklab, var(--paper) 94%, transparent); backdrop-filter: blur(8px); }
+

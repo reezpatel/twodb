@@ -1,0 +1,37 @@
+{
+  "name": "Toolkit",
+  "slug": "toolkit",
+  "generatedAt": "2026-11-15T18:11:58.572Z",
+  "jobs": [],
+  "events": [
+    {
+      "event": "toolkit.connector.event",
+      "description": "A connector instance emitted a broadcast event.",
+      "direction": "produces",
+      "relatedApps": [],
+      "payload": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "templateId": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "payload": {}
+        },
+        "required": [
+          "instanceId",
+          "templateId",
+          "event",
+          "payload"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

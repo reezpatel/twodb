@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineAppManifest, defineEndpoint } from "@twodb/core-platform/manifest";
-import { BatchRequest, BatchResult, Board, BoardEvent, CreateBoard, Item, ItemPatch, NewItem } from "./shared/model.js";
+import { BatchRequest, BatchResult, Board, BoardEvent, BoardGroup, CreateBoard, Item, ItemPatch, NewItem } from "./shared/model.js";
 import { BuildResult, DiagramRequest, ErdRequest, LayoutRequest, MermaidRequest, ProcessRequest } from "./shared/dto.js";
 
 const id = z.object({ id: z.string().describe("Board id") });
@@ -18,9 +18,18 @@ const listBoards = defineEndpoint({
   method: "GET",
   path: "/boards",
   auth,
-  description: "Lists boards in the caller's workspace (optionally one space). Every workspace member can read and write every board.",
+  description: "Lists boards and board groups in the caller's workspace (optionally one space). Every workspace member can read and write every board.",
   request: z.object({ spaceId: z.string().optional() }),
-  response: z.object({ boards: z.array(Board) }),
+  response: z.object({ boards: z.array(Board), groups: z.array(BoardGroup) }),
+});
+
+const listGroups = defineEndpoint({
+  name: "listGroups",
+  method: "GET",
+  path: "/groups",
+  auth,
+  description: "Lists board groups. A group is a named collection of boards labelled with a space; boards are created into a group.",
+  response: z.object({ groups: z.array(BoardGroup) }),
 });
 
 const createBoard = defineEndpoint({
@@ -30,7 +39,8 @@ const createBoard = defineEndpoint({
   auth,
   description:
     'Creates a board. `kind: "diagram"` is a canvas for architecture/AWS/GCP/ERD/flowchart/process diagrams; ' +
-    '`kind: "doc"` is a Markdown document whose ```mermaid blocks render as diagrams. `spaceId` defaults to the caller\'s first space.',
+    '`kind: "doc"` is a Markdown document whose ```mermaid blocks render as diagrams. The board goes into a group: pass an existing ' +
+    "`groupId`, or a `groupName` to find-or-create (default \"General\"); a new group takes `spaceId` (default: the caller's first space).",
   request: CreateBoard,
   response: Board,
 });
@@ -314,6 +324,7 @@ export const manifest = defineAppManifest({
   websocketPaths: ["/boards/:id/ws"],
   endpoints: [
     listBoards,
+    listGroups,
     createBoard,
     getBoard,
     updateBoard,

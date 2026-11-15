@@ -12,6 +12,16 @@ and LLM agents at once. **Implemented in Phase 1** — read `README.md` first.
   this" and builders must not move it (unless `relayout`).
 - New agent-facing endpoints: manifest entry first, then the route, then
   `pnpm gen:docs`. Run `pnpm test`, `scripts/smoke.ts` and `scripts/ui-check.mjs`.
+- Storybook lives in `webapp/.storybook` (port **6528**, `pnpm storybook`):
+  stories under `webapp/src/stories/` with `fixtures.tsx` (item factory,
+  `WithDiagram` context, no-op commands). New presentational component → new
+  story. `scripts/story-check.mjs` renders every story headlessly and fails on
+  errors — run it after touching components.
+- The diagram canvas is a **custom SVG engine** (`webapp/src/svg-canvas`) — no
+  React Flow. One `<svg>`, world coords transformed by `useViewport`, pointer
+  gestures as a state machine in `useInteractions`, shape paths from
+  `src/shared/shapes.ts`. Node/edge look comes from `webapp/src/lib/canvas-theme.ts`
+  (light + dark), never hardcoded hex in components.
 
 ## Before writing any route
 - Add a `defineEndpoint(...)` to `src/manifest.ts` first (request/response

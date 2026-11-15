@@ -8,7 +8,10 @@ import { runCompaction } from "./compaction.js";
 import { subagentTools } from "./tools/subagents.js";
 import { askUserTool } from "./tools/ask-user.js";
 import { memoryTools } from "./tools/memory.js";
+import { toolkitTools } from "./tools/toolkit.js";
+import type { ToolkitClient } from "../toolkit-client.js";
 import { memoryPrompt, sessionMemories } from "../memory.js";
+import { canvasTools, type ServiceFetch } from "../canvas.js";
 
 /** Invocation matrix — caller agent type (null = main session) → allowed target types. */
 const INVOKABLE_BY: Record<string, string[]> = {
@@ -26,6 +29,7 @@ export interface ToolContext {
   deps: RunDeps;
   repo: ArtisanRepo;
   dispatch: DispatchClient;
+  toolkit: ToolkitClient;
   session: SessionRow;
   agent: AgentRow;
   model: string;
@@ -242,6 +246,9 @@ export interface RunDeps {
   hub: WorkspaceHub;
   tworoute: TworouteClient;
   dispatch: DispatchClient;
+  serviceFetch?: ServiceFetch;
+  /** Toolkit app client — absent when the toolkit app isn't registered. */
+  toolkit?: ToolkitClient;
 }
 
 /** Max chars of a single tool result sent to the model (~3k tokens). The full text is not kept. */
@@ -268,6 +275,19 @@ export function abortSession(sessionId: string): boolean {
   return true;
 }
 
+class ToolAborted extends Error {}
+
+/** How a collaborator run differs from a normal one. */
+export interface CollabRunHooks {
+  extraTools: ToolSpec[];
+  /** Appended to the system prompt. */
+  systemExtra: string;
+  /** Checked after every round of tool calls; true ends the run (send_reply succeeded). */
+  shouldStop(): boolean;
+  /** The model stopped calling tools without finishing: return a nudge to keep going, or null to give up. */
+  onIdle(): string | null;
+}
+
 export interface AgentFrameEmitter {
   (frame: ServerFrameBody): void;
 }
@@ -282,6 +302,8 @@ export async function runAgentLoop(opts: {
   userMessage?: string;
   /** Used by subagent runs: emit frames to the parent instead of the room. */
   emitOverride?: AgentFrameEmitter;
+  /** Non-interactive chat-collaborator runs (see collab/): extra tools, no ask_user, run ends when shouldStop() says so. */
+  collab?: CollabRunHooks;
 }): Promise<void> {
   const { deps, session, agent, model } = opts;
   if (running.has(session.id)) throw new Error("session already running");
@@ -310,13 +332,17 @@ export async function runAgentLoop(opts: {
       ...fileTools(deps.dispatch),
       ...subagentTools(),
       ...memoryTools(),
-      askUserTool(),
+      ...(deps.serviceFetch ? canvasTools(deps.serviceFetch) : []),
+      ...(deps.toolkit ? toolkitTools(deps.toolkit) : []),
+      ...(opts.collab ? [] : [askUserTool()]), // collaborators never block on a question: they post buttons/inputs and end the run
     ];
     const allow = parseJson<string[]>(agent.tools_json, []);
-    const visible = allow.length === 0 ? allTools : allTools.filter((t) => allow.includes(t.name));
+    const visibleBase = allow.length === 0 ? allTools : allTools.filter((t) => allow.includes(t.name));
+    const visible = opts.collab ? [...visibleBase, ...opts.collab.extraTools] : visibleBase;
+    const systemExtra = opts.collab?.systemExtra;
 
     // History: prior threads' summaries + current thread messages.
-    const messages = await buildContext(deps, session, agent, visible, thread);
+    const messages = await buildContext(deps, session, agent, visible, thread, systemExtra);
 
 
     // max_tokens = the model's own context capacity so reasoning models (e.g. glm)
@@ -471,16 +497,33 @@ export async function runAgentLoop(opts: {
       });
 
       if (toolCalls.length === 0) {
+        // A collaborator must finish through its reply tool: nudge instead of ending silently.
+        const nudge = opts.collab && !opts.collab.shouldStop() ? opts.collab.onIdle() : null;
+        if (nudge) {
+          messages.push({ role: "user", content: nudge });
+          await deps.repo.addMessage({ threadId: thread.id, sessionId: session.id, role: "user", content: nudge, meta: { system: true } });
+          continue loop;
+        }
         // No tools — the run is complete.
         await deps.repo.touchSession(session.id);
         emit({ type: "done", ok: true, message: content.slice(0, 200) });
         break loop;
       }
 
-      // Execute tools.
+      // Execute tools. A stop (abort) interrupts the wait on a running tool too, not only the model stream:
+      // the run unwinds at once, and the history stays valid (every tool call gets a result).
+      let stoppedByUser = false;
       for (const tc of toolCalls) {
         const tool = visible.find((t) => t.name === tc.name);
         toolStartedAt.set(tc.id, Date.now());
+        if (stoppedByUser || ctrl.signal.aborted) {
+          stoppedByUser = true;
+          const out = "(not run: the run was stopped)";
+          toolResults.set(tc.id, { output: out, ok: false, durationMs: 0 });
+          emit({ type: "tool_result", id: tc.id, name: tc.name, output: out, ok: false });
+          messages.push({ role: "tool", tool_call_id: tc.id, content: out });
+          continue;
+        }
         emit({ type: "tool_start", id: tc.id, name: tc.name, args: safeParse(tc.args) });
         if (!tool) {
           const out = `unknown tool ${tc.name}`;
@@ -493,6 +536,7 @@ export async function runAgentLoop(opts: {
           const toolCtx: ToolContext = {
             session, agent, model, deps, emit, apiKey: opts.apiKey,
             dispatch: deps.dispatch, repo: deps.repo,
+            toolkit: deps.toolkit!,
             tools: visible,
             askUser: async (questions) => {
               if (!session.interactive || deps.hub.roomSize(session.workspace_id, session.id) === 0) {
@@ -502,11 +546,25 @@ export async function runAgentLoop(opts: {
               return await waitForAnswer(session.id, tc.id);
             },
           };
-          const out = await tool.execute(args, toolCtx);
+          const running = tool.execute(args, toolCtx);
+          running.catch(() => undefined); // if we stop waiting, a late failure must not become an unhandled rejection
+          const aborted = new Promise<never>((_, reject) => {
+            if (ctrl.signal.aborted) reject(new ToolAborted());
+            else ctrl.signal.addEventListener("abort", () => reject(new ToolAborted()), { once: true });
+          });
+          const out = await Promise.race([running, aborted]);
           toolResults.set(tc.id, { output: out.slice(0, 8_000), ok: true, durationMs: Date.now() - (toolStartedAt.get(tc.id) ?? Date.now()) });
           emit({ type: "tool_result", id: tc.id, name: tc.name, output: out.slice(0, 4_000), ok: true });
           messages.push({ role: "tool", tool_call_id: tc.id, content: capToolResult(out) });
         } catch (err) {
+          if (err instanceof ToolAborted) {
+            stoppedByUser = true;
+            const out = "(stopped before it finished — it may still be running on the machine)";
+            toolResults.set(tc.id, { output: out, ok: false, durationMs: Date.now() - (toolStartedAt.get(tc.id) ?? Date.now()) });
+            emit({ type: "tool_result", id: tc.id, name: tc.name, output: out, ok: false });
+            messages.push({ role: "tool", tool_call_id: tc.id, content: out });
+            continue;
+          }
           const out = `tool error: ${(err as Error).message}`;
           toolResults.set(tc.id, { output: out, ok: false, durationMs: Date.now() - (toolStartedAt.get(tc.id) ?? Date.now()) });
           emit({ type: "tool_result", id: tc.id, name: tc.name, output: out, ok: false });
@@ -536,6 +594,17 @@ export async function runAgentLoop(opts: {
         toolStartedAt.clear();
       }
 
+      if (stoppedByUser) {
+        emit({ type: "done", ok: false, message: "aborted" });
+        break loop;
+      }
+
+      if (opts.collab?.shouldStop()) {
+        await deps.repo.touchSession(session.id);
+        emit({ type: "done", ok: true, message: "reply sent" });
+        break loop;
+      }
+
       // Auto-compaction check. Count what is really sent: message text, tool-call arguments and
       // the tool schemas. Prefer the provider's own prompt_tokens for the request just made, plus
       // an estimate for what was appended since (tool results).
@@ -555,7 +624,7 @@ export async function runAgentLoop(opts: {
         const next = await deps.repo.currentThread(session.id);
         if (next) thread = next;
         messages.length = 0;
-        messages.push(...(await buildContext(deps, session, agent, visible, thread)));
+        messages.push(...(await buildContext(deps, session, agent, visible, thread, systemExtra)));
         if (lastUser) {
           messages.push({
             role: "user",
@@ -572,7 +641,7 @@ export async function runAgentLoop(opts: {
 }
 
 /** Context builder: system prompt (agent instruction + skills) + prior summaries + thread messages. */
-async function buildContext(deps: RunDeps, session: SessionRow, agent: AgentRow, tools: ToolSpec[], thread: { id: string; summary: string | null }): Promise<ChatMessage[]> {
+async function buildContext(deps: RunDeps, session: SessionRow, agent: AgentRow, tools: ToolSpec[], thread: { id: string; summary: string | null }, systemExtra?: string): Promise<ChatMessage[]> {
   const out: ChatMessage[] = [];
 
   const visibleSkills = (await deps.repo.listSkills(session.workspace_id)).filter((s) => skillApplies(s, agent, session));
@@ -587,11 +656,15 @@ async function buildContext(deps: RunDeps, session: SessionRow, agent: AgentRow,
   if (session.parent_session_id) {
     systemParts.push("\nYou are a headless subagent — you cannot ask the user questions; proceed autonomously and return a final summary as your last message.");
   }
+  if (systemExtra) systemParts.push(`\n${systemExtra}`);
   if (visibleSkills.length) {
     systemParts.push(`\n## Skills\n${visibleSkills.map((s) => `- ${s.name}: ${s.description}`).join("\n")}\n(read_skill <name> for the full content; follow it when relevant)`);
   }
   if (tools.some((t) => t.name === "get_memories")) {
     systemParts.push(memoryPrompt(await sessionMemories(deps.repo, session.workspace_id, session.id)));
+  }
+  if (tools.some((t) => t.name === "update_canvas")) {
+    systemParts.push("\n## Canvas\nUse update_canvas for substantial documents the user should see beside the chat. The Canvas tab can contain multiple Markdown documents; send the full document on every update.");
   }
   const plan = parseJson<unknown>(session.plan_json, null);
   if (plan) systemParts.push(`\n## Current plan\n${JSON.stringify(plan)}`);

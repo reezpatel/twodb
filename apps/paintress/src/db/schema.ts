@@ -3,7 +3,7 @@ import { sql, type Kysely } from "@twodb/core-data/db";
 export interface BoardRow {
   id: string;
   workspace_id: string;
-  space_id: string;
+  group_id: string;
   kind: "diagram" | "doc";
   name: string;
   description: string;
@@ -61,7 +61,18 @@ export interface AssetRow {
   created_at: string;
 }
 
+export interface BoardGroupRow {
+  id: string;
+  workspace_id: string;
+  space_id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PaintressDb {
+  board_groups: BoardGroupRow;
   boards: BoardRow;
   items: ItemRow;
   board_events: BoardEventRow;
@@ -71,10 +82,23 @@ export interface PaintressDb {
 /** Idempotent schema bootstrap (the schema + role are provisioned by TwoDB). */
 export async function applySchema(db: Kysely<PaintressDb>): Promise<void> {
   await sql`
-    create table if not exists boards (
+    create table if not exists board_groups (
       id text primary key,
       workspace_id text not null,
       space_id text not null,
+      name text not null,
+      created_by text not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      unique (workspace_id, space_id, name)
+    )`.execute(db);
+  await sql`create index if not exists board_groups_workspace_idx on board_groups (workspace_id)`.execute(db);
+
+  await sql`
+    create table if not exists boards (
+      id text primary key,
+      workspace_id text not null,
+      group_id text not null,
       kind text not null check (kind in ('diagram','doc')),
       name text not null,
       description text not null default '',
@@ -138,4 +162,24 @@ export async function applySchema(db: Kysely<PaintressDb>): Promise<void> {
       created_by text not null,
       created_at timestamptz not null default now()
     )`.execute(db);
+
+  // Pre-groups databases: boards carried space_id directly. Move each distinct
+  // (workspace, space) pair into a "General" group and point the boards at it.
+  await sql`
+    do $$
+    begin
+      if exists (select 1 from information_schema.columns
+                 where table_schema = current_schema() and table_name = 'boards' and column_name = 'space_id') then
+        alter table boards add column if not exists group_id text;
+        insert into board_groups (id, workspace_id, space_id, name, created_by)
+        select distinct '01MIGRATED' || md5(workspace_id || ':' || space_id), workspace_id, space_id, 'General', 'system'
+        from boards
+        on conflict (workspace_id, space_id, name) do nothing;
+        update boards b set group_id = g.id
+        from board_groups g
+        where b.group_id is null and g.workspace_id = b.workspace_id and g.space_id = b.space_id and g.name = 'General';
+        alter table boards drop column space_id;
+        alter table boards alter column group_id set not null;
+      end if;
+    end $$`.execute(db);
 }

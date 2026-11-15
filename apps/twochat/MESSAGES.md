@@ -2,7 +2,7 @@
 
 > **Generated file — do not hand-edit.** Source of truth is `src/messages.ts` (Zod schemas via `@twodb/core-async/registry`). Regenerate with `pnpm gen:docs`.
 
-_Generated: 2026-11-14T03:42:35.848Z_
+_Generated: 2026-11-15T06:16:06.346Z_
 
 ## Queue jobs
 
@@ -23,6 +23,167 @@ Maintenance sweep (hourly): recomputes unread counts from read cursors. Unread c
       "type": "string"
     }
   },
+  "additionalProperties": false
+}
+```
+
+### `twochat.collab.reply`
+
+From Artisan: a collaborator's reply for a run. Posted as the bot; `isCompleted` is authoritative for closing the task. Dropped when its epoch is older than the task's (rolled back).
+
+- **Direction**: `consumes`
+- **Retry notes**: Delivered by the core-async relay (at-least-once); every handler is idempotent on its dedupe key.
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "taskId": {
+      "type": "string"
+    },
+    "epoch": {
+      "type": "number"
+    },
+    "messageId": {
+      "type": "string"
+    },
+    "isCompleted": {
+      "type": "boolean"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "failed",
+        "stopped"
+      ]
+    }
+  },
+  "required": [
+    "runId",
+    "taskId",
+    "epoch",
+    "messageId",
+    "isCompleted",
+    "outcome"
+  ],
+  "additionalProperties": {}
+}
+```
+
+### `twochat.collab.edit`
+
+From Artisan: the collaborator edited one of its own earlier replies in the same task.
+
+- **Direction**: `consumes`
+- **Retry notes**: Delivered by the core-async relay (at-least-once); every handler is idempotent on its dedupe key.
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "taskId": {
+      "type": "string"
+    },
+    "epoch": {
+      "type": "number"
+    },
+    "messageId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "runId",
+    "taskId",
+    "epoch",
+    "messageId"
+  ],
+  "additionalProperties": {}
+}
+```
+
+### `twochat.collab.status`
+
+From Artisan: run state (started | stopped | failed) driving the 'is working' indicator.
+
+- **Direction**: `consumes`
+- **Retry notes**: Delivered by the core-async relay (at-least-once); every handler is idempotent on its dedupe key.
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "taskId": {
+      "type": "string"
+    },
+    "epoch": {
+      "type": "number"
+    },
+    "state": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "runId",
+    "taskId",
+    "epoch",
+    "state"
+  ],
+  "additionalProperties": {}
+}
+```
+
+### `twochat.collab.bot`
+
+From Artisan: a collaborator agent was created, changed or deleted — mirrored here as a bot (enabled only while it has a runner and directory).
+
+- **Direction**: `consumes`
+- **Retry notes**: Delivered by the core-async relay (at-least-once); every handler is idempotent on its dedupe key.
+
+**Payload**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "agentId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "deleted": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "agentId",
+    "name",
+    "description",
+    "enabled",
+    "deleted"
+  ],
   "additionalProperties": false
 }
 ```

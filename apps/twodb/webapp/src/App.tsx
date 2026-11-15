@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router";
 import { RequireAuth } from "./routes/auth/RequireAuth.js";
 import { Authorize } from "./routes/authorize/Authorize.js";
+import { CliAuth } from "./routes/authorize/CliAuth.js";
 import { AppDetails } from "./routes/app-details/AppDetails.js";
 import { AppsRegistry } from "./routes/registry/AppsRegistry.js";
 import { ApiKeysView } from "./routes/keys/ApiKeysView.js";
@@ -26,6 +27,8 @@ export function App() {
       <Routes>
         {/* "Login with TwoDB" — outside the hub chrome */}
         <Route path="/authorize" element={<RequireAuth><Authorize /></RequireAuth>} />
+        {/* `twodb auth` CLI consent — outside the hub chrome */}
+        <Route path="/cli-auth" element={<RequireAuth><CliAuth /></RequireAuth>} />
         <Route path="*" element={<RequireAuth><ShellRoutes /></RequireAuth>} />
       </Routes>
       <Toaster />
