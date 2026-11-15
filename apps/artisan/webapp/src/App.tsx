@@ -179,8 +179,8 @@ function Shell() {
         activeSkillId={location.pathname.match(/^\/skills\/([^/]+)/)?.[1] ?? null}
         mcpServers={mcpServers}
         activeMcpId={location.pathname.match(/^\/mcp\/([^/]+)/)?.[1] ?? null}
-        globalInstructionActive={location.pathname === "/global-instruction"}
-        onOpenGlobalInstruction={() => navigate("/global-instruction")}
+        activeSettingId={location.pathname.match(/^\/settings\/([^/]+)/)?.[1] ?? null}
+        onOpenSetting={(id) => navigate(`/settings/${id}`)}
         onNewMcp={() => setMcpDialog(true)}
         onOpenMcp={(s) => navigate(`/mcp/${s.id}`)}
         onDeleteMcp={async (s) => {
@@ -267,7 +267,8 @@ function Shell() {
               }
             />
             <Route path="/skills/:skillId" element={<SkillRoute agents={agents} onChanged={refreshSessions} />} />
-            <Route path="/global-instruction" element={<GlobalInstructionView />} />
+            <Route path="/settings" element={<Navigate to="/settings/global-instruction" replace />} />
+            <Route path="/settings/global-instruction" element={<GlobalInstructionView />} />
             <Route path="/mcp/:mcpId" element={<McpRoute agents={agents} directories={directories} onChanged={refreshSessions} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Plus, Bot, BookOpen, Plug, ScrollText, MessageSquare, FolderPlus, Pencil, Search, ChevronRight, Archive, Check, MoreHorizontal, Trash2 } from "lucide-react";
+import { Plus, Bot, BookOpen, Plug, ScrollText, Settings, MessageSquare, FolderPlus, Pencil, Search, ChevronRight, Archive, Check, MoreHorizontal, Trash2 } from "lucide-react";
 import { artisanClient, type AgentInfo, type DirectoryInfo, type McpServerInfo, type SessionInfo, type SkillInfo } from "../../../lib/artisan-client.js";
 import { SessionSearchDialog } from "./SessionSearchDialog.js";
 import { useResizableWidth } from "../../../lib/useResizableWidth.js";
@@ -27,8 +27,9 @@ export interface SidebarProps {
   onNewMcp: () => void;
   onOpenMcp: (server: McpServerInfo) => void;
   onDeleteMcp: (server: McpServerInfo) => Promise<void> | void;
-  globalInstructionActive: boolean;
-  onOpenGlobalInstruction: () => void;
+  /** Id of the settings page currently open (see SETTINGS_ITEMS), if any. */
+  activeSettingId: string | null;
+  onOpenSetting: (id: string) => void;
   agents: AgentInfo[];
   onNewAgent: () => void;
   onOpenAgent: (agent: AgentInfo) => void;
@@ -36,12 +37,18 @@ export interface SidebarProps {
   onDeleteAgent: (agent: AgentInfo) => Promise<void> | void;
 }
 
-type SidebarTab = "sessions" | "agents" | "skills" | "mcp";
+/** Settings pages. Add an entry here (plus a route in App.tsx) to grow the Settings tab. */
+export const SETTINGS_ITEMS: Array<{ id: string; label: string; hint: string; icon: typeof Bot }> = [
+  { id: "global-instruction", label: "Global instruction", hint: "Base instructions added to every agent's prompt", icon: ScrollText },
+];
+
+type SidebarTab = "sessions" | "agents" | "skills" | "mcp" | "settings";
 const SIDEBAR_TABS: Array<{ id: SidebarTab; label: string; icon: typeof Bot }> = [
   { id: "sessions", label: "Sessions", icon: MessageSquare },
   { id: "agents", label: "Agents", icon: Bot },
   { id: "skills", label: "Skills", icon: BookOpen },
   { id: "mcp", label: "MCP", icon: Plug },
+  { id: "settings", label: "Settings", icon: Settings },
 ];
 
 interface DirGroup {
@@ -54,7 +61,7 @@ interface DirGroup {
 /** Left sidebar: registered directories as sections, each with a `+` to start a session. */
 export function Sidebar(props: SidebarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
-  const [tab, setTabState] = useState<SidebarTab>(() => (["agents", "skills", "mcp"].includes(localStorage.getItem("artisan.sidebar.tab") ?? "") ? (localStorage.getItem("artisan.sidebar.tab") as SidebarTab) : "sessions"));
+  const [tab, setTabState] = useState<SidebarTab>(() => (["agents", "skills", "mcp", "settings"].includes(localStorage.getItem("artisan.sidebar.tab") ?? "") ? (localStorage.getItem("artisan.sidebar.tab") as SidebarTab) : "sessions"));
   const setTab = (t: SidebarTab) => {
     setTabState(t);
     localStorage.setItem("artisan.sidebar.tab", t);
@@ -112,7 +119,7 @@ export function Sidebar(props: SidebarProps) {
     <div className="flex h-full min-h-0 shrink-0" style={{ width }}>
       <div className="flex h-full min-h-0 w-full flex-col border-r border-outline/50 bg-card/50 p-3">
         <div className="flex shrink-0 items-center justify-between gap-2 px-1 pb-2">
-          <span className="min-w-0 flex-1 truncate px-1.5 font-sans text-[13px] font-medium text-ink">{tab === "agents" ? "Agents" : tab === "skills" ? "Skills" : tab === "mcp" ? "MCP servers" : "Sessions"}</span>
+          <span className="min-w-0 flex-1 truncate px-1.5 font-sans text-[13px] font-medium text-ink">{tab === "agents" ? "Agents" : tab === "skills" ? "Skills" : tab === "mcp" ? "MCP servers" : tab === "settings" ? "Settings" : "Sessions"}</span>
           {tab === "sessions" ? (
             <>
               <button type="button" aria-label="Add directory" title="Add directory" onClick={props.onAddDirectory} className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-paper-grid hover:text-ink">
@@ -122,7 +129,7 @@ export function Sidebar(props: SidebarProps) {
                 <Search className="size-4" strokeWidth={1.5} />
               </button>
             </>
-          ) : (
+          ) : tab === "settings" ? null : (
             <button type="button" aria-label={tab === "skills" ? "New skill" : tab === "mcp" ? "New MCP server" : "New agent"} title={tab === "skills" ? "New skill" : tab === "mcp" ? "New MCP server" : "New agent"} onClick={tab === "skills" ? props.onNewSkill : tab === "mcp" ? props.onNewMcp : props.onNewAgent} className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-paper-grid hover:text-ink">
               <Plus className="size-4" strokeWidth={1.5} />
             </button>
@@ -148,16 +155,21 @@ export function Sidebar(props: SidebarProps) {
         {tab === "skills" ? <SkillList skills={props.skills} activeId={props.activeSkillId} onOpen={props.onOpenSkill} onNew={props.onNewSkill} onDelete={props.onDeleteSkill} /> : null}
         {tab === "mcp" ? <McpList servers={props.mcpServers} activeId={props.activeMcpId} onOpen={props.onOpenMcp} onNew={props.onNewMcp} onDelete={props.onDeleteMcp} /> : null}
         {tab === "agents" ? <AgentList agents={props.agents} activeId={props.activeAgentId} onEdit={props.onOpenAgent} onNew={props.onNewAgent} onDelete={props.onDeleteAgent} /> : null}
-        {tab === "agents" ? (
-          <button
-            type="button"
-            onClick={props.onOpenGlobalInstruction}
-            title="Base instructions added to every agent's prompt"
-            className={`mt-1 flex shrink-0 items-center gap-2 rounded-[8px] px-2.5 py-[7px] text-left font-sans text-[13px] font-light leading-none transition-colors ${props.globalInstructionActive ? "bg-stone text-ink" : "text-muted-foreground hover:bg-paper-grid hover:text-ink"}`}
-          >
-            <ScrollText className="size-4 shrink-0" strokeWidth={1.5} />
-            Global instruction
-          </button>
+        {tab === "settings" ? (
+          <div className="flex flex-col gap-0.5">
+            {SETTINGS_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => props.onOpenSetting(item.id)}
+                title={item.hint}
+                className={`flex shrink-0 items-center gap-2 rounded-[8px] px-2.5 py-[7px] text-left font-sans text-[13px] font-light leading-none transition-colors ${props.activeSettingId === item.id ? "bg-stone text-ink" : "text-muted-foreground hover:bg-paper-grid hover:text-ink"}`}
+              >
+                <item.icon className="size-4 shrink-0" strokeWidth={1.5} />
+                {item.label}
+              </button>
+            ))}
+          </div>
         ) : null}
         <div className={`mt-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${tab !== "sessions" ? "hidden" : ""}`}>
           {groups.map((g) => (
