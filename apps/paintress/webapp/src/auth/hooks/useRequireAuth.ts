@@ -13,9 +13,6 @@ export function useRequireAuth() {
       alive = false;
     };
   }, []);
-  useEffect(() => {
-    // No login of our own: bounce to the control plane (gateway origin), which returns here after sign-in.
-    if (state === "anonymous") window.location.href = `${window.location.origin}/`;
-  }, [state]);
+  // No redirect on "anonymous": RequireTwoDbAuth (main.tsx) owns login; bouncing to our own origin loops.
   return state;
 }

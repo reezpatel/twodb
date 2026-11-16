@@ -9,9 +9,7 @@ export function RequireAuth(props: { children: ReactNode }) {
   const { data: session, isPending } = authClient.useSession();
 
   if (isPending) return <div className="p-6 text-muted-foreground">Loading…</div>;
-  if (!session) {
-    window.location.href = `${window.location.origin}/`;
-    return null;
-  }
+  // No redirect here: RequireTwoDbAuth (main.tsx) already guarantees a signed-in user, and bouncing to this app's own
+  // origin reloads the page into the same gate forever. `session` can be briefly null while the console cookie loads.
   return <>{props.children}</>;
 }

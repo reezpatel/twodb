@@ -70,7 +70,7 @@ x-app-env: &app-env
   TWODB_GATEWAY_URL: http://twodb:6400
   TWODB_REGISTRATION_SECRET: ${TWODB_REGISTRATION_SECRET:?TWODB_REGISTRATION_SECRET is mandatory (>=16 random chars)}
   # Public addressing — injected into each app's webapp at runtime (login redirect) and used for cross-app links.
-  TWODB_CONSOLE_URL: ${PUBLIC_SCHEME:-https}://console.${ROOT_DOMAIN:?ROOT_DOMAIN is mandatory (e.g. twodb.io)}
+  TWODB_CONSOLE_URL: ${TWODB_CONSOLE_URL:-${PUBLIC_SCHEME:-https}://console.${ROOT_DOMAIN:?ROOT_DOMAIN is mandatory (e.g. twodb.io)}} # override if your console host is e.g. twodb.<ROOT_DOMAIN>
   TWODB_APP_URL_TEMPLATE: ${PUBLIC_SCHEME:-https}://{slug}.${ROOT_DOMAIN}
   TWODB_TOKEN_FILE: /data/token # cached app token, persisted under ${DATA_DIR}/apps/<slug>
 
@@ -176,7 +176,7 @@ services:
       CATCH_ALL_SERVICE: ${CATCH_ALL_SERVICE-twopager} # custom domains -> TwoPager (static sites); set CATCH_ALL_SERVICE= (empty) to disable
       CATCH_ALL_HOST_REGEX: ${CATCH_ALL_HOST_REGEX:-}
       TWODB_BODY_LIMIT_MB: ${TWODB_BODY_LIMIT_MB:-4096} # largest proxied request body (TwoPager zip uploads)
-      TWODB_CONSOLE_URL: ${PUBLIC_SCHEME:-https}://console.${ROOT_DOMAIN}
+      TWODB_CONSOLE_URL: ${TWODB_CONSOLE_URL:-${PUBLIC_SCHEME:-https}://console.${ROOT_DOMAIN}}
       TWODB_APP_URL_TEMPLATE: ${PUBLIC_SCHEME:-https}://{slug}.${ROOT_DOMAIN}
       # --- identity ---
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is mandatory (>=16 random chars)}

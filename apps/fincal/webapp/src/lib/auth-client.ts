@@ -1,4 +1,5 @@
 import { createAuthClient } from "better-auth/react";
+import { authBaseUrl } from "@twodb/twodb-shared-frontend";
 
-// Same-origin SSO with the control plane; no Fincal login of its own.
-export const authClient = createAuthClient({ baseURL: `${window.location.origin}/api/auth`, fetchOptions: { credentials: "include" } });
+// SSO with the control plane: auth lives on the CONSOLE origin (an app origin only serves its own /api).
+export const authClient = createAuthClient({ baseURL: authBaseUrl(), fetchOptions: { credentials: "include" } });

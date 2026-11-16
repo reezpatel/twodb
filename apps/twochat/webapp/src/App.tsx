@@ -9,12 +9,8 @@ import { Chat } from "./routes/chat/Chat";
 export function App() {
   const { data: session, isPending } = authClient.useSession();
 
-  if (isPending) return <div className="grid h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
-  if (!session) {
-    window.location.href = `${window.location.origin}/`;
-    return null;
-  }
-
+  if (isPending || !session) return <div className="grid h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
+  // No redirect when `session` is null: RequireTwoDbAuth (main.tsx) owns login, and bouncing to this app's own origin loops.
   return (
     <ChatProvider myUserId={session.user.id} myUserName={session.user.name ?? "you"}>
       <Chat />

@@ -210,6 +210,12 @@ export function installAuthFetch(cfg: ResolvedConfig, getToken: () => string | n
   };
 }
 
+/** Base URL for a better-auth client in an app webapp: the console's `/api/auth` (an app origin serves only ITS OWN
+ *  API under /api, so `${location.origin}/api/auth` would 401). Use as `createAuthClient({ baseURL: authBaseUrl() })`. */
+export function authBaseUrl(): string {
+  return `${resolveConfig().gatewayBase}/api/auth`;
+}
+
 /** The signed-in session token (or null) — for code outside React that must call the API itself. */
 export function currentToken(): string | null {
   return tokenSource?.() ?? loadToken(resolveConfig());

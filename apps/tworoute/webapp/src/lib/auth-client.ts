@@ -1,12 +1,10 @@
 import { createAuthClient } from "better-auth/react";
+import { authBaseUrl } from "@twodb/twodb-shared-frontend";
 import { passkeyClient } from "@better-auth/passkey/client";
 
-// Same-origin SSO with the control plane: the gateway (which this app's API
-// calls always go through) resolves the shared better-auth session. No
-// separate TwoRoute login exists — an unauthenticated visit here means the
-// session is absent, and RequireAuth bounces to the control plane's login.
+// SSO with the control plane: auth lives on the CONSOLE origin (an app origin only serves its own /api).
 export const authClient = createAuthClient({
-  baseURL: `${window.location.origin}/api/auth`,
+  baseURL: authBaseUrl(),
   fetchOptions: { credentials: "include" },
   plugins: [passkeyClient()],
 });

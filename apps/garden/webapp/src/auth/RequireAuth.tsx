@@ -8,7 +8,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen flex-col items-center justify-center gap-2 bg-paper text-ink-muted">
       <Sprout size={22} className="text-ink" />
-      {state === "loading" ? "Loading…" : <span>You're signed out. <a className="text-ion-deep underline" href="/">Sign in to TwoDB</a> and come back.</span>}
+      {state === "loading" ? "Loading…" : <span>You're signed out. <button type="button" className="text-ion-deep underline" onClick={() => window.location.reload()}>Reload</button> to sign in again.</span>}
     </div>
   );
 }
