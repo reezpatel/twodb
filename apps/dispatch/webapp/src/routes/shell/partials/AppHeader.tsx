@@ -1,3 +1,4 @@
+import { consoleUrl } from "@twodb/twodb-shared-frontend";
 import { useState, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import { AppShellHeader, Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label, RadioGroup, RadioGroupItem } from "@twodb/blocks";
@@ -67,7 +68,7 @@ function AddRunnerDialog(props: {
               Start two-runner on the machine with this key — it's shown <strong>only once</strong>:
             </p>
             <pre className="overflow-x-auto rounded-md border border-outline bg-surface-muted p-3 text-[11px] leading-relaxed">
-two-runner --gateway {window.location.origin} \
+two-runner --gateway {consoleUrl()} \
   --key {created.key} --name {created.name}
             </pre>
             <Button size="sm" variant="secondary" onClick={() => props.onOpenChange(false)}>Done</Button>

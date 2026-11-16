@@ -6,7 +6,7 @@ import { readLatestArchive } from "./archive-store.js";
 import type { DispatchHub } from "./hub.js";
 
 /**
- * The runner-side WS endpoint: `/runner-ws?key=twodbrun_...`.
+ * The runner-side WS endpoint: `/api/runner-ws?key=twodbrun_...`.
  *
  * Auth is the runner key (hash lookup) — the Gateway's WS passthrough
  * (see apps/twodb gateway) bridges upgrade requests here *without* session

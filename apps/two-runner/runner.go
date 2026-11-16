@@ -90,7 +90,7 @@ func (r *runner) connect() error {
 	if r.enrollToken != "" {
 		query = "enroll=" + url.QueryEscape(r.enrollToken)
 	}
-	wsURL := fmt.Sprintf("%s://%s/apps/dispatch/runner-ws?%s", scheme, u.Host, query)
+	wsURL := fmt.Sprintf("%s://%s/apps/dispatch/api/runner-ws?%s", scheme, u.Host, query)
 
 	dialer := &websocket.Dialer{
 		HandshakeTimeout: 15 * time.Second,

@@ -1,3 +1,4 @@
+import { consoleUrl } from "@twodb/twodb-shared-frontend";
 import { useState } from "react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label } from "@twodb/blocks";
 
@@ -40,7 +41,7 @@ export function NewTokenDialog(props: NewTokenDialogProps) {
               Run this on any machine to join — shown <strong>only once</strong>:
             </p>
             <pre className="overflow-x-auto rounded-md border border-outline bg-surface-muted p-3 text-[11px] leading-relaxed">
-two-runner --gateway {window.location.origin} \\
+two-runner --gateway {consoleUrl()} \
   --enroll {created.key} [--name my-machine] [--microvm]
             </pre>
             <p className="text-[12px] text-ink-muted">

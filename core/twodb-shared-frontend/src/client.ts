@@ -216,6 +216,11 @@ export function authBaseUrl(): string {
   return `${resolveConfig().gatewayBase}/api/auth`;
 }
 
+/** Public URL of the TwoDB console/gateway (`https://console.<domain>`), the host machines like `two-runner` must dial. */
+export function consoleUrl(): string {
+  return resolveConfig().twodbUrl;
+}
+
 /** The signed-in session token (or null) — for code outside React that must call the API itself. */
 export function currentToken(): string | null {
   return tokenSource?.() ?? loadToken(resolveConfig());
