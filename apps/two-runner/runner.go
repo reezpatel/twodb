@@ -3,14 +3,15 @@ package main
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -44,14 +45,16 @@ type runner struct {
 	// Enrollment (first boot with --enroll): set until helloAck returns the
 	// minted runner key, which is persisted to keyPath and used from then on.
 	enrollToken string
-	keyPath     string
+	// Token to re-enroll with when the persisted key is rejected (4401).
+	enrollFallback string
+	keyPath        string
 
 	conn  *websocket.Conn
 	write sync.Mutex
 
-	jobs   map[string]*jobHandle
-	jobsMu sync.Mutex
-	calls  map[string]*callState
+	jobs    map[string]*jobHandle
+	jobsMu  sync.Mutex
+	calls   map[string]*callState
 	callsMu sync.Mutex
 
 	vms   map[string]*microvm
@@ -115,7 +118,7 @@ func (r *runner) connect() error {
 			"os":       runtimeOS(),
 			"arch":     runtimeArch(),
 			"hostname": r.name,
-			"version":  "0.1.0",
+			"version":  version,
 			"pid":      os.Getpid(),
 		},
 	}); err != nil {
@@ -125,6 +128,13 @@ func (r *runner) connect() error {
 	for {
 		_, raw, err := conn.ReadMessage()
 		if err != nil {
+			var ce *websocket.CloseError
+			if errors.As(err, &ce) && ce.Code == 4401 && r.key != "" && r.enrollFallback != "" {
+				log.Printf("runner key was rejected (%s) — enrolling again", ce.Text)
+				r.key, r.enrollToken = "", r.enrollFallback
+				r.enrollFallback = ""
+				_ = os.Remove(r.keyPath)
+			}
 			return err
 		}
 		var f frame

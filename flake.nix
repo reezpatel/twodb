@@ -12,7 +12,14 @@
       nixpkgs,
       flake-utils,
     }:
+    let
+      twoRunnerModules = import ./deploy/nix/two-runner-module.nix { inherit self; };
+    in
     {
+      # two-runner (Dispatch agent) as a service — see deploy/nix/two-runner-module.nix for usage.
+      nixosModules.two-runner = twoRunnerModules.nixos;
+      darwinModules.two-runner = twoRunnerModules.darwin;
+
       nixosModules.default =
         {
           config,
@@ -371,6 +378,20 @@
       in
       {
         packages = {
+          # Dispatch's machine-side agent (Go, apps/two-runner). `nix run github:reezpatel/twodb#two-runner -- --help`.
+          two-runner = pkgs.buildGoModule {
+            pname = "two-runner";
+            version = self.shortRev or self.dirtyShortRev or "dev";
+            src = pkgs.lib.cleanSource ./apps/two-runner;
+            vendorHash = "sha256-MHi11CN4xvaJ9Tx0Ij/ZppYQAYL0lZ3xbC/4F7D5zvw=";
+            subPackages = [ "." "cmd/two-vm-agent" ];
+            ldflags = [ "-s" "-w" "-X main.version=${self.shortRev or self.dirtyShortRev or "dev"}" ];
+            meta = {
+              description = "TwoDB Dispatch runner: executes commands, jobs and microvms for a TwoDB workspace";
+              mainProgram = "two-runner";
+              platforms = pkgs.lib.platforms.unix;
+            };
+          };
           twodb-runner = runnerPackage (runnerTarballFor system);
           twodb-server = serverPackage serverTarballFor;
         };

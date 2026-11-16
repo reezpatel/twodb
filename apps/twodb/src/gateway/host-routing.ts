@@ -9,6 +9,12 @@ export interface HostRoutingConfig {
 
 const SERVICE_RE = /^[a-z0-9][a-z0-9-]*$/;
 const CONTROL_PLANE_HOSTS = new Set(["console", "twodb"]);
+/**
+ * Machine endpoints that must reach the gateway's own /apps mount on ANY host. two-runner dials the gateway by whatever
+ * address it can reach (a NetBird name like `slayer.lan.nb` is a perfectly valid FQDN), and that must not be mistaken for
+ * a custom domain and handed to the catch-all service. The path is authenticated by runner key inside Dispatch.
+ */
+const MACHINE_PATH = /^\/apps\/dispatch\/api\/runner-ws(?:[/?]|$)/;
 
 function normalizeRootDomain(value: string | undefined): string | null {
   const domain = value?.trim().toLowerCase().replace(/^\.+|\.+$/g, "");
@@ -70,7 +76,7 @@ export function createHostRouter(config: HostRoutingConfig): (req: Pick<Incoming
 
     // Custom domains are real FQDNs: IPs, localhost and single-label names (docker-internal hosts, health checks,
     // direct access by IP) never fall into the catch-all.
-    const catchAllEligible = isIP(hostname) === 0 && hostname.includes(".");
+    const catchAllEligible = isIP(hostname) === 0 && hostname.includes(".") && !MACHINE_PATH.test(originalUrl);
     if (!service && !belongsToRootDomain && catchAllService && catchAllEligible) {
       // Reset lastIndex so stateful /g or /y regexes behave consistently.
       if (catchAllHostRegex) catchAllHostRegex.lastIndex = 0;

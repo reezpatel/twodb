@@ -62,7 +62,9 @@ export function registerRunnerWs(app: FastifyInstance, hubArg: DispatchHub, repo
         // (the machine persists it and reconnects with ?key= from now on).
         const token = await repo.getEnrollmentTokenByKey(enroll).catch(() => undefined);
         if (!token) return socket.close(4401, "unknown or expired enrollment token");
-        const helloFrame = early.find((raw) => {
+        // The hello can arrive AFTER the token lookup resolves (it is the runner's first frame, sent right after the
+        // handshake), so wait for it briefly instead of failing the first connect.
+        const findHello = () => early.find((raw) => {
           try {
             const f = JSON.parse(String(raw)) as { type?: string };
             return f.type === "hello";
@@ -70,6 +72,11 @@ export function registerRunnerWs(app: FastifyInstance, hubArg: DispatchHub, repo
             return false;
           }
         });
+        let helloFrame = findHello();
+        for (let waited = 0; !helloFrame && waited < 5000 && socket.readyState === socket.OPEN; waited += 50) {
+          await new Promise((r) => setTimeout(r, 50));
+          helloFrame = findHello();
+        }
         if (!helloFrame) return socket.close(4400, "expected hello frame");
         const hello = JSON.parse(String(helloFrame)) as {
           name?: string; kind?: "host" | "microvm-host"; meta?: Record<string, unknown>;

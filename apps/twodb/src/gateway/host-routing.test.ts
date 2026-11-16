@@ -50,6 +50,15 @@ test("catch-all never captures IPs, localhost or single-label hosts", () => {
   assert.equal(route({ url: "/", headers: { host: "landing.acme.com" } }), "/apps/twopager/");
 });
 
+test("runner WebSocket path is never captured by the catch-all (e.g. a NetBird FQDN gateway address)", () => {
+  const route = createHostRouter({ ROOT_DOMAIN: "twodb.io", CATCH_ALL_SERVICE: "twopager" });
+  const ws = "/apps/dispatch/api/runner-ws?enroll=twodbenroll_x";
+  assert.equal(route({ url: ws, headers: { host: "slayer.lan.nb:6400" } }), ws);
+  assert.equal(route({ url: "/apps/dispatch/api/runner-ws", headers: { host: "landing.acme.com" } }), "/apps/dispatch/api/runner-ws");
+  // everything else on that host is still a site
+  assert.equal(route({ url: "/apps/dispatch/other", headers: { host: "landing.acme.com" } }), "/apps/twopager/apps/dispatch/other");
+});
+
 test("invalid catch-all configuration fails at startup", () => {
   assert.throws(() => createHostRouter({ CATCH_ALL_SERVICE: "Bad Service" }), /kebab-case/);
   assert.throws(() => createHostRouter({ CATCH_ALL_SERVICE: "artisan", CATCH_ALL_HOST_REGEX: "[" }), /invalid/);
