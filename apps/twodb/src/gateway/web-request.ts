@@ -41,11 +41,28 @@ export function toWebRequest(req: FastifyRequest): Request {
 
 /** Writes a standard Fetch API Response back onto the raw Fastify/Node response, streaming the body. */
 export async function sendWebResponse(reply: FastifyReply, response: Response): Promise<void> {
+  // Headers other Fastify hooks already put on `reply` (notably @fastify/cors's Access-Control-Allow-Origin /
+  // -Credentials / Vary) are NOT flushed when we write to the raw response, so carry them over first.
+  const carried = reply.getHeaders();
+  for (const [key, value] of Object.entries(carried)) {
+    if (value !== undefined) reply.raw.setHeader(key, value as string | string[] | number);
+  }
   reply.raw.statusCode = response.status;
+  const setCookies = response.headers.getSetCookie?.() ?? [];
   response.headers.forEach((value, key) => {
-    if (key.toLowerCase() === "content-encoding") return; // let Node handle framing itself
+    const k = key.toLowerCase();
+    if (k === "content-encoding") return; // let Node handle framing itself
+    if (k === "set-cookie") return; // written below, one header line per cookie (setHeader would overwrite)
+    if (k === "vary") {
+      // merge with Vary from hooks (e.g. `Origin`) instead of replacing it
+      const prev = reply.raw.getHeader("vary");
+      const merged = new Set([...String(prev ?? "").split(","), ...value.split(",")].map((v) => v.trim()).filter(Boolean));
+      reply.raw.setHeader("vary", [...merged].join(", "));
+      return;
+    }
     reply.raw.setHeader(key, value);
   });
+  if (setCookies.length) reply.raw.setHeader("set-cookie", setCookies);
 
   if (!response.body) {
     reply.raw.end();
