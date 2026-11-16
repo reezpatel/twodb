@@ -14,10 +14,10 @@ const WEEKS = 53;
 function dayTone(calls: number, peak: number): string {
   if (calls === 0) return "bg-ink/[0.06]";
   const r = calls / peak;
-  if (r > 0.75) return "bg-ion-deep/85";
-  if (r > 0.5) return "bg-ion-deep/55";
-  if (r > 0.25) return "bg-ion-deep/35";
-  return "bg-ion-deep/20";
+  if (r > 0.75) return "bg-info/85";
+  if (r > 0.5) return "bg-info/55";
+  if (r > 0.25) return "bg-info/35";
+  return "bg-info/20";
 }
 
 export function CallsWidget({

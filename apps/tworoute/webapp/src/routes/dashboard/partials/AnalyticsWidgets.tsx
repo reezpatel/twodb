@@ -125,7 +125,7 @@ export function ModelsWidget({ rows }: { rows: SummaryRow[] }) {  // Per-model t
   const top = entries.slice(0, 4);
   const otherShare = entries.length > 4 ? entries.slice(4).reduce((a, [, v]) => a + v, 0) : 0;
 
-  const swatch = (i: number) => (i === 0 ? "bg-ion-deep" : i === 1 ? "bg-ion-deep/60" : "bg-ion-deep/35");
+  const swatch = (i: number) => (i === 0 ? "bg-info" : i === 1 ? "bg-info/60" : "bg-info/35");
   const shareOf = (v: number) => (total > 0 ? `${Math.round((v / total) * 100)}%` : "0%");
 
   return (

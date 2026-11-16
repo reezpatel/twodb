@@ -20,6 +20,7 @@
     "@twodb/twodb-shared-frontend": "workspace:*"
   },
   "devDependencies": {
+    "@storybook/react-vite": "^10.6.3",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

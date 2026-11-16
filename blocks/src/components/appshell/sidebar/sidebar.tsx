@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "../../../lib/utils";
+import { useLargeViewport } from "../use-large-viewport";
 
 export interface SidebarProps extends Omit<React.ComponentProps<"aside">, "onResize"> {
   /** Which edge of the shell this panel docks to. Defaults to "right". */
@@ -19,7 +20,7 @@ export interface SidebarProps extends Omit<React.ComponentProps<"aside">, "onRes
   variant?: "fixed" | "responsive";
   /** Whether the panel is shown. Defaults to true. In "push" mode it animates its width to 0; in "overlay" mode it slides off-screen. */
   open?: boolean;
-  /** Called when the overlay backdrop is clicked, or Escape is pressed while the panel has focus. Only relevant in "overlay" mode. */
+  /** Called when the overlay backdrop is clicked, or Escape is pressed. Only relevant when floating (overlay mode, or responsive below lg). */
   onOpenChange?: (open: boolean) => void;
   /** Initial/uncontrolled width in px. */
   defaultWidth?: number;
@@ -28,32 +29,28 @@ export interface SidebarProps extends Omit<React.ComponentProps<"aside">, "onRes
   /** Controlled width in px — pairs with onWidthChange. */
   width?: number;
   onWidthChange?: (width: number) => void;
-  /** Show the drag handle on the edge shared with the main content. */
+  /** Show the drag handle on the edge shared with the main content. Only when docked (not overlay). */
   resizable?: boolean;
+  /**
+   * Upper bound (px) for the panel's width while floating as an overlay.
+   * The inline width style wins over CSS classes, so a responsive sheet
+   * would otherwise keep its desktop width on a phone — cap it here in JS.
+   * Defaults to 85vw (tracks resizes).
+   */
+  maxOverlayWidth?: number;
 }
 
 const KEYBOARD_STEP = 16;
 
-/** lg breakpoint of the default blocks/Tailwind theme (1024px). */
-const LARGE_VIEWPORT_QUERY = "(min-width: 1024px)";
-
-/** SSR-safe live viewport test — false below lg, true on lg+. */
-function isLargeViewport(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return true;
-  return window.matchMedia(LARGE_VIEWPORT_QUERY).matches;
-}
-
-/** Re-renders on viewport class change so a `variant="responsive"` Sidebar
- * swaps between docked (push) and floating (overlay) without remounting. */
-function useViewportVariant(): boolean {
-  const [large, setLarge] = React.useState(isLargeViewport);
+/** Live window.innerWidth, tracked on resize (SSR-safe initial 1024). */
+function useViewportWidth(): number {
+  const [w, setW] = React.useState(() => (typeof window === "undefined" ? 1024 : window.innerWidth));
   React.useEffect(() => {
-    const mql = window.matchMedia(LARGE_VIEWPORT_QUERY);
-    const onChange = () => setLarge(mql.matches);
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
+    const onResize = () => setW(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
-  return large;
+  return w;
 }
 
 /** A left- or right-docked panel, resizable by dragging the edge shared with the main content, in "push" or "overlay" mode. */
@@ -72,12 +69,14 @@ function Sidebar({
   width: controlledWidth,
   onWidthChange,
   resizable = true,
+  maxOverlayWidth,
   ...props
 }: SidebarProps) {
   // responsive: lg+ pushes (always docked, open ignored), below lg floats as
   // an overlay whose visibility is the `open` prop.
-  const isLarge = useViewportVariant();
+  const isLarge = useLargeViewport();
   const isOverlay = variant === "responsive" ? !isLarge : mode === "overlay";
+
   const [uncontrolledWidth, setUncontrolledWidth] = React.useState(defaultWidth);
   const width = controlledWidth ?? uncontrolledWidth;
   const setWidth = (next: number) => {
@@ -85,6 +84,22 @@ function Sidebar({
     onWidthChange?.(next);
   };
   const clamp = (value: number) => Math.min(maxWidth, Math.max(minWidth, value));
+
+  // Overlay sheets never cover the whole screen: the inline width style wins
+  // over CSS classes, so cap the overlay width here in JS (default 85vw).
+  const viewportWidth = useViewportWidth();
+  const overlayCap = typeof maxOverlayWidth === "number" ? maxOverlayWidth : Math.round(viewportWidth * 0.85);
+  const effectiveWidth = isOverlay ? Math.min(width, overlayCap) : width;
+
+  // Overlay: Escape closes the panel.
+  React.useEffect(() => {
+    if (!isOverlay || !open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onOpenChange?.(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOverlay, open, onOpenChange]);
 
   const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -118,7 +133,7 @@ function Sidebar({
     setWidth(clamp(width + (grow ? KEYBOARD_STEP : -KEYBOARD_STEP)));
   };
 
-  const resizeHandle = resizable ? (
+  const resizeHandle = resizable && !isOverlay ? (
     <div
       data-slot="sidebar-resize-handle"
       role="separator"
@@ -151,14 +166,14 @@ function Sidebar({
         <aside
           data-slot="sidebar"
           data-side={side}
-          data-mode={mode}
+          data-mode="overlay"
           className={cn(
             "absolute inset-y-0 z-40 flex h-full flex-col overflow-hidden bg-stone transition-transform duration-200 ease-out",
             side === "right" ? "right-0 border-l border-outline" : "left-0 border-r border-outline",
             open ? "translate-x-0" : side === "right" ? "translate-x-full" : "-translate-x-full",
             className,
           )}
-          style={{ width, ...style }}
+          style={{ width: effectiveWidth, ...style }}
           {...props}
         >
           {resizeHandle}

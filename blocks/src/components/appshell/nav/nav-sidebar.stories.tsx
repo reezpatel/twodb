@@ -96,3 +96,42 @@ export const Collapsible: Story = {
     );
   },
 };
+
+/**
+ * Desktop-dock / mobile-sheet: inline on lg+ screens (collapses to 0 width),
+ * floats as a backdrop sheet below lg. Narrow the browser under 1024px to
+ * see the overlay — the toggle opens it, backdrop click or Escape closes it,
+ * and picking an item closes it too.
+ */
+export const Responsive: Story = {
+  render: () => {
+    const [open, setOpen] = React.useState(false);
+    const [activeId, setActiveId] = React.useState("home");
+    const select = (id: string) => {
+      setActiveId(id);
+      setOpen(false);
+    };
+    return (
+      <div className="flex h-[480px] flex-col bg-paper">
+        <div className="flex h-10 shrink-0 items-center gap-2 border-b border-outline px-2">
+          <NavSidebarToggle open={open} onToggle={() => setOpen((o) => !o)} />
+          <span className="font-sans text-[13px] font-medium text-ink">Responsive nav — resize below 1024px</span>
+        </div>
+        <div className="relative flex min-h-0 flex-1">
+          <NavSidebar
+            variant="responsive"
+            open={open}
+            onOpenChange={setOpen}
+            groups={groups}
+            footerItems={footerItems}
+            activeId={activeId}
+            onSelect={select}
+          />
+          <div className="flex-1 p-4 text-ink-muted">
+            Main content. On lg+ the nav docks inline and pushes this pane; below lg it floats above it as a sheet with a backdrop.
+          </div>
+        </div>
+      </div>
+    );
+  },
+};

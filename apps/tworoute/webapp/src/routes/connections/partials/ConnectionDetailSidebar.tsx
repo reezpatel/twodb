@@ -76,6 +76,7 @@ export function ConnectionDetailSidebar(props: ConnectionDetailSidebarProps) {
       defaultWidth={480}
       minWidth={280}
       maxWidth={maxWidth}
+      resizable={false}
       className="border-l border-outline bg-card"
     >
       <div className="flex min-h-0 flex-1 flex-col pt-4">
@@ -154,9 +155,9 @@ export function ConnectionDetailSidebar(props: ConnectionDetailSidebarProps) {
                       </span>
                     </div>
                     {ratio !== null ? (
-                      <div className="mt-1 h-[30px] overflow-hidden rounded-[3px] bg-ink/10">
+                      <div className="mt-1 h-[15px] overflow-hidden rounded-[3px] bg-ink/10 lg:h-[30px]">
                         <span
-                          className={`block h-full rounded-[3px] ${ratio > 0.85 ? "bg-destructive" : ratio > 0.6 ? "bg-warning" : "bg-success"}`}
+                          className={`block h-full rounded-[3px] ${ratio > 0.85 ? "bg-destructive" : ratio > 0.6 ? "bg-warning" : "bg-info"}`}
                           style={{ width: `${Math.min(100, ratio * 100)}%` }}
                         />
                       </div>

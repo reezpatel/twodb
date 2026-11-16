@@ -8,6 +8,8 @@ import { ShellChrome } from "./routes/shell/partials/ShellChrome.js";
 import { AppHeader, type AppHeaderProps } from "./routes/shell/partials/AppHeader.js";
 import { useShellSession } from "./routes/shell/hooks/useShellSession.js";
 import { useSidebarToggle } from "./routes/shell/hooks/useSidebarToggle.js";
+import { useDetailPanel } from "./routes/shell/hooks/useDetailPanel.js";
+import { useInstallPrompt } from "./routes/shell/hooks/useInstallPrompt.js";
 import { useShellNav } from "./routes/shell/hooks/useShellNav.js";
 import { ConnectionDetailSidebar } from "./routes/connections/partials/ConnectionDetailSidebar.js";
 import { ConnectionsProvider, useSharedConnections } from "./lib/connections-context.js";
@@ -36,14 +38,15 @@ export function App() {
 
 function ShellRoutes() {
   const { userName, signOut } = useShellSession();
+  const installPrompt = useInstallPrompt();
   const { connections, activeId, onSelect } = useShellNav();
   const conn = useSharedConnections();
   const [quotaSweep, setQuotaSweep] = useState<null | { ok: number; error: number; skipped: number }>(null);
 
-  const { open: navOpen, toggle: toggleNav } = useSidebarToggle("tworoute.nav-open");
+  const { open: navOpen, toggle: toggleNav, setOpen: setNavOpen, overlay: navOverlay } = useSidebarToggle("tworoute.nav-open");
   const activeConnection = activeId === "dashboard" ? null : (connections.find((c) => c.name === activeId) ?? null);
-  /** Overlay visibility of the detail sidebar below lg. */
-  const [detailOpen, setDetailOpen] = useState(true);
+  /** Detail panel: docked on lg+, overlay sheet below lg (closed by default). */
+  const { open: detailOpen, setOpen: setDetailOpen, toggle: toggleDetail } = useDetailPanel();
 
   // Lazily pull models + usage for the detail sidebar when entering a
   // connection page.
@@ -93,19 +96,20 @@ function ShellRoutes() {
             variant="ghost"
             className="lg:hidden"
             aria-label="Toggle connection details"
-            onClick={() => setDetailOpen((o) => !o)}
+            aria-expanded={detailOpen}
+            onClick={toggleDetail}
           >
             Details
           </Button>
         ) : null}
         {quotaSweep ? (
-          <span className="text-[11px] text-ink-muted">
+          <span className="hidden text-[11px] text-ink-muted sm:inline">
             {quotaSweep.ok} ok · {quotaSweep.error} failed · {quotaSweep.skipped} skipped
           </span>
         ) : null}
-        <Button size="sm" variant="ghost" disabled={conn.busy} onClick={() => void refreshAllQuotas()}>
+        <Button size="sm" variant="ghost" disabled={conn.busy} aria-label="Refresh quotas" onClick={() => void refreshAllQuotas()}>
           <RefreshCw className="size-3.5" />
-          Refresh quotas
+          <span className="hidden sm:inline">Refresh quotas</span>
         </Button>
       </div>
     ),
@@ -115,11 +119,26 @@ function ShellRoutes() {
     <ShellChrome
       connections={connections}
       activeId={activeId}
-      onSelect={onSelect}
+      onSelect={(id) => {
+        onSelect(id);
+        if (navOverlay) setNavOpen(false);
+      }}
       userName={userName}
       onSignOut={signOut}
+      canInstall={installPrompt.visible}
+      onInstall={() => {
+        void installPrompt.install().then((result) => {
+          // No native prompt available (e.g. iOS Safari) — guide the user.
+          if (result === "manual") {
+            window.alert(
+              "To install TwoRoute: open the browser's share menu and choose “Add to Home Screen”.",
+            );
+          }
+        });
+      }}
       navOpen={navOpen}
       onToggleNav={toggleNav}
+      onNavOpenChange={setNavOpen}
       header={<AppHeader {...headerProps} />}
       sidebar={
         activeConnection ? (

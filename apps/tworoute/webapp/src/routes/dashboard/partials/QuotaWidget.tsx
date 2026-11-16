@@ -24,11 +24,12 @@ function until(iso: string | null): string | null {
   return `${Math.floor(hours / 24)}d`;
 }
 
+/** Theme tones for the filled blocks: info (ok) → warning → destructive. */
 function toneFor(ratio: number | null): string {
   if (ratio === null) return "bg-ink-muted";
   if (ratio > 0.8) return "bg-destructive";
   if (ratio >= 0.5) return "bg-warning";
-  return "bg-success";
+  return "bg-info";
 }
 
 function fmtValue(q: QuotaSnapshot): string {
@@ -45,7 +46,7 @@ function QuotaBlocks({ ratio }: { ratio: number }) {
     <div className="flex flex-col" style={{ height: 30 }}>
       <div className="flex items-end gap-1" style={{ height: 30 }} role="img" aria-label={`${Math.round(ratio * 100)}% used`}>
         {Array.from({ length: BLOCKS }, (_, i) => (
-          <span key={i} className={`w-3 flex-1 rounded-[1px] ${i < filled ? tone : "bg-ink/10"}`} style={{ height: 30 }} />
+          <span key={i} className={`w-3 flex-1 rounded-[1px] ${i < filled ? tone : "bg-info/15"}`} style={{ height: 30 }} />
         ))}
       </div>
     </div>

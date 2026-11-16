@@ -7,7 +7,9 @@ import { useConnections } from "../routes/connections/hooks/useConnections.js";
  * mutation elsewhere (patch in the sidebar wouldn't reach the dashboard's
  * connection list, etc.).
  */
+/** Exported for stories/tests that need to feed a mock value into the hook. */
 const ConnectionsContext = createContext<ReturnType<typeof useConnections> | null>(null);
+export { ConnectionsContext };
 
 export function ConnectionsProvider({ children }: { children: ReactNode }) {
   const connections = useConnections();

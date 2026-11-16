@@ -3,6 +3,7 @@ import { useSharedConnections } from "../../lib/connections-context.js";
 import { useAnalytics } from "./hooks/useAnalytics.js";
 import { CallsWidget } from "./partials/CallsWidget.js";
 import { QuotaWidget } from "./partials/QuotaWidget.js";
+import { ProviderQuotaWidget } from "./partials/ProviderQuotaWidget.js";
 import { CostWidget, ErrorsWidget, LatencyWidget, ModelsWidget, StatusWidget, TokensWidget, ToolCallsWidget } from "./partials/AnalyticsWidgets.js";
 import type { CachedModel } from "../../lib/tworoute-client.js";
 
@@ -22,29 +23,36 @@ export function Dashboard({ scope }: { scope: string | null }) {
   const scopedSummary = active ? summary : summary;
   void scopedSummary;
 
+  // Quotas: one tile per board — per-provider rollup on the aggregate
+  // board, per-connection windows on a connection's board.
   const items: WidgetItem[] = [
+    { id: "provider_quota", size: "wide", label: "Provider quotas" },
     { id: "calls", size: "wide", label: "Calls" },
     { id: "tokens", size: "sm", label: "Tokens" },
     { id: "cost", size: "sm", label: "Cost" },
     { id: "status", size: "sm", label: "Status" },
     { id: "latency", size: "sm", label: "Latency" },
     { id: "errors", size: "sm", label: "Errors" },
-    { id: "quota", size: "wide", label: "Quotas" },
+    ...(scope ? [{ id: "quota", size: "wide", label: "Quotas" } as WidgetItem] : []),
     { id: "models", size: "wide", label: "Token usage by model" },
     { id: "tool_calls", size: "wide", label: "Tool calls" },
   ];
 
   return (
-    <div className="w-full max-w-6xl p-6">
+    <div className="w-full max-w-6xl p-4 sm:p-6">
       {loading ? (
         <p className="mb-4 text-[13px] text-ink-muted">Loading analytics…</p>
       ) : null}
       <DraggableWidgetGrid
         className="max-w-full"
+        editable={false}
+        radius={10}
         maxColumns={4}
         items={items}
         renderItem={(item) => {
           switch (item.id) {
+            case "provider_quota":
+              return <ProviderQuotaWidget />;
             case "calls":
               return <CallsWidget buckets={buckets} connections={conn.connections} />;
             case "tokens":

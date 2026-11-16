@@ -165,7 +165,7 @@ export const tworouteClient = {
   },
 
   /** 24h usage summary per (connection, model) — feeds every widget. */
-  analyticsSummary(connectionId?: string): Promise<{
+  analyticsSummary(connectionId?: string, days = 1): Promise<{
     since: string;
     days: number;
     rows: Array<{

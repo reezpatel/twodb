@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { MoreVertical, RefreshCw } from "lucide-react";
-import { AppShellHeader, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@twodb/blocks";
+import { MoreVertical, Plus, RefreshCw } from "lucide-react";
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@twodb/blocks";
 import type { Connection, ProviderSpec } from "../../../lib/tworoute-client.js";
 import type { Space } from "../../connections/hooks/useConnections.js";
 import { ConnectionDialog, type ConnectionFormValues, type OauthRunner, type OauthCompleter } from "./ConnectionDialog.js";
@@ -26,17 +26,17 @@ export interface AppHeaderProps {
 }
 
 /**
- * The app-wide header (blocks AppShellHeader): title on the left, shared
- * actions on the right — Add connection everywhere, plus a per-connection
- * hamburger (Edit / Refresh models) when the current page is a connection.
- * Dumb — all logic flows in via props.
+ * The app-wide header content (lives inside the shell's AppShellHeader):
+ * title on the left, shared actions on the right — Add connection
+ * everywhere, plus a per-connection hamburger (Edit / Refresh models) when
+ * the current page is a connection. Dumb — all logic flows in via props.
  */
 export function AppHeader(props: AppHeaderProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
 
   return (
-    <AppShellHeader className="flex h-14 shrink-0 items-center gap-3 border-b border-outline px-6">
+    <>
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-[15px] font-semibold leading-none text-ink">{props.title}</h1>
         {props.subtitle ? <p className="mt-1 truncate text-[12px] leading-none text-ink-muted">{props.subtitle}</p> : null}
@@ -76,7 +76,10 @@ export function AppHeader(props: AppHeaderProps) {
         onRunOauth={props.onRunOauth}
         onCompleteOauth={props.onCompleteOauth}
         trigger={
-          <Button size="sm">Add connection</Button>
+          <Button size="sm" aria-label="Add connection">
+            <Plus className="size-4 sm:hidden" />
+            <span className="hidden sm:inline">Add connection</span>
+          </Button>
         }
       />
 
@@ -95,6 +98,6 @@ export function AppHeader(props: AppHeaderProps) {
         onCompleteOauth={props.onCompleteOauth}
         />
       ) : null}
-    </AppShellHeader>
+    </>
   );
 }
