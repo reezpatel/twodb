@@ -235,7 +235,7 @@ interface QuotaCtx {
 /** Claude Code: oauth usage endpoint — 5h/weekly percent windows, per-model weeklies, extra-usage pool. */
 async function collectClaudeCode(connection: LiveConn, ctx: QuotaCtx): Promise<QuotaSnapshot[]> {
   const config = await ensureFreshTokens(connection, ctx.db, ctx.encrypt);
-  const token = config.access_token;
+  const token = config.accessToken ?? config.access_token;
   if (!token) throw new Error("missing OAuth access token");
 
   const json = await fetchJson("https://api.anthropic.com/api/oauth/usage", {
@@ -293,12 +293,12 @@ async function collectClaudeCode(connection: LiveConn, ctx: QuotaCtx): Promise<Q
 /** Codex (ChatGPT): wham usage endpoint — primary (5h) + secondary (weekly) percent windows. */
 async function collectCodex(connection: LiveConn, ctx: QuotaCtx): Promise<QuotaSnapshot[]> {
   const config = await ensureFreshTokens(connection, ctx.db, ctx.encrypt);
-  const token = config.access_token;
+  const token = config.accessToken ?? config.access_token;
   if (!token) throw new Error("missing OAuth access token");
 
   const json = await fetchJson("https://chatgpt.com/backend-api/wham/usage", {
     authorization: `Bearer ${token}`,
-    ...((config.account_id ?? config.accountId) ? { "chatgpt-account-id": String(config.account_id ?? config.accountId) } : {}),
+    ...((config.accountId ?? config.account_id) ? { "chatgpt-account-id": String(config.accountId ?? config.account_id) } : {}),
   });
 
   const rateLimit = asRecord(asRecord(json)?.rate_limit) ?? asRecord(json);

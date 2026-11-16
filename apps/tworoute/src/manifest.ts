@@ -114,7 +114,7 @@ const updateConnection = defineEndpoint({
   auth: "session-or-apiKey",
   description:
     "Updates a connection — rename, move space, change base URL/default model, rotate the API key, or " +
-    "replace its config (OAuth tokens, org, accountId…). Only fields present are changed.",
+    "merge into its config (OAuth tokens, org, accountId…). Only fields present are changed; config keys are merged, not replaced.",
   request: z.object({
     id: z.string(),
     name: z.string().optional(),

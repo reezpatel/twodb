@@ -9,7 +9,7 @@ Multi-provider LLM gateway: 24 provider kinds (OAuth for Claude Code & Codex inc
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-16T16:08:08.215Z_
+_Generated: 2026-11-16T17:49:36.456Z_
 
 ## Endpoints
 
@@ -241,7 +241,7 @@ Registers a new LLM provider connection, scoped to one or more spaces (`spaceIds
 
 ### `PATCH /connections/:id` — updateConnection
 
-Updates a connection — rename, move space, change base URL/default model, rotate the API key, or replace its config (OAuth tokens, org, accountId…). Only fields present are changed.
+Updates a connection — rename, move space, change base URL/default model, rotate the API key, or merge into its config (OAuth tokens, org, accountId…). Only fields present are changed; config keys are merged, not replaced.
 
 - **Auth**: `session-or-apiKey`
 

@@ -138,7 +138,12 @@ export function createConnectionsRepo(db: Kysely<TwoRouteDb>, encryptionKey: str
       if (patch.defaultModel !== undefined) set.default_model = patch.defaultModel;
       if (patch.apiKey !== undefined) set.api_key = encryptSecret(patch.apiKey, encryptionKey);
       if (patch.config !== undefined) {
-        set.config = Object.keys(patch.config).length ? encryptSecret(JSON.stringify(patch.config), encryptionKey) : null;
+        // Merge into the stored config: the edit dialog only sends the fields the user
+        // filled in, and replacing wholesale would wipe untouched secrets (refresh tokens…).
+        const current = await db.selectFrom("llm_connection").select("config").where("id", "=", id).executeTakeFirst();
+        const existing = current?.config ? (JSON.parse(decryptSecret(current.config, encryptionKey)) as ConnectionConfig) : {};
+        const merged = { ...existing, ...patch.config };
+        set.config = Object.keys(merged).length ? encryptSecret(JSON.stringify(merged), encryptionKey) : null;
       }
       if (Object.keys(set).length === 0) return;
       await db.updateTable("llm_connection").set(set).where("id", "=", id).execute();
