@@ -32,6 +32,9 @@ export async function proxyToApp(
   // Never trust identity headers from the caller: always drop them, then (re)set from the resolved context.
   for (const h of [...headers.keys()]) if (h.startsWith("x-twodb-")) headers.delete(h);
   headers.delete("x-gateway-verified");
+  // The Host the client used (the Host header itself may be rewritten by the transport). Apps that serve by host
+  // (TwoPager's catch-all sites) read this; always overwritten so callers cannot spoof it.
+  if (req.headers.host) headers.set("x-forwarded-host", req.headers.host);
   // Calling-app identity, as screened by the gateway's onRequest hook
   // (x-twodb-token never reaches here — it is stripped at the edge).
   headers.set("x-gateway-verified", req.callerApp?.verified ? "true" : "false");

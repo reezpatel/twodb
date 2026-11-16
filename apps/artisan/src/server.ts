@@ -103,14 +103,14 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
   app.addHook("onClose", async () => clearInterval(purgeTimer));
 
   // Workspace API key for TwoRoute/Dispatch calls — from the forwarded
-  // x-api-key when present (gateway forwards it) or the provision token env.
+  // x-api-key when present (gateway forwards it) or the per-login token.
   const apiKeyFor = (req: FastifyRequest): string => {
     const fwd = (req.headers["x-api-key"] as string | undefined) ?? (req.headers["authorization"] as string | undefined)?.replace(/^Bearer\s+/i, "");
     if (fwd) return fwd;
     // Browsers can't set headers on WS upgrades / iframes: the webapp passes
     // the per-login gateway token as ?access_token=.
     const q = new URL(req.url, "http://internal").searchParams.get("access_token");
-    return q ?? process.env.WORKSPACE_API_KEY ?? "";
+    return q ?? "";
   };
 
   const depsFor = (req: FastifyRequest): RunDeps & { tworoute: TworouteClient; dispatch: DispatchClient } => {
@@ -1480,15 +1480,18 @@ echo saved`;
   });
 
   // --- workspace WS -------------------------------------------------------------
-  registerWorkspaceWs(app, hub, repo, (() => {
-    const key = process.env.WORKSPACE_API_KEY ?? "";
+  // Machine-to-machine: the workspace is known per socket, so TwoRoute/Dispatch are called as THIS app via a
+  // control-plane service token (actAs, grant `artisan>tworoute,artisan>dispatch`) — no stored API key.
+  // Without a control-plane session (tests) there is simply no credential.
+  registerWorkspaceWs(app, hub, repo, (workspaceId) => {
+    const act = opts.twodb?.actAs;
     return {
       repo, hub,
-      tworoute: new TworouteClient(config, key),
-      dispatch: new DispatchClient(config, key),
+      tworoute: new TworouteClient(config, act ? act("tworoute", workspaceId) : ""),
+      dispatch: new DispatchClient(config, act ? act("dispatch", workspaceId) : ""),
       ...(opts.twodb?.serviceFetch ? { toolkit: createToolkitClient(opts.twodb.serviceFetch) } : {}),
     };
-  })());
+  });
 
   app.get("/healthz", async () => ({ ok: true }));
 

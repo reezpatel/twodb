@@ -10,18 +10,20 @@
 #   postgres   shared cluster; TwoDB provisions one schema + role per app
 #   rustfs     S3-compatible object storage (MinIO replacement), bucket created by s3-init
 #
-# Routing (gateway = the ONLY published port, ${GATEWAY_PORT:-6400})
+# Routing (gateway = the only publicly published port, ${GATEWAY_PORT:-6400}; Postgres is published on the NetBird IP only)
 #   Point a wildcard DNS record  *.<ROOT_DOMAIN>  (and <ROOT_DOMAIN>) at your TLS-terminating reverse proxy,
 #   which forwards every host UNCHANGED (keep the Host header!) to the gateway port. Then
 #     https://console.<ROOT_DOMAIN>   -> console (sign in, apps, admin)       https://console.<ROOT_DOMAIN>/storybook/ -> Storybook
 #     https://<slug>.<ROOT_DOMAIN>    -> that app's webapp   (e.g. artisan.<ROOT_DOMAIN>)
 #     https://<slug>.<ROOT_DOMAIN>/api/...  -> that app's API
-#   Hosts outside ROOT_DOMAIN pass through untouched, unless CATCH_ALL_SERVICE is set (see below).
+#   Hosts OUTSIDE ROOT_DOMAIN (custom domains) go to CATCH_ALL_SERVICE — TwoPager by default — which serves the static
+#   site attached to that domain. IPs, localhost and single-label hosts are never captured. Sites can also get a built-in
+#   hostname `<site-slug>.<SITES_DOMAIN>` (point *.<SITES_DOMAIN> at the same proxy; SITES_DOMAIN must NOT be under ROOT_DOMAIN).
 #
 # Persistent data — EVERYTHING lives under ${DATA_DIR:-./data} (relative paths are relative to THIS file;
 # set DATA_DIR to an absolute path in production). Back up this one directory:
 #   postgres/        all app databases
-#   rustfs/          all object storage (drive files, uploads, ...)
+#   rustfs/          all object storage (drive files, uploads, TwoPager sites, ...)
 #   twodb/           control-plane SQLite (users, passkeys, app registry, tokens)
 #   apps/<slug>/     per-app local files (registration token cache, blobs, archives)
 #
@@ -31,16 +33,20 @@
 #                               Changing it later invalidates stored secrets — treat as permanent.
 #   TWODB_REGISTRATION_SECRET   >= 16 random chars; apps present it to self-register with the control plane
 #   POSTGRES_PASSWORD           URL-safe characters only (it is embedded in a connection URL)
+#   POSTGRES_BIND_IP            this host's NetBird IP; Postgres is published ONLY on it (NetBird peers can connect to
+#                               <that ip>:${POSTGRES_PORT:-5432}; also restrict who may reach it with NetBird access policies)
 #   S3_ACCESS_KEY_ID            object-storage root access key
 #   S3_SECRET_ACCESS_KEY        object-storage root secret key
 #
 # OPTIONAL environment (defaults in the file):
-#   PUBLIC_SCHEME=https | GATEWAY_PORT=6400 | DATA_DIR=./data | TWODB_VERSION=latest | REGISTRY_OWNER=reezpatel
+#   PUBLIC_SCHEME=https | POSTGRES_PORT=5432 | GATEWAY_PORT=6400 | DATA_DIR=./data | TWODB_VERSION=latest | REGISTRY_OWNER=reezpatel
 #   POSTGRES_USER=twodb | POSTGRES_DB=twodb | S3_BUCKET=twodb | S3_REGION=us-east-1 | RUSTFS_VERSION
 #   TWODB_OPEN_SIGNUP=false (true = anyone can register a passkey; default: only the first user)
-#   CATCH_ALL_SERVICE=<slug>   route hosts OUTSIDE ROOT_DOMAIN (custom domains) to this app, Host header preserved
+#   CATCH_ALL_SERVICE=twopager route hosts OUTSIDE ROOT_DOMAIN (custom domains) to this app, Host header preserved ("" = off)
+#   SITES_DOMAIN=              wildcard base for built-in site hostnames <slug>.<SITES_DOMAIN> (TwoPager); default none
+#   TWOPAGER_CACHE_MAX_MB=2048 | TWOPAGER_MAX_ZIP_MB=1024 | TWOPAGER_MAX_FILE_MB=512 (zip upload / single file limits; gateway body limit TWODB_BODY_LIMIT_MB=4096)
 #   CATCH_ALL_HOST_REGEX=...   restrict the catch-all to hostnames matching this regex; the rest passes through
-#   TWOMAIL_ALLOWED_HOSTS=...  IMAP/SMTP hosts TwoMail may connect to | WORKSPACE_API_KEY=... (artisan fallback key)
+#   TWOMAIL_ALLOWED_HOSTS=...  IMAP/SMTP hosts TwoMail may connect to
 #   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / POCKETID_ISSUER / POCKETID_CLIENT_ID / POCKETID_CLIENT_SECRET (social login)
 # =============================================================================
 
@@ -78,7 +84,7 @@ services:
       - sh
       - -c
       - >-
-        mkdir -p /data/postgres /data/rustfs /data/twodb /data/apps/tworoute /data/apps/twomail /data/apps/twoday /data/apps/twocontacts /data/apps/twochat /data/apps/twodrive /data/apps/artisan /data/apps/dispatch /data/apps/tworing /data/apps/garden /data/apps/twothing /data/apps/twoloop /data/apps/membrain /data/apps/paintress /data/apps/twopin /data/apps/twodoo /data/apps/twoplan /data/apps/toolkit /data/apps/fincal &&
+        mkdir -p /data/postgres /data/rustfs /data/twodb /data/apps/tworoute /data/apps/twomail /data/apps/twoday /data/apps/twocontacts /data/apps/twochat /data/apps/twodrive /data/apps/artisan /data/apps/dispatch /data/apps/tworing /data/apps/garden /data/apps/twothing /data/apps/twoloop /data/apps/membrain /data/apps/paintress /data/apps/twopin /data/apps/twodoo /data/apps/twoplan /data/apps/toolkit /data/apps/fincal /data/apps/twopager &&
         chown -R 10001:10001 /data/rustfs
     volumes:
       - ${DATA_DIR:-./data}:/data
@@ -95,6 +101,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-twodb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is mandatory (URL-safe characters)}
       POSTGRES_INITDB_ARGS: --encoding=UTF8
+    ports:
+      # Reachable from NetBird peers only: bound to this host's NetBird interface IP (see `ip -4 addr show wt0`
+      # or `netbird status`), never 0.0.0.0, so it is not exposed on the public interface.
+      - "${POSTGRES_BIND_IP:?POSTGRES_BIND_IP is mandatory (this host's NetBird IP, e.g. 100.64.0.5)}:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ${DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
     healthcheck:
@@ -156,15 +166,16 @@ services:
       s3-init:
         condition: service_completed_successfully
     ports:
-      - "${GATEWAY_PORT:-6400}:6400" # the ONLY published port
+      - "${GATEWAY_PORT:-6400}:6400" # the only publicly published port
     environment:
       NODE_ENV: production
       PORT: "6400"
       TWODB_SQLITE_FILE: /data/twodb-control-plane.sqlite
       # --- host-based routing: <slug>.ROOT_DOMAIN -> app, console.ROOT_DOMAIN -> console ---
       ROOT_DOMAIN: ${ROOT_DOMAIN:?ROOT_DOMAIN is mandatory (e.g. twodb.io)}
-      CATCH_ALL_SERVICE: ${CATCH_ALL_SERVICE:-}
+      CATCH_ALL_SERVICE: ${CATCH_ALL_SERVICE-twopager} # custom domains -> TwoPager (static sites); set CATCH_ALL_SERVICE= (empty) to disable
       CATCH_ALL_HOST_REGEX: ${CATCH_ALL_HOST_REGEX:-}
+      TWODB_BODY_LIMIT_MB: ${TWODB_BODY_LIMIT_MB:-4096} # largest proxied request body (TwoPager zip uploads)
       TWODB_CONSOLE_URL: ${PUBLIC_SCHEME:-https}://console.${ROOT_DOMAIN}
       TWODB_APP_URL_TEMPLATE: ${PUBLIC_SCHEME:-https}://{slug}.${ROOT_DOMAIN}
       # --- identity ---
@@ -281,7 +292,6 @@ services:
       HTTP_URL: http://artisan:6407
       TWOROUTE_URL: http://twodb:6400/apps/tworoute/api
       DISPATCH_URL: http://twodb:6400/apps/dispatch/api
-      WORKSPACE_API_KEY: ${WORKSPACE_API_KEY:-}
     volumes:
       - ${DATA_DIR:-./data}/apps/artisan:/data
 
@@ -408,6 +418,24 @@ services:
       HTTP_URL: http://toolkit:6418
     volumes:
       - ${DATA_DIR:-./data}/apps/toolkit:/data
+
+  # twopager — static site hosting AND the gateway's catch-all (see CATCH_ALL_SERVICE). Admin UI at twopager.<ROOT_DOMAIN>;
+  # every other host (custom domains, optional <slug>.${SITES_DOMAIN}) serves the site published there. Files: S3 + local cache.
+  twopager:
+    <<: *app
+    image: ghcr.io/${REGISTRY_OWNER:-reezpatel}/app-twopager:${TWODB_VERSION:-latest}
+    environment:
+      <<: *app-env
+      PORT: "6420"
+      HTTP_URL: http://twopager:6420
+      ADMIN_HOSTS: twopager.${ROOT_DOMAIN}
+      SITES_DOMAIN: ${SITES_DOMAIN:-}
+      CACHE_DIR: /data/cache
+      CACHE_MAX_MB: ${TWOPAGER_CACHE_MAX_MB:-2048}
+      MAX_ZIP_MB: ${TWOPAGER_MAX_ZIP_MB:-1024}
+      MAX_FILE_MB: ${TWOPAGER_MAX_FILE_MB:-512}
+    volumes:
+      - ${DATA_DIR:-./data}/apps/twopager:/data
 
   # fincal
   fincal:

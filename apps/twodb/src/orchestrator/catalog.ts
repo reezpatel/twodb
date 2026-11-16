@@ -42,6 +42,7 @@ export const APP_CATALOG: CatalogEntry[] = [
   { slug: "twoplan", name: "TwoPlan", pkgName: "@twodb/app-twoplan", containerPort: 6417, hostPort: 6417 },
   { slug: "toolkit", name: "Toolkit", pkgName: "@twodb/app-toolkit", containerPort: 6418, hostPort: 6418 },
   { slug: "fincal", name: "Fincal", pkgName: "@twodb/app-fincal", containerPort: 6419, hostPort: 6419 },
+  { slug: "twopager", name: "TwoPager", pkgName: "@twodb/app-twopager", containerPort: 6420, hostPort: 6420 },
 ];
 
 export function getCatalogEntry(slug: string): CatalogEntry | undefined {

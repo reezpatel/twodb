@@ -223,9 +223,14 @@ The image built for `@twodb/app-twodb` also builds the shared Blocks Storybook a
 
 ### Full stack in one compose file
 
-`deploy/docker-compose.full.yaml` (+ `deploy/.env.full.example`) runs the control plane, all apps, Postgres and RustFS
-(S3) with every piece of persistent data under one `DATA_DIR`. Only the gateway port is published. The mandatory
+`deploy/docker-compose.full.yaml` (+ `deploy/.env.full.example`) runs the control plane, all apps, Postgres and RustFS (S3-compatible object storage)
+with persistent local data under one `DATA_DIR`. Only the gateway port is published. The mandatory
 environment variables are listed (and enforced with `${VAR:?}`) at the top of that file.
+
+`CATCH_ALL_SERVICE` defaults to `twopager` there: any host outside `ROOT_DOMAIN` that is a real domain (not an IP,
+`localhost` or a single-label name) is sent to TwoPager, which serves the static site attached to that domain
+(`apps/twopager/README.md`). The gateway forwards the original host as `x-forwarded-host` to every app and buffers request
+bodies up to `TWODB_BODY_LIMIT_MB` (default 4096) so zip uploads fit.
 
 See `ENDPOINTS.md` / `MESSAGES.md` (generated — run `pnpm gen:docs`) for
 the exact header/payload contracts.

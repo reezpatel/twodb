@@ -6,7 +6,7 @@ import { readForwardedContext } from "../gateway-context.js";
 import { runAgentLoop, isSessionRunning, resolveAsk, cancelAsk, abortSession, type RunDeps } from "./agent-loop.js";
 
 /** Workspace WS: one per workspace; join/leave session rooms; viewer input. */
-export function registerWorkspaceWs(app: FastifyInstance, hub: WorkspaceHub, repo: ArtisanRepo, deps: RunDeps): void {
+export function registerWorkspaceWs(app: FastifyInstance, hub: WorkspaceHub, repo: ArtisanRepo, depsFor: (workspaceId: string) => RunDeps): void {
   app.get("/ws", { websocket: true }, (socket: WebSocket, req) => {
     const ctx = readForwardedContext(req);
     if (!ctx) return socket.close(4401, "no identity");
@@ -43,7 +43,7 @@ export function registerWorkspaceWs(app: FastifyInstance, hub: WorkspaceHub, rep
               : await repo.getOrCreateDirectoryAgent(workspaceId, session.space_id, session.runner, session.directory);
             if (!agent) return hub.broadcast(workspaceId, frame.sessionId, { type: "error", message: "agent config missing" });
             // fire-and-forget: frames stream to the room
-            void runAgentLoop({ deps, session, agent, model: session.model, apiKey: "", userMessage: frame.text }).catch((err) => {
+            void runAgentLoop({ deps: depsFor(workspaceId), session, agent, model: session.model, apiKey: "", userMessage: frame.text }).catch((err) => {
               hub.broadcast(workspaceId, frame.sessionId, { type: "error", message: (err as Error).message });
               hub.broadcast(workspaceId, frame.sessionId, { type: "done", ok: false, message: (err as Error).message });
             });

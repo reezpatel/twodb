@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import { isIP } from "node:net";
 
 export interface HostRoutingConfig {
   ROOT_DOMAIN?: string;
@@ -29,7 +30,8 @@ function hostnameFromHostHeader(host: string | undefined): string | null {
  * - <slug>.<ROOT_DOMAIN> routes to that registered service.
  * - console.<ROOT_DOMAIN> and twodb.<ROOT_DOMAIN> stay on the control plane.
  * - Non-root-domain hosts route to CATCH_ALL_SERVICE when configured and,
- *   when present, CATCH_ALL_HOST_REGEX matches the hostname.
+ *   when present, CATCH_ALL_HOST_REGEX matches the hostname. Only real FQDNs qualify:
+ *   IP addresses, localhost and single-label hosts always pass through.
  * - Everything else is returned unchanged for normal gateway routing.
  *
  * Only the URL is rewritten. The original Host header is deliberately kept
@@ -66,7 +68,10 @@ export function createHostRouter(config: HostRoutingConfig): (req: Pick<Incoming
       if (!label.includes(".") && SERVICE_RE.test(label) && !CONTROL_PLANE_HOSTS.has(label)) service = label;
     }
 
-    if (!service && !belongsToRootDomain && catchAllService) {
+    // Custom domains are real FQDNs: IPs, localhost and single-label names (docker-internal hosts, health checks,
+    // direct access by IP) never fall into the catch-all.
+    const catchAllEligible = isIP(hostname) === 0 && hostname.includes(".");
+    if (!service && !belongsToRootDomain && catchAllService && catchAllEligible) {
       // Reset lastIndex so stateful /g or /y regexes behave consistently.
       if (catchAllHostRegex) catchAllHostRegex.lastIndex = 0;
       if (!catchAllHostRegex || catchAllHostRegex.test(hostname)) service = catchAllService;

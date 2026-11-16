@@ -48,7 +48,9 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
   // Fastify must rewrite before route lookup; an onRequest hook is too late.
   // The same resolver is also used by the raw WebSocket upgrade bridge below.
   const routeHost = createHostRouter(config);
-  const app = Fastify({ logger: true, rewriteUrl: routeHost });
+  // Request bodies are buffered here before proxying; 4 GB default (TwoPager zip uploads are capped separately by its MAX_ZIP_MB).
+  const bodyLimit = Math.max(1, Number(process.env.TWODB_BODY_LIMIT_MB ?? 4096)) * 1024 * 1024;
+  const app = Fastify({ logger: true, rewriteUrl: routeHost, bodyLimit });
   await app.register(cors, {
     // Trusted origins + app webapps allowed to run "Login with TwoDB" (same rule as the redirect check).
     origin: (origin, cb) => cb(null, !origin || config.AUTH_TRUSTED_ORIGINS.includes(origin) || isRootDomainOrigin(origin, config.ROOT_DOMAIN) || isAllowedRedirect(origin, config)),

@@ -42,6 +42,14 @@ test("missing or malformed hosts pass through", () => {
   assert.equal(route(request("not a host")), "/boards/1?view=full");
 });
 
+test("catch-all never captures IPs, localhost or single-label hosts", () => {
+  const route = createHostRouter({ ROOT_DOMAIN: "twodb.io", CATCH_ALL_SERVICE: "twopager" });
+  for (const host of ["127.0.0.1:6400", "10.0.0.5", "localhost:6400", "twodb:6400", "[::1]:6400"]) {
+    assert.equal(route({ url: "/healthz", headers: { host } }), "/healthz", host);
+  }
+  assert.equal(route({ url: "/", headers: { host: "landing.acme.com" } }), "/apps/twopager/");
+});
+
 test("invalid catch-all configuration fails at startup", () => {
   assert.throws(() => createHostRouter({ CATCH_ALL_SERVICE: "Bad Service" }), /kebab-case/);
   assert.throws(() => createHostRouter({ CATCH_ALL_SERVICE: "artisan", CATCH_ALL_HOST_REGEX: "[" }), /invalid/);
