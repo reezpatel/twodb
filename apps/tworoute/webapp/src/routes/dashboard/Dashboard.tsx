@@ -23,8 +23,16 @@ export function Dashboard({ scope }: { scope: string | null }) {
   const scopedSummary = active ? summary : summary;
   void scopedSummary;
 
-  // Quotas: one tile per board — per-provider rollup on the aggregate
-  // board, per-connection windows on a connection's board.
+  // The aggregate board is a single, box-less provider-quota panel; a
+  // connection's board keeps the full analytics grid.
+  if (scope === null) {
+    return (
+      <div className="w-full max-w-3xl p-4 sm:p-6">
+        <ProviderQuotaWidget />
+      </div>
+    );
+  }
+
   const items: WidgetItem[] = [
     { id: "provider_quota", size: "wide", label: "Provider quotas" },
     { id: "calls", size: "wide", label: "Calls" },
@@ -33,7 +41,7 @@ export function Dashboard({ scope }: { scope: string | null }) {
     { id: "status", size: "sm", label: "Status" },
     { id: "latency", size: "sm", label: "Latency" },
     { id: "errors", size: "sm", label: "Errors" },
-    ...(scope ? [{ id: "quota", size: "wide", label: "Quotas" } as WidgetItem] : []),
+    { id: "quota", size: "wide", label: "Quotas" },
     { id: "models", size: "wide", label: "Token usage by model" },
     { id: "tool_calls", size: "wide", label: "Tool calls" },
   ];
@@ -46,6 +54,7 @@ export function Dashboard({ scope }: { scope: string | null }) {
       <DraggableWidgetGrid
         className="max-w-full"
         editable={false}
+        chrome={false}
         radius={10}
         maxColumns={4}
         items={items}

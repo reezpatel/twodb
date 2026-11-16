@@ -57,6 +57,12 @@ export interface DraggableWidgetGridProps {
   gap?: number;
   /** Corner radius of a widget in px. */
   radius?: number;
+  /**
+   * Widget chrome (card background + outline ring). Defaults to true;
+   * false renders widgets bare on the page — handy for a single-widget
+   * "panel-less" dashboard.
+   */
+  chrome?: boolean;
   className?: string;
 }
 
@@ -369,6 +375,7 @@ const Widget = memo(function Widget({
   columns,
   rows,
   editable,
+  chrome,
   held,
   raised,
   landed,
@@ -386,6 +393,7 @@ const Widget = memo(function Widget({
   columns: number;
   rows: number;
   editable: boolean;
+  chrome: boolean;
   held: boolean;
   raised: boolean;
   landed: boolean;
@@ -526,8 +534,9 @@ const Widget = memo(function Widget({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", visualDuration: 0.6, bounce: 0.12, delay }}
         className={cn(
-          "relative isolate flex h-full w-full flex-col overflow-hidden rounded-[var(--widget-radius)] bg-card text-ink ring-inset transition-shadow duration-300 [clip-path:inset(0_round_var(--widget-radius))]",
-          landed ? "ring-2 ring-ink/40" : "ring-1 ring-outline",
+          "relative isolate flex h-full w-full flex-col overflow-hidden rounded-[var(--widget-radius)] text-ink ring-inset transition-shadow duration-300 [clip-path:inset(0_round_var(--widget-radius))]",
+          chrome && "bg-card",
+          chrome && (landed ? "ring-2 ring-ink/40" : "ring-1 ring-outline"),
         )}
       >
         {renderItem?.(item, sizeOf(w, h))}
@@ -543,6 +552,7 @@ export function DraggableWidgetGrid({
   onChange,
   renderItem,
   editable = true,
+  chrome = true,
   maxColumns = 4,
   cellSize = 215,
   gap = 12,
@@ -765,6 +775,7 @@ export function DraggableWidgetGrid({
                 columns={columns}
                 rows={rows}
                 editable={editable}
+                chrome={chrome}
                 held={held === p.id}
                 raised={raised === p.id}
                 landed={landed === p.id}
