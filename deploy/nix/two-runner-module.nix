@@ -15,6 +15,9 @@
 # that is persisted in the state dir (/var/lib/two-runner); restarts reuse it, so a token that stays in the config never
 # creates duplicate runners. If the runner is deleted in Dispatch the stale key is rejected and the machine enrolls again.
 #
+# Microvms (NixOS only — Firecracker needs Linux + /dev/kvm; macOS runners simply run commands, jobs and terminals): `microvm = true;` — the kernel, rootfs and static guest agent come from this flake
+# (packages.two-vm-kernel / two-vm-rootfs / two-vm-agent); override with microvm.kernel / microvm.rootfs.
+#
 # Secrets are never copied into the Nix store: only the PATH of the token/key file is configured. On NixOS the file is
 # handed to the (unprivileged) service with systemd LoadCredential, so root-owned agenix/sops files work as-is.
 { self }:
@@ -66,8 +69,6 @@ let
         '';
       };
 
-      microvm = lib.mkEnableOption "hosting Firecracker microvms on this machine (needs /dev/kvm)";
-
       stateDir = lib.mkOption {
         type = lib.types.str;
         default = "/var/lib/two-runner";
@@ -97,6 +98,44 @@ in
     in
     {
       options.services.two-runner = options { inherit lib pkgs config; } // {
+      microvm = lib.mkOption {
+        description = ''
+          Host Firecracker microvms on this machine (Linux with /dev/kvm only). `microvm = true;` is shorthand for
+          `microvm.enable = true;`. The guest assets (static agent, Firecracker kernel, busybox rootfs) are built by
+          Nix — nothing to download or build by hand.
+        '';
+        default = { };
+        example = lib.literalExpression "{ enable = true; }";
+        type = lib.types.coercedTo lib.types.bool (enable: { inherit enable; }) (
+          lib.types.submodule {
+            options = {
+              enable = lib.mkEnableOption "hosting Firecracker microvms (needs /dev/kvm)";
+              kernel = lib.mkOption {
+                type = lib.types.path;
+                default = "${self.packages.${pkgs.stdenv.hostPlatform.system}.two-vm-kernel}/vmlinux";
+                defaultText = "the flake's two-vm-kernel (Firecracker CI kernel 6.1)";
+                description = "Uncompressed guest kernel (vmlinux) passed as TWO_RUNNER_KERNEL.";
+              };
+              rootfs = lib.mkOption {
+                type = lib.types.path;
+                default = "${self.packages.${pkgs.stdenv.hostPlatform.system}.two-vm-rootfs}/rootfs.ext4";
+                defaultText = "the flake's two-vm-rootfs (busybox + two-vm-agent, 2 GiB ext4)";
+                description = ''
+                  Guest root filesystem (ext4) passed as TWO_RUNNER_ROOTFS. Every microvm boots from its own copy.
+                  Replace it to give guests more tools (it must contain a static two-vm-agent started by /sbin/init).
+                '';
+              };
+              firecracker = lib.mkOption {
+                type = lib.types.package;
+                default = pkgs.firecracker;
+                defaultText = "pkgs.firecracker";
+                description = "Firecracker package (its binary is passed as TWO_RUNNER_FC_BIN).";
+              };
+            };
+          }
+        );
+      };
+
         user = lib.mkOption {
           type = lib.types.str;
           default = "two-runner";
@@ -137,7 +176,7 @@ in
             isSystemUser = true;
             group = cfg.group;
             home = cfg.stateDir;
-            extraGroups = cfg.extraGroups ++ lib.optional cfg.microvm "kvm";
+            extraGroups = cfg.extraGroups ++ lib.optional cfg.microvm.enable "kvm";
           };
         };
         users.groups = lib.mkIf (cfg.group == "two-runner") { two-runner = { }; };
@@ -147,15 +186,21 @@ in
           wantedBy = [ "multi-user.target" ];
           after = [ "network-online.target" ] ++ cfg.after;
           wants = [ "network-online.target" ];
-          path = basePackages pkgs ++ cfg.extraPackages ++ lib.optional cfg.microvm pkgs.firecracker;
-          environment.HOME = cfg.stateDir;
+          path = basePackages pkgs ++ cfg.extraPackages;
+          environment = {
+            HOME = cfg.stateDir;
+          } // lib.optionalAttrs cfg.microvm.enable {
+            TWO_RUNNER_FC_BIN = "${cfg.microvm.firecracker}/bin/firecracker";
+            TWO_RUNNER_KERNEL = toString cfg.microvm.kernel;
+            TWO_RUNNER_ROOTFS = toString cfg.microvm.rootfs;
+          };
 
           serviceConfig = {
             ExecStart = lib.escapeShellArgs (
               [ "${cfg.package}/bin/two-runner" "--gateway" cfg.gateway "--name" cfg.name "--state" cfg.stateDir ]
               ++ lib.optionals (cfg.enrollTokenFile != null) [ "--enroll-file" "%d/enroll" ]
               ++ lib.optionals (cfg.keyFile != null) [ "--key-file" "%d/key" ]
-              ++ lib.optional cfg.microvm "--microvm"
+              ++ lib.optional cfg.microvm.enable "--microvm"
               ++ cfg.extraArgs
             );
             LoadCredential =
@@ -206,7 +251,6 @@ in
             [ "${cfg.package}/bin/two-runner" "--gateway" cfg.gateway "--name" cfg.name "--state" cfg.stateDir ]
             ++ lib.optionals (cfg.enrollTokenFile != null) [ "--enroll-file" (toString cfg.enrollTokenFile) ]
             ++ lib.optionals (cfg.keyFile != null) [ "--key-file" (toString cfg.keyFile) ]
-            ++ lib.optional cfg.microvm "--microvm"
             ++ cfg.extraArgs;
           EnvironmentVariables = {
             HOME = cfg.stateDir;

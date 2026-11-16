@@ -104,7 +104,7 @@ func (r *runner) connect() error {
 		return err
 	}
 	r.conn = conn
-	log.Printf("connected to %s", wsURL)
+	log.Printf("connected to %s://%s%s (credentials not logged)", scheme, u.Host, "/apps/dispatch/api/runner-ws")
 
 	kind := "host"
 	if r.microvm {

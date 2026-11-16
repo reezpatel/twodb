@@ -283,6 +283,8 @@
         # native module, so each platform's tarball carries its own build).
         # Bump runnerVersion -- and the hashes, which `nix build` prints -- per release.
         runnerVersion = "0.2.35";
+        twoRunnerSrc = pkgs.lib.cleanSource ./apps/two-runner;
+        twoRunnerVersion = self.shortRev or self.dirtyShortRev or "dev";
         # node-pty is a native module — each system needs its platform tarball.
         runnerTarballFor =
           sys:
@@ -379,19 +381,31 @@
       {
         packages = {
           # Dispatch's machine-side agent (Go, apps/two-runner). `nix run github:reezpatel/twodb#two-runner -- --help`.
+          # Static (CGO off): the runner has no C dependencies and then runs the same everywhere.
           two-runner = pkgs.buildGoModule {
             pname = "two-runner";
-            version = self.shortRev or self.dirtyShortRev or "dev";
-            src = pkgs.lib.cleanSource ./apps/two-runner;
+            version = twoRunnerVersion;
+            src = twoRunnerSrc;
             vendorHash = "sha256-MHi11CN4xvaJ9Tx0Ij/ZppYQAYL0lZ3xbC/4F7D5zvw=";
-            subPackages = [ "." "cmd/two-vm-agent" ];
-            ldflags = [ "-s" "-w" "-X main.version=${self.shortRev or self.dirtyShortRev or "dev"}" ];
+            subPackages = [ "." ];
+            env.CGO_ENABLED = "0";
+            ldflags = [ "-s" "-w" "-X main.version=${twoRunnerVersion}" ];
             meta = {
               description = "TwoDB Dispatch runner: executes commands, jobs and microvms for a TwoDB workspace";
               mainProgram = "two-runner";
               platforms = pkgs.lib.platforms.unix;
             };
           };
+        }
+        // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux (
+          # Microvm guest assets (static agent + Firecracker kernel + busybox rootfs) — no Docker needed.
+          import ./deploy/nix/two-vm-guest.nix {
+            inherit pkgs nixpkgs;
+            src = twoRunnerSrc;
+            version = twoRunnerVersion;
+          }
+        )
+        // {
           twodb-runner = runnerPackage (runnerTarballFor system);
           twodb-server = serverPackage serverTarballFor;
         };

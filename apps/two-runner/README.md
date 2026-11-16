@@ -41,6 +41,16 @@ The token/key **file path** is the only thing in your config — the secret neve
 through systemd `LoadCredential`, so a root-only agenix/sops file works for the unprivileged `two-runner` user.
 Commands Dispatch runs execute as `services.two-runner.user` (default: a dedicated unprivileged user) — choose it deliberately.
 
+### Microvms (NixOS / Linux only)
+`microvm = true;` (or `microvm.enable = true;`) hosts Firecracker microvms. The guest assets are built by Nix — nothing to download or
+build by hand: `packages.two-vm-kernel` (Firecracker's CI kernel 6.1), `packages.two-vm-rootfs` (busybox + the agent, 2 GiB ext4) and
+`packages.two-vm-agent` (static). The module adds the runner user to `kvm`, and sets `TWO_RUNNER_FC_BIN/KERNEL/ROOTFS`. Override
+`microvm.kernel`, `microvm.rootfs` or `microvm.firecracker` to use your own. The machine needs `/dev/kvm` (bare metal, or nested virtualization).
+macOS runners have no such option: they run commands, jobs and terminals only.
+
+Outside Nix: `TWO_RUNNER_FC_BIN` (or `firecracker` on `$PATH`, or `<state>/firecracker`), `TWO_RUNNER_KERNEL`, `TWO_RUNNER_ROOTFS`
+(see `apps/dispatch/scripts/build-rootfs.sh`).
+
 Just the binary: `nix run github:reezpatel/twodb#two-runner -- --help`.
 
 ## Build

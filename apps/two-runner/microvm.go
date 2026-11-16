@@ -52,7 +52,7 @@ func (r *runner) initMicrovmHost() error {
 	}
 	fc := r.fcBin()
 	if _, err := os.Stat(fc); err != nil {
-		return fmt.Errorf("firecracker binary not found at %s (set TWO_RUNNER_FC_BIN)", fc)
+		return fmt.Errorf("firecracker binary not found (looked at %s and $PATH; set TWO_RUNNER_FC_BIN)", fc)
 	}
 	if err := r.ensureGuestAssets(); err != nil {
 		return err
@@ -61,11 +61,19 @@ func (r *runner) initMicrovmHost() error {
 	return nil
 }
 
+// fcBin resolves the firecracker binary: TWO_RUNNER_FC_BIN, then <state>/firecracker, then $PATH.
 func (r *runner) fcBin() string {
 	if v := os.Getenv("TWO_RUNNER_FC_BIN"); v != "" {
 		return v
 	}
-	return filepath.Join(r.stateDir, "firecracker")
+	local := filepath.Join(r.stateDir, "firecracker")
+	if _, err := os.Stat(local); err == nil {
+		return local
+	}
+	if p, err := exec.LookPath("firecracker"); err == nil {
+		return p
+	}
+	return local // not found: callers report this path in their error
 }
 
 // ensureGuestAssets resolves kernel + rootfs. Env overrides first, then
