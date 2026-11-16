@@ -6,7 +6,8 @@ import { encryptSecret, decryptSecret } from "../crypto.js";
 
 export interface CreateConnectionInput {
   workspaceId: string;
-  spaceId: string;
+  /** One or more spaces the connection is visible in (first = primary). */
+  spaceIds: string[];
   name: string;
   provider: string;
   baseUrl: string;
@@ -33,12 +34,32 @@ export function createConnectionsRepo(db: Kysely<TwoRouteDb>, encryptionKey: str
     return { ...decrypted, configParsed: JSON.parse(decrypted.config ?? "{}") as ConnectionConfig };
   }
 
+  async function replaceSpaces(connectionId: string, spaceIds: string[]) {
+    await db.deleteFrom("llm_connection_space").where("connection_id", "=", connectionId).execute();
+    if (spaceIds.length) {
+      await db
+        .insertInto("llm_connection_space")
+        .values(spaceIds.map((space_id) => ({ connection_id: connectionId, space_id })))
+        .execute();
+    }
+  }
+
   return {
+    /** connection id → its space ids (primary first not guaranteed; callers treat as a set). */
+    async spaceIdsFor(connectionIds: string[]) {
+      const map = new Map<string, string[]>();
+      if (connectionIds.length === 0) return map;
+      const rows = await db.selectFrom("llm_connection_space").selectAll().where("connection_id", "in", connectionIds).execute();
+      for (const r of rows) map.set(r.connection_id, [...(map.get(r.connection_id) ?? []), r.space_id]);
+      return map;
+    },
+
     async create(input: CreateConnectionInput) {
+      const spaceIds = [...new Set(input.spaceIds.map((s) => s.trim()).filter(Boolean))];
       const row = {
         id: ulid(),
         workspace_id: input.workspaceId,
-        space_id: input.spaceId,
+        space_id: spaceIds[0],
         name: input.name,
         provider: input.provider,
         base_url: input.baseUrl,
@@ -48,6 +69,7 @@ export function createConnectionsRepo(db: Kysely<TwoRouteDb>, encryptionKey: str
         created_at: new Date().toISOString(),
       };
       await db.insertInto("llm_connection").values(row as any).execute();
+      await replaceSpaces(row.id, spaceIds);
       return row;
     },
 
@@ -79,7 +101,7 @@ export function createConnectionsRepo(db: Kysely<TwoRouteDb>, encryptionKey: str
       return db
         .selectFrom("llm_connection")
         .select(["id", "workspace_id", "space_id", "name", "provider", "base_url", "default_model", "created_at"])
-        .where("space_id", "in", spaceIds)
+        .where("id", "in", db.selectFrom("llm_connection_space").select("connection_id").where("space_id", "in", spaceIds))
         .execute();
     },
 
@@ -96,7 +118,7 @@ export function createConnectionsRepo(db: Kysely<TwoRouteDb>, encryptionKey: str
       id: string,
       patch: {
         name?: string;
-        spaceId?: string;
+        spaceIds?: string[];
         baseUrl?: string;
         defaultModel?: string | null;
         apiKey?: string;
@@ -105,7 +127,13 @@ export function createConnectionsRepo(db: Kysely<TwoRouteDb>, encryptionKey: str
     ) {
       const set: Record<string, string | null> = {};
       if (patch.name !== undefined) set.name = patch.name;
-      if (patch.spaceId !== undefined) set.space_id = patch.spaceId;
+      if (patch.spaceIds !== undefined) {
+        const ids = [...new Set(patch.spaceIds.map((s) => s.trim()).filter(Boolean))];
+        if (ids.length) {
+          set.space_id = ids[0];
+          await replaceSpaces(id, ids);
+        }
+      }
       if (patch.baseUrl !== undefined) set.base_url = patch.baseUrl;
       if (patch.defaultModel !== undefined) set.default_model = patch.defaultModel;
       if (patch.apiKey !== undefined) set.api_key = encryptSecret(patch.apiKey, encryptionKey);
@@ -122,6 +150,7 @@ export function createConnectionsRepo(db: Kysely<TwoRouteDb>, encryptionKey: str
       // history stays — audit/billing).
       await db.deleteFrom("llm_model").where("connection_id", "=", id).execute();
       await db.deleteFrom("llm_quota").where("connection_id", "=", id).execute();
+      await db.deleteFrom("llm_connection_space").where("connection_id", "=", id).execute();
     },
 
     async logUsage(entry: {

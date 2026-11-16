@@ -76,13 +76,15 @@ function ShellRoutes() {
     onEdit: (id, values) =>
       void conn.patch(id, {
         name: values.name,
-        spaceId: values.spaceId,
+        spaceIds: values.spaceIds,
         baseUrl: values.baseUrl,
         defaultModel: values.defaultModel ?? null,
         apiKey: values.apiKey,
         config: values.config,
       }),
     onRefreshModels: (id) => void conn.refreshModelsFor(id),
+    onRunOauth: conn.runOauth,
+    onCompleteOauth: conn.completeOauth,
     actions: (
       <div className="flex items-center gap-2">
         {activeConnection ? (
@@ -124,7 +126,7 @@ function ShellRoutes() {
           <ConnectionDetailSidebar
             connection={activeConnection}
             providerLabel={conn.providerLabel(activeConnection.provider)}
-            spaceName={conn.spaceName(activeConnection.spaceId)}
+            spaceName={conn.spaceNames(activeConnection.spaceIds ?? [activeConnection.spaceId])}
             quotas={conn.quotas.filter((q) => q.connectionId === activeConnection.id)}
             usage={conn.usage[activeConnection.id] ?? null}
             models={conn.models[activeConnection.id] ?? null}

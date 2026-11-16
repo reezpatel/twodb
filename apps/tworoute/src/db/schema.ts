@@ -66,8 +66,16 @@ export interface ModelRow {
   created_at: string;
 }
 
+/** Join table: a connection can be visible in several spaces.
+ * `llm_connection.space_id` stays as the "primary" (first) space for back-compat. */
+export interface ConnectionSpaceRow {
+  connection_id: string;
+  space_id: string;
+}
+
 export interface TwoRouteDb {
   llm_connection: LlmConnectionRow;
+  llm_connection_space: ConnectionSpaceRow;
   usage_log: UsageLogRow;
   llm_quota: QuotaRow;
   llm_model: ModelRow;
@@ -103,6 +111,28 @@ export async function applySchema(db: Kysely<TwoRouteDb>): Promise<void> {
     .columns(["workspace_id", "name"])
     .unique()
     .execute();
+
+  await db.schema
+    .createTable("llm_connection_space")
+    .ifNotExists()
+    .addColumn("connection_id", "text", (c) => c.notNull())
+    .addColumn("space_id", "text", (c) => c.notNull())
+    .addPrimaryKeyConstraint("llm_connection_space_pk", ["connection_id", "space_id"])
+    .execute();
+
+  await db.schema
+    .createIndex("llm_connection_space_space_idx")
+    .ifNotExists()
+    .on("llm_connection_space")
+    .columns(["space_id"])
+    .execute();
+
+  // Backfill: every pre-existing connection gets its single space as a join row.
+  await sql`
+    INSERT INTO llm_connection_space (connection_id, space_id)
+    SELECT id, space_id FROM llm_connection
+    ON CONFLICT DO NOTHING
+  `.execute(db);
 
   await db.schema
     .createTable("usage_log")

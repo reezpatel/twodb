@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Dialog,
@@ -14,7 +13,7 @@ import type { Connection, ProviderSpec } from "../../../lib/tworoute-client.js";
 import type { Space } from "../../connections/hooks/useConnections.js";
 
 export interface ConnectionFormValues {
-  spaceId: string;
+  spaceIds: string[];
   name: string;
   provider: string;
   baseUrl?: string;
@@ -22,6 +21,10 @@ export interface ConnectionFormValues {
   defaultModel?: string;
   config?: Record<string, string>;
 }
+
+export type OauthTokens = { accessToken: string; refreshToken: string; accountId?: string | null };
+export type OauthRunner = (provider: "claude-code" | "codex") => Promise<OauthTokens | null>;
+export type OauthCompleter = (provider: "claude-code" | "codex", input: string) => Promise<OauthTokens>;
 
 /**
  * Shared add/edit connection dialog — one dumb component, two modes. Add:
@@ -40,6 +43,7 @@ export function ConnectionDialog({
   onOpenChange,
   onSubmit,
   onRunOauth,
+  onCompleteOauth,
   trigger,
 }: {
   spaces: Space[];
@@ -51,11 +55,17 @@ export function ConnectionDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: ConnectionFormValues) => void;
-  onRunOauth: (provider: "claude-code" | "codex") => Promise<{ accessToken: string; refreshToken: string; accountId?: string | null } | null>;
+  onRunOauth: OauthRunner;
+  onCompleteOauth: OauthCompleter;
   trigger?: React.ReactNode;
 }) {
   const [providerId, setProviderId] = useState(connection?.provider ?? "anthropic");
-  const [spaceId, setSpaceId] = useState(connection?.spaceId ?? spaces[0]?.id ?? "");
+  const [spaceIds, setSpaceIds] = useState<string[]>(
+    connection ? (connection.spaceIds?.length ? connection.spaceIds : [connection.spaceId]) : spaces[0] ? [spaces[0].id] : [],
+  );
+  const [callbackUrl, setCallbackUrl] = useState("");
+  /** Bumped on every sign-in attempt so a superseded poll loop can't clobber newer results. */
+  const oauthRun = useRef(0);
   const [name, setName] = useState(connection?.name ?? "");
   const [defaultModel, setDefaultModel] = useState(connection?.defaultModel ?? "");
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
@@ -69,7 +79,7 @@ export function ConnectionDialog({
   useEffect(() => {
     if (mode === "edit" && connection) {
       setProviderId(connection.provider);
-      setSpaceId(connection.spaceId);
+      setSpaceIds(connection.spaceIds?.length ? connection.spaceIds : [connection.spaceId]);
       setName(connection.name);
       setDefaultModel(connection.defaultModel ?? "");
       setFieldValues((v) => ({ ...v, baseUrl: connection.baseUrl }));
@@ -79,6 +89,11 @@ export function ConnectionDialog({
   }, [mode, connection]);
 
   useEffect(() => {
+    if (mode === "add" && spaceIds.length === 0 && spaces[0]) setSpaceIds([spaces[0].id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaces, mode]);
+
+  useEffect(() => {
     if (mode === "add") {
       if (spec?.defaultBaseUrl) setFieldValues((v) => ({ ...v, baseUrl: spec.defaultBaseUrl! }));
       if (spec?.models[0]) setDefaultModel((m) => m || spec.models[0]);
@@ -86,31 +101,55 @@ export function ConnectionDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providerId, providers, mode]);
 
+  const applyOauthTokens = (result: OauthTokens) => {
+    setFieldValues((v) => ({
+      ...v,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      ...(result.accountId ? { accountId: String(result.accountId) } : {}),
+    }));
+    setOauthState("done");
+    setOauthError(null);
+    setCallbackUrl("");
+  };
+
+  const oauthProvider = providerId as "claude-code" | "codex";
+
   const startOauth = async () => {
+    const run = ++oauthRun.current;
     setOauthState("waiting");
     setOauthError(null);
     try {
-      const result = await onRunOauth(providerId as "claude-code" | "codex");
-      if (result) {
-        setFieldValues((v) => ({
-          ...v,
-          accessToken: result.accessToken,
-          refreshToken: result.refreshToken,
-          ...(result.accountId ? { accountId: String(result.accountId) } : {}),
-        }));
-        setOauthState("done");
-      } else {
+      const result = await onRunOauth(oauthProvider);
+      if (run !== oauthRun.current) return;
+      if (result) applyOauthTokens(result);
+      else {
         setOauthState("error");
-        setOauthError("Sign-in didn't complete (timed out waiting for the callback)");
+        setOauthError("Sign-in didn't complete (timed out waiting for the callback). Paste the callback URL below instead.");
       }
+    } catch (e) {
+      if (run !== oauthRun.current) return;
+      setOauthState("error");
+      setOauthError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  /** Firewall/remote fallback: paste the redirected (failed-to-load) callback URL to finish by hand. */
+  const submitCallback = async () => {
+    oauthRun.current++; // supersede any running poll
+    setOauthError(null);
+    try {
+      applyOauthTokens(await onCompleteOauth(oauthProvider, callbackUrl));
     } catch (e) {
       setOauthState("error");
       setOauthError(e instanceof Error ? e.message : String(e));
     }
   };
 
+  const toggleSpace = (id: string) => setSpaceIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+
   const requiredFieldsOk = (spec?.fields ?? []).filter((f) => !f.optional && mode === "add").every((f) => (fieldValues[f.key] ?? "").trim().length > 0);
-  const canSubmit = spaceId && name.trim() && spec && (mode === "edit" || requiredFieldsOk) && !busy && (!isOauth || oauthState === "done" || mode === "edit");
+  const canSubmit = spaceIds.length > 0 && name.trim() && spec && (mode === "edit" || requiredFieldsOk) && !busy && (!isOauth || oauthState === "done" || mode === "edit");
 
   const submit = () => {
     const config: Record<string, string> = {};
@@ -119,7 +158,7 @@ export function ConnectionDialog({
       if (val && f.key !== "apiKey" && f.key !== "baseUrl") config[f.key] = val;
     }
     const values: ConnectionFormValues = {
-      spaceId,
+      spaceIds,
       name: name.trim(),
       provider: providerId,
       baseUrl: (fieldValues.baseUrl ?? "").trim() || spec?.defaultBaseUrl,
@@ -167,19 +206,19 @@ export function ConnectionDialog({
             </p>
           )}
           <div className="grid gap-1.5">
-            <Label htmlFor="conn-space">Space</Label>
-            <select
-              id="conn-space"
-              value={spaceId}
-              onChange={(e) => setSpaceId(e.target.value)}
-              className="h-9 rounded-[6px] border border-outline bg-paper px-2 font-sans text-[13px] text-ink outline-none"
-            >
+            <Label>
+              Spaces
+              <span className="text-ink-muted"> (select one or more)</span>
+            </Label>
+            <div className="flex max-h-36 flex-col gap-1 overflow-y-auto rounded-[6px] border border-outline bg-paper p-2">
+              {spaces.length === 0 ? <span className="text-[13px] text-ink-muted">No spaces available</span> : null}
               {spaces.map((s) => (
-                <option key={s.id} value={s.id}>
+                <label key={s.id} className="flex cursor-pointer items-center gap-2 text-[13px] text-ink">
+                  <input type="checkbox" checked={spaceIds.includes(s.id)} onChange={() => toggleSpace(s.id)} />
                   {s.name}
-                </option>
+                </label>
               ))}
-            </select>
+            </div>
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="conn-name">Name</Label>
@@ -194,6 +233,25 @@ export function ConnectionDialog({
               <Button size="sm" className="self-start" disabled={oauthBusy || oauthState === "waiting"} onClick={() => void startOauth()}>
                 {oauthState === "waiting" ? "Waiting for sign-in…" : oauthState === "done" ? "Signed in ✓" : "Sign in with OAuth"}
               </Button>
+              {oauthState !== "done" ? (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="conn-callback">
+                    Or paste the callback URL
+                    <span className="text-ink-muted"> (if the browser couldn't reach localhost)</span>
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="conn-callback"
+                      value={callbackUrl}
+                      onChange={(e) => setCallbackUrl(e.target.value)}
+                      placeholder="http://localhost:…/callback?code=…&state=…"
+                    />
+                    <Button size="sm" variant="ghost" disabled={!callbackUrl.trim()} onClick={() => void submitCallback()}>
+                      Use URL
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               {oauthError ? <p className="text-[13px] text-destructive">{oauthError}</p> : null}
             </div>
           ) : null}
@@ -245,15 +303,5 @@ export function ConnectionDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/** Convenience trigger for the header's Add-connection button. */
-export function AddConnectionButtonTrigger() {
-  return (
-    <Button size="sm">
-      <Plus className="size-4" aria-hidden />
-      Add connection
-    </Button>
   );
 }

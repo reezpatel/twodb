@@ -6,29 +6,27 @@
 # resolution needs the whole tree). TwoDB's orchestrator (src/orchestrator/
 # install.ts) always invokes it this way; this comment is for manual/CI use.
 #
-# v1 deliberately copies the entire workspace into the image rather than
-# doing a trimmed multi-stage `pnpm deploy` build — simpler, correct, and
-# fine for a self-hosted single-machine setup. Revisit (prune to just the
-# app's dependency closure) if image size/build time become a real problem.
+# Build in the full workspace, then deploy only the selected app and its
+# dependency closure into a clean runtime image. This avoids shipping every
+# workspace's node_modules in each app image.
 
-FROM node:22-slim AS base
+FROM node:22-slim AS build
 
 RUN corepack enable && corepack prepare pnpm@11.11.0 --activate
 
-# Docker CLI (static client binary only — no daemon). Only the TwoDB
-# control-plane image uses it: when TwoDB itself runs as a container it
-# orchestrates sibling app containers by shelling out to `docker` against a
-# mounted /var/run/docker.sock. ~30MB in every app image is the price for
-# keeping ONE generic Dockerfile; acceptable for now.
-# (node:22-slim ships neither curl nor wget; Docker only publishes static
-# binaries for x86_64 + aarch64.)
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
-  && rm -rf /var/lib/apt/lists/* \
-  && ARCH="$(uname -m)" \
-  && curl -fsSL "https://download.docker.com/linux/static/stable/${ARCH}/docker-27.5.1.tgz" \
-     | tar -xz -C /tmp --strip-components=1 docker/docker \
-  && mv /tmp/docker /usr/local/bin/docker \
-  && docker --version
+ARG APP_PKG
+# Only the console orchestrates sibling app containers via the Docker socket.
+# Keep the Docker CLI out of every other app image.
+RUN if [ "$APP_PKG" = "@twodb/app-twodb" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+      && rm -rf /var/lib/apt/lists/* \
+      && ARCH="$(uname -m)" \
+      && curl -fsSL "https://download.docker.com/linux/static/stable/${ARCH}/docker-27.5.1.tgz" \
+         | tar -xz -C /tmp --strip-components=1 docker/docker \
+      && mv /tmp/docker /usr/local/bin/docker \
+      && docker --version; \
+    else touch /usr/local/bin/docker; \
+    fi
 
 WORKDIR /repo
 
@@ -41,7 +39,6 @@ COPY tools ./tools
 
 RUN pnpm install --frozen-lockfile --prod=false
 
-ARG APP_PKG
 ENV APP_PKG=${APP_PKG}
 
 # Fail fast at build time if APP_PKG was forgotten, instead of a confusing
@@ -55,6 +52,27 @@ RUN SLUG="${APP_PKG#@twodb/app-}"; \
     if [ -f "apps/$SLUG/webapp/package.json" ]; then pnpm --filter "${APP_PKG}-webapp" build; fi; \
     if [ "$SLUG" = "twodb" ]; then pnpm --filter @twodb/blocks storybook:build; fi
 
-EXPOSE 3000-9000
+# pnpm deploy creates an isolated production package with just this app's
+# runtime dependency graph. Keep dev dependencies: app entrypoints currently
+# run TypeScript directly through tsx, which is declared as a devDependency.
+RUN pnpm deploy --legacy --filter "$APP_PKG" --prod=true /out
+# Apps currently execute TypeScript directly; install only the tiny runtime
+# loader, not each app's TypeScript compiler/test/build toolchain.
+RUN npm install --prefix /tmp/tsx --omit=dev --no-audit --no-fund tsx@4.20.0 \
+    && cp -a /tmp/tsx/node_modules/. /out/node_modules/
+RUN SLUG="${APP_PKG#@twodb/app-}"; \
+    if [ -d "apps/$SLUG/webapp/dist" ]; then mkdir -p "/out/webapp" && cp -a "apps/$SLUG/webapp/dist" "/out/webapp/"; fi; \
+    if [ "$SLUG" = "twodb" ]; then mkdir -p /out/blocks && cp -a blocks/storybook-static /out/blocks/; fi
 
-CMD pnpm --filter "$APP_PKG" start
+FROM node:22-slim AS runtime
+WORKDIR /app
+COPY --from=build /out ./
+ARG APP_PKG
+ENV APP_PKG=${APP_PKG} NODE_ENV=production
+# The Docker CLI is needed only by the console app. The build stage provides
+# an empty placeholder for other app packages so this conditional copy works.
+COPY --from=build /usr/local/bin/docker /tmp/docker-cli
+RUN if [ "$APP_PKG" = "@twodb/app-twodb" ]; then mv /tmp/docker-cli /usr/local/bin/docker; else rm /tmp/docker-cli; fi
+
+EXPOSE 3000-9000
+CMD ["node_modules/.bin/tsx", "src/index.ts"]

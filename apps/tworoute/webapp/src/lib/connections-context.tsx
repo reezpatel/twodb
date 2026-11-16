@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
-import { useConnections, type TestResult } from "../routes/connections/hooks/useConnections.js";
+import { useConnections } from "../routes/connections/hooks/useConnections.js";
 
 /**
  * One shared instance of the connections state at the app level. Without it,
@@ -7,7 +7,7 @@ import { useConnections, type TestResult } from "../routes/connections/hooks/use
  * mutation elsewhere (patch in the sidebar wouldn't reach the dashboard's
  * connection list, etc.).
  */
-export const ConnectionsContext = createContext<ReturnType<typeof useConnections> | null>(null);
+const ConnectionsContext = createContext<ReturnType<typeof useConnections> | null>(null);
 
 export function ConnectionsProvider({ children }: { children: ReactNode }) {
   const connections = useConnections();
@@ -21,4 +21,3 @@ export function useSharedConnections(): ReturnType<typeof useConnections> {
   return ctx;
 }
 
-export type { TestResult };

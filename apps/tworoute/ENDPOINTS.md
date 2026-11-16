@@ -9,7 +9,7 @@ Multi-provider LLM gateway: 24 provider kinds (OAuth for Claude Code & Codex inc
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-15T19:04:18.728Z_
+_Generated: 2026-11-16T16:08:08.215Z_
 
 ## Endpoints
 
@@ -122,7 +122,14 @@ Lists LLM provider connections visible to the caller's active spaces. API keys a
         "type": "string"
       },
       "spaceId": {
-        "type": "string"
+        "type": "string",
+        "description": "Primary (first) space — kept for back-compat"
+      },
+      "spaceIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
       },
       "name": {
         "type": "string"
@@ -146,6 +153,7 @@ Lists LLM provider connections visible to the caller's active spaces. API keys a
     "required": [
       "id",
       "spaceId",
+      "spaceIds",
       "name",
       "provider",
       "baseUrl",
@@ -159,7 +167,7 @@ Lists LLM provider connections visible to the caller's active spaces. API keys a
 
 ### `POST /connections` — createConnection
 
-Registers a new LLM provider connection, scoped to one space. `name` is unique per workspace (that's how the CLI/tests address connections). Secrets (api key, OAuth tokens, extra config) are encrypted at rest (AES-256-GCM). On create the model cache is seeded right away (static fallback if the provider's listing API fails).
+Registers a new LLM provider connection, scoped to one or more spaces (`spaceIds`). `name` is unique per workspace (that's how the CLI/tests address connections). Secrets (api key, OAuth tokens, extra config) are encrypted at rest (AES-256-GCM). On create the model cache is seeded right away (static fallback if the provider's listing API fails).
 
 - **Auth**: `session-or-apiKey`
 
@@ -169,7 +177,16 @@ Registers a new LLM provider connection, scoped to one space. `name` is unique p
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
+    "spaceIds": {
+      "description": "Spaces the connection is visible in",
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "spaceId": {
+      "description": "Deprecated single-space form; merged into spaceIds",
       "type": "string"
     },
     "name": {
@@ -198,7 +215,6 @@ Registers a new LLM provider connection, scoped to one space. `name` is unique p
     }
   },
   "required": [
-    "spaceId",
     "name",
     "provider"
   ],
@@ -240,6 +256,14 @@ Updates a connection — rename, move space, change base URL/default model, rota
     },
     "name": {
       "type": "string"
+    },
+    "spaceIds": {
+      "description": "Replaces the set of spaces",
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "spaceId": {
       "type": "string"

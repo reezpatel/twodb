@@ -5,7 +5,9 @@
 
 export interface Connection {
   id: string;
+  /** Primary space (back-compat). */
   spaceId: string;
+  spaceIds: string[];
   name: string;
   provider: string;
   baseUrl: string;
@@ -13,7 +15,7 @@ export interface Connection {
   createdAt: string;
 }
 
-export interface ProviderField {
+interface ProviderField {
   key: string;
   label: string;
   secret?: boolean;
@@ -85,7 +87,7 @@ export const tworouteClient = {
   },
 
   createConnection(input: {
-    spaceId: string;
+    spaceIds: string[];
     name: string;
     provider: string;
     baseUrl?: string;
@@ -105,7 +107,7 @@ export const tworouteClient = {
     id: string,
     patch: {
       name?: string;
-      spaceId?: string;
+      spaceIds?: string[];
       baseUrl?: string;
       defaultModel?: string | null;
       apiKey?: string;
@@ -205,6 +207,16 @@ export const tworouteClient = {
 
   oauthStart(provider: "claude-code" | "codex"): Promise<{ url: string; state: string }> {
     return fetch(`${BASE}/oauth/${provider}/start`, { method: "POST", credentials: "include" }).then((r) => json(r));
+  },
+
+  /** Manual completion: paste the redirected callback URL (or "code state"). */
+  oauthComplete(provider: "claude-code" | "codex", input: string): Promise<Record<string, unknown>> {
+    return fetch(`${BASE}/oauth/${provider}/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ input }),
+    }).then((r) => json(r));
   },
 
   oauthPoll(provider: "claude-code" | "codex", state: string): Promise<Record<string, unknown>> {

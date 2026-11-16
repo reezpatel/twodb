@@ -6,7 +6,8 @@ const chatMessage = z.object({ role: z.enum(["system", "user", "assistant"]), co
 
 const connectionSummary = z.object({
   id: z.string(),
-  spaceId: z.string(),
+  spaceId: z.string().describe("Primary (first) space — kept for back-compat"),
+  spaceIds: z.array(z.string()),
   name: z.string(),
   provider: z.string(),
   baseUrl: z.string(),
@@ -89,12 +90,13 @@ const createConnection = defineEndpoint({
   path: "/connections",
   auth: "session-or-apiKey",
   description:
-    "Registers a new LLM provider connection, scoped to one space. `name` is unique per workspace " +
+    "Registers a new LLM provider connection, scoped to one or more spaces (`spaceIds`). `name` is unique per workspace " +
     "(that's how the CLI/tests address connections). Secrets (api key, OAuth tokens, extra config) are " +
     "encrypted at rest (AES-256-GCM). On create the model cache is seeded right away (static fallback " +
     "if the provider's listing API fails).",
   request: z.object({
-    spaceId: z.string(),
+    spaceIds: z.array(z.string()).min(1).optional().describe("Spaces the connection is visible in"),
+    spaceId: z.string().optional().describe("Deprecated single-space form; merged into spaceIds"),
     name: z.string(),
     provider: z.string(),
     baseUrl: z.string().optional(),
@@ -116,6 +118,7 @@ const updateConnection = defineEndpoint({
   request: z.object({
     id: z.string(),
     name: z.string().optional(),
+    spaceIds: z.array(z.string()).min(1).optional().describe("Replaces the set of spaces"),
     spaceId: z.string().optional(),
     baseUrl: z.string().optional(),
     defaultModel: z.string().nullable().optional(),

@@ -63,13 +63,14 @@ export function useConnections() {
   }, [refresh]);
 
   const spaceName = useCallback((id: string) => spaces.find((s) => s.id === id)?.name ?? id, [spaces]);
+  const spaceNames = useCallback((ids: string[]) => ids.map(spaceName).join(", "), [spaceName]);
   const providerLabel = useCallback(
     (id: string) => providers.find((p) => p.id === id)?.label ?? id,
     [providers],
   );
 
   const create = useCallback(
-    async (input: { spaceId: string; name: string; provider: string; baseUrl?: string; apiKey?: string; defaultModel?: string; config?: Record<string, string> }) => {
+    async (input: { spaceIds: string[]; name: string; provider: string; baseUrl?: string; apiKey?: string; defaultModel?: string; config?: Record<string, string> }) => {
       setBusy(true);
       setError(null);
       try {
@@ -208,6 +209,14 @@ export function useConnections() {
     return null;
   }, []);
 
+  /** Manual fallback: finish the flow from a pasted callback URL. */
+  const completeOauth = useCallback(async (provider: "claude-code" | "codex", input: string) => {
+    const result = await tworouteClient.oauthComplete(provider, input);
+    if (result.status === "done") return result as { accessToken: string; refreshToken: string; accountId?: string | null };
+    if (result.status === "error") throw new Error(String(result.error ?? "OAuth failed"));
+    throw new Error(result.status === "unknown" ? "Sign-in expired or unknown — start it again" : "Couldn't read that callback URL");
+  }, []);
+
   return {
     connections,
     providers,
@@ -220,6 +229,7 @@ export function useConnections() {
     quotas,
     usage,
     spaceName,
+    spaceNames,
     providerLabel,
     create,
     patch,
@@ -230,6 +240,7 @@ export function useConnections() {
     refreshQuotasFor,
     refreshAllQuotas,
     runOauth,
+    completeOauth,
     refresh,
   };
 }

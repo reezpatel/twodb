@@ -3,7 +3,7 @@ import { MoreVertical, RefreshCw } from "lucide-react";
 import { AppShellHeader, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@twodb/blocks";
 import type { Connection, ProviderSpec } from "../../../lib/tworoute-client.js";
 import type { Space } from "../../connections/hooks/useConnections.js";
-import { ConnectionDialog, type ConnectionFormValues } from "./ConnectionDialog.js";
+import { ConnectionDialog, type ConnectionFormValues, type OauthRunner, type OauthCompleter } from "./ConnectionDialog.js";
 
 export interface AppHeaderProps {
   /** Page title — Dashboard, a connection name, or "Manage connections". */
@@ -19,6 +19,8 @@ export interface AppHeaderProps {
   onCreate: (values: ConnectionFormValues) => void;
   onEdit: (id: string, values: ConnectionFormValues) => void;
   onRefreshModels: (id: string) => void;
+  onRunOauth: OauthRunner;
+  onCompleteOauth: OauthCompleter;
   /** Extra actions on the right (e.g. Refresh-all-quotas on the dashboard). */
   actions?: ReactNode;
 }
@@ -71,7 +73,8 @@ export function AppHeader(props: AppHeaderProps) {
         open={addOpen}
         onOpenChange={setAddOpen}
         onSubmit={props.onCreate}
-        onRunOauth={() => Promise.resolve(null)}
+        onRunOauth={props.onRunOauth}
+        onCompleteOauth={props.onCompleteOauth}
         trigger={
           <Button size="sm">Add connection</Button>
         }
@@ -88,7 +91,8 @@ export function AppHeader(props: AppHeaderProps) {
           open={editOpen}
           onOpenChange={setEditOpen}
           onSubmit={(values) => props.onEdit(props.activeConnection!.id, values)}
-          onRunOauth={() => Promise.resolve(null)}
+          onRunOauth={props.onRunOauth}
+        onCompleteOauth={props.onCompleteOauth}
         />
       ) : null}
     </AppShellHeader>

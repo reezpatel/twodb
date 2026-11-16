@@ -41,6 +41,9 @@ export async function buildServer(config: TwoRouteConfig) {
     return PROVIDERS;
   });
 
+  const normalizeSpaceIds = (ids?: string[], single?: string) =>
+    [...new Set([...(ids ?? []), ...(single ? [single] : [])].map((s) => String(s).trim()).filter(Boolean))];
+
   // --- OAuth flows (claude-code, codex) -----------------------------------
   app.post("/oauth/claude-code/start", async (req, reply) => {
     const ctx = readForwardedContext(req);
@@ -99,7 +102,9 @@ export async function buildServer(config: TwoRouteConfig) {
     const ctx = readForwardedContext(req);
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const body = req.body as {
-      spaceId: string;
+      spaceIds?: string[];
+      /** @deprecated single-space form, kept for CLI/API back-compat */
+      spaceId?: string;
       name: string;
       provider: string;
       baseUrl?: string;
@@ -111,13 +116,15 @@ export async function buildServer(config: TwoRouteConfig) {
     const spec = getProviderSpec(body.provider);
     if (!spec) return reply.code(400).send({ error: `unknown provider "${body.provider}"` });
     if (!body.name?.trim()) return reply.code(400).send({ error: "name is required" });
+    const spaceIds = normalizeSpaceIds(body.spaceIds, body.spaceId);
+    if (!spaceIds.length) return reply.code(400).send({ error: "at least one space is required" });
 
     const existing = await connections.getByName(ctx.workspaceId, body.name.trim());
     if (existing) return reply.code(409).send({ error: `a connection named "${body.name.trim()}" already exists` });
 
     const row = await connections.create({
       workspaceId: ctx.workspaceId,
-      spaceId: body.spaceId,
+      spaceIds,
       name: body.name.trim(),
       provider: body.provider,
       baseUrl: body.baseUrl?.trim() || spec.defaultBaseUrl || "",
@@ -145,9 +152,11 @@ export async function buildServer(config: TwoRouteConfig) {
     const rows = ctx.spaceIds.length
       ? await connections.listForSpaces(ctx.spaceIds)
       : await connections.listForWorkspace(ctx.workspaceId);
+    const spaceMap = await connections.spaceIdsFor(rows.map((r) => r.id));
     return rows.map((r) => ({
       id: r.id,
       spaceId: r.space_id,
+      spaceIds: spaceMap.get(r.id) ?? [r.space_id],
       name: r.name,
       provider: r.provider,
       baseUrl: r.base_url,
@@ -167,6 +176,7 @@ export async function buildServer(config: TwoRouteConfig) {
 
     const body = req.body as {
       name?: string;
+      spaceIds?: string[];
       spaceId?: string;
       baseUrl?: string;
       defaultModel?: string | null;
@@ -175,11 +185,12 @@ export async function buildServer(config: TwoRouteConfig) {
     };
 
     if (body.name !== undefined && !body.name.trim()) return reply.code(400).send({ error: "invalid name" });
-    if (body.spaceId !== undefined && !body.spaceId.trim()) return reply.code(400).send({ error: "invalid spaceId" });
+    const patchSpaceIds = body.spaceIds !== undefined || body.spaceId !== undefined ? normalizeSpaceIds(body.spaceIds, body.spaceId) : undefined;
+    if (patchSpaceIds && !patchSpaceIds.length) return reply.code(400).send({ error: "at least one space is required" });
 
     await connections.update(id, {
       name: body.name?.trim(),
-      spaceId: body.spaceId,
+      spaceIds: patchSpaceIds,
       baseUrl: body.baseUrl,
       defaultModel: body.defaultModel,
       apiKey: body.apiKey,
