@@ -56,12 +56,18 @@ RUN SLUG="${APP_PKG#@twodb/app-}"; \
 # runtime dependency graph. Keep dev dependencies: app entrypoints currently
 # run TypeScript directly through tsx, which is declared as a devDependency.
 RUN pnpm deploy --legacy --filter "$APP_PKG" --prod=true /out
-# Apps currently execute TypeScript directly; install only the tiny runtime
-# loader, not each app's TypeScript compiler/test/build toolchain.
+# Keep the monorepo-relative layout expected by app code (console gateway
+# assets, metadata, and app webappDist paths). Keep workspace node_modules at
+# /out/node_modules so Node resolves it from each nested app directory.
+RUN SLUG="${APP_PKG#@twodb/app-}"; \
+    mkdir -p "/out/apps/$SLUG"; \
+    find /out -mindepth 1 -maxdepth 1 ! -name node_modules ! -name apps -exec mv -t "/out/apps/$SLUG" -- {} +
+# Install the small TS runtime loader separately; avoid all app build/test
+# toolchains in the final image.
 RUN npm install --prefix /tmp/tsx --omit=dev --no-audit --no-fund tsx@4.20.0 \
     && cp -a /tmp/tsx/node_modules/. /out/node_modules/
 RUN SLUG="${APP_PKG#@twodb/app-}"; \
-    if [ -d "apps/$SLUG/webapp/dist" ]; then mkdir -p "/out/webapp" && cp -a "apps/$SLUG/webapp/dist" "/out/webapp/"; fi; \
+    if [ -d "apps/$SLUG/webapp/dist" ]; then mkdir -p "/out/apps/$SLUG/webapp" && cp -a "apps/$SLUG/webapp/dist" "/out/apps/$SLUG/webapp/"; fi; \
     if [ "$SLUG" = "twodb" ]; then mkdir -p /out/blocks && cp -a blocks/storybook-static /out/blocks/; fi
 
 FROM node:22-slim AS runtime
@@ -75,4 +81,4 @@ COPY --from=build /usr/local/bin/docker /tmp/docker-cli
 RUN if [ "$APP_PKG" = "@twodb/app-twodb" ]; then mv /tmp/docker-cli /usr/local/bin/docker; else rm /tmp/docker-cli; fi
 
 EXPOSE 3000-9000
-CMD ["node_modules/.bin/tsx", "src/index.ts"]
+CMD ["sh", "-c", "exec node_modules/.bin/tsx apps/${APP_PKG#@twodb/app-}/src/index.ts"]
