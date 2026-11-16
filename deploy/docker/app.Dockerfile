@@ -35,6 +35,7 @@ WORKDIR /repo
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY core ./core
 COPY blocks ./blocks
+COPY editor ./editor
 COPY apps ./apps
 COPY tools ./tools
 
