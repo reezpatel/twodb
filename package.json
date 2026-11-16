@@ -15,9 +15,13 @@
     "db:ps": "docker compose -f deploy/docker-compose.db.yaml ps",
     "local:apps": "turbo run dev --filter='./apps/*' --filter='./apps/*/webapp' --parallel",
     "local:platform": "pnpm --parallel --filter @twodb/app-twodb --filter @twodb/app-twodb-webapp --filter @twodb/app-tworoute dev",
-    "storybook:build": "pnpm --filter @twodb/blocks storybook:build"
+    "storybook:build": "pnpm --filter @twodb/blocks storybook:build",
+    "moon": "moon",
+    "m:build": "moon run :build",
+    "m:lint": "moon run :lint"
   },
   "devDependencies": {
+    "@moonrepo/cli": "^2.6.5",
     "@types/pg": "^8.21.0",
     "turbo": "^2.5.0",
     "typescript": "^5.8.0"

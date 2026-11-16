@@ -45,6 +45,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
   await app.register(websocket);
 
   const db = createPgDb<{ tables: never }>({ connectionString: config.DATABASE_URL, schema: "artisan" }) as never;
+  await applySchema(db as never); // tables first: the collab sync / workers below query them
   const HOP_BY_HOP = new Set(["connection","keep-alive","transfer-encoding","te","trailer","upgrade","proxy-authenticate","proxy-authorization","content-length"]);
   const repo = createArtisanRepo(db as never);
   const hub = new WorkspaceHub();
@@ -1498,8 +1499,7 @@ echo saved`;
   // --- webapp: the bundled SPA (apps/artisan/webapp/dist), served outside /api
   await registerWebapp(app, { distDir: webappDist(import.meta.dirname) });
 
-  await applySchema(db as never);
-  void purgeInspection(); // after the tables exist
+  void purgeInspection(); // after the tables exist (applySchema ran right after the db was created)
 
   return app;
 }

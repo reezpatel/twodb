@@ -346,15 +346,20 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
         app.log.warn({ slug }, "stored credentials failed to decrypt — re-provisioning");
       }
     }
-    // First contact (unmanaged app) or stale ciphertext: provision now.
-    // NB: provisioning resets the role password, so never do it when valid creds exist.
+    // Ensure the app's Postgres role + schema + grants exist on EVERY config fetch (idempotent: creates only what is
+    // missing, and keeps the stored role password, so valid credentials never change). This self-heals a wiped/restored
+    // database or a role created without ownership. If the admin connection is down but we hold stored credentials,
+    // carry on with them rather than blocking the app's boot.
     let schema = row.pg_schema;
     let role = row.pg_role;
-    if (!containerUrl) {
+    try {
       const p = await provisionDatabase(slug, { registry, config });
       containerUrl = p.containerConnectionString;
       schema = p.schema;
       role = p.role;
+    } catch (err) {
+      if (!containerUrl) throw err;
+      app.log.warn({ slug, err }, "database ensure failed — continuing with stored credentials");
     }
 
     let connectionString = containerUrl;

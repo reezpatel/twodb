@@ -1,0 +1,21 @@
+$schema: 'https://moonrepo.dev/schemas/tasks.json'
+
+inheritedBy:
+  toolchains: ['node']
+
+fileGroups:
+  sources: ['src/**/*', 'package.json', 'tsconfig*.json', 'vite.config.*', 'index.html']
+
+tasks:
+  build:
+    command: 'pnpm run build'
+    inputs: ['@globs(sources)']
+  lint:
+    command: 'pnpm run lint'
+    inputs: ['@globs(sources)']
+  dev:
+    command: 'pnpm run dev'
+    preset: 'server'
+    options:
+      cache: false
+      persistent: true

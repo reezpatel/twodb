@@ -28,3 +28,7 @@ apps/two-runner/two-vm-agent
 
 # twodb-core per-app token cache
 .twodb/
+
+# moon
+.moon/cache/
+.moon/docker/

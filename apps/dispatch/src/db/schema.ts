@@ -1,3 +1,4 @@
+import { sql } from "kysely";
 import { type Kysely } from "@twodb/core-data/db";
 
 /** A registered machine that dials in over WS and executes commands.
@@ -103,7 +104,10 @@ export interface DispatchDb {
 }
 
 export async function applySchema(db: Kysely<DispatchDb>): Promise<void> {
-  await db.schema.createSchema("dispatch").ifNotExists().execute();
+  // TwoDB's provisioner normally creates the schema; self-heal for bare dev DBs. Checked first: the
+  // least-privilege app role lacks CREATE on the database, and Postgres checks that BEFORE `IF NOT EXISTS`.
+  const exists = await sql<{ n: number }>`select count(*)::int as n from information_schema.schemata where schema_name = 'dispatch'`.execute(db as never);
+  if (!exists.rows[0]?.n) await sql`create schema dispatch`.execute(db as never);
 
   await db.schema
     .createTable("runner")

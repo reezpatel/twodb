@@ -1,0 +1,15 @@
+$schema: 'https://moonrepo.dev/schemas/toolchains.json'
+
+# Toolchains come from the Nix dev shell (flake.nix), so no versions are
+# pinned here -- moon uses whatever is on PATH.
+javascript:
+  inferTasksFromScripts: false
+  syncProjectWorkspaceDependencies: true
+
+node: {}
+pnpm: {}
+
+typescript:
+  syncProjectReferences: false
+
+go: {}

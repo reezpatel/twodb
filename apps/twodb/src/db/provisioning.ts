@@ -61,7 +61,12 @@ export async function provisionAppDatabase(
     }
 
     await client.query(`CREATE SCHEMA IF NOT EXISTS ${client.escapeIdentifier(schema)} AUTHORIZATION ${client.escapeIdentifier(role)}`);
+    // Heal: a schema created earlier by another role (e.g. the admin) is handed over to the app's role, and
+    // objects already in it become usable — the app owns its schema, nothing else can touch it.
+    await client.query(`ALTER SCHEMA ${client.escapeIdentifier(schema)} OWNER TO ${client.escapeIdentifier(role)}`);
     await client.query(`GRANT ALL ON SCHEMA ${client.escapeIdentifier(schema)} TO ${client.escapeIdentifier(role)}`);
+    await client.query(`GRANT ALL ON ALL TABLES IN SCHEMA ${client.escapeIdentifier(schema)} TO ${client.escapeIdentifier(role)}`);
+    await client.query(`GRANT ALL ON ALL SEQUENCES IN SCHEMA ${client.escapeIdentifier(schema)} TO ${client.escapeIdentifier(role)}`);
     await client.query(`ALTER ROLE ${client.escapeIdentifier(role)} SET search_path = ${client.escapeIdentifier(schema)}`);
     // Default privileges so future tables the app creates stay owned/grantable the same way.
     await client.query(

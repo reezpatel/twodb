@@ -1,0 +1,23 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'go'
+layer: 'application'
+
+fileGroups:
+  sources: ['**/*.go', 'go.mod', 'go.sum']
+
+tasks:
+  build:
+    command: 'go build -o two-runner .'
+    inputs: ['@globs(sources)']
+    outputs: ['two-runner']
+  build-agent:
+    command: 'go build -o two-vm-agent ./cmd/two-vm-agent'
+    inputs: ['@globs(sources)']
+    outputs: ['two-vm-agent']
+  lint:
+    command: 'go vet ./...'
+    inputs: ['@globs(sources)']
+  test:
+    command: 'go test ./...'
+    inputs: ['@globs(sources)']
