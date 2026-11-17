@@ -111,6 +111,8 @@ export function defaultSize(type: ItemType, data: Record<string, unknown>): { wi
       return { width: 240, height: 160 };
     case "edge":
       return { width: 0, height: 0 };
+    case "draw":
+      return { width: 0, height: 0 };
   }
 }
 
