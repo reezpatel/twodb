@@ -9,8 +9,8 @@ import { cn } from "../../../lib/cn.js";
 export function ChatMessage({ variant = "assistant", className, children, ...props }: ComponentProps<"div"> & { variant?: "user" | "assistant" }) {
   const user = variant === "user";
   return (
-    <div data-slot="chat-message" data-variant={variant} className={cn("flex flex-col", user ? "mt-20" : "gap-0.5", className)} {...props}>
-      <div className={cn(user && "ms-5 rounded-sm bg-bubble px-4 py-4 md:ms-20 lg:ms-40")}>{children}</div>
+    <div data-slot="chat-message" data-variant={variant} className={cn("flex flex-col", user ? "mt-4" : "gap-0.5", className)} {...props}>
+      <div className={cn(user && "ms-5 rounded-sm bg-bubble px-2.5 py-2 md:px-4 md:py-4 md:ms-20 lg:ms-40")}>{children}</div>
     </div>
   );
 }

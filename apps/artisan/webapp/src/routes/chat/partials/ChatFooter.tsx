@@ -4,7 +4,7 @@ import { cn } from "../../../lib/cn.js";
 import { chatWidth } from "./ChatShell.js";
 
 export function ChatFooter({ className, ...props }: ComponentProps<"div">) {
-  return <div data-slot="chat-footer" className={cn(chatWidth, "flex shrink-0 flex-col gap-2 px-4 pb-3", className)} {...props} />;
+  return <div data-slot="chat-footer" className={cn(chatWidth, "flex shrink-0 flex-col gap-1.5 px-2 pb-2 md:gap-2 md:px-4 md:pb-3", className)} {...props} />;
 }
 
 /** Error/warning notice above the composer. */
@@ -43,5 +43,5 @@ export function ChatReconnecting({ className, label = "Reconnecting", children =
 
 /** Status line strip under the composer (usage stats live here). */
 export function ChatStatusBar({ className, ...props }: ComponentProps<"div">) {
-  return <div data-slot="chat-status-bar" className={cn("flex flex-col gap-1 pt-1", className)} {...props} />;
+  return <div data-slot="chat-status-bar" className={cn("flex flex-col gap-1 pt-0 md:pt-1", className)} {...props} />;
 }

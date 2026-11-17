@@ -85,12 +85,32 @@ export class DispatchClient {
     return this.post<MicrovmInfo>("/microvms/boot", input);
   }
 
+  /** In-flight boots by identifier, so parallel first tool calls share one boot. */
+  private readonly booting = new Map<string, Promise<MicrovmInfo>>();
+
+  /** Make sure the microvm exists and is running — creating it on first use (lazy chat VMs) and resuming it when idle-stopped. */
+  private ensureMicrovm(identifier: string): Promise<MicrovmInfo> {
+    const pending = this.booting.get(identifier);
+    if (pending) return pending;
+    const run = (async () => {
+      const vm = (await this.listMicrovms()).find((v) => v.identifier === identifier);
+      if (!vm) return this.bootMicrovm({ identifier }); // never booted: dispatch creates a fresh VM on the first online microvm host
+      // Dispatch exec does not resume idle VMs on its own — boot/resume first.
+      if (vm.status !== "running") return this.bootMicrovm({ identifier, runnerId: vm.runnerName ?? vm.runnerId });
+      return vm;
+    })().finally(() => this.booting.delete(identifier));
+    this.booting.set(identifier, run);
+    return run;
+  }
+
   private async execMicrovm(identifier: string, command: string, cwd: string, timeoutMs: number): Promise<ExecResult> {
-    const vm = (await this.listMicrovms()).find((v) => v.identifier === identifier);
-    if (!vm) throw new Error(`microvm ${identifier} not found`);
-    // Dispatch exec does not resume idle VMs on its own — boot/resume first.
-    if (vm.status !== "running") await this.bootMicrovm({ identifier, runnerId: vm.runnerName ?? vm.runnerId });
+    const vm = await this.ensureMicrovm(identifier);
     return this.post<ExecResult>("/microvms/exec", { runnerId: vm.runnerName ?? vm.runnerId, identifier, command, cwd, timeoutMs: Math.min(timeoutMs, 600_000) });
+  }
+
+  /** Stop a microvm (best-effort cleanup, e.g. when its chat is deleted). Missing VMs are fine. */
+  async shutdownMicrovm(identifier: string): Promise<void> {
+    await this.post(`/microvms/${encodeURIComponent(identifier)}/shutdown`, {}).catch(() => {});
   }
 
   async exec(runner: string, command: string, cwd: string, timeoutMs = 60_000): Promise<ExecResult> {

@@ -4,6 +4,11 @@ import { createHash } from "node:crypto";
 import { ulid } from "ulid";
 import type { SkillScope } from "../skills.js";
 import type { McpScope } from "../mcp.js";
+
+/** Marker space for the workspace-wide chat agent (it belongs to no single space). */
+const CHAT_AGENT_SPACE = "*";
+const CHAT_AGENT_NAME = "Chats";
+const CHAT_AGENT_DESCRIPTION = "All llm_chat conversations — each runs in its own microVM (booted on the first tool call)";
 import type { AgentRow, ArtisanDb, CanvasRow, CheckpointRow, DirectoryRow, McpServerRow, MemoryRow, MessageRow, SessionRow, SessionUsageRow, SkillRow, ThreadRow } from "./schema.js";
 
 export function newId(): string {
@@ -66,6 +71,10 @@ export interface ArtisanRepo {
   listAgents(workspaceId: string, spaceId?: string): Promise<AgentRow[]>;
   /** Directory agent config for (runner, directory) — auto-created on first use. */
   getOrCreateDirectoryAgent(workspaceId: string, spaceId: string, runner: string, directory: string): Promise<AgentRow>;
+  /** The workspace's single chat agent (type "llm_chat"): configurable instruction/model/tools; each chat runs it in its own microVM. */
+  getOrCreateChatAgent(workspaceId: string): Promise<AgentRow>;
+  /** The agent that runs a session: its own agent, the chat agent (llm_chat), or the directory agent. */
+  agentForSession(session: SessionRow): Promise<AgentRow | undefined>;
   updateAgent(workspaceId: string, id: string, patch: Partial<{
     name: string; spaceIds: string[]; description: string; instruction: string; model: string | null;
     tools: string[]; skillTags: string[]; tags: string[]; runner: string | null; directory: string | null;
@@ -364,6 +373,46 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
       let q = db.selectFrom("agent").selectAll().where("workspace_id", "=", workspaceId);
       if (spaceId) q = q.where((eb) => eb.or([eb("space_id", "=", spaceId), eb("space_ids_json", "like", `%"${spaceId.replace(/[^A-Za-z0-9_-]/g, "")}"%`)]));
       return q.orderBy("created_at", "asc").execute();
+    },
+
+    async getOrCreateChatAgent(workspaceId) {
+      const existing = await db.selectFrom("agent").selectAll()
+        .where("workspace_id", "=", workspaceId)
+        .where("type", "=", "llm_chat")
+        .executeTakeFirst();
+      if (existing) {
+        if (existing.description !== CHAT_AGENT_DESCRIPTION || existing.name !== CHAT_AGENT_NAME) {
+          await db.updateTable("agent").set({ description: CHAT_AGENT_DESCRIPTION, name: CHAT_AGENT_NAME }).where("id", "=", existing.id).execute();
+          return { ...existing, description: CHAT_AGENT_DESCRIPTION, name: CHAT_AGENT_NAME };
+        }
+        return existing;
+      }
+      const row: AgentRow = {
+        id: newId(),
+        workspace_id: workspaceId,
+        space_id: CHAT_AGENT_SPACE, // workspace-wide: one config for chats in every space
+        space_ids_json: JSON.stringify([]),
+        type: "llm_chat",
+        name: CHAT_AGENT_NAME,
+        description: CHAT_AGENT_DESCRIPTION,
+        instruction: "",
+        model: null,
+        tools_json: JSON.stringify([]),
+        skill_tags_json: JSON.stringify([]),
+        tags_json: JSON.stringify(["chat"]),
+        runner: null,
+        directory: null,
+        created_at: now(),
+        updated_at: now(),
+      };
+      await db.insertInto("agent").values(row).execute();
+      return row;
+    },
+
+    async agentForSession(session) {
+      if (session.agent_id) return this.getAgent(session.workspace_id, session.agent_id);
+      if (session.type === "llm_chat") return this.getOrCreateChatAgent(session.workspace_id);
+      return this.getOrCreateDirectoryAgent(session.workspace_id, session.space_id, session.runner, session.directory);
     },
 
     async getOrCreateDirectoryAgent(workspaceId, spaceId, runner, directory) {

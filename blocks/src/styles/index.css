@@ -256,6 +256,18 @@ body,
   letter-spacing: 0.02em;
 }
 
+/* Paint the canvas itself with the app ground so nothing white shows through
+   under the Android gesture/nav bar (installed PWAs are edge-to-edge) or on
+   overscroll. Follows light/dark via --paper. */
+html {
+  background: var(--paper);
+}
+@supports (height: 100dvh) {
+  #root {
+    height: 100dvh;
+  }
+}
+
 /* Minimal scrollbars everywhere — thin, token-tinted (brighter on hover),
    same scheme as the legacy app. Firefox via scrollbar-*; Chromium/WebKit
    via ::-webkit-scrollbar. */

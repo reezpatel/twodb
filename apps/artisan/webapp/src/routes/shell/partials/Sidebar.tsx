@@ -1,6 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { Plus, Bot, BookOpen, Plug, ScrollText, Settings, MessageSquare, FolderPlus, Pencil, Search, ChevronRight, Archive, Check, MoreHorizontal, Trash2 } from "lucide-react";
-import { artisanClient, type AgentInfo, type DirectoryInfo, type McpServerInfo, type SessionInfo, type SkillInfo } from "../../../lib/artisan-client.js";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Plus, Bot, BookOpen, Plug, Settings, LogOut, SquareTerminal, MessageCircle, FolderPlus, Pencil, Search, ChevronRight, Archive, Check, MoreHorizontal, Trash2 } from "lucide-react";
+import { artisanClient, type AgentInfo, type DirectoryInfo, type McpServerInfo, type SessionInfo, type SkillInfo, type SpaceInfo } from "../../../lib/artisan-client.js";
 import { SessionSearchDialog } from "./SessionSearchDialog.js";
 import { useResizableWidth } from "../../../lib/useResizableWidth.js";
 
@@ -27,9 +27,19 @@ export interface SidebarProps {
   onNewMcp: () => void;
   onOpenMcp: (server: McpServerInfo) => void;
   onDeleteMcp: (server: McpServerInfo) => Promise<void> | void;
-  /** Id of the settings page currently open (see SETTINGS_ITEMS), if any. */
-  activeSettingId: string | null;
-  onOpenSetting: (id: string) => void;
+  /** Plain LLM chats (session type llm_chat) — the Chat tab. */
+  chats: SessionInfo[];
+  /** Spaces — the Chat tab has one section per space, each with its own `+`. */
+  spaces: SpaceInfo[];
+  onNewChat: (spaceId: string) => void;
+  /** Footer: Settings opens the settings dialog; Sign out ends the SSO session. */
+  onOpenSettings: () => void;
+  onSignOut: () => void;
+  /** Below lg the sidebar is a slide-over sheet: `open` shows it, `onClose` dismisses (backdrop / Escape). */
+  overlay?: boolean;
+  open?: boolean;
+  onClose?: () => void;
+  userName?: string;
   agents: AgentInfo[];
   onNewAgent: () => void;
   onOpenAgent: (agent: AgentInfo) => void;
@@ -37,18 +47,13 @@ export interface SidebarProps {
   onDeleteAgent: (agent: AgentInfo) => Promise<void> | void;
 }
 
-/** Settings pages. Add an entry here (plus a route in App.tsx) to grow the Settings tab. */
-export const SETTINGS_ITEMS: Array<{ id: string; label: string; hint: string; icon: typeof Bot }> = [
-  { id: "global-instruction", label: "Global instruction", hint: "Base instructions added to every agent's prompt", icon: ScrollText },
-];
-
-type SidebarTab = "sessions" | "agents" | "skills" | "mcp" | "settings";
+type SidebarTab = "sessions" | "chat" | "agents" | "skills" | "mcp";
 const SIDEBAR_TABS: Array<{ id: SidebarTab; label: string; icon: typeof Bot }> = [
-  { id: "sessions", label: "Sessions", icon: MessageSquare },
+  { id: "sessions", label: "Sessions", icon: SquareTerminal },
+  { id: "chat", label: "Chat", icon: MessageCircle },
   { id: "agents", label: "Agents", icon: Bot },
   { id: "skills", label: "Skills", icon: BookOpen },
   { id: "mcp", label: "MCP", icon: Plug },
-  { id: "settings", label: "Settings", icon: Settings },
 ];
 
 interface DirGroup {
@@ -61,7 +66,7 @@ interface DirGroup {
 /** Left sidebar: registered directories as sections, each with a `+` to start a session. */
 export function Sidebar(props: SidebarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
-  const [tab, setTabState] = useState<SidebarTab>(() => (["agents", "skills", "mcp", "settings"].includes(localStorage.getItem("artisan.sidebar.tab") ?? "") ? (localStorage.getItem("artisan.sidebar.tab") as SidebarTab) : "sessions"));
+  const [tab, setTabState] = useState<SidebarTab>(() => (["chat", "agents", "skills", "mcp"].includes(localStorage.getItem("artisan.sidebar.tab") ?? "") ? (localStorage.getItem("artisan.sidebar.tab") as SidebarTab) : "sessions"));
   const setTab = (t: SidebarTab) => {
     setTabState(t);
     localStorage.setItem("artisan.sidebar.tab", t);
@@ -113,13 +118,38 @@ export function Sidebar(props: SidebarProps) {
     return out;
   }, [directorySessions, props.directories, archiveMode]);
   // Search covers every session, including chats with custom agents.
-  const searchable = useMemo(() => props.sessions.filter((s) => !s.archivedAt), [props.sessions]);
+  const searchable = useMemo(() => [...props.sessions, ...props.chats].filter((s) => !s.archivedAt), [props.sessions, props.chats]);
+  const chatGroups = useMemo(() => {
+    const shown = props.chats.filter((s) => !!s.archivedAt === archiveMode);
+    const known = new Set(props.spaces.map((sp) => sp.id));
+    const groups = props.spaces.map((sp) => ({ id: sp.id, name: sp.name, chats: shown.filter((c) => c.spaceId === sp.id) }));
+    const orphans = shown.filter((c) => !known.has(c.spaceId)); // chats whose space is no longer visible
+    if (orphans.length) groups.push({ id: "_other", name: "Other", chats: orphans });
+    // While archived, hide empty sections (nothing to create there).
+    return archiveMode ? groups.filter((g) => g.chats.length > 0) : groups;
+  }, [props.chats, props.spaces, archiveMode]);
+
+  useEffect(() => {
+    if (!props.overlay || !props.open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") props.onClose?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [props.overlay, props.open, props.onClose]);
+
+  if (props.overlay && !props.open) return null;
 
   return (
-    <div className="flex h-full min-h-0 shrink-0" style={{ width }}>
+    <>
+    {props.overlay ? <div aria-hidden className="fixed inset-0 z-40 bg-black/50" onClick={props.onClose} /> : null}
+    <div
+      className={props.overlay ? "fixed inset-y-0 left-0 z-50 flex min-h-0 bg-paper shadow-xl" : "flex h-full min-h-0 shrink-0"}
+      style={{ width: props.overlay ? "min(85vw, 320px)" : width }}
+    >
       <div className="flex h-full min-h-0 w-full flex-col border-r border-outline/50 bg-card/50 p-3">
         <div className="flex shrink-0 items-center justify-between gap-2 px-1 pb-2">
-          <span className="min-w-0 flex-1 truncate px-1.5 font-sans text-[13px] font-medium text-ink">{tab === "agents" ? "Agents" : tab === "skills" ? "Skills" : tab === "mcp" ? "MCP servers" : tab === "settings" ? "Settings" : "Sessions"}</span>
+          <span className="min-w-0 flex-1 truncate px-1.5 font-sans text-[13px] font-medium text-ink">{tab === "agents" ? "Agents" : tab === "skills" ? "Skills" : tab === "mcp" ? "MCP servers" : tab === "chat" ? "Chat" : "Sessions"}</span>
           {tab === "sessions" ? (
             <>
               <button type="button" aria-label="Add directory" title="Add directory" onClick={props.onAddDirectory} className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-paper-grid hover:text-ink">
@@ -129,7 +159,7 @@ export function Sidebar(props: SidebarProps) {
                 <Search className="size-4" strokeWidth={1.5} />
               </button>
             </>
-          ) : tab === "settings" ? null : (
+          ) : tab === "chat" ? null : (
             <button type="button" aria-label={tab === "skills" ? "New skill" : tab === "mcp" ? "New MCP server" : "New agent"} title={tab === "skills" ? "New skill" : tab === "mcp" ? "New MCP server" : "New agent"} onClick={tab === "skills" ? props.onNewSkill : tab === "mcp" ? props.onNewMcp : props.onNewAgent} className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-paper-grid hover:text-ink">
               <Plus className="size-4" strokeWidth={1.5} />
             </button>
@@ -155,20 +185,46 @@ export function Sidebar(props: SidebarProps) {
         {tab === "skills" ? <SkillList skills={props.skills} activeId={props.activeSkillId} onOpen={props.onOpenSkill} onNew={props.onNewSkill} onDelete={props.onDeleteSkill} /> : null}
         {tab === "mcp" ? <McpList servers={props.mcpServers} activeId={props.activeMcpId} onOpen={props.onOpenMcp} onNew={props.onNewMcp} onDelete={props.onDeleteMcp} /> : null}
         {tab === "agents" ? <AgentList agents={props.agents} activeId={props.activeAgentId} onEdit={props.onOpenAgent} onNew={props.onNewAgent} onDelete={props.onDeleteAgent} /> : null}
-        {tab === "settings" ? (
-          <div className="flex flex-col gap-0.5">
-            {SETTINGS_ITEMS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => props.onOpenSetting(item.id)}
-                title={item.hint}
-                className={`flex shrink-0 items-center gap-2 rounded-[8px] px-2.5 py-[7px] text-left font-sans text-[13px] font-light leading-none transition-colors ${props.activeSettingId === item.id ? "bg-stone text-ink" : "text-muted-foreground hover:bg-paper-grid hover:text-ink"}`}
-              >
-                <item.icon className="size-4 shrink-0" strokeWidth={1.5} />
-                {item.label}
-              </button>
+        {tab === "chat" ? (
+          <div className="mt-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {chatGroups.map((g) => (
+              <div key={g.id} className="flex flex-col">
+                <div className="group/header flex items-center pr-1">
+                  <button
+                    type="button"
+                    className="group/title flex min-w-0 flex-1 items-center gap-1 px-2.5 pb-1 text-left"
+                    aria-expanded={!collapsed[`chat:${g.id}`]}
+                    onClick={() => toggle(`chat:${g.id}`)}
+                    title={g.name}
+                  >
+                    <span className="min-w-0 truncate font-sans text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/50 transition-colors group-hover/title:text-muted-foreground">{g.name}</span>
+                    <ChevronRight className={`size-3 shrink-0 text-muted-foreground/40 opacity-0 transition-all group-hover/title:opacity-100 ${collapsed[`chat:${g.id}`] ? "" : "rotate-90"}`} strokeWidth={2} />
+                  </button>
+                  {g.id !== "_other" ? (
+                    <button type="button" aria-label={`New chat in ${g.name}`} title="New chat" className="rounded-sm p-1 text-muted-foreground opacity-100 transition-opacity hover:bg-paper-grid hover:text-ink md:opacity-0 md:focus-visible:opacity-100 md:group-hover/header:opacity-100" onClick={() => props.onNewChat(g.id)}>
+                      <Plus className="size-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+                {collapsed[`chat:${g.id}`] ? null : (
+                  <div className="flex flex-col gap-0.5">
+                    {g.chats.map((s) => (
+                      <SessionRow key={s.id} session={s} active={s.id === props.activeSessionId} {...props} />
+                    ))}
+                    {g.chats.length === 0 ? <p className="px-2.5 py-1 text-[11px] text-muted-foreground/60">no chats yet</p> : null}
+                  </div>
+                )}
+              </div>
             ))}
+            {chatGroups.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+                <div className="flex size-10 items-center justify-center rounded-full bg-surface-muted text-ink-muted">
+                  {archiveMode ? <Archive className="size-5" /> : <MessageCircle className="size-5" />}
+                </div>
+                <p className="text-sm font-medium tracking-wide">{archiveMode ? "Nothing archived" : "No spaces"}</p>
+                <p className="text-sm leading-relaxed text-ink-muted">{archiveMode ? "Chats you archive will appear here" : "Chats live in a space — none is available to you yet."}</p>
+              </div>
+            ) : null}
           </div>
         ) : null}
         <div className={`mt-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${tab !== "sessions" ? "hidden" : ""}`}>
@@ -228,15 +284,18 @@ export function Sidebar(props: SidebarProps) {
           ) : null}
         </div>
         <div className="mt-auto flex shrink-0 flex-col gap-0.5 border-t border-outline/50 pt-3">
-          {tab === "sessions" ? (
+          {tab === "sessions" || tab === "chat" ? (
             <NavRow icon={Archive} label="Archive" active={archiveMode} onClick={() => setArchiveMode((v) => !v)} title={archiveMode ? "Showing archived sessions — click to show active" : "Show archived sessions"}>
               {archiveMode ? <Check className="size-3.5" /> : null}
             </NavRow>
           ) : null}
+          <NavRow icon={Settings} label="Settings" onClick={props.onOpenSettings} title="Settings" />
+          <NavRow icon={LogOut} label="Sign out" onClick={props.onSignOut} title={props.userName ? `Sign out ${props.userName}` : "Sign out"} />
         </div>
       </div>
-      <Handle edge="right" />
+      {props.overlay ? null : <Handle edge="right" />}
     </div>
+    </>
   );
 }
 
@@ -425,6 +484,7 @@ function AgentList(props: { agents: AgentInfo[]; activeId: string | null; onEdit
   const groups = useMemo(() => {
     const by = new Map<string, AgentInfo[]>();
     for (const a of props.agents) {
+      if (a.type === "llm_chat") continue; // the shared chat agent lives in Settings → Chat agent
       const list = by.get(a.type) ?? [];
       list.push(a);
       by.set(a.type, list);

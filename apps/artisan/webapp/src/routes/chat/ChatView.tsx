@@ -1,3 +1,4 @@
+import { TOGGLE_EXPAND_EVENT, announceExpandState } from "./hooks/useExpandToggle.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, Scissors, Paperclip } from "lucide-react";
 import { Markdown, ThinkingState } from "@twodb/blocks";
@@ -107,7 +108,7 @@ function contextPercent(usage: { contextTokens?: number } | null, contextWindow:
  * bubble, assistant = open text), bordered composer with Stop/Send, and a
  * usage status bar (↑ ↓ ⚡ + context ring + model picker).
  */
-export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
+export function ChatView(props: { sessionId: string; noHeader?: boolean; /** llm_chat: no runner — hides @files and the terminal shortcut. */ plain?: boolean }) {
   const chat = useSessionChat(props.sessionId);
   const { connected } = useWorkspaceWs();
   const catalog = useCatalog();
@@ -118,7 +119,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
 
   const liveDeltaRef = useRef({ count: 0, startedAt: 0 });
   const [mentionIndex, setMentionIndex] = useState(0);
-  const files = useDirectoryFiles(props.sessionId);
+  const files = useDirectoryFiles(props.plain ? null : props.sessionId);
   const detail = chat.detail;
   const [attachments, setAttachments] = useState<Array<{ path: string; uploaded?: boolean; name?: string }>>([]);
   const [skillContent, setSkillContent] = useState<Record<string, string>>({});
@@ -279,12 +280,17 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
   const ctxPct = contextPercent(chat.usage, modelInfo?.contextWindow ?? null);
   const cacheHit = chat.usage && chat.usage.inputTokens > 0 ? `${Math.round((chat.usage.cachedTokens / chat.usage.inputTokens) * 100)}%` : "—";
 
-  // App-wide Cmd/Ctrl+O (wired in App.tsx) → toggle expand/collapse all thinking/tool blocks.
+  // App-wide O / Cmd/Ctrl+O (wired in App.tsx) → toggle expand/collapse all thinking/tool blocks.
   useEffect(() => {
     const onToggle = () => setExpandAll((prev) => (prev === 1 ? 0 : 1));
-    window.addEventListener("artisan:toggle-expand", onToggle);
-    return () => window.removeEventListener("artisan:toggle-expand", onToggle);
+    window.addEventListener(TOGGLE_EXPAND_EVENT, onToggle);
+    return () => window.removeEventListener(TOGGLE_EXPAND_EVENT, onToggle);
   }, []);
+  // Keep the header button's icon in sync.
+  useEffect(() => {
+    announceExpandState(expandAll === 1);
+    return () => announceExpandState(false);
+  }, [expandAll]);
 
   // Generation speed: token/400ms window, reset on run start (legacy code-chat usage bar).
   useEffect(() => {
@@ -447,10 +453,10 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
                 aria-label="Attach files"
                 title="Attach files"
                 disabled={uploading}
-                className="flex size-8 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink disabled:opacity-40"
+                className="flex size-7 md:size-8 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink disabled:opacity-40"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <Paperclip className="size-4" />
+                <Paperclip className="size-3.5 md:size-4" />
               </button>
               <ChatComposerSpacer />
               {chat.running ? <ChatComposerStop onClick={() => void chat.abort()} /> : null}
@@ -461,9 +467,9 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
 
         <ChatStatusBar>
           <ChatUsage>
-            <ChatUsageStat title="Input tokens (incl. cached)">↑ {fmtTokens(chat.usage?.inputTokens ?? 0)}</ChatUsageStat>
-            <ChatUsageStat title="Output tokens">↓ {fmtTokens(chat.usage?.outputTokens ?? 0)}</ChatUsageStat>
-            <ChatUsageStat title="Cache hit — cached input / total input">⚡ {cacheHit}</ChatUsageStat>
+            <ChatUsageStat className="hidden md:inline" title="Input tokens (incl. cached)">↑ {fmtTokens(chat.usage?.inputTokens ?? 0)}</ChatUsageStat>
+            <ChatUsageStat className="hidden md:inline" title="Output tokens">↓ {fmtTokens(chat.usage?.outputTokens ?? 0)}</ChatUsageStat>
+            <ChatUsageStat className="hidden md:inline" title="Cache hit — cached input / total input">⚡ {cacheHit}</ChatUsageStat>
             <ChatUsageContext
               percent={ctxPct}
               label={
@@ -476,18 +482,21 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
                 { label: "cached", value: fmtTokens(chat.usage?.cachedTokens ?? 0) },
                 { label: "output", value: fmtTokens(chat.usage?.outputTokens ?? 0) },
                 { label: "model calls", value: String(chat.usage?.calls ?? 0) },
+                { label: "cache hit", value: cacheHit },
+                { label: "speed", value: tokPerSec !== null ? `${tokPerSec} tok/s` : "—" },
+                { label: "cost", value: chat.usage?.costUsd != null ? `$${chat.usage.costUsd.toFixed(4)}` : "—" },
               ]}
             />
             <ChatUsageSpacer />
-            <button
+            {props.plain ? null : <button
               type="button"
               data-slot="terminal-toggle"
               title="Open terminal"
-              className="flex size-6 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
+              className="hidden size-6 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink md:flex"
               onClick={() => window.dispatchEvent(new CustomEvent("artisan:open-tab", { detail: "terminal" }))}
             >
               <SquareDashed className="size-3.5" />
-            </button>
+            </button>}
             {providers.length > 0 && detail ? (
               <ModelPicker
                 providers={providers}
@@ -510,7 +519,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean }) {
               />
             ) : null}
           </ChatUsage>
-          <div data-slot="chat-metrics" className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-sm text-ink-muted">
+          <div data-slot="chat-metrics" className="hidden flex-wrap items-center md:flex gap-x-4 gap-y-1 px-1 text-sm text-ink-muted">
             <ChatUsageStat title="Generation speed">Speed {tokPerSec !== null ? `${tokPerSec} tok/s` : "—"}</ChatUsageStat>
             <ChatUsageStat title="Session cost">Cost {chat.usage?.costUsd != null ? `$${chat.usage.costUsd.toFixed(4)}` : "—"}</ChatUsageStat>
           </div>

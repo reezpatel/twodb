@@ -9,7 +9,7 @@ Coding agent harness — sessions on runner directories, threads, subagents, ski
 - **Capabilities**: ws
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-15T19:04:19.209Z_
+_Generated: 2026-11-17T04:57:02.942Z_
 
 ## Endpoints
 
@@ -61,7 +61,7 @@ App-to-app message inbox (core-async relay). Authenticated by a control-plane-si
 
 ### `POST /sessions` — createSession
 
-Creates a session bound to a runner directory (any type; type=directory is the default webapp kind). Optional opening message runs immediately.
+Creates a session bound to a runner directory (any type; type=directory is the default webapp kind). type=llm_chat makes a chat: runner/directory are omitted — the chat gets its own microVM (working dir /app), booted lazily on the first tool call — and model falls back to the chat agent's default. Optional opening message runs immediately.
 
 - **Auth**: `session-or-apiKey`
 
@@ -102,10 +102,6 @@ Creates a session bound to a runner directory (any type; type=directory is the d
       "type": "string"
     }
   },
-  "required": [
-    "runner",
-    "directory"
-  ],
   "additionalProperties": false
 }
 ```
@@ -1381,7 +1377,7 @@ The tools an agent can be allowed to use (name + description).
 
 ### `GET /agents` — listAgents
 
-Agents in a space (directory agents included — they are auto-created per runner+directory).
+Agents in a space (directory agents included — they are auto-created per runner+directory), plus the workspace-wide chat agent (type llm_chat, name "Chats") so agent pickers — Toolkit access, Skill / MCP availability — can target chats.
 
 - **Auth**: `session-or-apiKey`
 
@@ -2077,6 +2073,104 @@ Sets the global instruction (max 20,000 characters; empty clears it). Applies fr
   "required": [
     "content",
     "updatedAt"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /settings/chat-agent` — getChatAgent
+
+The single agent behind every llm_chat session (created on first read): its instruction and default model. Tools are configured via PATCH /agents/:id. Chats get the full tool set unless the allowlist narrows it.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "instruction": {
+      "type": "string"
+    },
+    "model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "instruction",
+    "model"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `PUT /settings/chat-agent` — setChatAgent
+
+Updates the llm_chat agent. instruction (max 20,000 chars) is added to every chat's system prompt from its next message; model is the default for new chats (null clears it).
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "instruction": {
+      "type": "string"
+    },
+    "model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "instruction": {
+      "type": "string"
+    },
+    "model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "instruction",
+    "model"
   ],
   "additionalProperties": false
 }

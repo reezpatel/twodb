@@ -18,7 +18,7 @@ import { gunzipSync } from "node:zlib";
 import { readForwardedContext } from "./gateway-context.js";
 import { artisanManifest } from "./manifest.js";
 import { TworouteClient } from "./tworoute-client.js";
-import { DispatchClient } from "./dispatch-client.js";
+import { DispatchClient, MICROVM_PREFIX } from "./dispatch-client.js";
 import { WorkspaceHub } from "./ws/hub.js";
 import { registerWorkspaceWs } from "./ws/workspace-ws.js";
 import { scopeOf, validateScope, type SkillMode, type SkillScope } from "./skills.js";
@@ -141,14 +141,15 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const body = (req.body ?? {}) as {
-      spaceId?: string; type?: string; title?: string; runner: string; directory: string;
+      spaceId?: string; type?: string; title?: string; runner?: string; directory?: string;
       model?: string; interactive?: boolean; agentId?: string | null; message?: string;
     };
+    const isChat = body.type === "llm_chat";
     // Resolve the owning directory first (explicit id or auto-register) so its
     // space is the default — API-key callers carry no space context.
-    let directoryId = (body as { directoryId?: string }).directoryId ?? null;
-    if (!directoryId) {
-      const existing = await repo.getDirectoryByPath(ctx.workspaceId, body.runner, body.directory);
+    let directoryId = isChat ? null : ((body as { directoryId?: string }).directoryId ?? null);
+    if (!directoryId && !isChat) {
+      const existing = await repo.getDirectoryByPath(ctx.workspaceId, body.runner!, body.directory!);
       if (existing) directoryId = existing.id;
     }
     const dirRow = directoryId ? await repo.getDirectory(ctx.workspaceId, directoryId) : undefined;
@@ -156,22 +157,28 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const agentRow = body.agentId ? await repo.getAgent(ctx.workspaceId, body.agentId) : undefined;
     const spaceId = body.spaceId ?? dirRow?.space_id ?? agentRow?.space_id ?? ctx.spaceIds[0];
     if (!spaceId) return reply.code(400).send({ error: "no space — pass spaceId, or use a registered directory or an agent that has one" });
-    const model = body.model ?? dirRow?.default_model ?? process.env.ARTISAN_DEFAULT_MODEL ?? "";
-    if (!body.runner || !body.directory) return reply.code(400).send({ error: "runner and directory required" });
+    const chatModel = isChat ? (await repo.getOrCreateChatAgent(ctx.workspaceId)).model : null;
+    const model = body.model ?? chatModel ?? dirRow?.default_model ?? process.env.ARTISAN_DEFAULT_MODEL ?? "";
+    if (!isChat && (!body.runner || !body.directory)) return reply.code(400).send({ error: "runner and directory required" });
     if (!model) return reply.code(400).send({ error: "model required (no default configured)" });
 
     // Ensure the working directory exists on the runner before anything runs.
-    const deps0 = depsFor(req);
-    await deps0.dispatch
-      .exec(body.runner, `mkdir -p ${shellQuote(body.directory)} && echo ok`, "/", 15_000)
-      .catch((err) => {
-        throw new Error(`runner "${body.runner}" unreachable: ${(err as Error).message}`);
-      });
+    // llm_chat: every chat gets its own microVM (`microvm:chat-<id>`, working dir /app). It is NOT booted here —
+    // the first tool call boots it (DispatchClient.ensureMicrovm), so a chat that never uses tools costs nothing.
+    const runner = isChat ? `${MICROVM_PREFIX}chat-${newId().slice(-8).toLowerCase()}` : body.runner!;
+    const directory = isChat ? "/app" : body.directory!;
+    if (!isChat) {
+      await depsFor(req).dispatch
+        .exec(runner, `mkdir -p ${shellQuote(directory)} && echo ok`, "/", 15_000)
+        .catch((err) => {
+          throw new Error(`runner "${runner}" unreachable: ${(err as Error).message}`);
+        });
+    }
 
     // Auto-register the path if not already a directory.
-    if (!directoryId) {
+    if (!directoryId && !isChat) {
       const created = await repo.createDirectory({
-        workspaceId: ctx.workspaceId, spaceId, runner: body.runner, path: body.directory,
+        workspaceId: ctx.workspaceId, spaceId, runner, path: directory,
         defaultModel: model,
       });
       directoryId = created.id;
@@ -182,21 +189,19 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
       spaceId,
       type: body.type ?? "directory",
       title: body.title ?? `session-${newId().slice(-4)}`,
-      runner: body.runner,
-      directory: body.directory,
+      runner,
+      directory,
       directoryId,
       model,
       interactive: body.interactive ?? true,
       agentId: body.agentId ?? null,
     });
-    await repo.getOrCreateDirectoryAgent(ctx.workspaceId, spaceId, body.runner, body.directory);
+    const agentForRun = await repo.agentForSession(session);
 
     // Optional opening message — run headless through the same loop.
     if (body.message) {
       const deps = depsFor(req);
-      const agent = session.agent_id
-        ? await repo.getAgent(ctx.workspaceId, session.agent_id)
-        : await repo.getOrCreateDirectoryAgent(ctx.workspaceId, spaceId, body.runner, body.directory);
+      const agent = agentForRun;
       if (agent) {
         void runAgentLoop({ deps, session, agent, model, apiKey: apiKeyFor(req), userMessage: body.message }).catch(async (err) => {
           console.error("agent loop failed:", err);
@@ -257,9 +262,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const { id } = req.params as { id: string };
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
-    const agent = session.agent_id
-      ? await repo.getAgent(ctx.workspaceId, session.agent_id)
-      : await repo.getOrCreateDirectoryAgent(ctx.workspaceId, session.space_id, session.runner, session.directory);
+    const agent = await repo.agentForSession(session);
     if (!agent) return reply.code(404).send({ error: "agent not found" });
     return listCanvasContent({ repo, serviceFetch: opts.twodb.serviceFetch, session, agent });
   });
@@ -296,7 +299,11 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     if (!ctx) return reply;
     const { id } = req.params as { id: string };
     if (isSessionRunning(id)) return reply.code(409).send({ error: "session running" });
-    return { ok: await repo.deleteSession(ctx.workspaceId, id) };
+    const doomed = await repo.getSession(ctx.workspaceId, id);
+    const ok = await repo.deleteSession(ctx.workspaceId, id);
+    // A deleted chat releases its microVM (best-effort; it may never have booted).
+    if (ok && doomed?.type === "llm_chat" && doomed.runner.startsWith(MICROVM_PREFIX)) void depsFor(req).dispatch.shutdownMicrovm(doomed.runner.slice(MICROVM_PREFIX.length));
+    return { ok };
   });
 
   // Message send via HTTP (WS send is the primary path).
@@ -309,9 +316,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
     if (isSessionRunning(id)) return reply.code(409).send({ error: "session running" });
-    const agent = session.agent_id
-      ? await repo.getAgent(ctx.workspaceId, session.agent_id)
-      : await repo.getOrCreateDirectoryAgent(ctx.workspaceId, session.space_id, session.runner, session.directory);
+    const agent = await repo.agentForSession(session);
     if (!agent) return reply.code(500).send({ error: "agent config missing" });
     void runAgentLoop({ deps: depsFor(req), session, agent, model: session.model, apiKey: apiKeyFor(req), userMessage: body.message }).catch(async (err) => {
       console.error("agent loop failed:", err);
@@ -390,7 +395,11 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     if (!ctx) return reply;
     const q = req.query as { spaceId?: string };
     const rows = await repo.listAgents(ctx.workspaceId, q.spaceId ?? ctx.spaceIds[0]);
-    return rows.map(agentOut);
+    // The workspace-wide chat agent belongs to no single space, so the space filter above never returns it —
+    // append it so it can be targeted by agent pickers (Toolkit access, Skill / MCP availability). It is
+    // created on first read, so it is always selectable. (The webapp's Agents tab hides it: it lives in Settings.)
+    const chat = await repo.getOrCreateChatAgent(ctx.workspaceId);
+    return [...rows.filter((a) => a.id !== chat.id), chat].map(agentOut);
   });
 
   app.get("/agents/:id", async (req, reply) => {
@@ -419,6 +428,15 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const current = await repo.getAgent(ctx.workspaceId, id);
     if (!current) return reply.code(404).send({ error: "not found" });
     const fixed = current.type === "directory";
+    // The llm_chat agent is workspace-wide and its runner is always the chat's own microVM: only instruction, model and tools are configurable.
+    if (current.type === "llm_chat") {
+      const updated = await repo.updateAgent(ctx.workspaceId, id, {
+        instruction: body.instruction as string | undefined,
+        model: body.model as string | null | undefined,
+        tools: body.tools as string[] | undefined,
+      });
+      return updated ? agentOut(updated) : reply.code(404).send({ error: "not found" });
+    }
     const agent = await repo.updateAgent(ctx.workspaceId, id, {
       name: body.name as string | undefined,
       spaceIds: fixed ? undefined : (body.spaceIds as string[] | undefined) ?? (typeof body.spaceId === "string" ? [body.spaceId] : undefined),
@@ -461,6 +479,25 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     if (content.length > MAX_GLOBAL_INSTRUCTION) return reply.code(400).send({ error: `too long (max ${MAX_GLOBAL_INSTRUCTION} characters)` });
     const s = await repo.setSetting(ctx.workspaceId, "global_instruction", content);
     return { content: s.value, updatedAt: s.updatedAt };
+  });
+
+  // --- llm_chat agent: the one agent shared by every plain chat -------------
+  const chatAgentOut = (a: { id: string; instruction: string; model: string | null }) => ({ id: a.id, instruction: a.instruction, model: a.model });
+  app.get("/settings/chat-agent", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    return chatAgentOut(await repo.getOrCreateChatAgent(ctx.workspaceId));
+  });
+  app.put("/settings/chat-agent", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const body = (req.body ?? {}) as { instruction?: unknown; model?: unknown };
+    if (body.instruction !== undefined && typeof body.instruction !== "string") return reply.code(400).send({ error: "instruction must be a string" });
+    if (typeof body.instruction === "string" && body.instruction.length > MAX_GLOBAL_INSTRUCTION) return reply.code(400).send({ error: `too long (max ${MAX_GLOBAL_INSTRUCTION} characters)` });
+    if (body.model !== undefined && body.model !== null && typeof body.model !== "string") return reply.code(400).send({ error: "model must be a string or null" });
+    const agent = await repo.getOrCreateChatAgent(ctx.workspaceId);
+    const updated = await repo.updateAgent(ctx.workspaceId, agent.id, { instruction: body.instruction as string | undefined, model: body.model === "" ? null : (body.model as string | null | undefined) });
+    return chatAgentOut(updated ?? agent);
   });
 
   // --- MCP servers (config only — not injected into agents yet) --------------
@@ -1526,11 +1563,12 @@ function messageOut(m: { id: string; role: string; content: string; meta_json: s
 
 function agentOut(a: { id: string; type: string; name: string; description: string; instruction?: string; model: string | null; tools_json: string; skill_tags_json: string; tags_json: string; runner: string | null; directory: string | null; space_id: string; space_ids_json?: string }) {
   const ids = a.space_ids_json ? (JSON.parse(a.space_ids_json) as string[]) : [];
-  const spaceIds = ids.length ? ids : [a.space_id];
+  // The llm_chat agent spans every space: it has no space of its own.
+  const spaceIds = a.type === "llm_chat" ? [] : ids.length ? ids : [a.space_id];
   return {
     id: a.id, type: a.type, name: a.name, description: a.description, instruction: a.instruction ?? "", model: a.model,
     tools: JSON.parse(a.tools_json), skillTags: JSON.parse(a.skill_tags_json), tags: JSON.parse(a.tags_json),
-    runner: a.runner, directory: a.directory, spaceId: spaceIds[0], spaceIds,
+    runner: a.runner, directory: a.directory, spaceId: spaceIds[0] ?? "", spaceIds,
   };
 }
 

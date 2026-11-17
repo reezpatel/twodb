@@ -38,9 +38,7 @@ export function registerWorkspaceWs(app: FastifyInstance, hub: WorkspaceHub, rep
             if (isSessionRunning(frame.sessionId)) {
               return hub.broadcast(workspaceId, frame.sessionId, { type: "error", message: "session already running" });
             }
-            const agent = session.agent_id
-              ? await repo.getAgent(workspaceId, session.agent_id)
-              : await repo.getOrCreateDirectoryAgent(workspaceId, session.space_id, session.runner, session.directory);
+            const agent = await repo.agentForSession(session);
             if (!agent) return hub.broadcast(workspaceId, frame.sessionId, { type: "error", message: "agent config missing" });
             // fire-and-forget: frames stream to the room
             void runAgentLoop({ deps: depsFor(workspaceId), session, agent, model: session.model, apiKey: "", userMessage: frame.text }).catch((err) => {

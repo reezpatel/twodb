@@ -53,8 +53,9 @@ export function AgentView({ agentId, models, directories, onStartChat, onOpenSes
   if (error) return <p className="p-6 text-[13px] text-destructive">{error}</p>;
   if (!agent) return <div className="flex flex-1 items-center justify-center text-ink-muted"><Loader2 className="size-5 animate-spin" /></div>;
 
-  const locked = agent.type === "directory";
-  // Directory agents are the per-directory defaults — their sessions are the directory's own sessions.
+  // Directory agents are the per-directory defaults and the llm_chat agent is the single shared chat agent:
+  // identity is fixed, and neither has a Sessions tab (their sessions live in the Sessions / Chat sidebar tabs).
+  const locked = agent.type === "directory" || agent.type === "llm_chat";
   const tabs = locked ? TABS.filter((t) => t.id !== "sessions") : TABS;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -113,7 +114,7 @@ function InstructionTab({ agent, onSave }: { agent: AgentInfo; onSave: (v: strin
     <div className="flex h-full min-h-[24rem] flex-col gap-3 px-6 py-4">
       <div className="flex items-center gap-3">
         <p className="min-w-0 flex-1 text-[12px] text-ink-muted">
-          The system prompt for this agent. It is added to every request it handles, after the built-in tool guidance.
+          {agent.type === "llm_chat" ? "The system prompt for every chat. It is added to each message, after the global instruction." : "The system prompt for this agent. It is added to every request it handles, after the built-in tool guidance."}
         </p>
         <span className="shrink-0 font-mono text-[11px] text-ink-muted">{text.length.toLocaleString()} chars</span>
         <Button size="sm" variant="primary" disabled={!dirty || busy} onClick={() => void save()}>
@@ -144,6 +145,7 @@ function ConfigTab({ agent, models, onSave }: { agent: AgentInfo; models: ModelI
   const [directory, setDirectory] = useState<string | null>(agent.directory);
   const [spaceIds, setSpaceIds] = useState<string[]>(agent.spaceIds?.length ? agent.spaceIds : [agent.spaceId]);
   const fixed = agent.type === "directory";
+  const chat = agent.type === "llm_chat"; // shared chat agent: model + tools; its runner is each chat's own microVM, and it spans every space
   const [pinOpen, setPinOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -175,7 +177,7 @@ function ConfigTab({ agent, models, onSave }: { agent: AgentInfo; models: ModelI
     setBusy(true);
     setErr(null);
     try {
-      await onSave(fixed ? { tools, model } : { tools, model, runner, directory, spaceIds });
+      await onSave(chat ? { tools, model } : fixed ? { tools, model } : { tools, model, runner, directory, spaceIds });
       setFlash(true);
       setTimeout(() => setFlash(false), 1500);
     } catch (e) {
@@ -203,17 +205,17 @@ function ConfigTab({ agent, models, onSave }: { agent: AgentInfo; models: ModelI
           <div className={row}>
             <div>
               <div className="text-[13px] text-ink">Model</div>
-              <div className="text-[12px] text-ink-muted">{model ? "Always uses this model." : "Uses the calling session's model."}</div>
+              <div className="text-[12px] text-ink-muted">{model ? (chat ? "Default model for new chats." : "Always uses this model.") : chat ? "New chats use the first available model." : "Uses the calling session's model."}</div>
             </div>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-1.5 text-[12px] text-ink-muted">
-                <Checkbox checked={model === null} onCheckedChange={(v) => setModel(v ? null : (models[0]?.id ?? null))} /> inherit
+                <Checkbox checked={model === null} onCheckedChange={(v) => setModel(v ? null : (models[0]?.id ?? null))} /> {chat ? "first available" : "inherit"}
               </label>
               {model !== null && providers.length > 0 ? <ModelPicker providers={providers} value={model} onChange={setModel} /> : null}
             </div>
           </div>
 
-          <div className={row}>
+          {chat ? null : <div className={row}>
             <div className="min-w-0">
               <div className="text-[13px] text-ink">Runner & directory</div>
               <div className="truncate font-mono text-[12px] text-ink-muted">{pinned ? `${runner}:${directory ?? "—"}` : "Inherited from the calling session."}</div>
@@ -226,17 +228,23 @@ function ConfigTab({ agent, models, onSave }: { agent: AgentInfo; models: ModelI
                 <Button size="sm" variant="secondary" onClick={() => setPinOpen(true)}>{pinned ? "Change…" : "Pin…"}</Button>
               </div>
             )}
-          </div>
+          </div>}
 
-          <div className={row}>
+          {chat ? null : <div className={row}>
             <div className="shrink-0">
               <div className="text-[13px] text-ink">Spaces</div>
               <div className="text-[12px] text-ink-muted">{fixed ? "Fixed for directory agents." : "Visible in every space you select."}</div>
             </div>
             <SpaceMultiSelect spaces={spaces} value={spaceIds} onChange={setSpaceIds} disabled={fixed} />
-          </div>
+          </div>}
         </div>
       </section>
+
+      {chat ? (
+        <p className="text-[12px] text-ink-muted">
+          Each chat runs in its own microVM (working directory /app). It boots the first time the agent calls a tool, goes idle when unused and resumes on the next call. This one agent is used by chats in every space.
+        </p>
+      ) : null}
 
       <section>
         <div className="mb-1 flex items-center gap-3">

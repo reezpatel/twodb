@@ -257,7 +257,7 @@ export const artisanClient = {
   },
 
   createSession(input: {
-    spaceId?: string; type?: string; title?: string; runner: string; directory: string;
+    spaceId?: string; type?: string; title?: string; runner?: string; directory?: string;
     model?: string; interactive?: boolean; agentId?: string | null; message?: string;
   }): Promise<SessionInfo> {
     return post("/sessions", input);
@@ -360,6 +360,12 @@ export const artisanClient = {
     return get("/skills");
   },
 
+  getChatAgent(): Promise<{ id: string; instruction: string; model: string | null }> {
+    return get("/settings/chat-agent");
+  },
+  async setChatAgent(body: { instruction?: string; model?: string | null }): Promise<{ id: string; instruction: string; model: string | null }> {
+    return json(await fetch(`${BASE}/settings/chat-agent`, { method: "PUT", headers: { "content-type": "application/json", ...(await gatewayAuthHeader()) }, body: JSON.stringify(body) }));
+  },
   getGlobalInstruction(): Promise<{ content: string; updatedAt: string | null }> {
     return get("/settings/global-instruction");
   },

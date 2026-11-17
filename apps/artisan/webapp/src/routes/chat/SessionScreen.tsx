@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import { useLargeViewport } from "@twodb/blocks";
 import { useResizableWidth } from "../../lib/useResizableWidth.js";
 import { ChatView } from "./ChatView.js";
 import { EditorScreen } from "./EditorScreen.js";
@@ -8,6 +9,7 @@ import { CheckpointsScreen } from "./CheckpointsScreen.js";
 import { InspectorScreen } from "./InspectorScreen.js";
 import { ChangesScreen } from "./ChangesScreen.js";
 import { CanvasScreen } from "./CanvasScreen.js";
+import { ExpandToggle } from "./partials/ExpandToggle.js";
 import { SessionTabs, type SessionTabId } from "./partials/SessionTabs.js";
 import { SessionSidebar } from "./partials/SessionSidebar.js";
 import { useSessionSide } from "./hooks/useSessionSide.js";
@@ -22,7 +24,12 @@ const MAIN_MIN_WIDTH = 480;
  */
 export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionId: string) => void; title?: string; connected?: boolean }) {
   const [tab, setTab] = useState<SessionTabId>("chat");
-  const [showSidebar, setShowSidebar] = useState(true);
+  const isLarge = useLargeViewport();
+  // Docked on lg+ (open by default); on mobile it is a slide-over sheet, hidden until toggled.
+  const [showSidebar, setShowSidebar] = useState(isLarge);
+  useEffect(() => {
+    setShowSidebar(isLarge);
+  }, [isLarge, props.sessionId]);
 
   // footer shortcuts (terminal button) request a tab switch
   useEffect(() => {
@@ -46,19 +53,36 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
   }, []);
   const rightWidth = Math.min(right.width, maxRight());
 
+  const panel = (
+    <SessionSidebar
+      sessionId={props.sessionId}
+      plan={side.plan}
+      children={side.children}
+      git={side.git}
+      jobs={side.jobs}
+      busy={side.busy}
+      onRefreshGit={side.refresh}
+      onOpenChild={(id) => {
+        if (!isLarge) setShowSidebar(false);
+        props.onOpenChild(id);
+      }}
+    />
+  );
+
   return (
     <div ref={rootRef} className="flex min-h-0 flex-1">
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex shrink-0 items-center gap-1.5 border-b border-outline bg-surface px-3 py-2">
           <SessionTabs active={tab} onChange={setTab} />
-          <div className="mx-1.5 h-4 w-px bg-outline" />
+          <div className="mx-1.5 hidden h-4 w-px bg-outline lg:block" />
           <span
             className="ml-auto flex items-center gap-1.5 text-[10px] text-ink-muted"
             title={props.connected ? "Connected to the workspace" : "Reconnecting to the workspace"}
           >
             <span className={`inline-block size-1.5 rounded-full ${props.connected ? "bg-emerald-500" : "bg-red-400"}`} />
-            {props.connected ? "live" : "reconnecting…"}
+            <span className="hidden sm:inline">{props.connected ? "live" : "reconnecting…"}</span>
           </span>
+          <ExpandToggle className="lg:hidden" />
           <button
             type="button"
             aria-label={showSidebar ? "Hide sidebar" : "Show sidebar"}
@@ -80,21 +104,19 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
         </div>
       </div>
       {showSidebar ? (
-        <div className="flex h-full min-h-0 shrink-0" style={{ width: rightWidth }}>
-          <right.Handle edge="left" />
-          <div className="h-full min-h-0 w-full">
-            <SessionSidebar
-              sessionId={props.sessionId}
-              plan={side.plan}
-              children={side.children}
-              git={side.git}
-              jobs={side.jobs}
-              busy={side.busy}
-              onRefreshGit={side.refresh}
-              onOpenChild={props.onOpenChild}
-            />
+        isLarge ? (
+          <div className="flex h-full min-h-0 shrink-0" style={{ width: rightWidth }}>
+            <right.Handle edge="left" />
+            <div className="h-full min-h-0 w-full">{panel}</div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div aria-hidden className="fixed inset-0 z-40 bg-black/50" onClick={() => setShowSidebar(false)} />
+            <div className="fixed inset-y-0 right-0 z-50 flex min-h-0 bg-paper shadow-xl" style={{ width: "min(88vw, 340px)" }}>
+              <div className="h-full min-h-0 w-full">{panel}</div>
+            </div>
+          </>
+        )
       ) : null}
     </div>
   );

@@ -644,11 +644,17 @@ export async function runAgentLoop(opts: {
 async function buildContext(deps: RunDeps, session: SessionRow, agent: AgentRow, tools: ToolSpec[], thread: { id: string; summary: string | null }, systemExtra?: string): Promise<ChatMessage[]> {
   const out: ChatMessage[] = [];
 
+  const isChat = session.type === "llm_chat";
   const visibleSkills = (await deps.repo.listSkills(session.workspace_id)).filter((s) => skillApplies(s, agent, session));
 
   const systemParts: string[] = [];
-  systemParts.push("You are an expert coding agent operating on a remote machine via tools.");
-  systemParts.push(`Working directory: ${session.directory} on runner ${session.runner}. Use relative paths from there.`);
+  if (isChat) {
+    systemParts.push("You are a helpful, concise assistant in a chat. Answer directly from your own knowledge whenever you can — use Markdown for formatting.");
+    systemParts.push("You also have a private Linux sandbox (a microVM, working directory /app) reachable through your tools. It only starts the first time you call a tool, so reach for tools only when the task needs a machine: running code, reading or writing files, installing packages, fetching data. Paths are relative to /app.");
+  } else {
+    systemParts.push("You are an expert coding agent operating on a remote machine via tools.");
+    systemParts.push(`Working directory: ${session.directory} on runner ${session.runner}. Use relative paths from there.`);
+  }
   const globalInstruction = (await deps.repo.getSetting(session.workspace_id, "global_instruction"))?.value.trim();
   if (globalInstruction) systemParts.push(`\n## Global instructions\nThese apply to every agent in this workspace:\n${globalInstruction}`);
   if (agent.instruction) systemParts.push(`\n## Instructions\n${agent.instruction}`);

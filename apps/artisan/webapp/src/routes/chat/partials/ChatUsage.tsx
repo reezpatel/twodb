@@ -3,7 +3,7 @@ import { cn } from "../../../lib/cn.js";
 
 /** Usage stat row under the composer (legacy code-chat-usage). */
 export function ChatUsage({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="chat-usage" className={cn("flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-sm text-ink-muted", className)} {...props} />;
+  return <div data-slot="chat-usage" className={cn("flex items-center gap-x-2 gap-y-1 px-0.5 text-sm text-ink-muted md:flex-wrap md:gap-x-4 md:px-1", className)} {...props} />;
 }
 
 export function ChatUsageStat({ className, ...props }: React.ComponentProps<"span">) {
@@ -69,7 +69,8 @@ export function ChatUsageContext({ percent, label, breakdown, warnAt = 80, dange
           pathLength={1}
         />
       </svg>
-      <span className="font-mono text-xs tabular-nums">{label}</span>
+      <span className="hidden font-mono text-xs tabular-nums md:inline">{label}</span>
+      <span className="font-mono text-xs tabular-nums md:hidden">{percent === null ? "—" : `${Math.round(percent)}%`}</span>
     </span>
   );
 }

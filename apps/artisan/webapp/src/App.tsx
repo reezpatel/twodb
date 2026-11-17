@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { ChevronDown, Menu, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@twodb/blocks";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 import {
   artisanClient,
@@ -8,19 +10,24 @@ import {
   type McpServerInfo,
   type SessionInfo,
   type SkillInfo,
+  type SpaceInfo,
 } from "./lib/artisan-client.js";
 import { WorkspaceProvider, useWorkspaceWs } from "./lib/workspace-ws.js";
 import { RequireAuth } from "./routes/auth/RequireAuth.js";
 import { Sidebar } from "./routes/shell/partials/Sidebar.js";
 import { NewSessionDialog } from "./routes/shell/partials/NewSessionDialog.js";
 import { DirectoryDialog } from "./routes/shell/partials/DirectoryDialog.js";
+import { isTypingTarget, toggleExpand } from "./routes/chat/hooks/useExpandToggle.js";
 import { useTabs } from "./routes/shell/hooks/useTabs.js";
 import { useCatalog } from "./routes/shell/hooks/useCatalog.js";
 import { SessionScreen } from "./routes/chat/SessionScreen.js";
+import { ChatScreen } from "./routes/chat/ChatScreen.js";
 import { AgentView, type AgentViewProps } from "./routes/agents/AgentView.js";
 import { AgentWizard } from "./routes/agents/partials/AgentWizard.js";
 import { SkillView } from "./routes/skills/SkillView.js";
-import { GlobalInstructionView } from "./routes/settings/GlobalInstructionView.js";
+import { SettingsDialog } from "./routes/settings/partials/SettingsDialog.js";
+import { useSidebarToggle } from "./routes/shell/hooks/useSidebarToggle.js";
+import { useShellSession } from "./routes/shell/hooks/useShellSession.js";
 import { McpView } from "./routes/mcp/McpView.js";
 import { McpDialog } from "./routes/mcp/partials/McpDialog.js";
 import { SkillDialog } from "./routes/skills/partials/SkillDialog.js";
@@ -47,7 +54,13 @@ function Shell() {
   const { connected } = useWorkspaceWs();
   const catalog = useCatalog();
   const tabs = useTabs();
+  const { userName, signOut } = useShellSession();
+  const nav = useSidebarToggle("artisan.nav-open");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [spaces, setSpaces] = useState<SpaceInfo[]>([]);
+  /** Plain LLM chats (type llm_chat) — the sidebar's Chat tab. */
+  const [chats, setChats] = useState<SessionInfo[]>([]);
   const [directories, setDirectories] = useState<DirectoryInfo[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [agentWizard, setAgentWizard] = useState(false);
@@ -62,6 +75,8 @@ function Shell() {
   const refreshSessions = useCallback(async () => {
     try {
       setSessions(await artisanClient.listSessions({ archived: "include" }));
+      setChats(await artisanClient.listSessions({ type: "llm_chat", archived: "include" }));
+      setSpaces(await artisanClient.listSpaces());
       setDirectories(await artisanClient.listRegisteredDirectories());
       setAgents(await artisanClient.listAgents());
       setSkills(await artisanClient.listSkills());
@@ -77,13 +92,14 @@ function Shell() {
     return () => clearInterval(t);
   }, [refreshSessions]);
 
-  // App-wide Cmd/Ctrl+O → broadcast expand/collapse-all for thinking/tool blocks.
+  // App-wide O or Cmd/Ctrl+O → expand/collapse all thinking/tool blocks. Bare O is ignored while typing.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o" && !e.shiftKey && !e.altKey) {
-        e.preventDefault();
-        window.dispatchEvent(new CustomEvent("artisan:toggle-expand"));
-      }
+      if (e.shiftKey || e.altKey || e.key.toLowerCase() !== "o") return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod && isTypingTarget(e.target)) return;
+      e.preventDefault();
+      toggleExpand();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -132,6 +148,21 @@ function Shell() {
     return null;
   };
 
+  /** Chat tab section `+`: a plain llm_chat session in that space — no runner, no directory, no tools. */
+  const newChat = async (spaceId: string) => {
+    // The chat agent's default model (Settings → Chat agent), else the first available one.
+    const cfg = await artisanClient.getChatAgent().catch(() => null);
+    const model = cfg?.model ?? catalog.models[0]?.id;
+    if (!model) {
+      window.alert("No model available yet — connect a provider in TwoRoute first.");
+      return;
+    }
+    const s = await artisanClient.createSession({ type: "llm_chat", spaceId, model, title: `chat-${Date.now().toString(36).slice(-4)}` });
+    await refreshSessions();
+    tabs.open(s.id, s.title);
+    navigate(`/s/${s.id}`);
+  };
+
   /** Directory `+` button: create a session immediately with the directory's defaults. */
   const quickCreate = async (dir: DirectoryInfo) => {
     try {
@@ -147,12 +178,22 @@ function Shell() {
     }
   };
 
+  // The sheet closes itself after any navigation (opening a session, agent, skill…).
+  useEffect(() => {
+    if (nav.overlay) nav.setOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  const chatIds = new Set(chats.map((c) => c.id));
   const showTabs = tabs.tabs.length > 0;
   const onSessionRoute = location.pathname === "/" || location.pathname.startsWith("/s/");
 
   return (
     <div className="flex h-screen overflow-hidden bg-paper text-ink">
       <Sidebar
+        overlay={nav.overlay}
+        open={nav.open}
+        onClose={() => nav.setOpen(false)}
         sessions={sessions}
         directories={directories}
         activeSessionId={tabs.active}
@@ -179,8 +220,12 @@ function Shell() {
         activeSkillId={location.pathname.match(/^\/skills\/([^/]+)/)?.[1] ?? null}
         mcpServers={mcpServers}
         activeMcpId={location.pathname.match(/^\/mcp\/([^/]+)/)?.[1] ?? null}
-        activeSettingId={location.pathname.match(/^\/settings\/([^/]+)/)?.[1] ?? null}
-        onOpenSetting={(id) => navigate(`/settings/${id}`)}
+        chats={chats}
+        spaces={spaces}
+        onNewChat={(spaceId) => void newChat(spaceId)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onSignOut={signOut}
+        userName={userName}
         onNewMcp={() => setMcpDialog(true)}
         onOpenMcp={(s) => navigate(`/mcp/${s.id}`)}
         onDeleteMcp={async (s) => {
@@ -206,7 +251,44 @@ function Shell() {
         }}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {showTabs ? (
+        {nav.overlay ? (
+          <div className="flex h-11 shrink-0 items-center gap-2 border-b border-outline bg-surface px-2">
+            <button type="button" aria-label="Open navigation" title="Open navigation" className="flex size-8 items-center justify-center rounded-md text-ink-muted hover:bg-surface-muted hover:text-ink" onClick={() => nav.setOpen(true)}>
+              <Menu className="size-5" />
+            </button>
+            {showTabs ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" data-slot="open-tabs-menu" aria-label="Open sessions" className="flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 text-left text-[13px] font-medium hover:bg-surface-muted">
+                    <span className="min-w-0 flex-1 truncate">{tabs.tabs.find((t) => t.sessionId === tabs.active)?.label ?? "Artisan"}</span>
+                    <span className="shrink-0 rounded-full bg-surface-muted px-1.5 text-[11px] text-ink-muted">{tabs.tabs.length}</span>
+                    <ChevronDown className="size-3.5 shrink-0 text-ink-muted" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64">
+                  {tabs.tabs.map((t) => (
+                    <DropdownMenuItem
+                      key={t.sessionId}
+                      className={t.sessionId === tabs.active && onSessionRoute ? "bg-surface-muted" : undefined}
+                      onSelect={() => {
+                        tabs.setActive(t.sessionId);
+                        navigate(`/s/${t.sessionId}`);
+                      }}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{t.label}</span>
+                      <button type="button" aria-label={`Close ${t.label}`} className="shrink-0 rounded p-0.5 text-ink-muted hover:bg-surface-muted hover:text-ink" onClick={(e) => { e.stopPropagation(); e.preventDefault(); tabs.close(t.sessionId); }}>
+                        <X className="size-3.5" />
+                      </button>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-[13px] font-medium">Artisan</span>
+            )}
+          </div>
+        ) : null}
+        {showTabs && !nav.overlay ? (
           <div className="flex items-end overflow-x-auto bg-stone" style={{ scrollbarWidth: "none" }}>
             {tabs.tabs.map((t) => (
               <div
@@ -240,18 +322,22 @@ function Shell() {
               path="/"
               element={
                 showTabs && tabs.active ? (
-                  <SessionScreen
-                    connected={connected}
-                    sessionId={tabs.active}
-                    onOpenChild={(id) => tabs.open(id)}
-                    title={tabs.tabs.find((t) => t.sessionId === tabs.active)?.label}
-                  />
+                  chatIds.has(tabs.active) ? (
+                    <ChatScreen connected={connected} sessionId={tabs.active} title={tabs.tabs.find((t) => t.sessionId === tabs.active)?.label} />
+                  ) : (
+                    <SessionScreen
+                      connected={connected}
+                      sessionId={tabs.active}
+                      onOpenChild={(id) => tabs.open(id)}
+                      title={tabs.tabs.find((t) => t.sessionId === tabs.active)?.label}
+                    />
+                  )
                 ) : (
                   <EmptyState onNew={() => setNewOpen(true)} />
                 )
               }
             />
-            <Route path="/s/:sessionId" element={<ChatViewRoute tabs={tabs} connected={connected} />} />
+            <Route path="/s/:sessionId" element={<ChatViewRoute tabs={tabs} connected={connected} chatIds={chatIds} />} />
             <Route
               path="/agents/:agentId"
               element={
@@ -267,13 +353,12 @@ function Shell() {
               }
             />
             <Route path="/skills/:skillId" element={<SkillRoute agents={agents} onChanged={refreshSessions} />} />
-            <Route path="/settings" element={<Navigate to="/settings/global-instruction" replace />} />
-            <Route path="/settings/global-instruction" element={<GlobalInstructionView />} />
             <Route path="/mcp/:mcpId" element={<McpRoute agents={agents} directories={directories} onChanged={refreshSessions} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </div>
+      {settingsOpen ? <SettingsDialog onClose={() => setSettingsOpen(false)} /> : null}
       {newOpen ? (
         <NewSessionDialog models={catalog.models} runners={catalog.runners} busy={false} onClose={() => setNewOpen(false)} onCreate={createSession} />
       ) : null}
@@ -376,7 +461,7 @@ function AgentRoute(props: {
   );
 }
 
-function ChatViewRoute(props: { tabs: ReturnType<typeof useTabs>; connected: boolean }) {
+function ChatViewRoute(props: { tabs: ReturnType<typeof useTabs>; connected: boolean; chatIds: Set<string> }) {
   const { sessionId } = useParams2();
   const found = props.tabs.tabs.some((t) => t.sessionId === sessionId);
   useEffect(() => {
@@ -384,6 +469,7 @@ function ChatViewRoute(props: { tabs: ReturnType<typeof useTabs>; connected: boo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, found]);
   if (!sessionId) return null;
+  if (props.chatIds.has(sessionId)) return <ChatScreen connected={props.connected} sessionId={sessionId} title={props.tabs.tabs.find((t) => t.sessionId === sessionId)?.label} />;
   return <SessionScreen connected={props.connected} sessionId={sessionId} onOpenChild={(id) => props.tabs.open(id)} title={undefined} />;
 }
 

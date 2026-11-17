@@ -8,7 +8,7 @@ export function ChatComposer({ busy = false, className, ...props }: ComponentPro
     <div
       data-slot="chat-composer"
       data-busy={busy || undefined}
-      className={cn("relative flex flex-col gap-1.5 rounded-md border bg-surface-muted/60 p-2 shadow-sm transition-colors", busy && "border-primary/50", className)}
+      className={cn("relative flex flex-col gap-1.5 rounded-md border bg-surface-muted/60 p-1.5 shadow-sm md:p-2 transition-colors", busy && "border-primary/50", className)}
       {...props}
     />
   );
@@ -90,12 +90,12 @@ export function ChatComposerSend({ className, ...props }: ComponentProps<"button
       type="button"
       data-slot="chat-composer-send"
       className={cn(
-        "flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:opacity-90 disabled:opacity-40",
+        "flex size-7 items-center justify-center rounded-full bg-primary md:size-8 text-primary-foreground transition-all hover:opacity-90 disabled:opacity-40",
         className,
       )}
       {...props}
     >
-      <ArrowUp className="size-4" />
+      <ArrowUp className="size-3.5 md:size-4" />
     </button>
   );
 }
@@ -107,7 +107,7 @@ export function ChatComposerStop({ label = "Stop", keyLabel = "Esc", className, 
       type="button"
       data-slot="chat-composer-stop"
       className={cn(
-        "flex h-8 items-center rounded-full border px-3 pr-2 text-sm text-ink transition-colors hover:bg-surface-muted",
+        "flex h-7 items-center rounded-full border px-2.5 pr-1.5 text-xs md:h-8 md:px-3 md:pr-2 md:text-sm text-ink transition-colors hover:bg-surface-muted",
         className,
       )}
       {...props}
