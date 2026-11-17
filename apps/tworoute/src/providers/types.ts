@@ -9,6 +9,12 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ChatTool {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
 export interface CompletionRequest {
   model: string;
   messages: ChatMessage[];
@@ -17,6 +23,7 @@ export interface CompletionRequest {
   max_tokens?: number;
   /** Thinking effort (low|medium|high|max) — forwarded verbatim to providers that support it. */
   effort?: string;
+  tools?: ChatTool[];
 }
 
 export interface LlmProvider {

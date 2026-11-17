@@ -35,6 +35,18 @@ function authHeaders(
 ): Record<string, string> {
   if (!spec) return {};
   if (spec.auth === "x-api-key") return { "x-api-key": credential(connection) };
+  // Claude Code OAuth: send the full Claude Code identity or Anthropic bills
+  // the request against API balance instead of the subscription (rate limits).
+  if (spec.auth === "claude-oauth") {
+    const token = credential(connection);
+    if (!token) return { "x-api-key": connection.api_key };
+    return {
+      authorization: `Bearer ${token}`,
+      "anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
+      "user-agent": "claude-cli/2.1.280 (external, cli)",
+      "x-app": "cli",
+    };
+  }
   return { authorization: `Bearer ${credential(connection)}` };
 }
 
@@ -74,21 +86,49 @@ export const anthropicProvider: LlmProvider = {
     const rest = req.messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: m.content }));
     const spec = getProviderSpec(connection.provider);
     const headers = authHeaders(spec, connection);
-    return fetch(joinUrl(connection.base_url || "https://api.anthropic.com", "/v1/messages"), {
+    const baseUrl = connection.base_url || "https://api.anthropic.com";
+    const firstParty = /api\.anthropic\.com/.test(baseUrl);
+    const supportsThinking =
+      /claude-(?:3-7|[4-9])/.test(req.model) || /claude-(?:sonnet|opus|haiku|fable)-(?:[4-9]|latest)/.test(req.model);
+    const budgetTokens: number = supportsThinking ? ({ off: 0, low: 1024, medium: 4096, high: 16384 } as Record<string, number>)[req.effort ?? "medium"] ?? 4096 : 0;
+    const adaptiveModel = /claude-(?:opus-(?:4\.(?:[7-9]|1[0-9])|[5-9])|fable|mythos|sonnet-[5-9]|haiku-[5-9]|latest)/.test(req.model);
+    let thinkingParam: Record<string, unknown> | undefined;
+    let outputConfig: Record<string, unknown> | undefined;
+    if (supportsThinking && req.effort === "off") {
+      // omit
+    } else if (supportsThinking && firstParty && adaptiveModel) {
+      thinkingParam = { type: "adaptive", display: "summarized" };
+      outputConfig = { effort: req.effort ?? "medium" };
+    } else if (supportsThinking && budgetTokens > 0) {
+      thinkingParam = firstParty
+        ? { type: "enabled", budget_tokens: budgetTokens, display: "summarized" }
+        : { type: "enabled", budget_tokens: budgetTokens };
+    }
+    // OAuth (Claude Code subscription) requests must lead with the Claude Code
+    // identity block or Anthropic bills them against API balance.
+    const systemParam =
+      spec?.auth === "claude-oauth"
+        ? [{ type: "text", text: "You are Claude Code, Anthropic's official CLI for Claude." }, ...(system ? [{ type: "text", text: system }] : [])]
+        : system || undefined;
+    return fetch(joinUrl(baseUrl, "/v1/messages"), {
       method: "POST",
       headers: {
         "content-type": "application/json",
         ...headers,
         "anthropic-version": "2023-06-01",
-        ...(spec?.auth === "claude-oauth" ? { "anthropic-beta": "oauth-2025-04-20" } : {}),
       },
       body: JSON.stringify({
         model: req.model,
-        system: system || undefined,
+        system: systemParam,
         messages: rest,
         stream: req.stream ?? false,
-        max_tokens: req.max_tokens ?? 1024,
+        max_tokens: req.max_tokens ?? (budgetTokens >= 8192 ? budgetTokens * 2 : 8192),
         temperature: req.temperature,
+        ...(thinkingParam ? { thinking: thinkingParam } : {}),
+        ...(outputConfig ? { output_config: outputConfig } : {}),
+        ...(req.tools?.length
+          ? { tools: req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })) }
+          : {}),
       }),
     });
   },
@@ -112,14 +152,36 @@ export const responsesProvider: LlmProvider = {
       .map((m) => ({ role: m.role, content: m.content }));
     return fetch(joinUrl(connection.base_url, "/responses"), {
       method: "POST",
-      headers: { "content-type": "application/json", ...headers },
+      headers: {
+        "content-type": "application/json",
+        accept: "text/event-stream",
+        "OpenAI-Beta": "responses=experimental",
+        originator: "twodb",
+        ...headers,
+      },
       body: JSON.stringify({
         model: req.model,
-        instructions: instructions || undefined,
+        // chatgpt backend requires instructions + encrypted reasoning when store=false
+        instructions: instructions || "You are a helpful assistant.",
         input,
         stream: req.stream ?? false,
+        store: false,
+        include: ["reasoning.encrypted_content"],
+        reasoning: req.effort === "off" ? { effort: "minimal" } : { effort: req.effort ?? "medium", summary: "auto" },
         temperature: req.temperature,
         max_output_tokens: req.max_tokens,
+        ...(req.tools?.length
+          ? {
+              tools: req.tools.map((t) => ({
+                type: "function",
+                name: t.name,
+                description: t.description,
+                parameters: t.parameters,
+                strict: false,
+              })),
+              tool_choice: "auto",
+            }
+          : {}),
       }),
     });
   },

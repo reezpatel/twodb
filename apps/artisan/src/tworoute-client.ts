@@ -65,6 +65,32 @@ export interface ChatChunk {
 
 const MODEL_CACHE = new Map<string, { at: number; models: ModelInfo[] }>();
 
+const MAX_RETRIES = 20;
+const BASE_DELAY_MS = 1000;
+const MAX_DELAY_MS = 30_000;
+
+function backoffMs(attempt: number, retryAfterHeader: string | null) {
+  const retryAfter = Number(retryAfterHeader);
+  if (retryAfter > 0) return Math.min(retryAfter * 1000, MAX_DELAY_MS);
+  const exp = Math.min(BASE_DELAY_MS * 2 ** attempt, MAX_DELAY_MS);
+  return exp / 2 + Math.random() * (exp / 2);
+}
+
+function abortableSleep(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const t = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(signal!.reason);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 /** A fixed key (user requests) or a provider yielding a fresh token per call (headless runs, see TwoDbSession.actAs). */
 export type Credential = string | (() => string | Promise<string>);
 
@@ -130,6 +156,8 @@ export class TworouteClient {
     signal?: AbortSignal;
     /** Thinking effort (low|medium|high|max) forwarded to the provider. */
     effort?: string | null;
+    /** Called with a human-readable status while the connection is retried. */
+    onRetry?: (info: { attempt: number; maxRetries: number; delayMs: number; message: string }) => void;
   }): AsyncGenerator<ChatChunk> {
     const body: Record<string, unknown> = {
       model: input.model,
@@ -141,10 +169,10 @@ export class TworouteClient {
     if (input.maxTokens) body.max_tokens = input.maxTokens;
     if (input.effort) body.effort = input.effort;
 
-    // The connection phase is retried (a restarting TwoRoute/gateway, a 5xx, a rate limit): nothing has been streamed yet,
-    // so a retry cannot duplicate output, and a long run is not lost to one blip. A user stop still wins immediately.
+    // Retry the connection phase (a restarting TwoRoute/gateway, 408/425/429/5xx) with
+    // exponential backoff + jitter and honouring Retry-After. Nothing has been streamed yet,
+    // so a retry cannot duplicate output. A user stop still wins immediately.
     const payload = JSON.stringify(body);
-    const delays = [1_500, 4_000, 10_000];
     let res: Response | undefined;
     for (let attempt = 0; ; attempt++) {
       try {
@@ -154,16 +182,20 @@ export class TworouteClient {
           body: payload,
           signal: input.signal,
         });
-        const transient = res.status >= 500 || res.status === 429;
-        if (!transient || attempt >= delays.length) break;
+        const transient = res.status === 408 || res.status === 425 || res.status === 429 || (res.status >= 500 && res.status !== 501);
+        if (!transient || attempt >= MAX_RETRIES) break;
+        const delay = backoffMs(attempt, res.headers.get("retry-after"));
+        input.onRetry?.({ attempt: attempt + 1, maxRetries: MAX_RETRIES, delayMs: Math.round(delay), message: `provider returned ${res.status}` });
         await res.body?.cancel().catch(() => undefined);
+        await abortableSleep(delay, input.signal);
       } catch (err) {
-        if (input.signal?.aborted || attempt >= delays.length) throw err;
+        if (input.signal?.aborted || attempt >= MAX_RETRIES) throw err;
+        const delay = backoffMs(attempt, null);
+        const cause = (err as { cause?: { code?: string; message?: string } }).cause;
+        const causeText = cause?.code ?? cause?.message;
+        input.onRetry?.({ attempt: attempt + 1, maxRetries: MAX_RETRIES, delayMs: Math.round(delay), message: `${(err as Error).message}${causeText ? ` (${causeText})` : ""}` });
+        await abortableSleep(delay, input.signal);
       }
-      await new Promise<void>((resolve, reject) => {
-        const t = setTimeout(resolve, delays[attempt]);
-        input.signal?.addEventListener("abort", () => { clearTimeout(t); reject(new Error("aborted")); }, { once: true });
-      });
     }
     if (!res.ok || !res.body) {
       const text = await res.text().catch(() => "");

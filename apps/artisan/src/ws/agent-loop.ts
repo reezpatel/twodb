@@ -406,6 +406,7 @@ export async function runAgentLoop(opts: {
           // Reasoning models (e.g. glm) spend budget on reasoning_content and can return
           // empty content when it runs out — size to the model's context capacity.
           maxTokens,
+          onRetry: (info) => emit({ type: "status", text: `provider unreachable — retry ${info.attempt}/${info.maxRetries} in ${Math.round(info.delayMs / 1000)}s` }),
         })) {
           const think = chunk.delta?.reasoning ?? chunk.delta?.reasoning_content;
           if (firstTokenAt === null && (think || chunk.delta?.content || chunk.delta?.tool_calls?.length)) firstTokenAt = Date.now();
