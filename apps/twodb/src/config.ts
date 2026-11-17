@@ -20,7 +20,7 @@ export const configSchema = z.object({
    * Which apps may act in a workspace as themselves (service token scope `gateway.act`) toward which other app, as
    * comma-separated `caller>target` pairs. Default: Artisan's headless runs calling TwoRoute (LLM) and Dispatch (runners).
    */
-  TWODB_SERVICE_ACT_GRANTS: z.string().default("artisan>tworoute,artisan>dispatch,artisan>toolkit"),
+  TWODB_SERVICE_ACT_GRANTS: z.string().default("artisan>tworoute,artisan>dispatch,artisan>toolkit,toolkit>*"),
   AUTH_SECRET: z.string().min(16).default("dev-only-secret-change-me-0000"), // dev default — MUST be set in production
   AUTH_BASE_URL: z.string().url().default("http://localhost:6400"),
   AUTH_TRUSTED_ORIGINS: z.string().default("http://localhost:6500").transform((v) => v.split(",")),

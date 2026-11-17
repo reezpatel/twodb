@@ -12,8 +12,9 @@ export function AgentAccessPicker({ agents, value, onChange, disabled }: {
   onChange: (agentIds: string[]) => void;
   disabled?: boolean;
 }) {
-  const known = new Set(agents.map((a) => a.id));
-  const chips = [...agents, ...value.filter((id) => !known.has(id)).map((id) => ({ id, name: id, type: "unknown", description: null }))];
+  const list = Array.isArray(agents) ? agents : [];
+  const known = new Set(list.map((a) => a.id));
+  const chips = [...list, ...value.filter((id) => !known.has(id)).map((id) => ({ id, name: id, type: "unknown", description: null }))];
 
   const toggle = (id: string) => {
     if (disabled) return;

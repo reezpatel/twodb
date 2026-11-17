@@ -11,7 +11,7 @@
     "core-async"
   ],
   "basePath": "/",
-  "generatedAt": "2026-11-15T19:04:17.351Z",
+  "generatedAt": "2026-11-17T06:25:47.323Z",
   "endpoints": [
     {
       "name": "registerApp",
@@ -328,6 +328,52 @@
           "keys"
         ],
         "additionalProperties": false
+      }
+    },
+    {
+      "name": "getAppCatalog",
+      "method": "GET",
+      "path": "/registry/catalog",
+      "auth": "public",
+      "description": "Every active app with its manifest (endpoints + request/response schemas) in one call — for a trusted platform app that exposes the whole API surface as tools (toolkit's TwoDB tools). Auth: x-twodb-app + x-twodb-token (app token), not a user session; only callers holding a `caller>*` act grant, else 403.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "slug": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "basePath": {
+              "type": "string"
+            },
+            "version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "manifest": {}
+          },
+          "required": [
+            "slug",
+            "name",
+            "basePath",
+            "version",
+            "manifest"
+          ],
+          "additionalProperties": false
+        }
       }
     },
     {

@@ -296,6 +296,8 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
   const SVC_SCOPE_RE = /^[a-z0-9][a-z0-9._-]*$/;
   /** `caller>target` pairs allowed to act in a workspace (scope gateway.act). Checked at issue time AND at use time. */
   const actGrants = new Set(config.TWODB_SERVICE_ACT_GRANTS.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
+  /** A grant is `caller>target`, or `caller>*` for a trusted platform app (e.g. toolkit) that may act toward every app. */
+  const actAllowed = (caller: string, target: string) => actGrants.has(`${caller}>${target}`) || actGrants.has(`${caller}>*`);
 
   /** Public keys receivers use to verify service tokens. Public by design. */
   app.get("/registry/jwks", async (_req, reply) => {
@@ -316,7 +318,7 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     if (!audience || !SLUG_RE.test(audience)) return reply.code(400).send({ error: "audience must be an app slug" });
     if (!(await registry.getApp(audience))) return reply.code(404).send({ error: `app "${audience}" is not registered` });
     const scopes = (b.scopes ?? []).filter((s) => typeof s === "string" && SVC_SCOPE_RE.test(s)).slice(0, 32);
-    if (scopes.includes(ACT_SCOPE) && !actGrants.has(`${caller}>${audience}`)) {
+    if (scopes.includes(ACT_SCOPE) && !actAllowed(caller, audience)) {
       return reply.code(403).send({ error: `app "${caller}" may not act in a workspace toward "${audience}"` });
     }
     const act = b.act?.type && b.act.id ? { type: String(b.act.type).slice(0, 20), id: String(b.act.id).slice(0, 80) } : undefined;
@@ -516,13 +518,8 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
   // cli comes from the registration payload when the app declares one, else
   // the checked-in apps/<slug>/cli.json, else null (the CLI falls back to
   // endpoint-derived commands). manifest is the same object endpoint.json serves.
-  app.get("/registry/apps/:slug/cli.json", async (req, reply) => {
-    const ctx = await resolveContext(new Headers(req.headers as any));
-    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
-    const { slug } = req.params as { slug: string };
-    const row = await registry.getApp(slug);
-    if (!row) return reply.code(404).send({ error: "not found" });
-
+  /** An app's { cli, manifest } as the CLI sees it: registration payload first, else the checked-in files. */
+  const loadCliInfo = async (row: NonNullable<Awaited<ReturnType<typeof registry.getApp>>>) => {
     let cli: unknown = null;
     if (row.cli_json) {
       try {
@@ -534,13 +531,11 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     if (!cli) {
       // Fall back to the app's checked-in cli.json in TwoDB's monorepo checkout.
       try {
-        const file = path.join(REPO_ROOT, "apps", slug, "cli.json");
-        cli = JSON.parse(await fs.readFile(file, "utf8"));
+        cli = JSON.parse(await fs.readFile(path.join(REPO_ROOT, "apps", row.slug, "cli.json"), "utf8"));
       } catch {
         cli = null;
       }
     }
-
     let manifest: unknown = null;
     if (row.manifest_json) {
       try {
@@ -551,14 +546,41 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     }
     if (!manifest) {
       try {
-        const file = path.join(REPO_ROOT, "apps", slug, "endpoint.json");
-        manifest = JSON.parse(await fs.readFile(file, "utf8"));
+        manifest = JSON.parse(await fs.readFile(path.join(REPO_ROOT, "apps", row.slug, "endpoint.json"), "utf8"));
       } catch {
         manifest = null;
       }
     }
-    reply.type("application/json");
     return { cli, manifest };
+  };
+
+  app.get("/registry/apps/:slug/cli.json", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx) return reply.code(401).send({ error: "unauthorized" });
+    const { slug } = req.params as { slug: string };
+    const row = await registry.getApp(slug);
+    if (!row) return reply.code(404).send({ error: "not found" });
+    reply.type("application/json");
+    return loadCliInfo(row);
+  });
+
+  /**
+   * Every active app with its manifest (endpoints + request schemas), for a trusted platform app that exposes the
+   * whole API surface as tools (toolkit's "TwoDB tools"). App-token auth, and only for callers holding a `caller>*`
+   * act grant — the same trust that lets them act in any app.
+   */
+  app.get("/registry/catalog", async (req, reply) => {
+    const caller = req.callerApp.slug;
+    if (!req.callerApp.verified || !caller) return reply.code(401).send({ error: "invalid app token" });
+    if (!actGrants.has(`${caller}>*`)) return reply.code(403).send({ error: `app "${caller}" may not read the app catalog` });
+    const rows = (await registry.listApps()).filter((a) => a.status === "active");
+    const out = [];
+    for (const a of rows) {
+      const info = await loadCliInfo(a);
+      out.push({ slug: a.slug, name: getCatalogEntry(a.slug)?.name ?? a.name, basePath: a.base_path, version: a.version, manifest: info.manifest });
+    }
+    reply.header("cache-control", "no-store");
+    return out;
   });
 
   // Messages contract (jobs + broadcast events) isn't part of the
@@ -834,8 +856,11 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
           const claims = verifyServiceToken(bearer, { keys: [serviceKey.jwk], audience: slug });
           if (/^\/_svc\//.test(subPath)) return proxyToApp(req, reply, app_, subPath, null);
           // Act-as-workspace: only for granted pairs, and only the workspace the control plane signed into the token.
-          if (claims.scp.includes(ACT_SCOPE) && actGrants.has(`${claims.sub}>${slug}`)) {
-            return proxyToApp(req, reply, app_, subPath, { kind: "service", userId: null, workspaceId: claims.wid, spaceIds: [], serviceApp: claims.sub });
+          if (claims.scp.includes(ACT_SCOPE) && actAllowed(claims.sub, slug)) {
+            // The granted caller names the space the call is for (e.g. toolkit relaying an agent's tool call); the
+            // workspace stays the one we signed into the token.
+            const spaceIds = String(req.headers["x-twodb-space-ids"] ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+            return proxyToApp(req, reply, app_, subPath, { kind: "service", userId: null, workspaceId: claims.wid, spaceIds, serviceApp: claims.sub });
           }
           return reply.code(403).send({ error: "service token is not allowed to call this route" });
         } catch (err) {

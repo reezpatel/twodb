@@ -9,7 +9,7 @@ Central host for external MCP servers and API connectors — connector instances
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-15T19:04:18.834Z_
+_Generated: 2026-11-17T06:27:28.310Z_
 
 ## Endpoints
 
@@ -1941,6 +1941,582 @@ Invokes a connector tool and returns `{ output }`. toolId is either the id form 
   },
   "required": [
     "toolId"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "output": {}
+  },
+  "required": [
+    "output"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /twodb/tools` — listTwodbTools
+
+The full TwoDB tool catalog: one tool per endpoint of every installed app (except toolkit), derived live from the control plane. Used by the configuration page; 403 when called with an agent context.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "key": {
+        "type": "string"
+      },
+      "app": {
+        "type": "string"
+      },
+      "appName": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "method": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "params": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "in": {
+              "type": "string",
+              "enum": [
+                "path",
+                "query",
+                "body"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "string",
+                "number",
+                "boolean",
+                "array",
+                "object"
+              ]
+            },
+            "description": {
+              "type": "string"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "name",
+            "in",
+            "type",
+            "description",
+            "required"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "key",
+      "app",
+      "appName",
+      "name",
+      "description",
+      "method",
+      "path",
+      "params"
+    ],
+    "additionalProperties": false
+  }
+}
+```
+
+### `GET /twodb/access` — listTwodbAccess
+
+Scopes (spaces / agents) that have at least one TwoDB tool enabled, with counts. Default is none.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "scopeType": {
+        "type": "string",
+        "enum": [
+          "space",
+          "agent"
+        ]
+      },
+      "scopeId": {
+        "type": "string"
+      },
+      "count": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "scopeType",
+      "scopeId",
+      "count"
+    ],
+    "additionalProperties": false
+  }
+}
+```
+
+### `GET /twodb/access/:scopeType/:scopeId` — getTwodbAccess
+
+The `<app>/<tool>` keys enabled for one scope (scopeType = space | agent).
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "scopeType": {
+      "type": "string",
+      "enum": [
+        "space",
+        "agent"
+      ]
+    },
+    "scopeId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "scopeType",
+    "scopeId"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "scopeType": {
+      "type": "string"
+    },
+    "scopeId": {
+      "type": "string"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "scopeType",
+    "scopeId",
+    "tools"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `PUT /twodb/access/:scopeType/:scopeId` — setTwodbAccess
+
+Replaces the enabled TwoDB tools of one scope. Keys must exist in the catalog (400 otherwise); an empty list clears the scope. A tool is callable when enabled for the calling agent OR for the space of the call.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "scopeType": {
+      "type": "string",
+      "enum": [
+        "space",
+        "agent"
+      ]
+    },
+    "scopeId": {
+      "type": "string"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "scopeType",
+    "scopeId",
+    "tools"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "scopeType": {
+      "type": "string"
+    },
+    "scopeId": {
+      "type": "string"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "scopeType",
+    "scopeId",
+    "tools"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `GET /twodb/apps` — listTwodbApps
+
+Agent-facing (needs ?agentId= + the call's space via x-twodb-space-ids or ?spaceId=): the apps that have at least one TwoDB tool enabled for this agent or space, with tool counts.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "agentId": {
+      "type": "string"
+    },
+    "spaceId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "agentId"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "slug": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "tools": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "slug",
+      "name",
+      "tools"
+    ],
+    "additionalProperties": false
+  }
+}
+```
+
+### `GET /twodb/apps/:app/tools` — listTwodbAppTools
+
+Agent-facing: one app's enabled tools (name, HTTP method, description) — no parameter schemas, to keep context small.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "app": {
+      "type": "string"
+    },
+    "agentId": {
+      "type": "string"
+    },
+    "spaceId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "app",
+    "agentId"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "method": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "method",
+      "description"
+    ],
+    "additionalProperties": false
+  }
+}
+```
+
+### `GET /twodb/apps/:app/tools/:tool` — getTwodbAppTool
+
+Agent-facing: one enabled tool with its full parameter list (location, type, required, options). 404 when not enabled.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "app": {
+      "type": "string"
+    },
+    "tool": {
+      "type": "string"
+    },
+    "agentId": {
+      "type": "string"
+    },
+    "spaceId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "app",
+    "tool",
+    "agentId"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string"
+    },
+    "app": {
+      "type": "string"
+    },
+    "appName": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "method": {
+      "type": "string"
+    },
+    "path": {
+      "type": "string"
+    },
+    "params": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "in": {
+            "type": "string",
+            "enum": [
+              "path",
+              "query",
+              "body"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "number",
+              "boolean",
+              "array",
+              "object"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "in",
+          "type",
+          "description",
+          "required"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "key",
+    "app",
+    "appName",
+    "name",
+    "description",
+    "method",
+    "path",
+    "params"
+  ],
+  "additionalProperties": false
+}
+```
+
+### `POST /twodb/apps/:app/tools/:tool/invoke` — invokeTwodbAppTool
+
+Agent-facing: runs an enabled tool and returns `{ output }`. Toolkit acts machine-to-machine through the gateway in the workspace, attaching the call's space (x-twodb-space-ids). Params are validated against the tool (400); a tool not enabled for the agent or space answers 403; the app's own error status is passed through.
+
+- **Auth**: `session-or-apiKey`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "app": {
+      "type": "string"
+    },
+    "tool": {
+      "type": "string"
+    },
+    "params": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "agentId": {
+      "type": "string"
+    },
+    "spaceId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "app",
+    "tool",
+    "agentId"
   ],
   "additionalProperties": false
 }

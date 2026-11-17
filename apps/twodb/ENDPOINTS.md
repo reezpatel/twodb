@@ -9,7 +9,7 @@ The control plane: Docker-based app installation/lifecycle management, Postgres 
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-15T19:04:17.356Z_
+_Generated: 2026-11-17T06:25:47.326Z_
 
 ## Endpoints
 
@@ -354,6 +354,59 @@ Public keys (JWKS, Ed25519) for verifying service tokens. Cache for 5 minutes.
     "keys"
   ],
   "additionalProperties": false
+}
+```
+
+### `GET /registry/catalog` — getAppCatalog
+
+Every active app with its manifest (endpoints + request/response schemas) in one call — for a trusted platform app that exposes the whole API surface as tools (toolkit's TwoDB tools). Auth: x-twodb-app + x-twodb-token (app token), not a user session; only callers holding a `caller>*` act grant, else 403.
+
+- **Auth**: `public`
+
+**Request**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
+```
+
+**Response**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "slug": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "basePath": {
+        "type": "string"
+      },
+      "version": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "manifest": {}
+    },
+    "required": [
+      "slug",
+      "name",
+      "basePath",
+      "version",
+      "manifest"
+    ],
+    "additionalProperties": false
+  }
 }
 ```
 

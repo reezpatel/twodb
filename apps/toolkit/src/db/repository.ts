@@ -191,7 +191,30 @@ export function createToolkitRepo(db: Kysely<ToolkitDb>, encryptionKey: string) 
     },
   };
 
-  return { mcp, instances, state, queues, broadcasts };
+  // --- TwoDB tools: per-scope (space / agent) allow-lists --------------------------
+  const twodbAccess = {
+    async get(workspaceId: string, scopeType: "space" | "agent", scopeId: string): Promise<string[]> {
+      const row = await db.selectFrom("twodb_tool_access").selectAll().where("workspace_id", "=", workspaceId).where("scope_type", "=", scopeType).where("scope_id", "=", scopeId).executeTakeFirst();
+      return row ? parseJson<string[]>(row.tools_json, []) : [];
+    },
+    /** Every scope that has at least one tool enabled (for the page's per-scope counts). */
+    async list(workspaceId: string): Promise<Array<{ scopeType: "space" | "agent"; scopeId: string; tools: string[] }>> {
+      const rows = await db.selectFrom("twodb_tool_access").selectAll().where("workspace_id", "=", workspaceId).execute();
+      return rows.map((r) => ({ scopeType: r.scope_type as "space" | "agent", scopeId: r.scope_id, tools: parseJson<string[]>(r.tools_json, []) })).filter((r) => r.tools.length > 0);
+    },
+    async set(workspaceId: string, scopeType: "space" | "agent", scopeId: string, tools: string[]): Promise<void> {
+      if (tools.length === 0) {
+        await db.deleteFrom("twodb_tool_access").where("workspace_id", "=", workspaceId).where("scope_type", "=", scopeType).where("scope_id", "=", scopeId).execute();
+        return;
+      }
+      await db.insertInto("twodb_tool_access")
+        .values({ workspace_id: workspaceId, scope_type: scopeType, scope_id: scopeId, tools_json: JSON.stringify(tools), updated_at: now() } as any)
+        .onConflict((oc) => oc.columns(["workspace_id", "scope_type", "scope_id"]).doUpdateSet({ tools_json: JSON.stringify(tools), updated_at: now() } as any))
+        .execute();
+    },
+  };
+
+  return { mcp, instances, state, queues, broadcasts, twodbAccess };
 }
 
 // getTemplate is injected from the registry (kept at the bottom to avoid a

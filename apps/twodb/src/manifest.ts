@@ -294,6 +294,18 @@ const jwksEp = defineEndpoint({
   response: z.object({ keys: z.array(z.object({ kty: z.string(), crv: z.string(), x: z.string(), kid: z.string(), alg: z.string(), use: z.string() })) }),
 });
 
+const catalogEp = defineEndpoint({
+  name: "getAppCatalog",
+  method: "GET",
+  path: "/registry/catalog",
+  auth: "public",
+  description:
+    "Every active app with its manifest (endpoints + request/response schemas) in one call — for a trusted platform app that exposes " +
+    "the whole API surface as tools (toolkit's TwoDB tools). Auth: x-twodb-app + x-twodb-token (app token), not a user session; only callers holding a `caller>*` act grant, else 403.",
+  request: z.object({}),
+  response: z.array(z.object({ slug: z.string(), name: z.string(), basePath: z.string(), version: z.string().nullable(), manifest: z.unknown() })),
+});
+
 const issueToken = defineEndpoint({
   name: "issueAppToken",
   method: "POST",
@@ -435,6 +447,7 @@ export const twodbManifest = defineAppManifest({
     getAppConfig,
     serviceTokenEp,
     jwksEp,
+    catalogEp,
     oauthAuthorize,
     oauthToken,
     createAppToken,

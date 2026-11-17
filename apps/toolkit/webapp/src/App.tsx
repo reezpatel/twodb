@@ -1,40 +1,35 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plug, Wrench } from "lucide-react";
+import { FileJson, Plus } from "lucide-react";
+import { useTwoDbAuth } from "@twodb/twodb-shared-frontend";
 import { toolkitClient, type ConnectorInstance, type ConnectorTemplate, type McpServer } from "./lib/toolkit-client.js";
 import { useToolkitData } from "./hooks/useToolkitData.js";
-import { Sidebar, type SidebarTab } from "./Sidebar.js";
+import { useToolkitNav } from "./hooks/useToolkitNav.js";
+import { useSidebarToggle } from "./hooks/useSidebarToggle.js";
+import { useInstallPrompt } from "./hooks/useInstallPrompt.js";
+import { ShellChrome } from "./partials/ShellChrome.js";
+import { AppHeader } from "./partials/AppHeader.js";
+import { btnGhost, btnPrimary } from "./partials/ui.js";
 import { ConnectorsView } from "./ConnectorsView.js";
 import { McpView } from "./McpView.js";
+import { TwodbToolsView } from "./TwodbToolsView.js";
 import { InstanceDialog } from "./InstanceDialog.js";
 import { McpDialog } from "./McpDialog.js";
 import { ImportDialog } from "./ImportDialog.js";
 
 /**
- * Toolkit shell (artisan-style): left sidebar with icon tabs — Connectors
- * (templates → instances) and MCP (user-registered servers) — and a main
- * area showing the selected view. Instance selection lives inside
- * ConnectorsView; the MCP tab opens one server's page at a time.
+ * Toolkit shell (dispatch-style): responsive nav sidebar — Connectors / MCP servers overviews plus one entry per
+ * instance and per MCP server — and a header with the page title and actions. Installable PWA.
  */
 export function App() {
   const data = useToolkitData();
-  const [tab, setTab] = useState<SidebarTab>(() => (localStorage.getItem("toolkit.sidebar.tab") === "mcp" ? "mcp" : "connectors"));
-  const [activeInstanceId, setActiveInstanceId] = useState<string | null>(() => localStorage.getItem("toolkit.active-instance"));
-  const [activeMcpId, setActiveMcpId] = useState<string | null>(null);
+  const { user, logout } = useTwoDbAuth();
+  const { activeId, view, select } = useToolkitNav();
+  const installPrompt = useInstallPrompt();
+  const { open: navOpen, toggle: toggleNav, setOpen: setNavOpen, overlay: navOverlay } = useSidebarToggle("toolkit.nav-open");
 
   const [instanceDialog, setInstanceDialog] = useState<null | { mode: "add"; template: ConnectorTemplate } | { mode: "edit"; instance: ConnectorInstance }>(null);
   const [mcpDialog, setMcpDialog] = useState<null | { mode: "add" } | { mode: "edit"; server: McpServer }>(null);
   const [importOpen, setImportOpen] = useState(false);
-
-  const onTab = useCallback((t: SidebarTab) => {
-    setTab(t);
-    localStorage.setItem("toolkit.sidebar.tab", t);
-  }, []);
-
-  const openInstance = useCallback((inst: ConnectorInstance) => {
-    setActiveInstanceId(inst.id);
-    localStorage.setItem("toolkit.active-instance", inst.id);
-    onTab("connectors");
-  }, [onTab]);
 
   const refreshAll = useCallback(async () => {
     await Promise.allSettled([data.refreshInstances(), data.refreshMcp()]);
@@ -45,94 +40,95 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // prune stale selection (deleted instance)
-  useEffect(() => {
-    if (activeInstanceId && data.instances.length > 0 && !data.instances.some((i) => i.id === activeInstanceId)) {
-      setActiveInstanceId(null);
-      localStorage.removeItem("toolkit.active-instance");
-    }
-  }, [data.instances, activeInstanceId]);
+  const activeInstance = view.page === "connectors" && view.id ? (data.instances.find((i) => i.id === view.id) ?? null) : null;
+  const activeMcp = view.page === "mcp" && view.id ? (data.mcpServers.find((s) => s.id === view.id) ?? null) : null;
 
-  const activeInstance = activeInstanceId ? (data.instances.find((i) => i.id === activeInstanceId) ?? null) : null;
-  const activeMcp = activeMcpId ? (data.mcpServers.find((s) => s.id === activeMcpId) ?? null) : null;
+  // A deleted / unknown selection falls back to its overview once data has loaded.
+  useEffect(() => {
+    if (data.loading) return;
+    if (view.id && !activeInstance && !activeMcp) select(view.page);
+  }, [data.loading, view.id, view.page, activeInstance, activeMcp, select]);
+
+  const openInstance = (inst: ConnectorInstance) => select(`instance:${inst.id}`);
+  const openMcp = (server: McpServer) => select(`mcp:${server.id}`);
+
+  const deleteInstance = async (instance: ConnectorInstance) => {
+    if (!confirm(`Delete connector instance "${instance.name}"? Its queues and state are removed too.`)) return;
+    await toolkitClient.deleteInstance(instance.id).catch(() => null);
+    select("connectors");
+    await refreshAll();
+  };
+  const deleteMcp = async (server: McpServer) => {
+    if (!confirm(`Delete MCP server "${server.name}"?`)) return;
+    await toolkitClient.deleteMcp(server.id).catch(() => null);
+    select("mcp");
+    await refreshAll();
+  };
+
+  const title = activeInstance?.name ?? activeMcp?.name ?? (view.page === "mcp" ? "MCP servers" : view.page === "twodb" ? "TwoDB tools" : "Connectors");
+  const subtitle = activeMcp?.url;
+  const status = data.error ?? (data.loading ? "loading…" : undefined);
+
+  const mcpActions = view.page === "mcp" ? (
+    <>
+      <button type="button" onClick={() => setImportOpen(true)} className={`${btnGhost} flex items-center gap-1.5`} aria-label="Import JSON" title="Import JSON">
+        <FileJson className="size-3.5" />
+        <span className="hidden sm:inline">Import JSON</span>
+      </button>
+      <button type="button" onClick={() => setMcpDialog({ mode: "add" })} className={btnPrimary} aria-label="Add server" title="Add server">
+        <Plus className="size-3.5" />
+        <span className="hidden sm:inline">Add server</span>
+      </button>
+    </>
+  ) : null;
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-surface text-ink">
-      <Sidebar
-        tab={tab}
-        onTab={onTab}
-        spaces={data.spaces}
-        templates={data.templates}
+    <>
+      <ShellChrome
         instances={data.instances}
-        activeInstanceId={tab === "connectors" ? activeInstanceId : null}
-        onOpenInstance={openInstance}
-        onNewInstance={(template) => setInstanceDialog({ mode: "add", template })}
-        onEditInstance={(instance) => setInstanceDialog({ mode: "edit", instance })}
-        onDeleteInstance={async (instance) => {
-          await toolkitClient.deleteInstance(instance.id).catch(() => null);
-          if (activeInstanceId === instance.id) {
-            setActiveInstanceId(null);
-            localStorage.removeItem("toolkit.active-instance");
-          }
-          await refreshAll();
-        }}
         mcpServers={data.mcpServers}
-        activeMcpId={tab === "mcp" ? activeMcpId : null}
-        onNewMcp={() => setMcpDialog({ mode: "add" })}
-        onOpenMcp={(server) => {
-          setActiveMcpId(server.id);
-          onTab("mcp");
+        activeId={activeId}
+        onSelect={(id) => {
+          select(id);
+          if (navOverlay) setNavOpen(false);
         }}
-        onEditMcp={(server) => setMcpDialog({ mode: "edit", server })}
-        onDeleteMcp={async (server) => {
-          await toolkitClient.deleteMcp(server.id).catch(() => null);
-          if (activeMcpId === server.id) setActiveMcpId(null);
-          await refreshAll();
+        canInstall={installPrompt.visible}
+        onInstall={() => {
+          void installPrompt.install().then((result) => {
+            if (result === "manual") window.alert("To install Toolkit: open the browser's share menu and choose “Add to Home Screen”.");
+          });
         }}
-      />
-
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="flex shrink-0 items-center gap-3 border-b border-outline/60 px-5 py-3">
-          <div className="flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-md bg-accent text-accent-foreground">
-              {tab === "connectors" ? <Plug className="size-4" /> : <Wrench className="size-4" />}
-            </div>
-            <h1 className="text-[15px] font-semibold tracking-tight">Toolkit</h1>
-          </div>
-          {tab === "mcp" && activeMcp ? (
-            <span className="truncate font-mono text-[13px] text-ink-muted">{activeMcp.name} · {activeMcp.url}</span>
-          ) : null}
-          {tab === "connectors" && activeInstance ? (
-            <span className="truncate text-[13px] text-ink-muted">{activeInstance.name}</span>
-          ) : null}
-          <div className="ml-auto text-[11px] text-ink-muted">{data.error ?? (data.loading ? "loading…" : "")}</div>
-          {tab === "mcp" ? (
-            <button type="button" onClick={() => setImportOpen(true)} className="rounded-md border border-outline/60 px-2.5 py-1.5 text-[12px] text-ink-muted transition-colors hover:border-outline-strong hover:text-ink">
-              Import JSON
-            </button>
-          ) : null}
-        </div>
-
+        onNavOpenChange={setNavOpen}
+        userName={user?.name ?? ""}
+        onSignOut={() => void logout()}
+        navOpen={navOpen}
+        onToggleNav={toggleNav}
+        header={<AppHeader title={title} subtitle={subtitle} status={status} actions={mcpActions} />}
+      >
         <div className="min-h-0 flex-1 overflow-hidden">
-          {tab === "connectors" ? (
+          {view.page === "twodb" ? (
+            <TwodbToolsView data={data} />
+          ) : view.page === "connectors" ? (
             <ConnectorsView
               data={data}
-              activeInstanceId={activeInstanceId}
+              active={activeInstance}
               onSelect={openInstance}
               onNewInstance={(template) => setInstanceDialog({ mode: "add", template })}
               onEditInstance={(instance) => setInstanceDialog({ mode: "edit", instance })}
+              onDeleteInstance={(instance) => void deleteInstance(instance)}
             />
           ) : (
             <McpView
               data={data}
               active={activeMcp}
-              onSelect={(server) => setActiveMcpId(server.id)}
+              onSelect={openMcp}
               onNew={() => setMcpDialog({ mode: "add" })}
               onEdit={(server) => setMcpDialog({ mode: "edit", server })}
+              onDelete={(server) => void deleteMcp(server)}
             />
           )}
         </div>
-      </main>
+      </ShellChrome>
 
       {instanceDialog ? (
         <InstanceDialog
@@ -142,14 +138,8 @@ export function App() {
           onClose={() => setInstanceDialog(null)}
         />
       ) : null}
-      {mcpDialog ? (
-        <McpDialog
-          data={data}
-          initial={mcpDialog.mode === "edit" ? mcpDialog.server : null}
-          onClose={() => setMcpDialog(null)}
-        />
-      ) : null}
+      {mcpDialog ? <McpDialog data={data} initial={mcpDialog.mode === "edit" ? mcpDialog.server : null} onClose={() => setMcpDialog(null)} /> : null}
       {importOpen ? <ImportDialog data={data} onClose={() => setImportOpen(false)} /> : null}
-    </div>
+    </>
   );
 }

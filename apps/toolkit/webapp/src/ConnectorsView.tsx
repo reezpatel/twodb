@@ -1,90 +1,59 @@
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@twodb/blocks";
+import { useState } from "react";
 import { type ConnectorInstance, type ConnectorTemplate } from "./lib/toolkit-client.js";
 import type { ToolkitData } from "./hooks/useToolkitData.js";
 import { InstancePage } from "./InstancePage.js";
+import { InstancesTable } from "./partials/InstancesTable.js";
+import { TemplatesTable } from "./partials/TemplatesTable.js";
+
+type ConnectorsTab = "active" | "available";
+
+/** Selected tab, remembered across reloads; defaults to Active. */
+function useConnectorsTab(): [ConnectorsTab, (t: ConnectorsTab) => void] {
+  const [tab, setTab] = useState<ConnectorsTab>(() => (localStorage.getItem("toolkit.connectors.tab") === "available" ? "available" : "active"));
+  return [tab, (t) => { setTab(t); localStorage.setItem("toolkit.connectors.tab", t); }];
+}
 
 /**
  * Connectors main view: when an instance is selected (sidebar) show its page
- * (tools / broadcasts / queues / settings); otherwise the gallery + instance
- * list as a landing grid.
+ * (tools / broadcasts / queues / settings); otherwise two tabs of
+ * Dispatch-style tables: Active (connected instances) and Available (every template to configure).
  */
-export function ConnectorsView({ data, activeInstanceId, onSelect, onNewInstance, onEditInstance }: {
+export function ConnectorsView({ data, active, onSelect, onNewInstance, onEditInstance, onDeleteInstance }: {
   data: ToolkitData;
-  activeInstanceId: string | null;
+  active: ConnectorInstance | null;
   onSelect: (instance: ConnectorInstance) => void;
   onNewInstance: (template: ConnectorTemplate) => void;
   onEditInstance: (instance: ConnectorInstance) => void;
+  onDeleteInstance: (instance: ConnectorInstance) => void;
 }) {
-  const active = activeInstanceId ? (data.instances.find((i) => i.id === activeInstanceId) ?? null) : null;
-  if (active) return <InstancePage data={data} instance={active} />;
+  const [tab, onTab] = useConnectorsTab();
+  if (active) return <InstancePage data={data} instance={active} onEdit={() => onEditInstance(active)} onDelete={() => onDeleteInstance(active)} />;
 
   return (
-    <div className="h-full overflow-y-auto px-6 py-5">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <section>
-          <h2 className="text-[14px] font-semibold">Connector templates</h2>
-          <p className="text-[12px] text-ink-muted">Predefined integrations — configure an instance per account/workspace.</p>
-          <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {data.templates.map((t) => (
-              <li key={t.id} className="flex flex-col rounded-lg border border-outline/60 bg-surface p-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="min-w-0">
-                    <h3 className="text-[13px] font-semibold">{t.name}</h3>
-                    <p className="text-[11px] text-ink-muted">
-                      {t.commands.length} tools{t.broadcasts.length ? ` · ${t.broadcasts.length} broadcasts` : ""}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onNewInstance(t)}
-                    className="ml-auto flex items-center gap-1 rounded-md border border-outline/60 px-2 py-1 text-[12px] text-ink-muted transition-colors hover:border-outline-strong hover:text-ink"
-                  >
-                    + New instance
-                  </button>
-                </div>
-                <p className="mt-2 line-clamp-2 text-[12px] text-ink-muted">{t.description}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section>
-          <h2 className="text-[14px] font-semibold">Instances</h2>
-          <p className="text-[12px] text-ink-muted">Configured connectors running in this workspace — select one in the sidebar to open its tools.</p>
-          {data.instances.length === 0 ? (
-            <p className="mt-3 rounded-lg border border-dashed border-outline/60 px-4 py-6 text-center text-[13px] text-ink-muted">
-              No connector instances yet — pick a template above.
-            </p>
-          ) : (
-            <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {data.instances.map((inst) => {
-                const template = data.templates.find((t) => t.id === inst.templateId);
-                return (
-                  <li key={inst.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(inst)}
-                      className="flex w-full items-center gap-3 rounded-lg border border-outline/60 bg-surface px-4 py-3 text-left transition-colors hover:border-outline-strong"
-                    >
-                      <span
-                        className={`size-2 shrink-0 rounded-full ${!inst.enabled ? "bg-outline-strong" : inst.healthStatus === "error" ? "bg-destructive" : inst.healthStatus === "ok" ? "bg-emerald-500" : "bg-warning"}`}
-                        title={inst.healthError ?? inst.healthStatus ?? "not checked"}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-2">
-                          <span className="text-[13px] font-semibold">{inst.name}</span>
-                          <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[10px] uppercase text-ink-muted">{template?.name ?? inst.templateId}</span>
-                        </span>
-                        {inst.healthError ? <span className="mt-0.5 block truncate text-[11px] text-destructive">{inst.healthError}</span> : null}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+    <div className="h-full overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+      <div className="mx-auto w-full max-w-6xl">
+        <Tabs value={tab} onValueChange={(v) => onTab(v as ConnectorsTab)} className="gap-4">
+          <TabsList variant="line" size="md">
+            <TabsTrigger value="active" className="px-1 pb-2">
+              Active
+              <span className="rounded bg-stone px-1.5 py-0.5 text-[10px] text-ink-muted">{data.instances.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="available" className="px-1 pb-2">
+              Available
+              <span className="rounded bg-stone px-1.5 py-0.5 text-[10px] text-ink-muted">{data.templates.length}</span>
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="active" className="space-y-3">
+            <p className="text-[12px] text-ink-muted">Connected instances running in this workspace — open one for its tools, events and queues.</p>
+            <InstancesTable instances={data.instances} templates={data.templates} onOpen={onSelect} onEdit={onEditInstance} onDelete={onDeleteInstance} />
+          </TabsContent>
+          <TabsContent value="available" className="space-y-3">
+            <p className="text-[12px] text-ink-muted">Every connector you can configure — connect one per account or workspace.</p>
+            <TemplatesTable templates={data.templates} instances={data.instances} onConnect={onNewInstance} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
 }
-

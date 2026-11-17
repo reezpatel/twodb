@@ -114,5 +114,96 @@ export function toolkitTools(toolkit: ToolkitClient): ToolSpec[] {
         }
       },
     },
+    ...twodbAppTools(),
+  ];
+}
+
+/**
+ * TwoDB tools — the whole TwoDB API surface (every installed app's endpoints, i.e. what the `twodb` CLI reaches) behind
+ * four meta-tools, so the context stays flat however many apps/endpoints exist: get_apps → get_app_tools →
+ * get_app_tool → invoke_app_tool. Nothing is enabled by default: toolkit only lists/runs what is enabled for this
+ * agent or for the session's space, and runs calls machine-to-machine with the space attached.
+ */
+function twodbAppTools(): ToolSpec[] {
+  const text = (v: unknown) => JSON.stringify(v, null, 2) ?? "null";
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : "");
+  return [
+    {
+      name: "get_apps",
+      description:
+        "Lists the TwoDB apps (e.g. artisan, dispatch, tworoute) that have tools enabled for you here, with how many tools each has. " +
+        "These tools operate the TwoDB platform itself — the same API the twodb CLI uses. Start here, then get_app_tools.",
+      parameters: { type: "object", properties: {} },
+      async execute(_args, ctx) {
+        try {
+          const apps = await ctx.toolkit.twodbApps(ctx.session.workspace_id, ctx.agent.id, ctx.session.space_id);
+          if (apps.length === 0) return "no TwoDB tools are enabled for you in this space (an admin enables them in Toolkit → TwoDB tools)";
+          return apps.map((a) => `- ${a.slug}: ${a.name} (${a.tools} tool${a.tools === 1 ? "" : "s"})`).join("\n");
+        } catch (err) {
+          return fail((err as Error).message);
+        }
+      },
+    },
+    {
+      name: "get_app_tools",
+      description: "Lists one app's enabled tools — name, HTTP method and one-line description. Use get_app_tool for a tool's parameters.",
+      parameters: { type: "object", properties: { app: { type: "string", description: "App slug from get_apps" } }, required: ["app"] },
+      async execute(args, ctx) {
+        const app = str(args.app); if (!app) return fail("app is required");
+        try {
+          const tools = await ctx.toolkit.twodbAppTools(ctx.session.workspace_id, ctx.agent.id, ctx.session.space_id, app);
+          if (tools.length === 0) return `no tools of "${app}" are enabled for you — call get_apps`;
+          return tools.map((t) => `- ${t.name} [${t.method}]: ${t.description}`).join("\n");
+        } catch (err) {
+          return fail((err as Error).message);
+        }
+      },
+    },
+    {
+      name: "get_app_tool",
+      description: "Returns one tool's full request shape: each parameter with its type, whether it is required and enum options. Use before invoke_app_tool.",
+      parameters: {
+        type: "object",
+        properties: { app: { type: "string", description: "App slug" }, tool: { type: "string", description: "Tool name from get_app_tools" } },
+        required: ["app", "tool"],
+      },
+      async execute(args, ctx) {
+        const app = str(args.app); if (!app) return fail("app is required");
+        const tool = str(args.tool); if (!tool) return fail("tool is required");
+        try {
+          const t = await ctx.toolkit.twodbAppTool(ctx.session.workspace_id, ctx.agent.id, ctx.session.space_id, app, tool);
+          const lines = t.params.map((p) => `  ${p.name} (${[p.type, p.required ? "required" : "optional", ...(p.options?.length ? [`one of: ${p.options.join(", ")}`] : [])].join(", ")})${p.description ? `: ${p.description}` : ""}`);
+          return `${t.app}/${t.name} [${t.method}] — ${t.description}\nparameters:${lines.length ? `\n${lines.join("\n")}` : " none"}`;
+        } catch (err) {
+          return fail((err as Error).message);
+        }
+      },
+    },
+    {
+      name: "invoke_app_tool",
+      description:
+        "Runs an enabled TwoDB app tool and returns its output as JSON text. The current space is applied automatically. " +
+        "Parameters follow get_app_tool (path/query/body are routed for you). Output may be truncated for very long results.",
+      parameters: {
+        type: "object",
+        properties: {
+          app: { type: "string", description: "App slug" },
+          tool: { type: "string", description: "Tool name from get_app_tools" },
+          params: { type: "object", description: "The tool's parameters as an object. Omit for no-parameter tools." },
+        },
+        required: ["app", "tool"],
+      },
+      async execute(args, ctx) {
+        const app = str(args.app); if (!app) return fail("app is required");
+        const tool = str(args.tool); if (!tool) return fail("tool is required");
+        const params = (args.params ?? {}) as Record<string, unknown>;
+        if (params === null || typeof params !== "object" || Array.isArray(params)) return fail("params must be an object");
+        try {
+          return text(await ctx.toolkit.twodbInvoke(ctx.session.workspace_id, ctx.agent.id, ctx.session.space_id, app, tool, params));
+        } catch (err) {
+          return fail((err as Error).message);
+        }
+      },
+    },
   ];
 }

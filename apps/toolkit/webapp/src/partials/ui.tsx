@@ -3,9 +3,9 @@ import { cn } from "../lib/cn.js";
 /** Shared dialog overlay + form atoms (one place, used by all dialogs/pages). */
 export function Overlay({ title, children, onClose, wide }: { title: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
       <div
-        className={cn("max-h-[85vh] w-full overflow-y-auto rounded-xl border border-outline/60 bg-surface p-5 shadow-xl", wide ? "max-w-2xl" : "max-w-lg")}
+        className={cn("max-h-[92dvh] w-full overflow-y-auto rounded-t-xl border border-outline/60 bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl sm:max-h-[85dvh] sm:rounded-xl sm:p-5", wide ? "max-w-2xl" : "max-w-lg")}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">

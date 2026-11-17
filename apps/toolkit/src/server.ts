@@ -14,6 +14,7 @@ import type { ConnectorTemplate, ConnectorRuntime } from "./connectors/types.js"
 import { startPoller } from "./poller.js";
 import { decryptSecret } from "./crypto.js";
 import { slugifyOwner, connectorToolName, agentCanUse, TOOL_NAME_RE } from "./tool-names.js";
+import { deriveTools, buildCall, isAllowed, type CatalogApp, type TwoDbTool } from "./twodb-tools.js";
 import type { Selectable } from "kysely";
 import type { McpServerRow, ConnectorInstanceRow } from "./db/schema.js";
 
@@ -60,7 +61,13 @@ function toolsOf(row: Selectable<ConnectorInstanceRow>, template: ConnectorTempl
   }));
 }
 
-export async function buildServer(config: ToolkitConfig) {
+/** What buildServer needs from the connected twodb runtime (absent in tests / TOOLKIT_DEV_DIRECT without a control plane). */
+export interface ToolkitPlatform {
+  gatewayFetch(path: string, init?: RequestInit): Promise<Response>;
+  serviceFetch(audience: string, workspaceId: string, path: string, init?: RequestInit & { scopes?: string[] }): Promise<Response>;
+}
+
+export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatform) {
   const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
   const db = createPgDb<ToolkitDb>({ connectionString: config.DATABASE_URL, schema: "toolkit" });
   await applySchema(db);
@@ -683,6 +690,143 @@ export async function buildServer(config: ToolkitConfig) {
     await asyncEngine.close();
   };
   app.addHook("onClose", async () => { await close(); });
+
+  // ============================================================ TwoDB tools =
+  //
+  // The whole TwoDB API surface (every installed app's endpoints — what `twodb <app> <command>` reaches) as agent
+  // tools, derived live from the control plane's catalog. Fixed: no instances, nothing to configure per tool. Access is
+  // a per-scope allow-list (a space or an agent, default none); a call is allowed when the agent's list OR the call's
+  // space list has the tool. Calls run machine-to-machine (toolkit acts in the workspace through the gateway, with the
+  // call's space attached) — the caller's own credentials are never needed.
+
+  let twodbCatalog: { at: number; tools: TwoDbTool[] } | null = null;
+  const loadTwodbTools = async (): Promise<TwoDbTool[]> => {
+    if (twodbCatalog && Date.now() - twodbCatalog.at < 60_000) return twodbCatalog.tools;
+    if (!platform) throw Object.assign(new Error("toolkit is not connected to the control plane"), { status: 503 });
+    const res = await platform.gatewayFetch("/registry/catalog");
+    if (!res.ok) throw Object.assign(new Error(`app catalog unavailable (${res.status}): ${(await res.text().catch(() => "")).slice(0, 200)}`), { status: 502 });
+    const tools = deriveTools((await res.json()) as CatalogApp[]);
+    twodbCatalog = { at: Date.now(), tools };
+    return tools;
+  };
+
+  const spaceIdsOf = (req: FastifyRequest, agent: { spaceIds: string[] }): string[] => {
+    const q = ((req.query as Record<string, string | undefined> | undefined)?.spaceId ?? "").trim();
+    return [...new Set([...agent.spaceIds, ...(q ? [q] : [])])];
+  };
+
+  /** Agent-facing guard: needs an agent context (trusted caller), loads the catalog and narrows it to what is enabled for the agent or the space. */
+  const twodbForAgent = async (req: FastifyRequest, reply: FastifyReply) => {
+    const ctx = auth(req, reply); if (!ctx) return null;
+    const agent = agentCtxOf(req);
+    if (!agent) { void reply.code(403).send({ error: "TwoDB tools are only available to agents" }); return null; }
+    const spaceIds = spaceIdsOf(req, agent);
+    try {
+      const all = await loadTwodbTools();
+      const agentTools = await repo.twodbAccess.get(ctx.workspaceId, "agent", agent.agentId);
+      const spaceTools = await Promise.all(spaceIds.map((id) => repo.twodbAccess.get(ctx.workspaceId, "space", id)));
+      return { ctx, spaceIds, tools: all.filter((t) => isAllowed(t.key, agentTools, spaceTools)) };
+    } catch (err: any) {
+      void reply.code(err?.status ?? 502).send({ error: err?.message ?? String(err) });
+      return null;
+    }
+  };
+
+  app.get("/twodb/apps", async (req, reply) => {
+    const g = await twodbForAgent(req, reply); if (!g) return reply;
+    const byApp = new Map<string, { slug: string; name: string; tools: number }>();
+    for (const t of g.tools) {
+      const e = byApp.get(t.app) ?? { slug: t.app, name: t.appName, tools: 0 };
+      e.tools += 1;
+      byApp.set(t.app, e);
+    }
+    return [...byApp.values()];
+  });
+
+  app.get("/twodb/apps/:app/tools", async (req, reply) => {
+    const g = await twodbForAgent(req, reply); if (!g) return reply;
+    const { app: slug } = req.params as { app: string };
+    return g.tools.filter((t) => t.app === slug).map((t) => ({ name: t.name, method: t.method, description: t.description }));
+  });
+
+  app.get("/twodb/apps/:app/tools/:tool", async (req, reply) => {
+    const g = await twodbForAgent(req, reply); if (!g) return reply;
+    const { app: slug, tool } = req.params as { app: string; tool: string };
+    const t = g.tools.find((x) => x.app === slug && x.name === tool);
+    if (!t) return reply.code(404).send({ error: `"${slug}/${tool}" is not available to you — call get_app_tools` });
+    return t;
+  });
+
+  app.post("/twodb/apps/:app/tools/:tool/invoke", async (req, reply) => {
+    const g = await twodbForAgent(req, reply); if (!g) return reply;
+    const { app: slug, tool } = req.params as { app: string; tool: string };
+    // Not enabled and not existing look the same: nothing is revealed about tools you cannot use.
+    const t = g.tools.find((x) => x.app === slug && x.name === tool);
+    if (!t) return reply.code(403).send({ error: `"${slug}/${tool}" is not available to you — call get_app_tools` });
+    const built = buildCall(t, ((req.body as { params?: Record<string, unknown> })?.params ?? {}));
+    if ("error" in built) return reply.code(400).send({ error: built.error });
+    const qs = new URLSearchParams(built.query).toString();
+    try {
+      const res = await platform!.serviceFetch(slug, g.ctx.workspaceId, `${built.path}${qs ? `?${qs}` : ""}`, {
+        method: built.method,
+        scopes: ["gateway.act"],
+        headers: { ...(built.body ? { "content-type": "application/json" } : {}), ...(g.spaceIds.length ? { "x-twodb-space-ids": g.spaceIds.join(",") } : {}) },
+        ...(built.body ? { body: JSON.stringify(built.body) } : {}),
+        signal: AbortSignal.timeout(60_000),
+      });
+      const text = await res.text();
+      let output: unknown = text;
+      try { output = text ? JSON.parse(text) : null; } catch { /* plain text */ }
+      if (!res.ok) {
+        const detail = typeof output === "object" && output && "error" in output ? String((output as { error: unknown }).error) : text.slice(0, 300);
+        return reply.code(res.status >= 400 && res.status < 600 ? res.status : 502).send({ error: `${slug}/${tool} answered ${res.status}${detail ? `: ${detail}` : ""}` });
+      }
+      return { output };
+    } catch (err: any) {
+      return reply.code(502).send({ error: `${slug}/${tool} failed: ${err?.message ?? String(err)}` });
+    }
+  });
+
+  // --- configuration (the toolkit webapp; never reachable with an agent context) -----------------------
+  const twodbConfigAuth = (req: FastifyRequest, reply: FastifyReply) => {
+    const ctx = auth(req, reply); if (!ctx) return null;
+    if (agentCtxOf(req)) { void reply.code(403).send({ error: "agents cannot read or change TwoDB tool access" }); return null; }
+    return ctx;
+  };
+
+  app.get("/twodb/tools", async (req, reply) => {
+    if (!twodbConfigAuth(req, reply)) return reply;
+    try { return await loadTwodbTools(); } catch (err: any) { return reply.code(err?.status ?? 502).send({ error: err?.message ?? String(err) }); }
+  });
+
+  /** Scopes that have anything enabled, with counts — drives the page's scope list badges. */
+  app.get("/twodb/access", async (req, reply) => {
+    const ctx = twodbConfigAuth(req, reply); if (!ctx) return reply;
+    return (await repo.twodbAccess.list(ctx.workspaceId)).map((r) => ({ scopeType: r.scopeType, scopeId: r.scopeId, count: r.tools.length }));
+  });
+
+  app.get("/twodb/access/:scopeType/:scopeId", async (req, reply) => {
+    const ctx = twodbConfigAuth(req, reply); if (!ctx) return reply;
+    const { scopeType, scopeId } = req.params as { scopeType: string; scopeId: string };
+    if (scopeType !== "space" && scopeType !== "agent") return reply.code(400).send({ error: "scopeType must be space or agent" });
+    return { scopeType, scopeId, tools: await repo.twodbAccess.get(ctx.workspaceId, scopeType, scopeId) };
+  });
+
+  app.put("/twodb/access/:scopeType/:scopeId", async (req, reply) => {
+    const ctx = twodbConfigAuth(req, reply); if (!ctx) return reply;
+    const { scopeType, scopeId } = req.params as { scopeType: string; scopeId: string };
+    if (scopeType !== "space" && scopeType !== "agent") return reply.code(400).send({ error: "scopeType must be space or agent" });
+    const raw = (req.body as { tools?: unknown })?.tools;
+    if (!Array.isArray(raw)) return reply.code(400).send({ error: "tools must be an array of `<app>/<tool>` keys" });
+    const keys = [...new Set(raw.map(String))];
+    try {
+      const known = new Set((await loadTwodbTools()).map((t) => t.key));
+      const unknown = keys.filter((k) => !known.has(k));
+      if (unknown.length) return reply.code(400).send({ error: `unknown tools: ${unknown.slice(0, 5).join(", ")}${unknown.length > 5 ? "…" : ""}` });
+    } catch (err: any) { return reply.code(err?.status ?? 502).send({ error: err?.message ?? String(err) }); }
+    await repo.twodbAccess.set(ctx.workspaceId, scopeType, scopeId, keys);
+    return { scopeType, scopeId, tools: keys };
+  });
 
   await registerWebapp(app, { distDir: webappDist(import.meta.dirname) });
   return app;

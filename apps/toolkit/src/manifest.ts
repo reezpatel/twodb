@@ -37,6 +37,14 @@ const toolOut = z.object({
   name: z.string(), description: z.string(), params: z.record(z.string(), paramSpec),
 });
 
+const twodbToolOut = z.object({
+  key: z.string(), app: z.string(), appName: z.string(), name: z.string(), description: z.string(), method: z.string(), path: z.string(),
+  params: z.array(z.object({
+    name: z.string(), in: z.enum(["path", "query", "body"]), type: z.enum(["string", "number", "boolean", "array", "object"]),
+    description: z.string(), required: z.boolean(), options: z.array(z.string()).optional(),
+  })),
+});
+
 const broadcastOut = z.object({
   id: z.string(), instanceId: z.string(), event: z.string(), payload: z.unknown(), createdAt: z.string(),
 });
@@ -216,6 +224,80 @@ export const toolkitManifest = defineAppManifest({
       request: z.object({ toolId: z.string(), params: z.record(z.string(), z.unknown()).optional(), agentId: z.string().optional() }),
       response: z.object({ output: z.unknown() }),
     }),
+    // --- TwoDB tools (the whole app API surface as agent tools; fixed catalog, per-scope allow-lists) ----------
+    defineEndpoint({
+      name: "listTwodbTools",
+      method: "GET",
+      path: "/twodb/tools",
+      auth: "session-or-apiKey",
+      description: "The full TwoDB tool catalog: one tool per endpoint of every installed app (except toolkit), derived live from the control plane. Used by the configuration page; 403 when called with an agent context.",
+      request: z.object({}),
+      response: z.array(twodbToolOut),
+    }),
+    defineEndpoint({
+      name: "listTwodbAccess",
+      method: "GET",
+      path: "/twodb/access",
+      auth: "session-or-apiKey",
+      description: "Scopes (spaces / agents) that have at least one TwoDB tool enabled, with counts. Default is none.",
+      request: z.object({}),
+      response: z.array(z.object({ scopeType: z.enum(["space", "agent"]), scopeId: z.string(), count: z.number() })),
+    }),
+    defineEndpoint({
+      name: "getTwodbAccess",
+      method: "GET",
+      path: "/twodb/access/:scopeType/:scopeId",
+      auth: "session-or-apiKey",
+      description: "The `<app>/<tool>` keys enabled for one scope (scopeType = space | agent).",
+      request: z.object({ scopeType: z.enum(["space", "agent"]), scopeId: z.string() }),
+      response: z.object({ scopeType: z.string(), scopeId: z.string(), tools: z.array(z.string()) }),
+    }),
+    defineEndpoint({
+      name: "setTwodbAccess",
+      method: "PUT",
+      path: "/twodb/access/:scopeType/:scopeId",
+      auth: "session-or-apiKey",
+      description: "Replaces the enabled TwoDB tools of one scope. Keys must exist in the catalog (400 otherwise); an empty list clears the scope. A tool is callable when enabled for the calling agent OR for the space of the call.",
+      request: z.object({ scopeType: z.enum(["space", "agent"]), scopeId: z.string(), tools: z.array(z.string()) }),
+      response: z.object({ scopeType: z.string(), scopeId: z.string(), tools: z.array(z.string()) }),
+    }),
+    defineEndpoint({
+      name: "listTwodbApps",
+      method: "GET",
+      path: "/twodb/apps",
+      auth: "session-or-apiKey",
+      description: "Agent-facing (needs ?agentId= + the call's space via x-twodb-space-ids or ?spaceId=): the apps that have at least one TwoDB tool enabled for this agent or space, with tool counts.",
+      request: z.object({ agentId: z.string(), spaceId: z.string().optional() }),
+      response: z.array(z.object({ slug: z.string(), name: z.string(), tools: z.number() })),
+    }),
+    defineEndpoint({
+      name: "listTwodbAppTools",
+      method: "GET",
+      path: "/twodb/apps/:app/tools",
+      auth: "session-or-apiKey",
+      description: "Agent-facing: one app's enabled tools (name, HTTP method, description) — no parameter schemas, to keep context small.",
+      request: z.object({ app: z.string(), agentId: z.string(), spaceId: z.string().optional() }),
+      response: z.array(z.object({ name: z.string(), method: z.string(), description: z.string() })),
+    }),
+    defineEndpoint({
+      name: "getTwodbAppTool",
+      method: "GET",
+      path: "/twodb/apps/:app/tools/:tool",
+      auth: "session-or-apiKey",
+      description: "Agent-facing: one enabled tool with its full parameter list (location, type, required, options). 404 when not enabled.",
+      request: z.object({ app: z.string(), tool: z.string(), agentId: z.string(), spaceId: z.string().optional() }),
+      response: twodbToolOut,
+    }),
+    defineEndpoint({
+      name: "invokeTwodbAppTool",
+      method: "POST",
+      path: "/twodb/apps/:app/tools/:tool/invoke",
+      auth: "session-or-apiKey",
+      description: "Agent-facing: runs an enabled tool and returns `{ output }`. Toolkit acts machine-to-machine through the gateway in the workspace, attaching the call's space (x-twodb-space-ids). Params are validated against the tool (400); a tool not enabled for the agent or space answers 403; the app's own error status is passed through.",
+      request: z.object({ app: z.string(), tool: z.string(), params: z.record(z.string(), z.unknown()).optional(), agentId: z.string(), spaceId: z.string().optional() }),
+      response: z.object({ output: z.unknown() }),
+    }),
+
     defineEndpoint({
       name: "listAgents",
       method: "GET",

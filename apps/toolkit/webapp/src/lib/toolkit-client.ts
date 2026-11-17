@@ -28,6 +28,10 @@ export interface Space {
   name: string;
 }
 
+export interface TwodbToolParam { name: string; in: "path" | "query" | "body"; type: string; description: string; required: boolean; options?: string[] }
+export interface TwodbTool { key: string; app: string; appName: string; name: string; description: string; method: string; path: string; params: TwodbToolParam[] }
+export type TwodbScopeType = "space" | "agent";
+
 export interface AgentInfo {
   id: string;
   name: string;
@@ -153,18 +157,26 @@ const send = <T>(path: string, method: string, body?: unknown): Promise<T> =>
 export const toolkitClient = {
   // --- spaces (control plane) + agents (artisan's own /agents, same gateway session) ---
   listSpaces: () => fetch("/registry/spaces", { credentials: "include" }).then((r) => json<{ spaces: Space[] }>(r)),
+  // /api/agents is toolkit's own proxy to artisan and answers `{ agents }`; accept a bare array too, and never
+  // return a non-array (the access picker maps over it).
   listAgents: async (): Promise<AgentInfo[]> => {
-    const res = await fetch("/api/agents", { credentials: "include" });
-    if (!res.ok) {
-      // fall back to toolkit's proxy (e.g. direct mode or artisan behind a different path)
-      try {
-        return (await get<{ agents: AgentInfo[] }>("/agents")).agents;
-      } catch {
-        return [];
-      }
+    try {
+      const res = await fetch("/api/agents", { credentials: "include" });
+      if (!res.ok) return [];
+      const body = (await res.json()) as AgentInfo[] | { agents?: AgentInfo[] };
+      const list = Array.isArray(body) ? body : body.agents;
+      return Array.isArray(list) ? list : [];
+    } catch {
+      return [];
     }
-    return (await res.json()) as AgentInfo[];
   },
+
+  // --- TwoDB tools (fixed catalog; per-space / per-agent allow-lists, default none) ---
+  listTwodbTools: () => get<TwodbTool[]>("/twodb/tools"),
+  listTwodbAccess: () => get<Array<{ scopeType: TwodbScopeType; scopeId: string; count: number }>>("/twodb/access"),
+  getTwodbAccess: (scopeType: TwodbScopeType, scopeId: string) => get<{ tools: string[] }>(`/twodb/access/${scopeType}/${encodeURIComponent(scopeId)}`),
+  setTwodbAccess: (scopeType: TwodbScopeType, scopeId: string, tools: string[]) =>
+    send<{ tools: string[] }>(`/twodb/access/${scopeType}/${encodeURIComponent(scopeId)}`, "PUT", { tools }),
 
   // --- MCP ---
   listMcp: () => get<McpServer[]>("/mcp"),

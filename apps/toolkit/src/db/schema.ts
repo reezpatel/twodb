@@ -89,7 +89,18 @@ export interface ConnectorStateRow {
   updated_at: string;
 }
 
+/** Which TwoDB tools (`<app>/<tool>` keys) are enabled for one scope — a space or an agent. No row = nothing enabled. */
+export interface TwodbToolAccessRow {
+  workspace_id: string;
+  /** space | agent */
+  scope_type: string;
+  scope_id: string;
+  tools_json: string;
+  updated_at: string;
+}
+
 export interface ToolkitDb {
+  twodb_tool_access: TwodbToolAccessRow;
   mcp_server: McpServerRow;
   connector_instance: ConnectorInstanceRow;
   event_queue: EventQueueRow;
@@ -189,6 +200,17 @@ export async function applySchema(db: Kysely<ToolkitDb>): Promise<void> {
     .addColumn("state_json", "text", (c) => c.notNull().defaultTo("{}"))
     .addColumn("updated_at", "timestamptz", (c) => c.notNull().defaultTo(sql`now()`))
     .execute();
+
+  await db.schema
+    .createTable("twodb_tool_access")
+    .ifNotExists()
+    .addColumn("workspace_id", "text", (c) => c.notNull())
+    .addColumn("scope_type", "text", (c) => c.notNull())
+    .addColumn("scope_id", "text", (c) => c.notNull())
+    .addColumn("tools_json", "text", (c) => c.notNull().defaultTo("[]"))
+    .addColumn("updated_at", "timestamptz", (c) => c.notNull().defaultTo(sql`now()`))
+    .execute();
+  await db.schema.createIndex("twodb_tool_access_scope_idx").ifNotExists().on("twodb_tool_access").columns(["workspace_id", "scope_type", "scope_id"]).unique().execute();
 
   // agent access (2026-11): backfill for dev DBs created before the column existed.
   await sql`alter table mcp_server add column if not exists agent_ids_json text not null default '[]'`.execute(db);
