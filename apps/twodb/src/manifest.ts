@@ -278,8 +278,9 @@ const serviceTokenEp = defineEndpoint({
     "App-to-app identity. An authenticated app (x-twodb-app + x-twodb-token) gets a 5-minute EdDSA JWT addressed to another app " +
     "for one workspace (`wid`), with `scp` = the message types it will send. The receiver trusts `wid` because the control plane signed it. " +
     "Service tokens reach the target app's `/_svc/*` routes through the gateway. With scope `gateway.act` the token instead lets the " +
-    "caller act inside that workspace as itself (no user, all spaces) toward the audience app — what headless runs use to call TwoRoute/Dispatch " +
-    "without a stored API key. Issued only for pairs listed in TWODB_SERVICE_ACT_GRANTS (default `artisan>tworoute,artisan>dispatch`); otherwise 403.",
+    "caller act inside that workspace as itself (no user) toward the audience app — what headless runs use to call TwoRoute/Dispatch " +
+    "without a stored API key; the caller may name the space via `x-twodb-space-ids`. Issued only for pairs listed in TWODB_SERVICE_ACT_GRANTS " +
+    "(`caller>app`, or `caller>*` for a trusted platform app such as toolkit; default `artisan>tworoute,artisan>dispatch,artisan>toolkit,toolkit>*`); otherwise 403.",
   request: z.object({ workspaceId: z.string(), audience: z.string(), scopes: z.array(z.string()).optional(), act: z.object({ type: z.string(), id: z.string() }).optional() }),
   response: z.object({ token: z.string(), expiresAt: z.string() }),
 });

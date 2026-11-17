@@ -1,25 +1,39 @@
 import type { ReactNode } from "react";
 import { Label } from "@twodb/blocks";
+import { HeaderPortal } from "../lib/header-slot";
 
 export const selectCls = "h-9 w-full rounded-md border border-outline bg-paper px-2.5 text-sm text-ink outline-none focus:border-ion-deep";
-export const cardCls = "rounded-md border border-outline bg-card";
+export const cardCls = "rounded-xl border border-outline bg-card";
 
-export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
+/** Title (+ short mono subtitle) and actions go to the shell header; `description` stays in the page as an intro line. */
+export function PageHeader({ title, subtitle, description, actions }: { title: string; subtitle?: string; description?: string; actions?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <div><h1 className="text-xl font-semibold">{title}</h1>{subtitle ? <p className="text-sm text-ink-muted">{subtitle}</p> : null}</div>
-      <div className="flex flex-wrap items-center gap-2">{actions}</div>
-    </div>
+    <>
+      <HeaderPortal>
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[15px] font-semibold leading-none text-ink">{title}</h1>
+            {subtitle ? <p className="mt-1 truncate font-mono text-[11px] leading-none text-ink-muted">{subtitle}</p> : null}
+          </div>
+          {actions}
+        </div>
+      </HeaderPortal>
+      {description ? <p className="mb-4 text-[12px] text-ink-muted">{description}</p> : null}
+    </>
   );
 }
 
 export function Page({ children, wide }: { children: ReactNode; wide?: boolean }) {
-  return <div className={`mx-auto w-full px-6 py-8 ${wide ? "max-w-7xl" : "max-w-5xl"}`}>{children}</div>;
+  return (
+    <div className="h-full overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+      <div className={`mx-auto w-full ${wide ? "max-w-7xl" : "max-w-6xl"}`}>{children}</div>
+    </div>
+  );
 }
 
 export function Section({ title, actions, children, className = "" }: { title?: string; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`${cardCls} p-4 ${className}`}>
+    <section className={`${cardCls} p-3 sm:p-4 ${className}`}>
       {title || actions ? <div className="mb-3 flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">{title}</h2>{actions}</div> : null}
       {children}
     </section>
@@ -63,16 +77,6 @@ export function Field({ label, children, hint, className = "" }: { label: string
 
 export function Swatch({ color, size = 10 }: { color: string; size?: number }) {
   return <span className="inline-block shrink-0 rounded-full" style={{ width: size, height: size, background: color }} />;
-}
-
-export function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { id: T; label: string }[]; onChange: (v: T) => void }) {
-  return (
-    <div className="inline-flex rounded-md border border-outline bg-paper p-0.5">
-      {options.map((o) => (
-        <button key={o.id} type="button" onClick={() => onChange(o.id)} className={`rounded-sm px-3 py-1 text-sm ${value === o.id ? "bg-stone font-medium text-ink" : "text-ink-muted hover:text-ink"}`}>{o.label}</button>
-      ))}
-    </div>
-  );
 }
 
 /** Colours a signed amount: income/positive green, expense/negative red. */

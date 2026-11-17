@@ -1,13 +1,14 @@
 import { useRef } from "react";
 import { Link, useParams } from "react-router";
-import { ExternalLink, Upload } from "lucide-react";
-import { Button } from "@twodb/blocks";
+import { ExternalLink, Trash2, Upload } from "lucide-react";
+import type { Tab } from "./hooks/useSitePage";
+import { Button, Tabs, TabsList, TabsTrigger } from "@twodb/blocks";
 import { useSitePage } from "./hooks/useSitePage";
 import { VersionsPanel } from "./partials/VersionsPanel";
 import { FilesPanel } from "./partials/FilesPanel";
 import { DomainsPanel } from "./partials/DomainsPanel";
 import { ConfigPanel } from "./partials/ConfigPanel";
-import { Page, PageHeader, Segmented, Spinner } from "../../components/Ui";
+import { Page, PageHeader, Spinner } from "../../components/Ui";
 
 export function SitePage() {
   const { spaceId = "", siteId = "" } = useParams();
@@ -23,16 +24,22 @@ export function SitePage() {
     <Page wide>
       <PageHeader
         title={site.name}
-        subtitle={site.activeVersionNumber ? `v${site.activeVersionNumber} is live` : "Not published yet"}
+        subtitle={site.activeVersionNumber ? `v${site.activeVersionNumber} live` : "not published"}
         actions={<>
-          {live && site.activeVersionNumber ? <a href={`https://${live}`} target="_blank" rel="noreferrer"><Button variant="secondary"><ExternalLink />Open</Button></a> : null}
+          {live && site.activeVersionNumber ? <a href={`https://${live}`} target="_blank" rel="noreferrer"><Button size="sm" variant="secondary" aria-label="Open site"><ExternalLink /><span className="hidden sm:inline">Open</span></Button></a> : null}
           <input ref={fileInput} type="file" accept=".zip,application/zip" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) actions.upload(f); e.target.value = ""; }} />
-          <Button onClick={() => fileInput.current?.click()} disabled={actions.uploading}><Upload />{actions.uploading ? "Uploading…" : "Upload zip"}</Button>
-          <Button variant="ghost" onClick={() => { if (confirm(`Delete "${site.name}" and all its versions?`)) actions.removeSite(); }}>Delete site</Button>
+          <Button size="sm" onClick={() => fileInput.current?.click()} disabled={actions.uploading} aria-label="Upload zip"><Upload /><span className="hidden sm:inline">{actions.uploading ? "Uploading…" : "Upload zip"}</span></Button>
+          <Button size="sm" variant="ghost" aria-label="Delete site" onClick={() => { if (confirm(`Delete "${site.name}" and all its versions?`)) actions.removeSite(); }}><Trash2 /><span className="hidden sm:inline">Delete</span></Button>
         </>}
       />
       {p.error ? <p className="mb-4 text-sm text-destructive" role="alert">{p.error}</p> : null}
-      <div className="mb-4"><Segmented value={p.tab} onChange={p.setTab} options={[{ id: "versions", label: "Versions" }, { id: "files", label: "Files" }, { id: "config", label: "Rewrite rules" }, { id: "domains", label: "Domains" }]} /></div>
+      <Tabs value={p.tab} onValueChange={(v) => p.setTab(v as Tab)} className="mb-4 gap-0">
+        <TabsList variant="line" size="md" className="overflow-x-auto [scrollbar-width:none]">
+          {([["versions", "Versions"], ["files", "Files"], ["config", "Rewrite rules"], ["domains", "Domains"]] as const).map(([id, label]) => (
+            <TabsTrigger key={id} value={id} className="px-1 pb-2">{label}</TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       {p.tab === "versions" ? (
         <VersionsPanel versions={p.versions} selectedId={p.version?.id ?? null} onSelect={(id) => { p.selectVersion(id); p.setTab("files"); }} onActivate={actions.activate} onFinalize={actions.finalize} onDraftFrom={actions.draftFrom} onDelete={actions.removeVersion} />
       ) : null}

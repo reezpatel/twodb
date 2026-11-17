@@ -9,7 +9,7 @@ The control plane: Docker-based app installation/lifecycle management, Postgres 
 - **Capabilities**: none
 - **Core deps**: core-data, core-platform, core-async
 
-_Generated: 2026-11-17T06:25:47.326Z_
+_Generated: 2026-11-17T06:36:46.405Z_
 
 ## Endpoints
 
@@ -224,7 +224,7 @@ Runtime config for the calling app (auth: x-twodb-app + x-twodb-token): its Post
 
 ### `POST /registry/service-token` — issueServiceToken
 
-App-to-app identity. An authenticated app (x-twodb-app + x-twodb-token) gets a 5-minute EdDSA JWT addressed to another app for one workspace (`wid`), with `scp` = the message types it will send. The receiver trusts `wid` because the control plane signed it. Service tokens reach the target app's `/_svc/*` routes through the gateway. With scope `gateway.act` the token instead lets the caller act inside that workspace as itself (no user, all spaces) toward the audience app — what headless runs use to call TwoRoute/Dispatch without a stored API key. Issued only for pairs listed in TWODB_SERVICE_ACT_GRANTS (default `artisan>tworoute,artisan>dispatch`); otherwise 403.
+App-to-app identity. An authenticated app (x-twodb-app + x-twodb-token) gets a 5-minute EdDSA JWT addressed to another app for one workspace (`wid`), with `scp` = the message types it will send. The receiver trusts `wid` because the control plane signed it. Service tokens reach the target app's `/_svc/*` routes through the gateway. With scope `gateway.act` the token instead lets the caller act inside that workspace as itself (no user) toward the audience app — what headless runs use to call TwoRoute/Dispatch without a stored API key; the caller may name the space via `x-twodb-space-ids`. Issued only for pairs listed in TWODB_SERVICE_ACT_GRANTS (`caller>app`, or `caller>*` for a trusted platform app such as toolkit; default `artisan>tworoute,artisan>dispatch,artisan>toolkit,toolkit>*`); otherwise 403.
 
 - **Auth**: `public`
 
