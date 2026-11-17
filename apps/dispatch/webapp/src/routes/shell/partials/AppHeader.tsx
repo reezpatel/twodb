@@ -17,7 +17,7 @@ export function AppHeader(props: AppHeaderProps) {
   const [addOpen, setAddOpen] = useState(false);
 
   return (
-    <AppShellHeader className="flex h-14 shrink-0 items-center gap-3 border-b border-outline px-6">
+    <AppShellHeader className="flex h-14 shrink-0 items-center gap-2 border-b border-outline px-0 sm:gap-3">
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-[15px] font-semibold leading-none text-ink">{props.title}</h1>
         {props.subtitle ? <p className="mt-1 truncate text-[12px] leading-none text-ink-muted">{props.subtitle}</p> : null}
@@ -25,7 +25,7 @@ export function AppHeader(props: AppHeaderProps) {
       {props.actions}
       <Button size="sm" variant="primary" onClick={() => setAddOpen(true)}>
         <Plus className="size-3.5" />
-        Add runner
+        <span className="hidden sm:inline">Add runner</span>
       </Button>
       <AddRunnerDialog open={addOpen} onOpenChange={setAddOpen} onCreate={props.onCreateRunner} />
     </AppShellHeader>

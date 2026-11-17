@@ -6,6 +6,7 @@ import { ShellChrome } from "./routes/shell/partials/ShellChrome.js";
 import { AppHeader } from "./routes/shell/partials/AppHeader.js";
 import { useShellSession } from "./routes/shell/hooks/useShellSession.js";
 import { useSidebarToggle } from "./routes/shell/hooks/useSidebarToggle.js";
+import { useInstallPrompt } from "./routes/shell/hooks/useInstallPrompt.js";
 import { useShellNav } from "./routes/shell/hooks/useShellNav.js";
 import { useSharedDispatch } from "./lib/dispatch-context.js";
 import { RunnersView } from "./routes/runners/RunnersView.js";
@@ -41,16 +42,18 @@ export function App() {
 function ShellRoutes() {
   const { userName, signOut } = useShellSession();
   const { activeId, onSelect } = useShellNav();
-  const { open: navOpen, toggle: toggleNav } = useSidebarToggle("dispatch.nav-open");
+  const installPrompt = useInstallPrompt();
+  const { open: navOpen, toggle: toggleNav, setOpen: setNavOpen, overlay: navOverlay } = useSidebarToggle("dispatch.nav-open");
   const { runners, microvms } = useSharedDispatch();
 
   const title = (() => {
-    if (activeId === "enroll") return "Enroll tokens";
+    if (activeId === "enroll") return "Enrollment keys";
+    if (activeId.startsWith("runners:")) return activeId.split(":").slice(1).join(":");
     if (activeId.startsWith("jobs:")) return "Job";
     if (activeId.startsWith("microvms:")) return activeId.split(":").slice(1).join(":");
-    if (activeId === "runners") return "Runners";
+    if (activeId === "dashboard") return "Dashboard";
     if (activeId === "jobs") return "Jobs";
-    if (activeId === "microvms") return "Microvms";
+    if (activeId === "microvms") return "MicroVMs";
     return "Dispatch";
   })();
 
@@ -59,7 +62,17 @@ function ShellRoutes() {
       runners={runners.runners}
       microvms={microvms.microvms}
       activeId={activeId}
-      onSelect={onSelect}
+      onSelect={(id) => {
+        onSelect(id);
+        if (navOverlay) setNavOpen(false);
+      }}
+      canInstall={installPrompt.visible}
+      onInstall={() => {
+        void installPrompt.install().then((result) => {
+          if (result === "manual") window.alert("To install Dispatch: open the browser's share menu and choose “Add to Home Screen”.");
+        });
+      }}
+      onNavOpenChange={setNavOpen}
       userName={userName}
       onSignOut={signOut}
       navOpen={navOpen}
@@ -72,13 +85,14 @@ function ShellRoutes() {
       }
     >
       <Routes>
-        <Route path="/runners" element={<RunnersView />} />
+        <Route path="/dashboard" element={<RunnersView />} />
+        <Route path="/runners/:name" element={<RunnersView />} />
         <Route path="/jobs" element={<JobsView />} />
         <Route path="/jobs/:id" element={<JobDetailView />} />
         <Route path="/microvms" element={<MicrovmsView />} />
         <Route path="/microvms/:identifier" element={<MicrovmDetailView />} />
         <Route path="/enroll" element={<EnrollTokensView />} />
-        <Route path="*" element={<Navigate to="/runners" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </ShellChrome>
   );

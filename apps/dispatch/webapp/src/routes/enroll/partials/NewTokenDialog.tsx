@@ -33,7 +33,7 @@ export function NewTokenDialog(props: NewTokenDialogProps) {
     <Dialog open onOpenChange={(o) => { if (!o) props.onClose(); }}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{created ? "Token created" : "New enrollment token"}</DialogTitle>
+          <DialogTitle>{created ? "Key created" : "New enrollment key"}</DialogTitle>
         </DialogHeader>
         {created ? (
           <div className="space-y-3">
@@ -45,7 +45,7 @@ two-runner --gateway {consoleUrl()} \
   --enroll {created.key} [--name my-machine] [--microvm]
             </pre>
             <p className="text-[12px] text-ink-muted">
-              Each machine gets its own identity and runner key; this token can enroll any number of them until revoked or expired.
+              Works for any number of machines until it expires or is revoked.
             </p>
             <div className="flex justify-end">
               <Button size="sm" variant="secondary" onClick={props.onClose}>Done</Button>

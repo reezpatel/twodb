@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDownToLine, RefreshCw, Square } from "lucide-react";
-import { Badge, Button, Input } from "@twodb/blocks";
+import { Button, Input } from "@twodb/blocks";
+import { Badge } from "../../../lib/badge.js";
 import type { Job, JobLogLine } from "../../../lib/dispatch-client.js";
 
 export interface JobDetailPanelProps {

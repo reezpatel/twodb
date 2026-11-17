@@ -1,4 +1,4 @@
-import { ListTree, Cpu, ScrollText, Boxes, Gauge, KeyRound } from "lucide-react";
+import { Boxes, Cpu, Download, KeyRound, LayoutDashboard, ListTree, ScrollText } from "lucide-react";
 import {
   AppShell,
   AppShellBody,
@@ -19,31 +19,30 @@ export interface ShellChromeProps {
   onSelect: (id: string) => void;
   userName: string;
   onSignOut: () => void;
+  canInstall?: boolean;
+  onInstall?: () => void;
   navOpen: boolean;
+  onNavOpenChange: (open: boolean) => void;
   onToggleNav: () => void;
   header: ReactNode;
   sidebar?: ReactNode;
   children: ReactNode;
 }
 
-/** Dumb chrome — nav (Runners, Jobs, Microvms + one entry per VM) + the
+/** Dumb chrome — nav (Dashboard, MicroVMs, Runners section; Jobs, Enrollment keys, Install, Sign out in the footer) + the
  * shared app header, both stateless. */
 export function ShellChrome(props: ShellChromeProps) {
   const groups: NavGroupData[] = [
     {
-      heading: "Dispatch",
+      heading: "Overview",
       items: [
-        { id: "runners", title: "Runners", icon: Cpu },
-        { id: "jobs", title: "Jobs", icon: ScrollText },
-        { id: "enroll", title: "Enroll tokens", icon: KeyRound },
+        { id: "dashboard", title: "Dashboard", icon: LayoutDashboard },
+        { id: "microvms", title: "MicroVMs", icon: Boxes },
       ],
     },
     {
-      heading: "Microvms",
-      items: [
-        { id: "microvms", title: "All microvms", icon: Boxes },
-        ...props.microvms.map((vm) => ({ id: `microvms:${vm.identifier}`, title: vm.identifier, icon: Gauge })),
-      ],
+      heading: "Runners",
+      items: props.runners.map((r) => ({ id: `runners:${r.name}`, title: r.name, icon: Cpu })),
     },
   ];
 
@@ -51,20 +50,33 @@ export function ShellChrome(props: ShellChromeProps) {
     <AppShell>
       <AppShellBody>
         <NavSidebar
+          variant="responsive"
           open={props.navOpen}
+          onOpenChange={props.onNavOpenChange}
           groups={groups}
-          footerItems={[{ id: "logout", title: "Sign out", icon: ListTree }]}
+          footerItems={[
+            { id: "jobs", title: "Jobs", icon: ScrollText },
+            { id: "enroll", title: "Enrollment keys", icon: KeyRound },
+            ...(props.canInstall ? [{ id: "install", title: "Install app", icon: Download }] : []),
+            { id: "logout", title: "Sign out", icon: ListTree },
+          ]}
           activeId={props.activeId}
-          onSelect={(id) => (id === "logout" ? props.onSignOut() : props.onSelect(id))}
+          onSelect={(id) => {
+            if (id === "logout") return props.onSignOut();
+            if (id === "install") return props.onInstall?.();
+            props.onSelect(id);
+          }}
           workspaces={[]}
           activeWorkspace={props.userName || "Dispatch"}
         />
         <AppShellMain>
-          <AppShellHeader className="h-12 gap-3 border-b border-outline px-6">
+          <AppShellHeader className="h-12 gap-2 border-b border-outline px-4 sm:gap-3 sm:px-6">
             <NavSidebarToggle open={props.navOpen} onToggle={props.onToggleNav} aria-label={props.navOpen ? "Hide navigation" : "Show navigation"} />
             <div className="min-w-0 flex-1">{props.header}</div>
           </AppShellHeader>
-          <AppShellContent>{props.children}</AppShellContent>
+          <AppShellContent>
+            <div className="mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 sm:py-6">{props.children}</div>
+          </AppShellContent>
         </AppShellMain>
         {props.sidebar}
       </AppShellBody>

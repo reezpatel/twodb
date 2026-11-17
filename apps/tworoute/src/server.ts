@@ -878,7 +878,40 @@ export async function buildServer(config: TwoRouteConfig) {
 
   app.get("/healthz", async () => ({ ok: true }));
 
+  // --- Background quota refresh. The platform has no cron facility, so refresh
+  // every quota-capable connection on an in-process timer (default 5 min).
+  const QUOTA_REFRESH_MS = Number(process.env.TWOROUTE_QUOTA_REFRESH_SEC ?? 300) * 1000;
+  let sweeping = false;
+  const sweepQuotas = async () => {
+    if (sweeping) return;
+    sweeping = true;
+    try {
+      const all = await connections.listAllForSweep();
+      await Promise.allSettled(
+        all
+          .filter((c) => hasQuotaCollector(c.provider))
+          .map(async (c) => {
+            const live = await connections.getLive(c.id);
+            if (!live) return;
+            try {
+              await refreshConnectionQuotas(live, connections, quotaCtx);
+            } catch (e) {
+              app.log.warn({ connection: c.name, err: (e as Error).message.slice(0, 200) }, "quota refresh failed");
+            }
+          }),
+      );
+    } catch (e) {
+      app.log.warn({ err: e }, "quota sweep failed");
+    } finally {
+      sweeping = false;
+    }
+  };
+  const quotaTimer = setInterval(() => void sweepQuotas(), QUOTA_REFRESH_MS);
+  quotaTimer.unref();
+  setTimeout(() => void sweepQuotas(), 15_000).unref();
+
   app.addHook("onClose", async () => {
+    clearInterval(quotaTimer);
     await asyncEngine.close();
   });
 

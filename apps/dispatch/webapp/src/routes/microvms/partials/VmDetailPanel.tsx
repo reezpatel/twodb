@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Play, RefreshCw, TerminalSquare } from "lucide-react";
-import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger } from "@twodb/blocks";
+import { Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger } from "@twodb/blocks";
+import { Badge } from "../../../lib/badge.js";
 import { dispatchClient, type Microvm } from "../../../lib/dispatch-client.js";
 import { useVmConsole, useVmTerminal } from "../hooks/useVmDetail.js";
 

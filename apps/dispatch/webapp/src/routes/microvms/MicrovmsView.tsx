@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@twodb/blocks";
 import { useSharedDispatch } from "../../lib/dispatch-context.js";
-import { MicrovmCard } from "./partials/MicrovmCard.js";
+import { MicrovmsTable } from "./partials/MicrovmsTable.js";
 import { BootVmDialog } from "./partials/BootVmDialog.js";
 import { useNavigate } from "react-router";
 
@@ -19,9 +19,9 @@ export function MicrovmsView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-[13px] text-ink-muted">
-          Ephemeral Firecracker microvms — same identifier resumes with its /app restored.
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="min-w-0 text-[13px] text-ink-muted">
+          Lightweight virtual machines running on your runners.
         </p>
         <Button size="sm" variant="primary" onClick={() => setBootOpen(true)}>
           <Plus className="size-3.5" />
@@ -29,18 +29,13 @@ export function MicrovmsView() {
         </Button>
       </div>
       {microvms.error ? <p className="text-[13px] text-destructive">{microvms.error}</p> : null}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {microvms.microvms.map((vm) => (
-          <MicrovmCard
-            key={vm.id}
-            vm={vm}
-            busy={microvms.busy}
-            onOpen={() => navigate(`/microvms/${encodeURIComponent(vm.identifier)}`)}
-            onBoot={() => void microvms.boot({ identifier: vm.identifier })}
-            onShutdown={(archive) => void microvms.shutdown(vm.identifier, archive)}
-          />
-        ))}
-      </div>
+      <MicrovmsTable
+        vms={microvms.microvms}
+        busy={microvms.busy}
+        onOpen={(vm) => navigate(`/microvms/${encodeURIComponent(vm.identifier)}`)}
+        onBoot={(vm) => void microvms.boot({ identifier: vm.identifier })}
+        onShutdown={(vm, archive) => void microvms.shutdown(vm.identifier, archive)}
+      />
       {bootOpen ? (
         <BootVmDialog
           runners={runners.runners.filter((r) => r.kind === "microvm-host" && r.status === "online")}

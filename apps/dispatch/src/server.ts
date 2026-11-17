@@ -299,6 +299,27 @@ export async function buildServer(config: DispatchConfig) {
   });
 
   /** Raw job row -> the API shape (camelCase, runner resolved by name). */
+  // --- Job history cleanup: once a day, drop finished jobs older than 3 days.
+  const JOB_RETENTION_DAYS = Number(process.env.DISPATCH_JOB_RETENTION_DAYS ?? 3);
+  const pruneJobs = async () => {
+    try {
+      const cutoff = new Date(Date.now() - JOB_RETENTION_DAYS * 86_400_000).toISOString();
+      const n = await repo.pruneFinishedJobs(cutoff);
+      if (n > 0) app.log.info({ removed: n }, "pruned old jobs");
+    } catch (e) {
+      app.log.warn({ err: e }, "job prune failed");
+    }
+  };
+  const pruneTimer = setInterval(() => void pruneJobs(), 86_400_000);
+  pruneTimer.unref();
+  setTimeout(() => void pruneJobs(), 30_000).unref(); // catch up after a restart
+  app.addHook("onClose", async () => clearInterval(pruneTimer));
+
+  /** runnerId -> name for every runner in the workspace (online or not). */
+  async function runnerNames(workspaceId: string): Promise<Map<string, string>> {
+    return new Map((await repo.listRunners(workspaceId)).map((r) => [r.id, r.name]));
+  }
+
   function jobOut(job: JobRow, hubNames: Map<string, string>) {
     return {
       id: job.id,
@@ -323,7 +344,7 @@ export async function buildServer(config: DispatchConfig) {
       status: q.status,
       limit: q.limit ? Number(q.limit) : undefined,
     });
-    const hubNames = new Map(hub.listOnline(ctx.workspaceId).map((r) => [r.runnerId, r.name]));
+    const hubNames = await runnerNames(ctx.workspaceId);
     return jobs.map((j) => jobOut(j, hubNames));
   });
 
@@ -333,7 +354,7 @@ export async function buildServer(config: DispatchConfig) {
     const { id } = req.params as { id: string };
     const job = await repo.getJob(ctx.workspaceId, id);
     if (!job) return reply.code(404).send({ error: "not found" });
-    const hubNames = new Map(hub.listOnline(ctx.workspaceId).map((r) => [r.runnerId, r.name]));
+    const hubNames = await runnerNames(ctx.workspaceId);
     return jobOut(job, hubNames);
   });
 
@@ -560,7 +581,7 @@ export async function buildServer(config: DispatchConfig) {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const vms = await repo.listMicrovms(ctx.workspaceId);
-    const hubNames = new Map(hub.listOnline(ctx.workspaceId).map((r) => [r.runnerId, r.name]));
+    const hubNames = await runnerNames(ctx.workspaceId);
     return vms.map((vm) => vmOut(vm, hubNames));
   });
 

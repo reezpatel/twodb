@@ -11,7 +11,7 @@ export function useShellNav() {
 
   // /jobs/:id -> jobs; /microvms/:identifier -> microvms; fixed pages otherwise.
   const pathMatch = location.pathname.match(/^\/(runners|jobs|microvms|enroll)(?:\/([^/]+))?$/);
-  const activeId = pathMatch ? (pathMatch[2] ? `${pathMatch[1]}:${decodeURIComponent(pathMatch[2])}` : pathMatch[1]) : "overview";
+  const activeId = pathMatch ? (pathMatch[2] ? `${pathMatch[1]}:${decodeURIComponent(pathMatch[2])}` : pathMatch[1]) : "dashboard";
 
   const onSelect = useCallback(
     (id: string) => {

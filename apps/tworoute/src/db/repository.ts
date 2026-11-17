@@ -105,6 +105,11 @@ export function createConnectionsRepo(db: Kysely<TwoRouteDb>, encryptionKey: str
         .execute();
     },
 
+    /** Every connection id + provider across all workspaces — for the background quota sweep. */
+    async listAllForSweep() {
+      return db.selectFrom("llm_connection").select(["id", "name", "provider"]).execute();
+    },
+
     /** Workspace-wide listing — used when the caller has no space filter (workspace API keys always see every space). */
     async listForWorkspace(workspaceId: string) {
       return db

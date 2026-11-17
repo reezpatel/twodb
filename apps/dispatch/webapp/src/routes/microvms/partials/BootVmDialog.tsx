@@ -40,7 +40,7 @@ export function BootVmDialog(props: BootVmDialogProps) {
         {props.runners.length === 0 ? (
           <div className="space-y-3">
             <p className="text-[13px] text-ink-muted">
-              No online microvm-host runners. Start two-runner with --microvm on a machine with /dev/kvm.
+              No runner is available for MicroVMs. Connect a machine with virtualization support first.
             </p>
             <div className="flex justify-end">
               <Button size="sm" variant="secondary" onClick={props.onClose}>Close</Button>

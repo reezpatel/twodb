@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Play, Search } from "lucide-react";
-import { Badge, Button, Card, CardContent, Input } from "@twodb/blocks";
+import { Button, Input } from "@twodb/blocks";
 import { useNavigate } from "react-router";
 import { useSharedDispatch } from "../../lib/dispatch-context.js";
 import { JobsTable } from "./partials/JobsTable.js";
@@ -69,11 +69,7 @@ export function JobsView() {
           </select>
         </div>
       </div>
-      <Card>
-        <CardContent className="p-0">
-          <JobsTable jobs={jobs.jobs} onOpen={(id) => navigate(`/jobs/${id}`)} />
-        </CardContent>
-      </Card>
+      <JobsTable jobs={jobs.jobs} onOpen={(id) => navigate(`/jobs/${id}`)} />
       {newOpen ? (
         <NewJobDialog
           runners={runners.runners}

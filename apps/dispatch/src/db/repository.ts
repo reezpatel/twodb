@@ -249,6 +249,23 @@ export function createDispatchRepo(db: Kysely<DispatchDb>) {
         .execute();
     },
 
+    /** Delete finished jobs (anything not running) that ended before `cutoffIso`,
+     * with their logs. Returns how many jobs were removed. */
+    async pruneFinishedJobs(cutoffIso: string): Promise<number> {
+      const old = db
+        .selectFrom("job")
+        .select("id")
+        .where("status", "!=", "running")
+        .where((eb) => eb(eb.fn.coalesce("ended_at", "started_at"), "<", cutoffIso));
+      await db.deleteFrom("job_log").where("job_id", "in", old).execute();
+      const res = await db
+        .deleteFrom("job")
+        .where("status", "!=", "running")
+        .where((eb) => eb(eb.fn.coalesce("ended_at", "started_at"), "<", cutoffIso))
+        .executeTakeFirst();
+      return Number(res.numDeletedRows ?? 0);
+    },
+
     // ---- job logs -------------------------------------------------------------
     async appendJobLog(input: AppendJobLogInput): Promise<void> {
       await db

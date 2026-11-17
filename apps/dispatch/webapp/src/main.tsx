@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import { TwoDbAuthProvider, RequireTwoDbAuth } from "@twodb/twodb-shared-frontend";
 import "@twodb/blocks/styles.css";
 import { App } from "./App.js";
+import { registerServiceWorker } from "./register-sw.js";
+
+registerServiceWorker();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
