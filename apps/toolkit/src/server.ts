@@ -14,6 +14,7 @@ import type { ConnectorTemplate, ConnectorRuntime } from "./connectors/types.js"
 import { startPoller } from "./poller.js";
 import { decryptSecret } from "./crypto.js";
 import { slugifyOwner, connectorToolName, agentCanUse, TOOL_NAME_RE } from "./tool-names.js";
+import { listMcpToolsSafe, callMcpTool, parseMcpToolName, invalidateMcp, type ToolParam } from "./mcp-client.js";
 import { deriveTools, buildCall, isAllowed, type CatalogApp, type TwoDbTool } from "./twodb-tools.js";
 import type { Selectable } from "kysely";
 import type { McpServerRow, ConnectorInstanceRow } from "./db/schema.js";
@@ -113,9 +114,18 @@ export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatf
     }
   };
 
+  /** Apps whose act-token (kind "service") calls toolkit trusts. Artisan's
+   *  agent tool bridge (list_tools/call_tool) is the consumer; the gateway
+   *  already verified the token + act grant before forwarding. */
+  const TRUSTED_SERVICE_CALLERS = new Set(["artisan"]);
+
   const auth = (req: FastifyRequest, reply: FastifyReply): ForwardedContext | null => {
     const ctx = readForwardedContext(req);
     if (!ctx) { void reply.code(401).send({ error: "unauthorized" }); return null; }
+    if (ctx.kind === "service" && !(ctx.serviceApp && TRUSTED_SERVICE_CALLERS.has(ctx.serviceApp))) {
+      void reply.code(403).send({ error: "service caller is not trusted" });
+      return null;
+    }
     return ctx;
   };
 
@@ -273,6 +283,7 @@ export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatf
       patch.agent_ids_json = JSON.stringify(agentIds);
     }
     const row = await repo.mcp.update(ctx.workspaceId, id, patch);
+    invalidateMcp(id); // url/headers/transport may have changed — drop cached tools+connection
     return row ? mcpOut(row) : reply.code(404).send({ error: "not found" });
   });
 
@@ -281,6 +292,7 @@ export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatf
     const { id } = req.params as { id: string };
     if (!(await repo.mcp.get(ctx.workspaceId, id))) return reply.code(404).send({ error: "not found" });
     await repo.mcp.remove(ctx.workspaceId, id);
+    invalidateMcp(id);
     return { ok: true };
   });
 
@@ -480,6 +492,26 @@ export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatf
     return out;
   };
 
+  /** All MCP tools of the workspace — discovered live from each enabled server,
+   *  same annotated shape as connectors so the agent/space filters apply. */
+  const allMcpTools = async (workspaceId: string) => {
+    const rows = (await repo.mcp.list(workspaceId)).filter((r) => Number(r.enabled) === 1);
+    const out: Array<{ id: string; instanceId: string; instanceName: string; templateId: string; name: string; description: string; params: Record<string, ToolParam>; agentIds: string[]; spaceAll: boolean; spaceIds: string[] }> = [];
+    // Discover servers in parallel; a down server just contributes nothing.
+    const discovered = await Promise.all(rows.map(async (row) => ({ row, tools: await listMcpToolsSafe(row) })));
+    for (const { row, tools } of discovered) {
+      const agentIds = JSON.parse(row.agent_ids_json ?? "[]") as string[];
+      for (const t of tools) {
+        out.push({
+          id: `${row.id}.${t.name}`, instanceId: row.id, instanceName: row.name, templateId: "mcp",
+          name: t.name, description: t.description, params: t.params,
+          agentIds, spaceAll: Number(row.scope_all) === 1, spaceIds: JSON.parse(row.scope_ids_json) as string[],
+        });
+      }
+    }
+    return out;
+  };
+
   /** Resolve a NAME-addressed tool to its owning instance row + command. */
   const resolveByName = async (workspaceId: string, name: string) => {
     const rows = await repo.instances.list(workspaceId);
@@ -496,7 +528,10 @@ export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatf
     const ctx = auth(req, reply); if (!ctx) return reply;
     const { templateId } = req.query as { templateId?: string };
     const agent = agentCtxOf(req);
-    let tools = await allConnectorTools(ctx.workspaceId);
+    // Connectors + MCP servers, merged. MCP tools are discovered live (cached
+    // briefly); a server that is down simply contributes no tools.
+    const [connectors, mcp] = await Promise.all([allConnectorTools(ctx.workspaceId), allMcpTools(ctx.workspaceId)]);
+    let tools: Array<(typeof connectors)[number]> = [...connectors, ...mcp];
     if (templateId) tools = tools.filter((t) => t.templateId === templateId);
     // agent context (trusted app caller): filter by agent access + space scope.
     // No agent context (webapp user) sees everything.
@@ -511,6 +546,32 @@ export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatf
     const ctx = auth(req, reply); if (!ctx) return reply;
     const { toolId } = req.params as { toolId: string };
     const agent = agentCtxOf(req);
+
+    // MCP tool? Names are mcp__<server>__<tool>; resolve to the server row and
+    // proxy the call to the remote MCP server after the same access checks.
+    const mcpName = parseMcpToolName(toolId);
+    if (mcpName) {
+      const mcpRows = await repo.mcp.list(ctx.workspaceId);
+      const server = mcpRows.find((r) => slugifyOwner(r.name) === mcpName.serverSlug);
+      if (!server) return reply.code(404).send({ error: `unknown tool "${toolId}"` });
+      if (Number(server.enabled) !== 1) return reply.code(409).send({ error: `MCP server "${server.name}" is disabled` });
+      if (agent) {
+        const agentIds = JSON.parse(server.agent_ids_json ?? "[]") as string[];
+        if (!agentCanUse(agentIds, agent.agentId)) return reply.code(403).send({ error: `tool "${toolId}" is not available to this agent` });
+        if (agent.spaceIds.length > 0) {
+          const all = Number(server.scope_all) === 1;
+          const ids = JSON.parse(server.scope_ids_json) as string[];
+          if (!all && !ids.some((id) => agent.spaceIds.includes(id))) return reply.code(403).send({ error: `tool "${toolId}" is not available in this space` });
+        }
+      }
+      const params = ((req.body as { params?: Record<string, unknown> })?.params ?? {}) as Record<string, unknown>;
+      try {
+        const output = await callMcpTool(server, mcpName.tool, params);
+        return { output };
+      } catch (err: any) {
+        return reply.code(502).send({ error: `mcp call failed: ${err?.message ?? String(err)}` });
+      }
+    }
 
     let instanceRow: Selectable<ConnectorInstanceRow> | undefined;
     let command: string;

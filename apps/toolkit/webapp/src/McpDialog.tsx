@@ -73,7 +73,7 @@ export function McpDialog({ data, initial, onClose }: { data: ToolkitData; initi
           </div>
         </div>
         <div>
-          <label className={labelCls}>Headers</label>
+<label className={labelCls}>Headers <span className="font-normal normal-case text-ink-muted">— values may use &lt;ENV_NAME&gt; to inject a toolkit env var (keeps secrets out of the DB)</span></label>
           <div className="mt-1 flex flex-col gap-1.5">
             {headerRows.map((row, i) => (
               <div key={i} className="flex gap-1.5">
