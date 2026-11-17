@@ -43,6 +43,10 @@ export default defineConfig({
     port: 6500,
     strictPort: true,
     host: true, // listen on all interfaces so the LAN hostname/IP works
+    // Other app webapps (https://divine.local:6501-6599) call this origin's /api/auth + /registry cross-origin.
+    // Vite's default CORS only allows localhost origins and answers the preflight itself, so the gateway's
+    // own CORS policy (AUTH_TRUSTED_ORIGINS + the 6500-6599 band) never got a say. Let the gateway decide.
+    cors: false,
     // (HMR host needs no override: by default the client connects back to the
     // host the browser used — e.g. wss://divine.local:6500. When it fails,
     // the cause is cert trust: browsers hard-fail WSS on untrusted certs.

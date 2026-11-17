@@ -4,7 +4,7 @@ export interface TwoDbAuthConfig {
   /**
    * Origin of the TwoDB webapp that hosts /authorize (where the user actually signs in).
    * Default: runtime `window.__TWODB_CONFIG__.twodbUrl` (injected by the app backend from TWODB_CONSOLE_URL),
-   * else `import.meta.env.VITE_TWODB_UI_URL`, else console.<parent domain> of this host, else http://localhost:6500.
+   * else `import.meta.env.VITE_TWODB_UI_URL`, else console.<parent domain> of this host, else the dev console on this host (same protocol/host, port 6500).
    */
   twodbUrl?: string;
   /** Base URL serving the auth endpoints (/registry/oauth/token, /api/auth/*). Default: the console (twodbUrl). */
@@ -27,6 +27,17 @@ interface Stored {
 
 const PENDING = "pending";
 
+/** Dev console port (the TwoDB webapp's dev server). */
+const DEV_CONSOLE_PORT = 6500;
+
+/** Last-resort dev fallback: the console on this page's own host + protocol (https://divine.local:6513 ->
+ *  https://divine.local:6500), so a LAN/mDNS dev host never gets pointed at the browser's own "localhost". */
+function devConsoleUrl(): string {
+  if (typeof window === "undefined") return `http://localhost:${DEV_CONSOLE_PORT}`;
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname.includes(":") ? `[${hostname}]` : hostname}:${DEV_CONSOLE_PORT}`;
+}
+
 /** Where the TwoDB console lives, when nothing says so explicitly: swap the first host label for "console"
  *  (artisan.twodb.io -> console.twodb.io). Localhost / IPs / bare domains fall back to the dev console. */
 function deriveConsoleUrl(): string | null {
@@ -41,7 +52,7 @@ export function resolveConfig(c: TwoDbAuthConfig = {}) {
   const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
   // Runtime config injected into index.html by the app backend (core/twodb-core/src/webapp.ts) — one image, any domain.
   const runtime = (typeof window !== "undefined" ? (window as unknown as { __TWODB_CONFIG__?: { twodbUrl?: string | null } }).__TWODB_CONFIG__ : undefined) ?? {};
-  const twodbUrl = (c.twodbUrl ?? runtime.twodbUrl ?? env.VITE_TWODB_UI_URL ?? deriveConsoleUrl() ?? "http://localhost:6500").replace(/\/+$/, "");
+  const twodbUrl = (c.twodbUrl ?? runtime.twodbUrl ?? env.VITE_TWODB_UI_URL ?? deriveConsoleUrl() ?? devConsoleUrl()).replace(/\/+$/, "");
   return {
     twodbUrl,
     // Where the auth endpoints (/registry/oauth/token, /api/auth/*) live: the console. An app webapp's own

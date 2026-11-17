@@ -18,7 +18,8 @@
     "storybook:build": "pnpm --filter @twodb/blocks storybook:build",
     "moon": "moon",
     "m:build": "moon run :build",
-    "m:lint": "moon run :lint"
+    "m:lint": "moon run :lint",
+    "m:dev": "node tools/dev-all.mjs"
   },
   "devDependencies": {
     "@moonrepo/cli": "^2.6.5",
