@@ -3,6 +3,7 @@ import type { ChildSession, GitInfo, JobRow as JobRowT } from "../hooks/useSessi
 import { SideSection, SubagentRow, JobRow } from "./SidePanel.js";
 import { GitSection } from "./GitSection.js";
 import { MemoriesSection } from "./MemoriesSection.js";
+import { ProviderSection } from "./ProviderSection.js";
 import { PlanList, type PlanStep } from "../../../components/ui/plan-list.js";
 
 export interface SessionSidebarProps {
@@ -42,6 +43,8 @@ export function SessionSidebar(props: SessionSidebarProps) {
       </SideSection>
 
       <MemoriesSection sessionId={props.sessionId} />
+
+      <ProviderSection />
 
       <GitSection git={git} refreshing={props.busy} onRefresh={props.onRefreshGit} />
 

@@ -279,6 +279,11 @@ export const artisanClient = {
     return post(`/sessions/${id}/compact`);
   },
 
+  /** Live provider quota windows (proxied from TwoRoute by the artisan server). */
+  providerQuotas(): Promise<{ connections: QuotaConnection[]; quotas: QuotaSnapshot[] }> {
+    return get("/quotas");
+  },
+
   abort(id: string): Promise<{ ok: boolean }> {
     return post(`/sessions/${id}/abort`);
   },
@@ -486,4 +491,22 @@ export class WorkspaceSocket {
   get connected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
   }
+}
+
+export interface QuotaSnapshot {
+  id: string;
+  connectionId: string;
+  quotaType: string;
+  groupName: string;
+  unit: string;
+  quotaTotal: number | null;
+  quotaUsed: number;
+  capturedAt: string;
+  resetAt: string | null;
+}
+
+export interface QuotaConnection {
+  id: string;
+  name: string;
+  provider: string;
 }
