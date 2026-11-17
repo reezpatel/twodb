@@ -31,6 +31,7 @@ import { runAgentLoop, isSessionRunning, fileTools, type RunDeps } from "./ws/ag
 import { subagentTools } from "./ws/tools/subagents.js";
 import { askUserTool } from "./ws/tools/ask-user.js";
 import { runCompaction } from "./ws/compaction.js";
+import { QuotaClient } from "./quota-client.js";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
 /** How long inspector request snapshots are kept. */
@@ -338,9 +339,16 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     if (isSessionRunning(id)) return reply.code(409).send({ error: "session running" });
     const thread = await repo.currentThread(id);
     if (thread) await repo.closeThread(thread.id);
-    await repo.openThread(id);
+    const fresh = await repo.openThread(id);
     await repo.setSessionPlan(id, null);
-    hub.broadcast(ctx.workspaceId, id, { type: "status", text: "new thread" });
+    // A marker row in the fresh thread gives every client a visible "new thread"
+    // divider in the transcript (skipped by the model context builder).
+    await repo.addMessage({
+      threadId: fresh.id, sessionId: id, role: "system",
+      content: "New thread started — earlier messages are kept below for reference but are no longer part of the context.",
+      meta: { trigger: "new_thread" },
+    });
+    hub.broadcast(ctx.workspaceId, id, { type: "new_thread" });
     return { ok: true };
   });
 
@@ -358,8 +366,29 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const { buildCompactionInput } = await import("./ws/compact-input.js");
     const input = buildCompactionInput(msgs);
     const summary = await runCompaction(deps, session, session.model, input);
+    // Persist a transcript marker so the compaction is visible in the thread —
+    // previously only a WS frame went out, leaving no trace for other clients
+    // or after a reload (the auto-compaction path does the same, see agent-loop).
+    const markerThread = await repo.currentThread(id);
+    if (markerThread) {
+      await repo.addMessage({ threadId: markerThread.id, sessionId: id, role: "compaction", content: summary, meta: { trigger: "manual" } });
+    }
     hub.broadcast(ctx.workspaceId, id, { type: "compaction_done", summary });
     return { ok: true, summary };
+  });
+
+  // Provider usage quotas — proxied from TwoRoute (same forwarded key the
+  // agent loop uses for model calls) so the sidebar can show live quota
+  // windows per connection.
+  app.get("/quotas", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    try {
+      const client = new QuotaClient(config, apiKeyFor(req));
+      return await client.quotas();
+    } catch (err) {
+      return reply.code(502).send({ error: (err as Error).message });
+    }
   });
 
   // --- agents ----------------------------------------------------------------

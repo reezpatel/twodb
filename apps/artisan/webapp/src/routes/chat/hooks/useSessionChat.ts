@@ -134,6 +134,9 @@ export function useSessionChat(sessionId: string) {
           if (/compacting/i.test(String(frame.text ?? ""))) setCompacting(true);
           else setStatus(String(frame.text ?? ""));
           break;
+        case "new_thread":
+          void refresh();
+          break;
         case "session_renamed":
           setDetail((d) => (d ? { ...d, title: String(frame.title) } : d));
           break;

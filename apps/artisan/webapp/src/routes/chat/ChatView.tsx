@@ -336,7 +336,22 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean; /** llm
                 <Markdown text={it.m.content} />
               </ChatMessage>
             ) : it.kind === "note" ? (
-              <ChatThreadHeader>{it.m.content.slice(0, 240)}</ChatThreadHeader>
+              it.m.role === "compaction" ? (
+                <div className="my-2 rounded-md border border-outline bg-surface-muted/40 px-3 py-2">
+                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-ink-muted">
+                    <Scissors className="size-3" />
+                    Context compacted — summary of the conversation so far
+                  </div>
+                  <div className="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap text-[12px] text-ink-muted/90">{it.m.content}</div>
+                </div>
+              ) : (
+                <ChatThreadHeader>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Sparkles className="size-3" />
+                    {it.m.content.slice(0, 240)}
+                  </span>
+                </ChatThreadHeader>
+              )
             ) : (
               <>
                 {it.trace.length > 0 ? <PersistedTrace nodes={it.trace} forceExpanded={expandAll === null ? undefined : expandAll === 1} /> : null}

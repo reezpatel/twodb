@@ -619,6 +619,12 @@ export async function runAgentLoop(opts: {
         emit({ type: "status", text: "compacting context…" });
         const summary = await runCompaction(deps, session, model, messages, ctrl.signal);
         emit({ type: "compaction_done", summary });
+        // Same transcript marker as manual /compact (server.ts) so the
+        // compaction is visible in the thread after a reload.
+        const markerThread = await deps.repo.currentThread(session.id);
+        if (markerThread) {
+          await deps.repo.addMessage({ threadId: markerThread.id, sessionId: session.id, role: "compaction", content: summary, meta: { trigger: "auto" } });
+        }
         // Compaction closed this thread and opened a new one holding the summary: continue there,
         // and re-state the request in flight (the new thread has no messages of its own yet).
         const lastUser = [...messages].reverse().find((m) => m.role === "user" && m.content)?.content ?? null;
