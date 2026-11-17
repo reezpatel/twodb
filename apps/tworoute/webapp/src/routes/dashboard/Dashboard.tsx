@@ -26,7 +26,7 @@ export function Dashboard({ scope }: { scope: string | null }) {
   // connection's board keeps the full analytics grid.
   if (scope === null) {
     return (
-      <div className="w-full max-w-3xl p-4 sm:p-6">
+      <div className="flex h-full w-full max-w-3xl flex-col p-4 sm:p-6">
         <ProviderQuotaWidget scope={null} />
       </div>
     );
