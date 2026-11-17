@@ -117,10 +117,24 @@ export interface UsageInfo {
   costUsd: number | null;
 }
 
+export interface QueueItemInfo {
+  id: string;
+  content: string;
+}
+
+export interface AskInfo {
+  askId: string;
+  questions: Array<{ question: string; options?: string[]; allowMultiple?: boolean }>;
+}
+
 export interface SessionDetail extends SessionInfo {
   thinkingLevel?: string | null;
   plan: Array<{ description: string; status: string }> | null;
   running: boolean;
+  /** Server-side steering queue — survives client disconnects. */
+  queue: QueueItemInfo[];
+  /** A live ask_user question, present even when it opened while this client was away. */
+  ask: AskInfo | null;
   usage: UsageInfo | null;
   messages: MessageInfo[];
 }
@@ -288,6 +302,14 @@ export const artisanClient = {
     return post(`/sessions/${id}/abort`);
   },
 
+  removeQueuedMessage(id: string, itemId: string): Promise<{ ok: boolean }> {
+    return del(`/sessions/${id}/queue/${itemId}`);
+  },
+
+  sendQueueNow(id: string): Promise<{ ok: boolean }> {
+    return post(`/sessions/${id}/queue/send`, {});
+  },
+
   listRegisteredDirectories(): Promise<DirectoryInfo[]> {
     return get("/directories/registered");
   },
@@ -444,6 +466,9 @@ export class WorkspaceSocket {
   private queue: string[] = [];
   private listeners = new Set<(frame: ServerFrame) => void>();
   private retryMs = 1000;
+  /** Sessions this client is joined to — re-joined after a reconnect so
+   * frames (deltas, done, ask_user) keep flowing after a network blip. */
+  private joined = new Set<string>();
 
   connect(): void {
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
@@ -459,6 +484,10 @@ export class WorkspaceSocket {
       // Ignore a stale open (a newer connect superseded this socket).
       if (this.ws !== ws) return;
       this.retryMs = 1000;
+      // Re-join every session room first: the server dropped this socket
+      // from all rooms when the old connection closed, and joins are what
+      // re-sync live state (running/queue/ask) via the state frame.
+      for (const sessionId of this.joined) ws.send(JSON.stringify({ type: "join", sessionId }));
       for (const raw of this.queue.splice(0)) ws.send(raw);
     };
     ws.onmessage = (ev) => {
@@ -478,6 +507,9 @@ export class WorkspaceSocket {
   }
 
   send(frame: unknown): void {
+    const f = frame as { type?: string; sessionId?: string };
+    if (f?.type === "join" && typeof f.sessionId === "string") this.joined.add(f.sessionId);
+    if (f?.type === "leave" && typeof f.sessionId === "string") this.joined.delete(f.sessionId);
     const raw = JSON.stringify(frame);
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(raw);
     else this.queue.push(raw);

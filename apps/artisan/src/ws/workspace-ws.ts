@@ -3,10 +3,15 @@ import type { WebSocket } from "ws";
 import type { ArtisanRepo } from "../db/repository.js";
 import type { WorkspaceHub, ClientFrame } from "./hub.js";
 import { readForwardedContext } from "../gateway-context.js";
-import { runAgentLoop, isSessionRunning, resolveAsk, cancelAsk, abortSession, type RunDeps } from "./agent-loop.js";
+import { resolveAsk, cancelAsk, abortSession } from "./agent-loop.js";
+import type { SessionRunner } from "./session-runner.js";
 
-/** Workspace WS: one per workspace; join/leave session rooms; viewer input. */
-export function registerWorkspaceWs(app: FastifyInstance, hub: WorkspaceHub, repo: ArtisanRepo, depsFor: (workspaceId: string) => RunDeps): void {
+/** Workspace WS: one per workspace; join/leave session rooms; viewer input.
+ * All run state (queue, running, ask_user) lives in the SessionRunner on the
+ * server — a joining socket gets a state frame to catch up after a reconnect,
+ * so an active ask_user question reappears and queued messages are never
+ * lost with a client disconnect. */
+export function registerWorkspaceWs(app: FastifyInstance, hub: WorkspaceHub, repo: ArtisanRepo, runner: SessionRunner): void {
   app.get("/ws", { websocket: true }, (socket: WebSocket, req) => {
     const ctx = readForwardedContext(req);
     if (!ctx) return socket.close(4401, "no identity");
@@ -25,7 +30,11 @@ export function registerWorkspaceWs(app: FastifyInstance, hub: WorkspaceHub, rep
             const session = await repo.getSession(workspaceId, frame.sessionId);
             if (!session) return socket.send(JSON.stringify({ sessionId: frame.sessionId, type: "error", message: "unknown session" }));
             hub.join(workspaceId, frame.sessionId, socket);
-            socket.send(JSON.stringify({ sessionId: frame.sessionId, type: "joined", title: session.title }));
+            // Catch the (re)joining client up with the live runtime state —
+            // an ask_user question that's still open, messages queued while
+            // no client was connected, whether a run is in flight.
+            const live = runner.snapshot(frame.sessionId);
+            socket.send(JSON.stringify({ sessionId: frame.sessionId, type: "state", title: session.title, ...live }));
             return;
           }
           case "leave": {
@@ -35,26 +44,21 @@ export function registerWorkspaceWs(app: FastifyInstance, hub: WorkspaceHub, rep
           case "send": {
             const session = await repo.getSession(workspaceId, frame.sessionId);
             if (!session) return;
-            if (isSessionRunning(frame.sessionId)) {
-              return hub.broadcast(workspaceId, frame.sessionId, { type: "error", message: "session already running" });
-            }
-            const agent = await repo.agentForSession(session);
-            if (!agent) return hub.broadcast(workspaceId, frame.sessionId, { type: "error", message: "agent config missing" });
-            // fire-and-forget: frames stream to the room
-            void runAgentLoop({ deps: depsFor(workspaceId), session, agent, model: session.model, apiKey: "", userMessage: frame.text }).catch((err) => {
-              hub.broadcast(workspaceId, frame.sessionId, { type: "error", message: (err as Error).message });
-              hub.broadcast(workspaceId, frame.sessionId, { type: "done", ok: false, message: (err as Error).message });
-            });
+            // Server-side queue: the runner starts the run when idle or
+            // drains the queue when the current run finishes.
+            await runner.enqueue(workspaceId, frame.sessionId, frame.text);
             return;
           }
           case "answer": {
-            resolveAsk(frame.sessionId, frame.askId, frame.answers);
-            hub.broadcast(workspaceId, frame.sessionId, { type: "ask_resolved" });
+            if (resolveAsk(frame.sessionId, frame.askId, frame.answers)) {
+              hub.broadcast(workspaceId, frame.sessionId, { type: "ask_resolved" });
+            }
             return;
           }
           case "cancel": {
-            cancelAsk(frame.sessionId, frame.askId);
-            hub.broadcast(workspaceId, frame.sessionId, { type: "ask_resolved" });
+            if (cancelAsk(frame.sessionId, frame.askId)) {
+              hub.broadcast(workspaceId, frame.sessionId, { type: "ask_resolved" });
+            }
             return;
           }
           case "typing":
@@ -76,3 +80,4 @@ export function registerWorkspaceWs(app: FastifyInstance, hub: WorkspaceHub, rep
     return { ok };
   });
 }
+

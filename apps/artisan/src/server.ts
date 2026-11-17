@@ -27,7 +27,8 @@ import { createToolkitClient } from "./toolkit-client.js";
 import type { McpServerRow, MemoryRow, SkillRow } from "./db/schema.js";
 import { canvasTools, listCanvasContent } from "./canvas.js";
 import { toolkitTools } from "./ws/tools/toolkit.js";
-import { runAgentLoop, isSessionRunning, fileTools, type RunDeps } from "./ws/agent-loop.js";
+import { isSessionRunning, fileTools, type RunDeps } from "./ws/agent-loop.js";
+import { SessionRunner } from "./ws/session-runner.js";
 import { subagentTools } from "./ws/tools/subagents.js";
 import { askUserTool } from "./ws/tools/ask-user.js";
 import { runCompaction } from "./ws/compaction.js";
@@ -126,6 +127,21 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     };
   };
 
+  // Server-side session runtime: message queue + live run/ask state. HTTP
+  // runs use the requester's forwarded key; queued drains after the last
+  // viewer disconnected fall back to the service token (same as WS runs).
+  const wsKeyFor = (workspaceId: string): (() => Promise<string>) => {
+    const act = opts.twodb?.actAs;
+    return act ? act("tworoute", workspaceId) : async () => "";
+  };
+  const sessionRunner = new SessionRunner({
+    repo,
+    depsFor: (workspaceId, key) => {
+      return { repo, hub, tworoute: new TworouteClient(config, key), dispatch: new DispatchClient(config, key), ...(opts.twodb?.serviceFetch ? { toolkit: createToolkitClient(opts.twodb.serviceFetch) } : {}) };
+    },
+    keyFor: wsKeyFor,
+  });
+
   const requireCtx = (req: FastifyRequest, reply: FastifyReply) => {
     const ctx = readForwardedContext(req);
     if (!ctx) {
@@ -199,19 +215,10 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     });
     const agentForRun = await repo.agentForSession(session);
 
-    // Optional opening message — run headless through the same loop.
-    if (body.message) {
-      const deps = depsFor(req);
-      const agent = agentForRun;
-      if (agent) {
-        void runAgentLoop({ deps, session, agent, model, apiKey: apiKeyFor(req), userMessage: body.message }).catch(async (err) => {
-          console.error("agent loop failed:", err);
-          hub.broadcast(ctx.workspaceId, session.id, { type: "error", message: (err as Error).message });
-          hub.broadcast(ctx.workspaceId, session.id, { type: "done", ok: false, message: (err as Error).message });
-          const t = await repo.currentThread(session.id);
-          if (t) await repo.addMessage({ threadId: t.id, sessionId: session.id, role: "assistant", content: `(run failed: ${(err as Error).message})`, meta: { error: true } });
-        });
-      }
+    // Optional opening message — through the session runner so it lands in
+    // the same queue/run tracking as every later message.
+    if (body.message && agentForRun) {
+      void sessionRunner.enqueue(ctx.workspaceId, session.id, body.message);
     }
     return sessionOut(session);
   });
@@ -252,7 +259,8 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
       cachedTokens: usageRow.cached_tokens, contextTokens, calls: usageRow.calls, costUsd: usageRow.cost_usd,
     } : null;
     const plan = session.plan_json ? JSON.parse(session.plan_json) : null;
-    return { ...sessionOut(session), plan, running: isSessionRunning(id), usage, messages: messages.map(messageOut) };
+    const live = sessionRunner.snapshot(id);
+    return { ...sessionOut(session), plan, running: live.running, queue: live.queue, ask: live.ask, usage, messages: messages.map(messageOut) };
   });
 
   // Canvas metadata lives in Artisan; document content is fetched from Paintress.
@@ -299,7 +307,8 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const { id } = req.params as { id: string };
-    if (isSessionRunning(id)) return reply.code(409).send({ error: "session running" });
+    if (!sessionRunner.isIdle(id)) return reply.code(409).send({ error: "session running" });
+    sessionRunner.clearQueue(id);
     const doomed = await repo.getSession(ctx.workspaceId, id);
     const ok = await repo.deleteSession(ctx.workspaceId, id);
     // A deleted chat releases its microVM (best-effort; it may never have booted).
@@ -307,7 +316,9 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     return { ok };
   });
 
-  // Message send via HTTP (WS send is the primary path).
+  // Message send — always lands in the server-side queue; the runner
+  // dispatches it immediately when the session is idle, or after the current
+  // run ends. Clients can disconnect freely; the queue survives them.
   app.post("/sessions/:id/messages", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
@@ -316,16 +327,34 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     if (typeof body.message !== "string" || !body.message.trim()) return reply.code(400).send({ error: "message is required" });
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
-    if (isSessionRunning(id)) return reply.code(409).send({ error: "session running" });
-    const agent = await repo.agentForSession(session);
-    if (!agent) return reply.code(500).send({ error: "agent config missing" });
-    void runAgentLoop({ deps: depsFor(req), session, agent, model: session.model, apiKey: apiKeyFor(req), userMessage: body.message }).catch(async (err) => {
-      console.error("agent loop failed:", err);
-      hub.broadcast(ctx.workspaceId, id, { type: "error", message: (err as Error).message });
-      hub.broadcast(ctx.workspaceId, id, { type: "done", ok: false, message: (err as Error).message });
-      const t = await repo.currentThread(id);
-      if (t) await repo.addMessage({ threadId: t.id, sessionId: id, role: "assistant", content: `(run failed: ${(err as Error).message})`, meta: { error: true } });
-    });
+    const { queued } = await sessionRunner.enqueue(ctx.workspaceId, id, body.message);
+    return { ok: true, queued };
+  });
+
+  // Queued (steering) messages — visible to every viewer, removable while
+  // they haven't been dispatched yet.
+  app.get("/sessions/:id/queue", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    return { queue: sessionRunner.listQueue(id) };
+  });
+
+  app.delete("/sessions/:id/queue/:itemId", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id, itemId } = req.params as { id: string; itemId: string };
+    const ok = sessionRunner.removeQueued(id, itemId);
+    return { ok };
+  });
+
+  // Send the queued messages now: the current run is aborted and the queue
+  // dispatches the moment its done frame lands.
+  app.post("/sessions/:id/queue/send", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    await sessionRunner.sendNow(ctx.workspaceId, id);
     return { ok: true };
   });
 
@@ -336,7 +365,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const { id } = req.params as { id: string };
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
-    if (isSessionRunning(id)) return reply.code(409).send({ error: "session running" });
+    if (!sessionRunner.isIdle(id)) return reply.code(409).send({ error: "session running" });
     const thread = await repo.currentThread(id);
     if (thread) await repo.closeThread(thread.id);
     const fresh = await repo.openThread(id);
@@ -359,7 +388,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const { id } = req.params as { id: string };
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
-    if (isSessionRunning(id)) return reply.code(409).send({ error: "session running" });
+    if (!sessionRunner.isIdle(id)) return reply.code(409).send({ error: "session running" });
     const deps = depsFor(req);
     const msgs = await repo.listSessionMessages(id);
     // serialize into ChatMessages roughly for the summarizer
@@ -1550,15 +1579,7 @@ echo saved`;
   // Machine-to-machine: the workspace is known per socket, so TwoRoute/Dispatch are called as THIS app via a
   // control-plane service token (actAs, grant `artisan>tworoute,artisan>dispatch`) — no stored API key.
   // Without a control-plane session (tests) there is simply no credential.
-  registerWorkspaceWs(app, hub, repo, (workspaceId) => {
-    const act = opts.twodb?.actAs;
-    return {
-      repo, hub,
-      tworoute: new TworouteClient(config, act ? act("tworoute", workspaceId) : ""),
-      dispatch: new DispatchClient(config, act ? act("dispatch", workspaceId) : ""),
-      ...(opts.twodb?.serviceFetch ? { toolkit: createToolkitClient(opts.twodb.serviceFetch) } : {}),
-    };
-  });
+  registerWorkspaceWs(app, hub, repo, sessionRunner);
 
   app.get("/healthz", async () => ({ ok: true }));
 

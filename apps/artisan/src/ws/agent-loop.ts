@@ -544,7 +544,12 @@ export async function runAgentLoop(opts: {
                 return { cancelled: false };
               }
               emit({ type: "ask_user", askId: tc.id, questions });
-              return await waitForAnswer(session.id, tc.id);
+              // Broadcast the resolution too: every viewer (including ones
+              // that joined while the question was open) clears the widget,
+              // and the runtime state resets for future joins.
+              const result = await waitForAnswer(session.id, tc.id);
+              emit({ type: "ask_resolved" });
+              return result;
             },
           };
           const running = tool.execute(args, toolCtx);

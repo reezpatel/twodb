@@ -18,6 +18,7 @@ export type ClientFrame =
 /** Frames the server pushes to clients, all tagged with sessionId. */
 export type ServerFrameBody =
   | { type: "joined"; title: string }
+  | { type: "state"; title: string; running: boolean; queue: Array<{ id: string; content: string }>; ask: { askId: string; questions: Array<{ question: string; options?: string[]; allowMultiple?: boolean }> } | null }
   | { type: "left" }
   | { type: "message"; message: { id: string; role: string; content: string; meta: unknown; createdAt: string } }
   | { type: "run_start" }

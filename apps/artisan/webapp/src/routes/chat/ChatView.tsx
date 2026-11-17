@@ -389,7 +389,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean; /** llm
       <ChatFooter>
         {chat.error ? <ChatFooterNotice>{chat.error}</ChatFooterNotice> : null}
         {!connected ? <ChatReconnecting /> : null}
-        <QueuePills items={chat.queue} onRemove={chat.removeQueued} onSendNow={chat.sendQueuedNow} />
+        <QueuePills items={chat.queue} onRemove={chat.removeQueued} onSendNow={chat.sendQueueNow} />
         {chat.ask ? (
           <AskWidget
             questions={chat.ask.questions}
