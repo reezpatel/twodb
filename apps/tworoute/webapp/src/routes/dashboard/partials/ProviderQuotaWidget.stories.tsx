@@ -28,7 +28,7 @@ const fixture = {
   quotas,
 };
 
-function Harness({ empty = false }: { empty?: boolean }) {
+function Harness({ empty = false, scope = null }: { empty?: boolean; scope?: string | null }) {
   const ctx = React.useMemo(
     () =>
       ({
@@ -43,7 +43,7 @@ function Harness({ empty = false }: { empty?: boolean }) {
   return (
     <ConnectionsContext.Provider value={ctx}>
       <div style={{ width: "min(480px, calc(100vw - 32px))", height: 380 }} className="border border-outline bg-paper">
-        <ProviderQuotaWidget />
+        <ProviderQuotaWidget scope={scope} />
       </div>
     </ConnectionsContext.Provider>
   );
@@ -57,5 +57,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Aggregate board: every connection, grouped by provider. */
 export const WithData: Story = { render: () => <Harness /> };
+
+/** Connection board: only that connection's own windows, no provider groups. */
+export const Scoped: Story = { render: () => <Harness scope="claude-main" /> };
+
 export const Empty: Story = { render: () => <Harness empty /> };

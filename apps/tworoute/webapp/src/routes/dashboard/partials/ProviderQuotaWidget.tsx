@@ -1,15 +1,15 @@
 import { useSharedConnections } from "../../../lib/connections-context.js";
 import { ProviderLogo } from "../../../lib/provider-logo.js";
-import type { QuotaSnapshot } from "../../../lib/tworoute-client.js";
+import type { Connection, QuotaSnapshot } from "../../../lib/tworoute-client.js";
 import { Shell } from "./WidgetBits.js";
 
 /**
- * Provider quotas — the aggregate board's first tile: every provider's live
- * quota windows (llm_quota snapshots), rolled up across that provider's
- * connections. Ratio-based windows become 8-segment blocks; balances/counters
- * render as text. The provider badge shows the worst (highest) ratio across
- * its connections' windows. Empty state offers the same refresh-all action
- * as the per-connection Quotas tile.
+ * Quotas by connection — every connection's live quota windows
+ * (llm_quota snapshots), one entry per connection. On the aggregate board
+ * (scope=null) entries are grouped under their provider; on a connection's
+ * board only that connection's windows show. Ratio windows get 8-segment
+ * blocks on theme tones (info → warning → destructive), balances render as
+ * text. Empty state offers the refresh-all action.
  */
 
 const BLOCKS = 8;
@@ -69,40 +69,86 @@ function QuotaBlocks({ ratio }: { ratio: number }) {
   );
 }
 
-export function ProviderQuotaWidget() {
+/** One connection's entry: name + provider chip, then its quota windows. */
+function ConnectionEntry({
+  connection,
+  providerLabel,
+  quotas,
+  showProvider,
+}: {
+  connection: Connection;
+  providerLabel: string;
+  quotas: QuotaSnapshot[];
+  showProvider: boolean;
+}) {
+  const worst = quotas.reduce<number | null>((w, q) => {
+    const r = ratioOf(q);
+    return r !== null && (w === null || r > w) ? r : w;
+  }, null);
+  const sorted = [...quotas].sort((a, b) => (ratioOf(b) ?? -1) - (ratioOf(a) ?? -1));
+  return (
+    <div className="flex shrink-0 flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <ProviderLogo provider={connection.provider} className="size-4 shrink-0" />
+        <span className="truncate text-[13px] font-semibold text-ink">{connection.name}</span>
+        {showProvider ? <span className="truncate text-[11px] text-ink-muted/80">{providerLabel}</span> : null}
+        <span className={`ml-auto shrink-0 text-[11px] font-medium tabular-nums ${textToneFor(worst)}`}>
+          {worst !== null ? `${Math.round(worst * 100)}% used` : `${quotas.length} windows`}
+        </span>
+      </div>
+      <div className="flex flex-col gap-2 border-l border-outline/60 pl-3">
+        {sorted.map((q) => {
+          const ratio = ratioOf(q);
+          const countdown = until(q.resetAt);
+          return (
+            <div key={q.id} className="flex flex-col gap-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="min-w-0 truncate text-[12px] text-ink">{q.quotaType}</span>
+                <span className="shrink-0 text-[11px] text-ink-muted tabular-nums">
+                  {fmtValue(q)}
+                  {countdown ? <span className="text-ink-muted/70"> · {countdown}</span> : null}
+                </span>
+              </div>
+              {ratio !== null ? <QuotaBlocks ratio={ratio} /> : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function ProviderQuotaWidget({ scope }: { scope: string | null }) {
   const { quotas, connections, providers, busy, refreshAllQuotas } = useSharedConnections();
 
-  // Group every quota snapshot by its connection's provider. Sort groups by
-  // the provider label, windows by worst ratio first.
-  const groups = new Map<string, { provider: string; label: string; quotas: QuotaSnapshot[] }>();
-  for (const q of quotas) {
-    const connection = connections.find((c) => c.id === q.connectionId);
-    if (!connection) continue;
-    let g = groups.get(connection.provider);
-    if (!g) {
-      g = {
-        provider: connection.provider,
-        label: providers.find((p) => p.id === connection.provider)?.label ?? connection.provider,
-        quotas: [],
-      };
-      groups.set(connection.provider, g);
-    }
-    g.quotas.push(q);
+  const providerLabel = (id: string) => providers.find((p) => p.id === id)?.label ?? id;
+
+  // One entry per connection (that has snapshots); scoped boards keep only
+  // their own connection.
+  const scopedConnections = scope ? connections.filter((c) => c.name === scope) : connections;
+  const entries = scopedConnections
+    .map((c) => ({ connection: c, quotas: quotas.filter((q) => q.connectionId === c.id) }))
+    .filter((e) => e.quotas.length > 0);
+
+  // Aggregate board: group entries by provider (providers sorted by label,
+  // connections by name inside). Scoped board: the single entry, ungrouped.
+  const groups = new Map<string, typeof entries>();
+  for (const e of entries) {
+    const key = scope ? "_all" : e.connection.provider;
+    const g = groups.get(key);
+    if (g) g.push(e);
+    else groups.set(key, [e]);
   }
-  const sorted = [...groups.values()]
-    .map((g) => ({
-      ...g,
-      quotas: [...g.quotas].sort((a, b) => (ratioOf(b) ?? -1) - (ratioOf(a) ?? -1)),
-      worst: g.quotas.reduce<number | null>((w, q) => {
-        const r = ratioOf(q);
-        return r !== null && (w === null || r > w) ? r : w;
-      }, null),
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+  const sortedGroups = [...groups.entries()]
+    .map(([provider, es]) => ({ provider, entries: [...es].sort((a, b) => a.connection.name.localeCompare(b.connection.name)) }))
+    .sort((a, b) => providerLabel(a.provider).localeCompare(providerLabel(b.provider)));
 
   return (
-    <Shell title="Provider quotas" meta={sorted.length ? `${sorted.length} provider${sorted.length === 1 ? "" : "s"}` : busy ? "loading…" : "live"}>
-      {sorted.length === 0 ? (
+    <Shell
+      title={scope ? "Quotas" : "Quotas by connection"}
+      meta={entries.length ? `${entries.length} connection${entries.length === 1 ? "" : "s"}` : busy ? "loading…" : "live"}
+    >
+      {entries.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
           <p className="text-[13px] text-ink-muted">No quota snapshots yet.</p>
           <button
@@ -115,37 +161,20 @@ export function ProviderQuotaWidget() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
-          {sorted.map((g) => (
-            <div key={g.provider} className="flex shrink-0 flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <ProviderLogo provider={g.provider} className="size-4 shrink-0" />
-                <span className="truncate text-[13px] font-semibold text-ink">{g.label}</span>
-                <span className={`ml-auto shrink-0 text-[11px] font-medium tabular-nums ${textToneFor(g.worst)}`}>
-                  {g.worst !== null ? `${Math.round(g.worst * 100)}% used` : `${g.quotas.length} windows`}
-                </span>
-              </div>
-              <div className="flex flex-col gap-2 border-l border-outline/60 pl-3">
-                {g.quotas.map((q) => {
-                  const ratio = ratioOf(q);
-                  const connectionName = connections.find((c) => c.id === q.connectionId)?.name;
-                  const countdown = until(q.resetAt);
-                  return (
-                    <div key={q.id} className="flex flex-col gap-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="min-w-0 truncate text-[12px] text-ink">
-                          {connectionName ? <span className="text-ink-muted">{connectionName} · </span> : null}
-                          {q.quotaType}
-                        </span>
-                        <span className="shrink-0 text-[11px] text-ink-muted tabular-nums">
-                          {fmtValue(q)}
-                          {countdown ? <span className="text-ink-muted/70"> · {countdown}</span> : null}
-                        </span>
-                      </div>
-                      {ratio !== null ? <QuotaBlocks ratio={ratio} /> : null}
-                    </div>
-                  );
-                })}
-              </div>
+          {sortedGroups.map((g) => (
+            <div key={g.provider} className="flex shrink-0 flex-col gap-3">
+              {!scope ? (
+                <p className="text-[12px] font-semibold tracking-wide text-ink-muted uppercase">{providerLabel(g.provider)}</p>
+              ) : null}
+              {g.entries.map((e) => (
+                <ConnectionEntry
+                  key={e.connection.id}
+                  connection={e.connection}
+                  providerLabel={providerLabel(e.connection.provider)}
+                  quotas={e.quotas}
+                  showProvider={!scope}
+                />
+              ))}
             </div>
           ))}
         </div>

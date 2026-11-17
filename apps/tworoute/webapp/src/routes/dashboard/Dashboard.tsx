@@ -2,7 +2,6 @@ import { DraggableWidgetGrid, type WidgetItem } from "@twodb/blocks";
 import { useSharedConnections } from "../../lib/connections-context.js";
 import { useAnalytics } from "./hooks/useAnalytics.js";
 import { CallsWidget } from "./partials/CallsWidget.js";
-import { QuotaWidget } from "./partials/QuotaWidget.js";
 import { ProviderQuotaWidget } from "./partials/ProviderQuotaWidget.js";
 import { CostWidget, ErrorsWidget, LatencyWidget, ModelsWidget, StatusWidget, TokensWidget, ToolCallsWidget } from "./partials/AnalyticsWidgets.js";
 import type { CachedModel } from "../../lib/tworoute-client.js";
@@ -23,25 +22,24 @@ export function Dashboard({ scope }: { scope: string | null }) {
   const scopedSummary = active ? summary : summary;
   void scopedSummary;
 
-  // The aggregate board is a single, box-less provider-quota panel; a
+  // Aggregate: just the per-connection quota panel (no grid boxes); a
   // connection's board keeps the full analytics grid.
   if (scope === null) {
     return (
       <div className="w-full max-w-3xl p-4 sm:p-6">
-        <ProviderQuotaWidget />
+        <ProviderQuotaWidget scope={null} />
       </div>
     );
   }
 
   const items: WidgetItem[] = [
-    { id: "provider_quota", size: "wide", label: "Provider quotas" },
+    { id: "provider_quota", size: "wide", label: "Quotas" },
     { id: "calls", size: "wide", label: "Calls" },
     { id: "tokens", size: "sm", label: "Tokens" },
     { id: "cost", size: "sm", label: "Cost" },
     { id: "status", size: "sm", label: "Status" },
     { id: "latency", size: "sm", label: "Latency" },
     { id: "errors", size: "sm", label: "Errors" },
-    { id: "quota", size: "wide", label: "Quotas" },
     { id: "models", size: "wide", label: "Token usage by model" },
     { id: "tool_calls", size: "wide", label: "Tool calls" },
   ];
@@ -61,7 +59,7 @@ export function Dashboard({ scope }: { scope: string | null }) {
         renderItem={(item) => {
           switch (item.id) {
             case "provider_quota":
-              return <ProviderQuotaWidget />;
+              return <ProviderQuotaWidget scope={scope} />;
             case "calls":
               return <CallsWidget buckets={buckets} connections={conn.connections} />;
             case "tokens":
@@ -74,8 +72,6 @@ export function Dashboard({ scope }: { scope: string | null }) {
               return <LatencyWidget rows={summary} />;
             case "errors":
               return <ErrorsWidget rows={summary} />;
-            case "quota":
-              return <QuotaWidget scope={scope} />;
             case "models":
               return <ModelsWidget rows={summary} />;
             case "tool_calls":
