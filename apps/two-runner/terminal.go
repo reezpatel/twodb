@@ -37,11 +37,11 @@ func (r *runner) doTermOpen(f frame) {
 		return
 	}
 
-	cmd := exec.Command("sh", "-c", command)
+	cmd := exec.Command(commandShell(), "-c", command)
 	if cwd := f.str("cwd"); cwd != "" {
 		cmd.Dir = cwd
 	}
-	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+	cmd.Env = append(spawnEnv(), "TERM=xterm-256color")
 	if cols := f.num("cols"); cols > 0 {
 		// resized below via termResize after pty.Start
 		_ = cols

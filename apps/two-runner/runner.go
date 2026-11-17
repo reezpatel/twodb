@@ -468,7 +468,7 @@ func (r *runner) doJobSignal(f frame) {
 // --- shared helpers ----------------------------------------------------------
 
 func (r *runner) buildCmd(f frame, tune func(*exec.Cmd)) *exec.Cmd {
-	cmd := exec.Command("sh", "-c", f.str("command"))
+	cmd := exec.Command(commandShell(), "-c", f.str("command"))
 	if cwd := f.str("cwd"); cwd != "" {
 		cmd.Dir = cwd
 	}
@@ -477,7 +477,7 @@ func (r *runner) buildCmd(f frame, tune func(*exec.Cmd)) *exec.Cmd {
 			cmd.Env = append(cmd.Env, k+"="+fmt.Sprint(v))
 		}
 	}
-	cmd.Env = append(os.Environ(), cmd.Env...)
+	cmd.Env = append(spawnEnv(), cmd.Env...)
 	if tune != nil {
 		tune(cmd)
 	}
