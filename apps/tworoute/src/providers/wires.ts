@@ -39,6 +39,66 @@ function flatTool(t: import("./types.js").ChatTool): { name: string; description
   };
 }
 
+// Messages arrive OpenAI-shaped ({role, content, tool_calls, tool_call_id}).
+// Anthropic wants assistant tool_use blocks and tool_result blocks in a *user*
+// turn. Map faithfully; repair pairing so a tool_use never dangles and a
+// tool_result never orphans (crash between call and result, history read out
+// of order). Provider hard-400s otherwise.
+type RawMessage = { role?: string; content?: string | null; tool_calls?: Array<{ id?: string; type?: string; function?: { name?: string; arguments?: unknown } }>; tool_call_id?: string };
+
+function anthropicMessages(messages: RawMessage[]) {
+  const system = messages.filter((m) => m.role === "system").map((m) => m.content ?? "").filter(Boolean).join("\n\n");
+  const out: unknown[] = [];
+  // Index results by call id for pairing; results with no call are dropped.
+  const resultById = new Map<string, string>();
+  for (const m of messages) if (m.role === "tool" && m.tool_call_id) resultById.set(m.tool_call_id, m.content ?? "");
+  for (const m of messages) {
+    if (m.role === "system" || m.role === "tool") continue;
+    if (m.role === "assistant") {
+      const blocks: unknown[] = [];
+      if (m.content) blocks.push({ type: "text", text: m.content });
+      for (const tc of m.tool_calls ?? []) {
+        if (!tc.function?.name) continue;
+        blocks.push({ type: "tool_use", id: tc.id ?? "", name: tc.function.name, input: typeof tc.function.arguments === "string" ? safeJson(tc.function.arguments) ?? {} : (tc.function.arguments ?? {}) });
+      }
+      out.push(blocks.length ? { role: "assistant", content: blocks } : { role: "assistant", content: m.content ?? "" });
+      // Immediately following user turn carries the results for these calls.
+      const results: unknown[] = [];
+      for (const tc of m.tool_calls ?? []) {
+        const id = tc.id ?? "";
+        if (!id) continue;
+        results.push({ type: "tool_result", tool_use_id: id, content: resultById.get(id) ?? "[no result recorded]" });
+      }
+      if (results.length) out.push({ role: "user", content: results });
+    } else {
+      const c = m.content ?? "";
+      if (c === "" ) continue; // drop empty plain text turns — Anthropic rejects empty content
+      out.push({ role: "user", content: c });
+    }
+  }
+  // Drop any message with empty content (string "" or empty blocks array) — Anthropic 400s on them.
+  const cleaned = (out as Array<{ role: string; content: unknown }>).filter((m) => {
+    if (Array.isArray(m.content)) return m.content.length > 0;
+    return typeof m.content === "string" && m.content.length > 0;
+  });
+  // Merge consecutive same-role turns (Anthropic requires strict user/assistant alternation).
+  const merged: Array<{ role: string; content: unknown }> = [];
+  for (const m of cleaned) {
+    const last = merged[merged.length - 1];
+    if (last && last.role === m.role) {
+      last.content = [...(Array.isArray(last.content) ? last.content : [{ type: "text", text: last.content }]), ...(Array.isArray(m.content) ? m.content : [{ type: "text", text: m.content }])];
+    } else {
+      merged.push({ role: m.role, content: m.content });
+    }
+  }
+  return { system, messages: merged };
+}
+
+function safeJson(data: unknown): Record<string, unknown> | null {
+  if (typeof data !== "string") return typeof data === "object" && data !== null ? (data as Record<string, unknown>) : null;
+  try { return JSON.parse(data) as Record<string, unknown>; } catch { return null; }
+}
+
 function authHeaders(
   spec: ReturnType<typeof getProviderSpec>,
   connection: { provider: string; api_key: string; configParsed: ConnectionConfig },
@@ -66,10 +126,12 @@ export const openAiCompatibleProvider: LlmProvider = {
     const spec = getProviderSpec(connection.provider);
     const headers = authHeaders(spec, connection);
     if (spec?.id === "openai" && connection.configParsed.org) headers["openai-organization"] = connection.configParsed.org;
+    // Some OpenAI-compatible providers reject null/empty content; normalize.
+    const messages = (req.messages as RawMessage[]).map((m) => ({ ...m, content: m.content ?? "" }));
     return fetch(joinUrl(connection.base_url, "/chat/completions"), {
       method: "POST",
       headers: { "content-type": "application/json", ...headers },
-      body: JSON.stringify(req),
+      body: JSON.stringify({ ...req, messages }),
     });
   },
 
@@ -92,8 +154,7 @@ export const openAiCompatibleProvider: LlmProvider = {
 /** Anthropic Messages API — translates OpenAI-ish requests to its shape. */
 export const anthropicProvider: LlmProvider = {
   async streamCompletion(connection, req) {
-    const system = req.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
-    const rest = req.messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: m.content }));
+    const { system, messages: mapped } = anthropicMessages(req.messages as RawMessage[]);
     const spec = getProviderSpec(connection.provider);
     const headers = authHeaders(spec, connection);
     const baseUrl = connection.base_url || "https://api.anthropic.com";
@@ -130,7 +191,7 @@ export const anthropicProvider: LlmProvider = {
       body: JSON.stringify({
         model: req.model,
         system: systemParam,
-        messages: rest,
+        messages: mapped,
         stream: req.stream ?? false,
         max_tokens: req.max_tokens ?? (budgetTokens >= 8192 ? budgetTokens * 2 : 8192),
         temperature: req.temperature,
@@ -156,10 +217,23 @@ export const responsesProvider: LlmProvider = {
     const accountId = connection.configParsed.accountId ?? connection.configParsed.account_id;
     if (accountId) headers["chatgpt-account-id"] = accountId;
     // Responses wire: messages become input items; system becomes instructions.
-    const instructions = req.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
-    const input = req.messages
-      .filter((m) => m.role !== "system")
-      .map((m) => ({ role: m.role, content: m.content }));
+    // Assistant tool_calls become function_call items; tool results become function_call_output.
+    const instructions = req.messages.filter((m) => m.role === "system").map((m) => m.content ?? "").filter(Boolean).join("\n\n");
+    const input: unknown[] = [];
+    for (const m of req.messages as RawMessage[]) {
+      if (m.role === "system") continue;
+      if (m.role === "assistant" && m.tool_calls?.length) {
+        if (m.content) input.push({ role: "assistant", content: m.content });
+        for (const tc of m.tool_calls) {
+          if (!tc.function?.name) continue;
+          input.push({ type: "function_call", call_id: tc.id ?? "", name: tc.function.name, arguments: typeof tc.function.arguments === "string" ? tc.function.arguments : JSON.stringify(tc.function.arguments ?? {}) });
+        }
+      } else if (m.role === "tool") {
+        input.push({ type: "function_call_output", call_id: m.tool_call_id ?? "", output: m.content ?? "" });
+      } else {
+        input.push({ role: m.role === "assistant" ? "assistant" : "user", content: m.content ?? "" });
+      }
+    }
     return fetch(joinUrl(connection.base_url, "/responses"), {
       method: "POST",
       headers: {
