@@ -29,8 +29,12 @@ export interface ToolkitAgent {
   description: string | null;
 }
 
-async function call<T>(serviceFetch: ServiceCaller["serviceFetch"], workspaceId: string, path: string, init?: RequestInit): Promise<T> {
-  const res = await serviceFetch(TOOLKIT_APP, workspaceId, path, init);
+type ServiceFetch = ServiceCaller["serviceFetch"];
+/** Every artisan→toolkit call acts in the workspace (toolkit reads/writes per-agent state), so it always carries the act scope. */
+const ACT_SCOPES = ["gateway.act"];
+
+async function call<T>(serviceFetch: ServiceFetch, workspaceId: string, path: string, init?: RequestInit): Promise<T> {
+  const res = await serviceFetch(TOOLKIT_APP, workspaceId, path, { ...init, scopes: ACT_SCOPES });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     let detail = body;

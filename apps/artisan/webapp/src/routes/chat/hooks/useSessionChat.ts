@@ -173,10 +173,14 @@ export function useSessionChat(sessionId: string) {
 
   const answer = useCallback((askId: string, answers: Array<string | string[]>) => {
     socket.send({ type: "answer", sessionId, askId, answers });
+    // Clear immediately instead of waiting for the ask_resolved echo — a fresh
+    // ask_user frame re-opens the widget if the agent asks again.
+    setAsk(null);
   }, [sessionId, socket]);
 
   const cancelAsk = useCallback((askId: string) => {
     socket.send({ type: "cancel", sessionId, askId });
+    setAsk(null);
   }, [sessionId, socket]);
 
   const newThread = useCallback(async () => {
