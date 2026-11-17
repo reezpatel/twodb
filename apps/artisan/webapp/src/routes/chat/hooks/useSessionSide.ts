@@ -47,6 +47,7 @@ export function useSessionSide(sessionId: string) {
   const [children, setChildren] = useState<ChildSession[]>([]);
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [plan, setPlan] = useState<Array<{ description: string; status: string }> | null>(null);
+  const [model, setModel] = useState<string | null>(null);
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -61,7 +62,9 @@ export function useSessionSide(sessionId: string) {
       setGit(g);
       setChildren(c);
       setCheckpoints(cp);
-      setPlan((detail as { plan?: Array<{ description: string; status: string }> | null } | null)?.plan ?? null);
+      const d = detail as { plan?: Array<{ description: string; status: string }> | null; model?: string } | null;
+      setPlan(d?.plan ?? null);
+      setModel(d?.model ?? null);
     } catch {
       // offline
     }
@@ -147,7 +150,7 @@ export function useSessionSide(sessionId: string) {
     await refresh();
   }, [refresh]);
 
-  return { git, children, checkpoints, plan, jobs, busy, refresh, commit, createCheckpoint, restoreCheckpoint, deleteCheckpoint };
+  return { git, children, checkpoints, plan, model, jobs, busy, refresh, commit, createCheckpoint, restoreCheckpoint, deleteCheckpoint };
 }
 
 /** Load/save session files (editor tab). */

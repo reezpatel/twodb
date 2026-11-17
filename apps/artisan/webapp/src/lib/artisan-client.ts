@@ -294,8 +294,8 @@ export const artisanClient = {
   },
 
   /** Live provider quota windows (proxied from TwoRoute by the artisan server). */
-  providerQuotas(): Promise<{ connections: QuotaConnection[]; quotas: QuotaSnapshot[] }> {
-    return get("/quotas");
+  providerQuotas(model?: string): Promise<{ connections: QuotaConnection[]; quotas: QuotaSnapshot[] }> {
+    return get(model ? `/quotas?model=${encodeURIComponent(model)}` : "/quotas");
   },
 
   abort(id: string): Promise<{ ok: boolean }> {

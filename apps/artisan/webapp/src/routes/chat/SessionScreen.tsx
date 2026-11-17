@@ -56,6 +56,7 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
   const panel = (
     <SessionSidebar
       sessionId={props.sessionId}
+      model={side.model}
       plan={side.plan}
       children={side.children}
       git={side.git}

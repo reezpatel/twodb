@@ -414,7 +414,19 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     if (!ctx) return reply;
     try {
       const client = new QuotaClient(config, apiKeyFor(req));
-      return await client.quotas();
+    const model = (req.query as { model?: string }).model;
+      const data = await client.quotas();
+      // ?model=<session model> → only that provider's connection. The chat
+      // sidebar shows the provider the session is actually using, not every
+      // connection in the workspace.
+      if (model) {
+        const connId = QuotaClient.connectionForModel(model, data.connections);
+        if (connId) {
+          return { connections: data.connections.filter((c) => c.id === connId), quotas: data.quotas.filter((q) => q.connectionId === connId) };
+        }
+        return { connections: [], quotas: [] };
+      }
+      return data;
     } catch (err) {
       return reply.code(502).send({ error: (err as Error).message });
     }

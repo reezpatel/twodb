@@ -98,8 +98,8 @@ function ConnectionEntry({ connection, quotas }: { connection: QuotaConnection; 
   );
 }
 
-export function ProviderSection() {
-  const { connections, quotas, error } = useProviderQuota();
+export function ProviderSection(props: { model: string | null }) {
+  const { connections, quotas, error } = useProviderQuota(props.model);
 
   const entries = useMemo(
     () =>
@@ -112,8 +112,10 @@ export function ProviderSection() {
 
   return (
     <SideSection title="Provider" count={entries.length ? `${entries.length} connection${entries.length === 1 ? "" : "s"}` : undefined}>
-      {entries.length === 0 ? (
-        <p className="py-1 text-[11px] text-ink-muted">{error ? `quota unavailable: ${error}` : "No quota snapshots yet — refresh quotas in TwoRoute."}</p>
+      {!props.model ? (
+        <p className="py-1 text-[11px] text-ink-muted">No model selected for this session.</p>
+      ) : entries.length === 0 ? (
+        <p className="py-1 text-[11px] text-ink-muted">{error ? `quota unavailable: ${error}` : `No quota snapshots for this provider — refresh quotas in TwoRoute.`}</p>
       ) : (
         <div className="flex flex-col gap-3">
           {entries.map((e) => (

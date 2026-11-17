@@ -8,6 +8,7 @@ import { PlanList, type PlanStep } from "../../../components/ui/plan-list.js";
 
 export interface SessionSidebarProps {
   sessionId: string;
+  model: string | null;
   plan: SessionDetail["plan"];
   children: ChildSession[];
   git: GitInfo | null;
@@ -44,7 +45,7 @@ export function SessionSidebar(props: SessionSidebarProps) {
 
       <MemoriesSection sessionId={props.sessionId} />
 
-      <ProviderSection />
+      <ProviderSection model={props.model} />
 
       <GitSection git={git} refreshing={props.busy} onRefresh={props.onRefreshGit} />
 
