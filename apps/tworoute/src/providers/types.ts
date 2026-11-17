@@ -9,10 +9,13 @@ export interface ChatMessage {
   content: string;
 }
 
+/** Callers send either the OpenAI shape ({type:"function", function:{…}}) or a flat {name, description, parameters}. */
 export interface ChatTool {
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;
+  name?: string;
+  description?: string;
+  parameters?: Record<string, unknown>;
+  type?: "function";
+  function?: { name: string; description?: string; parameters?: Record<string, unknown> };
 }
 
 export interface CompletionRequest {

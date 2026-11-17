@@ -29,6 +29,16 @@ function snakeOf(camel: string): string {
   return camel.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 }
 
+/** Normalize both tool shapes to flat {name, description, parameters}. */
+function flatTool(t: import("./types.js").ChatTool): { name: string; description: string; parameters: Record<string, unknown> } {
+  const f = t.function;
+  return {
+    name: t.name ?? f?.name ?? "",
+    description: t.description ?? f?.description ?? "",
+    parameters: t.parameters ?? f?.parameters ?? { type: "object", properties: {} },
+  };
+}
+
 function authHeaders(
   spec: ReturnType<typeof getProviderSpec>,
   connection: { provider: string; api_key: string; configParsed: ConnectionConfig },
@@ -127,7 +137,7 @@ export const anthropicProvider: LlmProvider = {
         ...(thinkingParam ? { thinking: thinkingParam } : {}),
         ...(outputConfig ? { output_config: outputConfig } : {}),
         ...(req.tools?.length
-          ? { tools: req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })) }
+          ? { tools: req.tools.map((t) => { const f = flatTool(t); return { name: f.name, description: f.description, input_schema: f.parameters }; }) }
           : {}),
       }),
     });
@@ -172,13 +182,7 @@ export const responsesProvider: LlmProvider = {
         max_output_tokens: req.max_tokens,
         ...(req.tools?.length
           ? {
-              tools: req.tools.map((t) => ({
-                type: "function",
-                name: t.name,
-                description: t.description,
-                parameters: t.parameters,
-                strict: false,
-              })),
+              tools: req.tools.map((t) => { const f = flatTool(t); return { type: "function", name: f.name, description: f.description, parameters: f.parameters, strict: false }; }),
               tool_choice: "auto",
             }
           : {}),
