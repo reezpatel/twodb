@@ -1,12 +1,13 @@
 package main
 
 import (
-	"strings"
-	"os"
-	"os/exec"
 	"bytes"
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/creack/pty"
@@ -37,7 +38,14 @@ func (r *runner) doTermOpen(f frame) {
 		return
 	}
 
-	cmd := exec.Command(commandShell(), "-c", command)
+	// Run the command under a LOGIN shell (archive runner-core behavior):
+	// profile files re-establish PATH inside the shell, which matters when an
+	// ancestor (tmux server, systemd) predates the runner and has a minimal
+	// environment. exec.CommandContext lets us forge argv0 as "-<shell>".
+	shell := loginShell()
+	argv0 := "-" + filepath.Base(shell)
+	cmd := exec.Command(shell, "-l", "-c", command)
+	cmd.Args[0] = argv0
 	if cwd := f.str("cwd"); cwd != "" {
 		cmd.Dir = cwd
 	}

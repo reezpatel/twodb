@@ -50,6 +50,23 @@ func spawnEnv() []string {
 	return env
 }
 
+// loginShell resolves the user's login shell for interactive terminals
+// ($SHELL, else bash, else sh). Terminals spawn it as a login shell (argv0
+// prefixed with "-") so profile files re-establish PATH inside the pane —
+// this matters when a tmux server or another ancestor predates the runner
+// and dropped its environment (non-login execs rely on spawnEnv instead).
+func loginShell() string {
+	if sh := os.Getenv("SHELL"); sh != "" {
+		if _, err := os.Stat(sh); err == nil {
+			return sh
+		}
+	}
+	if sh := commandShell(); sh != "sh" {
+		return sh
+	}
+	return "sh"
+}
+
 // commandShell picks the shell for `-c` spawns: prefer bash (agents write
 // bashisms), fall back to plain sh. LookPath runs against the runner's own
 // minimal PATH, so well-known absolute locations are probed too.
@@ -64,4 +81,3 @@ func commandShell() string {
 	}
 	return "sh"
 }
-
