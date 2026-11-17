@@ -9,6 +9,7 @@ import { applySchema, type TwoRouteDb } from "./db/schema.js";
 import { createConnectionsRepo } from "./db/repository.js";
 import { encryptSecret } from "./crypto.js";
 import { getProvider, PROVIDERS, getProviderSpec } from "./providers/index.js";
+import { createAnthropicTranslator } from "./providers/anthropic-stream.js";
 import { readForwardedContext } from "./gateway-context.js";
 import { refreshConnectionModels, refreshConnectionQuotas, hasQuotaCollector } from "./lib/model-quota.js";
 import { ensureFreshTokens, OAUTH_PROVIDERS } from "./lib/token-refresh.js";
@@ -659,6 +660,12 @@ export async function buildServer(config: TwoRouteConfig) {
     let outputTokens: number | null = null;
     const toolNames = new Set<string>();
 
+    // Anthropic-wire providers stream their own event vocabulary; callers
+    // expect OpenAI chunks, so translate at the edge. The usage/tool scan
+    // below then sees the *translated* (OpenAI-shaped) lines.
+    const anthropic = getProviderSpec(connection.provider)?.api === "anthropic";
+    const translator = anthropic ? createAnthropicTranslator(request.model) : null;
+
     reply.hijack();
     const reader = upstream.body.getReader();
     try {
@@ -666,12 +673,23 @@ export async function buildServer(config: TwoRouteConfig) {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        reply.raw.write(value);
         buffer += textDecoder.decode(value, { stream: true });
         // Process only complete lines; carry the remainder.
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
-        for (const line of lines) {
+        for (const rawLine of lines) {
+          let line = rawLine.replace(/\r$/, "");
+          if (translator) {
+            if (!line.startsWith("data:")) continue; // drop anthropic `event:` lines
+            const payload = line.slice(5).trim();
+            const translated = translator.translate(payload);
+            if (translated) reply.raw.write(translated);
+            // Scan the first translated data line (single chunk per event).
+            const tl = translated.startsWith("data: ") ? translated.slice(6, translated.indexOf("\n")) : "";
+            line = tl ? `data: ${tl}` : "";
+          } else {
+            reply.raw.write(line + "\n");
+          }
           if (!line.startsWith("data:")) continue;
           const payload = line.slice(5).trim();
           if (!payload || payload === "[DONE]") continue;
@@ -705,6 +723,11 @@ export async function buildServer(config: TwoRouteConfig) {
             // not JSON — ignore
           }
         }
+      }
+      if (translator) {
+        const tail = translator.finalize();
+        if (tail) reply.raw.write(tail);
+        reply.raw.write("data: [DONE]\n\n");
       }
     } finally {
       reply.raw.end();
