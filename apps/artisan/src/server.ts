@@ -1189,33 +1189,55 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     if (!session) return reply.code(404).send({ error: "not found" });
     const url = (req.query as { url?: string }).url ?? (await repo.listSessionPrs(ctx.workspaceId, id))[0]?.url ?? null;
     if (!url) return { pr: null };
+    const m = url.match(/^https?:\/\/([\w.-]+)\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    if (!m) return { pr: null, error: "not a pull request URL" };
+    const [, host, owner, repoName, num] = m;
     const deps = depsFor(req);
-    const fields = "number,title,url,state,isDraft,mergeStateStatus,reviewDecision,additions,deletions,changedFiles,statusCheckRollup,reviews,comments,reviewThreads,autoMergeRequest";
-    // gh runs in the session's directory on its runner; -R works even when the
-    // local checkout has no GitHub remote.
-    const script = `gh pr view ${JSON.stringify(url)} --json ${fields} 2>&1 || { echo "@@gh_failed"; exit 13; }`;
+    const fields = "number,title,url,state,isDraft,mergeStateStatus,reviewDecision,additions,deletions,changedFiles,statusCheckRollup,reviews,comments,autoMergeRequest";
+    // gh runs in the session's directory on its runner. reviewThreads is NOT a
+    // `gh pr view --json` field — open/resolved comment counts come from a
+    // GraphQL follow-up appended after an @@threads marker.
+    const gql = "query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved}}}}}";
+    const script = [
+      `gh pr view ${JSON.stringify(url)} --json ${fields} 2>&1 || { echo "@@gh_failed"; exit 13; }`,
+      "echo @@threads",
+      `GH_HOST=${JSON.stringify(host)} gh api graphql -F owner=${JSON.stringify(owner)} -F repo=${JSON.stringify(repoName)} -F number=${num} -f query=${JSON.stringify(gql)} 2>/dev/null || true`,
+    ].join("\n");
     const res = await deps.dispatch.exec(session.runner, script, session.directory, 30_000);
     if (res.exitCode !== 0) {
       return { pr: null, error: (res.stdout || res.stderr || "gh failed").replace("@@gh_failed", "").trim().slice(0, 300) };
     }
+    const sep = res.stdout.indexOf("\n@@threads");
+    const viewJson = sep >= 0 ? res.stdout.slice(0, sep) : res.stdout;
+    const threadsJson = sep >= 0 ? res.stdout.slice(sep + "\n@@threads".length).trim() : "";
     try {
-      const raw = JSON.parse(res.stdout) as {
+      const raw = JSON.parse(viewJson) as {
         number: number; title: string; url: string; state: string; isDraft: boolean;
         mergeStateStatus?: string; reviewDecision?: string;
         additions?: number; deletions?: number; changedFiles?: number;
         statusCheckRollup?: Array<{ name?: string; context?: string; status?: string; state?: string; conclusion?: string; __typename?: string }>;
         reviews?: Array<{ state?: string }>;
         comments?: unknown[];
-        reviewThreads?: Array<{ isResolved?: boolean }>;
         autoMergeRequest?: unknown;
       };
+      // GraphQL follow-up: review thread resolution (not exposed by gh pr view).
+      let openThreads = 0;
+      let resolvedThreads = 0;
+      try {
+        const g = JSON.parse(threadsJson) as { data?: { repository?: { pullRequest?: { reviewThreads?: { nodes?: Array<{ isResolved?: boolean }> } } } } };
+        const nodes = g.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
+        resolvedThreads = nodes.filter((t) => t.isResolved).length;
+        openThreads = nodes.length - resolvedThreads;
+      } catch {
+        /* gh api unavailable (older gh, no graphql scope) — counts stay 0 */
+      }
       const checks = (raw.statusCheckRollup ?? []).map((c) => ({
         name: c.name ?? c.context ?? "check",
         status: (c.status ?? "").toUpperCase(),
         conclusion: (c.conclusion ?? c.state ?? "").toUpperCase(),
       }));
-      const openComments = (raw.reviewThreads ?? []).filter((t) => !t.isResolved).length + (raw.comments?.length ?? 0);
-      const resolvedComments = (raw.reviewThreads ?? []).filter((t) => t.isResolved).length;
+      const openComments = openThreads + (raw.comments?.length ?? 0);
+      const resolvedComments = resolvedThreads;
       return {
         pr: {
           number: raw.number, title: raw.title, url: raw.url, state: raw.state, draft: raw.isDraft,
