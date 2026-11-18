@@ -48,58 +48,96 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
 
   const db = createPgDb<{ tables: never }>({ connectionString: config.DATABASE_URL, schema: "artisan" }) as never;
   await applySchema(db as never); // tables first: the collab sync / workers below query them
-  const HOP_BY_HOP = new Set(["connection","keep-alive","transfer-encoding","te","trailer","upgrade","proxy-authenticate","proxy-authorization","content-length"]);
+  const HOP_BY_HOP = new Set([
+    "connection",
+    "keep-alive",
+    "transfer-encoding",
+    "te",
+    "trailer",
+    "upgrade",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "content-length",
+  ]);
   const repo = createArtisanRepo(db as never);
   const hub = new WorkspaceHub();
 
   // --- chat collaborators: durable messaging with TwoChat ----------------------
   // Everything below is skipped when the server runs without a control-plane session (tests).
   const collabCleanup: Array<() => Promise<void> | void> = [];
-  const collab = opts.twodb ? await (async () => {
-    const twodb = opts.twodb!;
-    const engine = createAsyncEngine({ connectionString: config.DATABASE_URL, schema: "artisan" });
-    await engine.init();
-    const relay = createRelay({ engine, deliver: serviceDeliver(twodb), concurrency: 4 });
-    const svc = createCollabService({
-      db: db as never, repo, hub, config, relay, serviceFetch: twodb.serviceFetch, actAs: twodb.actAs,
-      log: { info: (o, m) => app.log.info(o as object, m), warn: (o, m) => app.log.warn(o as object, m), error: (o, m) => app.log.error(o as object, m) },
-    });
-    const inbox = createInboxHandler({
-      caller: twodb,
-      receive: async (input) => {
-        await svc.beforeReceive(input.type, input.workspaceId, input.payload);
-        return relay.receive(input);
-      },
-      accepts: {
-        [RUN_JOB]: { maxAttempts: 1, leaseMs: 60_000 }, // never blindly retried: a re-run repeats side effects
-        [CANCEL_JOB]: { maxAttempts: 3 },
-        [ROLLBACK_JOB]: { maxAttempts: 3 },
-      },
-    });
-    app.post("/_svc/inbox", { bodyLimit: 8 * 1024 * 1024 }, async (req, reply) => {
-      const r = await inbox(req.headers as { authorization?: string }, req.body);
-      return reply.code(r.status).send(r.body);
-    });
+  const collab = opts.twodb
+    ? await (async () => {
+        const twodb = opts.twodb!;
+        const engine = createAsyncEngine({ connectionString: config.DATABASE_URL, schema: "artisan" });
+        await engine.init();
+        const relay = createRelay({ engine, deliver: serviceDeliver(twodb), concurrency: 4 });
+        const svc = createCollabService({
+          db: db as never,
+          repo,
+          hub,
+          config,
+          relay,
+          serviceFetch: twodb.serviceFetch,
+          actAs: twodb.actAs,
+          log: { info: (o, m) => app.log.info(o as object, m), warn: (o, m) => app.log.warn(o as object, m), error: (o, m) => app.log.error(o as object, m) },
+        });
+        const inbox = createInboxHandler({
+          caller: twodb,
+          receive: async (input) => {
+            await svc.beforeReceive(input.type, input.workspaceId, input.payload);
+            return relay.receive(input);
+          },
+          accepts: {
+            [RUN_JOB]: { maxAttempts: 1, leaseMs: 60_000 }, // never blindly retried: a re-run repeats side effects
+            [CANCEL_JOB]: { maxAttempts: 3 },
+            [ROLLBACK_JOB]: { maxAttempts: 3 },
+          },
+        });
+        app.post("/_svc/inbox", { bodyLimit: 8 * 1024 * 1024 }, async (req, reply) => {
+          const r = await inbox(req.headers as { authorization?: string }, req.body);
+          return reply.code(r.status).send(r.body);
+        });
 
-    relay.start();
-    engine.queue.onDead([RUN_JOB], (job, error) => svc.onRunDead(job.payload, error));
-    const runWorker = engine.queue.worker([RUN_JOB], async (job) => svc.runJob(job.payload as RunPayload), { concurrency: 4, pollIntervalMs: 500 });
-    const ctlWorker = engine.queue.worker([CANCEL_JOB, ROLLBACK_JOB], async (job) => {
-      if (job.type === CANCEL_JOB) await svc.cancelRun(job.payload as CancelPayload);
-      else await svc.rollback(job.payload as RollbackPayload);
-    }, { concurrency: 2, pollIntervalMs: 300 });
-    const sweep = setInterval(() => void svc.failStaleRuns().catch(() => undefined), 60_000);
-    sweep.unref();
-    void svc.syncAllBots().then((n) => { if (n) app.log.info(`collab: synced ${n} collaborator(s) to TwoChat`); }).catch((err) => app.log.warn({ err }, "collab bot sync failed"));
-    collabCleanup.push(() => clearInterval(sweep), () => relay.stop(), () => runWorker.stop(), () => ctlWorker.stop(), () => engine.close());
-    return svc;
-  })() : null;
-  app.addHook("onClose", async () => { for (const c of collabCleanup) await c(); });
+        relay.start();
+        engine.queue.onDead([RUN_JOB], (job, error) => svc.onRunDead(job.payload, error));
+        const runWorker = engine.queue.worker([RUN_JOB], async (job) => svc.runJob(job.payload as RunPayload), { concurrency: 4, pollIntervalMs: 500 });
+        const ctlWorker = engine.queue.worker(
+          [CANCEL_JOB, ROLLBACK_JOB],
+          async (job) => {
+            if (job.type === CANCEL_JOB) await svc.cancelRun(job.payload as CancelPayload);
+            else await svc.rollback(job.payload as RollbackPayload);
+          },
+          { concurrency: 2, pollIntervalMs: 300 },
+        );
+        const sweep = setInterval(() => void svc.failStaleRuns().catch(() => undefined), 60_000);
+        sweep.unref();
+        void svc
+          .syncAllBots()
+          .then((n) => {
+            if (n) app.log.info(`collab: synced ${n} collaborator(s) to TwoChat`);
+          })
+          .catch((err) => app.log.warn({ err }, "collab bot sync failed"));
+        collabCleanup.push(
+          () => clearInterval(sweep),
+          () => relay.stop(),
+          () => runWorker.stop(),
+          () => ctlWorker.stop(),
+          () => engine.close(),
+        );
+        return svc;
+      })()
+    : null;
+  app.addHook("onClose", async () => {
+    for (const c of collabCleanup) await c();
+  });
 
   // Inspector snapshots are short-lived: purge on boot, then hourly.
   const purgeInspection = () =>
-    repo.purgeInspection(new Date(Date.now() - INSPECT_RETENTION_DAYS * 86_400_000).toISOString())
-      .then((r) => { if (r.rounds || r.blobs) app.log.info(`inspector purge: ${r.rounds} rounds, ${r.blobs} blobs`); })
+    repo
+      .purgeInspection(new Date(Date.now() - INSPECT_RETENTION_DAYS * 86_400_000).toISOString())
+      .then((r) => {
+        if (r.rounds || r.blobs) app.log.info(`inspector purge: ${r.rounds} rounds, ${r.blobs} blobs`);
+      })
       .catch((err) => app.log.warn({ err }, "inspector purge failed"));
   const purgeTimer = setInterval(purgeInspection, 3_600_000);
   purgeTimer.unref();
@@ -119,7 +157,8 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
   const depsFor = (req: FastifyRequest): RunDeps & { tworoute: TworouteClient; dispatch: DispatchClient } => {
     const key = apiKeyFor(req);
     return {
-      repo, hub,
+      repo,
+      hub,
       tworoute: new TworouteClient(config, key),
       dispatch: new DispatchClient(config, key),
       serviceFetch: opts.twodb?.serviceFetch,
@@ -141,7 +180,13 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
   const sessionRunner = new SessionRunner({
     repo,
     depsFor: (_workspaceId, creds) => {
-      return { repo, hub, tworoute: new TworouteClient(config, creds.tworoute), dispatch: new DispatchClient(config, creds.dispatch), ...(opts.twodb?.serviceFetch ? { toolkit: createToolkitClient(opts.twodb.serviceFetch) } : {}) };
+      return {
+        repo,
+        hub,
+        tworoute: new TworouteClient(config, creds.tworoute),
+        dispatch: new DispatchClient(config, creds.dispatch),
+        ...(opts.twodb?.serviceFetch ? { toolkit: createToolkitClient(opts.twodb.serviceFetch) } : {}),
+      };
     },
     keyFor: runCredentialsFor,
   });
@@ -162,8 +207,15 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const body = (req.body ?? {}) as {
-      spaceId?: string; type?: string; title?: string; runner?: string; directory?: string;
-      model?: string; interactive?: boolean; agentId?: string | null; message?: string;
+      spaceId?: string;
+      type?: string;
+      title?: string;
+      runner?: string;
+      directory?: string;
+      model?: string;
+      interactive?: boolean;
+      agentId?: string | null;
+      message?: string;
     };
     const isChat = body.type === "llm_chat";
     // Resolve the owning directory first (explicit id or auto-register) so its
@@ -189,8 +241,8 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const runner = isChat ? `${MICROVM_PREFIX}chat-${newId().slice(-8).toLowerCase()}` : body.runner!;
     const directory = isChat ? "/app" : body.directory!;
     if (!isChat) {
-      await depsFor(req).dispatch
-        .exec(runner, `mkdir -p ${shellQuote(directory)} && echo ok`, "/", 15_000)
+      await depsFor(req)
+        .dispatch.exec(runner, `mkdir -p ${shellQuote(directory)} && echo ok`, "/", 15_000)
         .catch((err) => {
           throw new Error(`runner "${runner}" unreachable: ${(err as Error).message}`);
         });
@@ -199,7 +251,10 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     // Auto-register the path if not already a directory.
     if (!directoryId && !isChat) {
       const created = await repo.createDirectory({
-        workspaceId: ctx.workspaceId, spaceId, runner, path: directory,
+        workspaceId: ctx.workspaceId,
+        spaceId,
+        runner,
+        path: directory,
         defaultModel: model,
       });
       directoryId = created.id;
@@ -256,12 +311,21 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role !== "assistant") continue;
       const u = (JSON.parse(messages[i].meta_json || "{}") as { usage?: { prompt_tokens?: number } | null }).usage;
-      if (u?.prompt_tokens) { contextTokens = u.prompt_tokens; break; }
+      if (u?.prompt_tokens) {
+        contextTokens = u.prompt_tokens;
+        break;
+      }
     }
-    const usage = usageRow ? {
-      inputTokens: usageRow.input_tokens, outputTokens: usageRow.output_tokens,
-      cachedTokens: usageRow.cached_tokens, contextTokens, calls: usageRow.calls, costUsd: usageRow.cost_usd,
-    } : null;
+    const usage = usageRow
+      ? {
+          inputTokens: usageRow.input_tokens,
+          outputTokens: usageRow.output_tokens,
+          cachedTokens: usageRow.cached_tokens,
+          contextTokens,
+          calls: usageRow.calls,
+          costUsd: usageRow.cost_usd,
+        }
+      : null;
     const plan = session.plan_json ? JSON.parse(session.plan_json) : null;
     const live = sessionRunner.snapshot(id);
     return { ...sessionOut(session), plan, running: live.running, queue: live.queue, ask: live.ask, usage, messages: messages.map(messageOut) };
@@ -296,7 +360,13 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const { id } = req.params as { id: string };
-    const body = (req.body ?? {}) as { title?: string; model?: string; thinkingLevel?: string | null; archived?: boolean; plan?: Array<{ description: string; status: string }> | null };
+    const body = (req.body ?? {}) as {
+      title?: string;
+      model?: string;
+      thinkingLevel?: string | null;
+      archived?: boolean;
+      plan?: Array<{ description: string; status: string }> | null;
+    };
     if (body.title) await repo.renameSession(ctx.workspaceId, id, body.title);
     if (body.archived !== undefined) await repo.setSessionArchived(ctx.workspaceId, id, body.archived);
     if (body.model) await repo.setSessionModel(ctx.workspaceId, id, body.model);
@@ -316,7 +386,8 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const doomed = await repo.getSession(ctx.workspaceId, id);
     const ok = await repo.deleteSession(ctx.workspaceId, id);
     // A deleted chat releases its microVM (best-effort; it may never have booted).
-    if (ok && doomed?.type === "llm_chat" && doomed.runner.startsWith(MICROVM_PREFIX)) void depsFor(req).dispatch.shutdownMicrovm(doomed.runner.slice(MICROVM_PREFIX.length));
+    if (ok && doomed?.type === "llm_chat" && doomed.runner.startsWith(MICROVM_PREFIX))
+      void depsFor(req).dispatch.shutdownMicrovm(doomed.runner.slice(MICROVM_PREFIX.length));
     return { ok };
   });
 
@@ -377,7 +448,9 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     // A marker row in the fresh thread gives every client a visible "new thread"
     // divider in the transcript (skipped by the model context builder).
     await repo.addMessage({
-      threadId: fresh.id, sessionId: id, role: "system",
+      threadId: fresh.id,
+      sessionId: id,
+      role: "system",
       content: "New thread started — earlier messages are kept below for reference but are no longer part of the context.",
       meta: { trigger: "new_thread" },
     });
@@ -418,7 +491,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     if (!ctx) return reply;
     try {
       const client = new QuotaClient(config, apiKeyFor(req));
-    const model = (req.query as { model?: string }).model;
+      const model = (req.query as { model?: string }).model;
       const data = await client.quotas();
       // ?model=<session model> → only that provider's connection. The chat
       // sidebar shows the provider the session is actually using, not every
@@ -441,8 +514,18 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const body = (req.body ?? {}) as {
-      spaceId?: string; spaceIds?: string[]; type?: string; name?: string; description?: string; instruction?: string;
-      model?: string | null; tools?: string[]; skillTags?: string[]; tags?: string[]; runner?: string | null; directory?: string | null;
+      spaceId?: string;
+      spaceIds?: string[];
+      type?: string;
+      name?: string;
+      description?: string;
+      instruction?: string;
+      model?: string | null;
+      tools?: string[];
+      skillTags?: string[];
+      tags?: string[];
+      runner?: string | null;
+      directory?: string | null;
     };
     if (!body.name?.trim() || !body.type) return reply.code(400).send({ error: "name and type required" });
     const agent = await repo.createAgent({
@@ -489,7 +572,14 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const deps = depsFor(req);
-    const all = [...fileTools(deps.dispatch), ...subagentTools(), ...memoryTools(), ...(deps.serviceFetch ? canvasTools(deps.serviceFetch) : []), ...(deps.toolkit ? toolkitTools(deps.toolkit) : []), askUserTool()];
+    const all = [
+      ...fileTools(deps.dispatch),
+      ...subagentTools(),
+      ...memoryTools(),
+      ...(deps.serviceFetch ? canvasTools(deps.serviceFetch) : []),
+      ...(deps.toolkit ? toolkitTools(deps.toolkit) : []),
+      askUserTool(),
+    ];
     return all.map((t) => ({ name: t.name, description: t.description }));
   });
 
@@ -513,7 +603,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     }
     const agent = await repo.updateAgent(ctx.workspaceId, id, {
       name: body.name as string | undefined,
-      spaceIds: fixed ? undefined : (body.spaceIds as string[] | undefined) ?? (typeof body.spaceId === "string" ? [body.spaceId] : undefined),
+      spaceIds: fixed ? undefined : ((body.spaceIds as string[] | undefined) ?? (typeof body.spaceId === "string" ? [body.spaceId] : undefined)),
       description: body.description as string | undefined,
       instruction: body.instruction as string | undefined,
       model: body.model as string | null | undefined,
@@ -567,10 +657,15 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     if (!ctx) return reply;
     const body = (req.body ?? {}) as { instruction?: unknown; model?: unknown };
     if (body.instruction !== undefined && typeof body.instruction !== "string") return reply.code(400).send({ error: "instruction must be a string" });
-    if (typeof body.instruction === "string" && body.instruction.length > MAX_GLOBAL_INSTRUCTION) return reply.code(400).send({ error: `too long (max ${MAX_GLOBAL_INSTRUCTION} characters)` });
-    if (body.model !== undefined && body.model !== null && typeof body.model !== "string") return reply.code(400).send({ error: "model must be a string or null" });
+    if (typeof body.instruction === "string" && body.instruction.length > MAX_GLOBAL_INSTRUCTION)
+      return reply.code(400).send({ error: `too long (max ${MAX_GLOBAL_INSTRUCTION} characters)` });
+    if (body.model !== undefined && body.model !== null && typeof body.model !== "string")
+      return reply.code(400).send({ error: "model must be a string or null" });
     const agent = await repo.getOrCreateChatAgent(ctx.workspaceId);
-    const updated = await repo.updateAgent(ctx.workspaceId, agent.id, { instruction: body.instruction as string | undefined, model: body.model === "" ? null : (body.model as string | null | undefined) });
+    const updated = await repo.updateAgent(ctx.workspaceId, agent.id, {
+      instruction: body.instruction as string | undefined,
+      model: body.model === "" ? null : (body.model as string | null | undefined),
+    });
     return chatAgentOut(updated ?? agent);
   });
 
@@ -682,7 +777,10 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const created: ReturnType<typeof mcpOut>[] = [];
     const conflicts: string[] = [];
     for (const d of parsed.drafts) {
-      if (taken.has(d.name.toLowerCase())) { conflicts.push(d.name); continue; }
+      if (taken.has(d.name.toLowerCase())) {
+        conflicts.push(d.name);
+        continue;
+      }
       taken.add(d.name.toLowerCase());
       created.push(mcpOut(await repo.createMcpServer({ workspaceId: ctx.workspaceId, ...d, enabled: true, scope })));
     }
@@ -751,21 +849,29 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
       if (level === "session") body.sessionId = mctx.sessionId;
     }
     if (level === "code_directory") {
-      if (!body.directoryId || !(await repo.getDirectory(ctx.workspaceId, body.directoryId))) return reply.code(400).send({ error: "this session has no registered directory" });
+      if (!body.directoryId || !(await repo.getDirectory(ctx.workspaceId, body.directoryId)))
+        return reply.code(400).send({ error: "this session has no registered directory" });
       place.directory_id = body.directoryId;
     } else if (level === "self") {
       const a = body.agentId ? await repo.getAgent(ctx.workspaceId, body.agentId) : undefined;
       if (!a) return reply.code(400).send({ error: "only persona and collaborator agents have their own memory" });
-      if (a.type === "sub_agent" || a.type === "directory") return reply.code(400).send({ error: "only persona and collaborator agents have their own memory" });
+      if (a.type === "sub_agent" || a.type === "directory")
+        return reply.code(400).send({ error: "only persona and collaborator agents have their own memory" });
       place.agent_id = a.id;
     } else if (level === "session") {
       if (!body.sessionId || !(await repo.getSession(ctx.workspaceId, body.sessionId))) return reply.code(400).send({ error: "sessionId required" });
       place.session_id = body.sessionId;
     }
-    if (titleTaken(await repo.listAllMemories(ctx.workspaceId), place, t.title)) return reply.code(409).send({ error: `a memory titled "${t.title}" already exists at that level` });
+    if (titleTaken(await repo.listAllMemories(ctx.workspaceId), place, t.title))
+      return reply.code(409).send({ error: `a memory titled "${t.title}" already exists at that level` });
     const row = await repo.createMemory({
-      workspaceId: ctx.workspaceId, level, title: t.title, content: c.content,
-      directoryId: place.directory_id, agentId: place.agent_id, sessionId: place.session_id,
+      workspaceId: ctx.workspaceId,
+      level,
+      title: t.title,
+      content: c.content,
+      directoryId: place.directory_id,
+      agentId: place.agent_id,
+      sessionId: place.session_id,
     });
     return memoryOut(row);
   });
@@ -838,8 +944,24 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
   });
 
   // --- directories (registered projects) ---------------------------------------
-  function directoryOut(d: { id: string; space_id: string; runner: string; path: string; title: string; default_model: string | null; project_settings_json: string }) {
-    return { id: d.id, spaceId: d.space_id, runner: d.runner, path: d.path, title: d.title, defaultModel: d.default_model, projectSettings: JSON.parse(d.project_settings_json || "{}") };
+  function directoryOut(d: {
+    id: string;
+    space_id: string;
+    runner: string;
+    path: string;
+    title: string;
+    default_model: string | null;
+    project_settings_json: string;
+  }) {
+    return {
+      id: d.id,
+      spaceId: d.space_id,
+      runner: d.runner,
+      path: d.path,
+      title: d.title,
+      defaultModel: d.default_model,
+      projectSettings: JSON.parse(d.project_settings_json || "{}"),
+    };
   }
 
   app.get("/directories/registered", async (req, reply) => {
@@ -851,15 +973,27 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
   app.post("/directories", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
-    const body = (req.body ?? {}) as { spaceId?: string; runner: string; path: string; title?: string; defaultModel?: string | null; projectSettings?: { loadAgents?: boolean; loadClaude?: boolean; loadAgentsMd?: boolean } };
+    const body = (req.body ?? {}) as {
+      spaceId?: string;
+      runner: string;
+      path: string;
+      title?: string;
+      defaultModel?: string | null;
+      projectSettings?: { loadAgents?: boolean; loadClaude?: boolean; loadAgentsMd?: boolean };
+    };
     if (!body.runner || !body.path) return reply.code(400).send({ error: "runner and path required" });
     const spaceId = body.spaceId ?? ctx.spaceIds[0];
     if (!spaceId) return reply.code(400).send({ error: "no space" });
     const existing = await repo.getDirectoryByPath(ctx.workspaceId, body.runner, body.path);
     if (existing) return reply.code(409).send({ error: "directory already registered", directory: directoryOut(existing) });
     const row = await repo.createDirectory({
-      workspaceId: ctx.workspaceId, spaceId, runner: body.runner, path: body.path,
-      title: body.title, defaultModel: body.defaultModel ?? null, projectSettings: body.projectSettings,
+      workspaceId: ctx.workspaceId,
+      spaceId,
+      runner: body.runner,
+      path: body.path,
+      title: body.title,
+      defaultModel: body.defaultModel ?? null,
+      projectSettings: body.projectSettings,
     });
     return directoryOut(row);
   });
@@ -868,7 +1002,12 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const { id } = req.params as { id: string };
-    const body = (req.body ?? {}) as { title?: string; defaultModel?: string | null; spaceId?: string; projectSettings?: { loadAgents?: boolean; loadClaude?: boolean; loadAgentsMd?: boolean } };
+    const body = (req.body ?? {}) as {
+      title?: string;
+      defaultModel?: string | null;
+      spaceId?: string;
+      projectSettings?: { loadAgents?: boolean; loadClaude?: boolean; loadAgentsMd?: boolean };
+    };
     await repo.updateDirectory(ctx.workspaceId, id, body);
     const row = await repo.getDirectory(ctx.workspaceId, id);
     return row ? directoryOut(row) : reply.code(404).send({ error: "not found" });
@@ -888,14 +1027,35 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const registered = await repo.listDirectories(ctx.workspaceId);
     const byPath = new Map(registered.map((d) => [`${d.runner}:${d.path}`, d]));
     const rows = await repo.listSessions(ctx.workspaceId, {});
-    const dirs = new Map<string, { runner: string; directory: string; spaceId: string; sessions: number; id?: string; title?: string; defaultModel?: string | null; projectSettings?: unknown }>();
+    const dirs = new Map<
+      string,
+      {
+        runner: string;
+        directory: string;
+        spaceId: string;
+        sessions: number;
+        id?: string;
+        title?: string;
+        defaultModel?: string | null;
+        projectSettings?: unknown;
+      }
+    >();
     for (const s of rows) {
       const key = `${s.runner}:${s.directory}`;
       const existing = dirs.get(key);
       if (existing) existing.sessions += 1;
       else {
         const reg = byPath.get(key);
-        dirs.set(key, { runner: s.runner, directory: s.directory, spaceId: s.space_id, sessions: 1, id: reg?.id, title: reg?.title, defaultModel: reg?.default_model, projectSettings: reg ? JSON.parse(reg.project_settings_json || "{}") : undefined });
+        dirs.set(key, {
+          runner: s.runner,
+          directory: s.directory,
+          spaceId: s.space_id,
+          sessions: 1,
+          id: reg?.id,
+          title: reg?.title,
+          defaultModel: reg?.default_model,
+          projectSettings: reg ? JSON.parse(reg.project_settings_json || "{}") : undefined,
+        });
       }
     }
     return [...dirs.values()];
@@ -947,8 +1107,13 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const sha = (res.stdout.trim().split("\n").pop() ?? "").trim();
     if (!/^[0-9a-f]{40,64}$/.test(sha)) return reply.code(500).send({ error: "checkpoint_failed" });
     const row = await repo.addCheckpoint({
-      workspaceId: ctx.workspaceId, sessionId: id, runner: session.runner, directory: session.directory,
-      label: body.label?.trim().slice(0, 200) || null, ref: `refs/artisan/checkpoints/${cpId}`, commitSha: sha,
+      workspaceId: ctx.workspaceId,
+      sessionId: id,
+      runner: session.runner,
+      directory: session.directory,
+      label: body.label?.trim().slice(0, 200) || null,
+      ref: `refs/artisan/checkpoints/${cpId}`,
+      commitSha: sha,
     });
     return checkpointOut(row);
   });
@@ -1011,15 +1176,24 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
       if (!rest.length) continue;
       counts.set(rest.join("\t"), { additions: add === "-" ? null : Number(add), deletions: del === "-" ? null : Number(del) });
     }
-    const files = lines.slice(iStat + 1).filter(Boolean).slice(0, 200).map((line) => {
-      const status = line.slice(0, 2).trim();
-      const path = line.slice(3).trim().replace(/^.* -> /, "");
-      const c = counts.get(path);
-      return { path, status, additions: c?.additions ?? null, deletions: c?.deletions ?? null };
-    });
+    const files = lines
+      .slice(iStat + 1)
+      .filter(Boolean)
+      .slice(0, 200)
+      .map((line) => {
+        const status = line.slice(0, 2).trim();
+        const path = line
+          .slice(3)
+          .trim()
+          .replace(/^.* -> /, "");
+        const c = counts.get(path);
+        return { path, status, additions: c?.additions ?? null, deletions: c?.deletions ?? null };
+      });
     return {
-      git: true, branch,
-      ahead: hasUpstream ? Number(aheadS) || 0 : null, behind: hasUpstream ? Number(behindS) || 0 : null,
+      git: true,
+      branch,
+      ahead: hasUpstream ? Number(aheadS) || 0 : null,
+      behind: hasUpstream ? Number(behindS) || 0 : null,
       additions: files.reduce((n, f) => n + (f.additions ?? 0), 0),
       deletions: files.reduce((n, f) => n + (f.deletions ?? 0), 0),
       files,
@@ -1088,8 +1262,12 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     // Scope to this session: job_start stamps the session id as the dispatch resourceId.
     const jobs = await deps.dispatch.listJobs(session.runner, id);
     return jobs.map((j) => ({
-      id: j.id, command: j.command, status: j.status, exitCode: j.exitCode,
-      startedAt: j.startedAt, endedAt: j.endedAt,
+      id: j.id,
+      command: j.command,
+      status: j.status,
+      exitCode: j.exitCode,
+      startedAt: j.startedAt,
+      endedAt: j.endedAt,
     }));
   });
 
@@ -1100,8 +1278,11 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const { id } = req.params as { id: string };
     const rows = await repo.listSessionsAll(ctx.workspaceId, id);
     return rows.map((r) => ({
-      id: r.id, title: r.title, running: isSessionRunning(r.id),
-      adhoc: r.adhoc_prompt !== null, updatedAt: r.updated_at,
+      id: r.id,
+      title: r.title,
+      running: isSessionRunning(r.id),
+      adhoc: r.adhoc_prompt !== null,
+      updatedAt: r.updated_at,
     }));
   });
 
@@ -1116,9 +1297,14 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const res = await deps.dispatch.exec(
       session.runner,
       "find . -maxdepth 3 -not -path '*/node_modules*' -not -path '*/.git/*' | head -300",
-      session.directory, 15_000,
+      session.directory,
+      15_000,
     );
-    const files = res.stdout.split("\n").filter((l) => l.startsWith("./")).map((l) => l.slice(2)).sort();
+    const files = res.stdout
+      .split("\n")
+      .filter((l) => l.startsWith("./"))
+      .map((l) => l.slice(2))
+      .sort();
     return { files };
   });
 
@@ -1208,8 +1394,12 @@ echo saved`;
       upstream.on("message", (raw: unknown) => {
         if (socket.readyState === socket.OPEN) socket.send(String(raw));
       });
-      upstream.on("close", () => { if (socket.readyState === socket.OPEN) socket.close(); });
-      upstream.on("error", () => { if (socket.readyState === socket.OPEN) socket.close(1011, "upstream error"); });
+      upstream.on("close", () => {
+        if (socket.readyState === socket.OPEN) socket.close();
+      });
+      upstream.on("error", () => {
+        if (socket.readyState === socket.OPEN) socket.close(1011, "upstream error");
+      });
       socket.on("message", (raw: unknown) => {
         const str = String(raw);
         // JSON resize control frame -> forward as a termResize to the runner
@@ -1220,11 +1410,19 @@ echo saved`;
               upstream.send(JSON.stringify({ type: "termResize", callId: termCallId, cols: m.cols, rows: m.rows }));
               return;
             }
-          } catch { /* fall through */ }
+          } catch {
+            /* fall through */
+          }
         }
         if (upstream.readyState === upstream.OPEN) upstream.send(str);
       });
-      socket.on("close", () => { try { upstream.close(); } catch { /* ignore */ } });
+      socket.on("close", () => {
+        try {
+          upstream.close();
+        } catch {
+          /* ignore */
+        }
+      });
     })();
   });
 
@@ -1238,7 +1436,9 @@ echo saved`;
 
   async function editorStatus(session: { runner: string; directory: string }): Promise<{ state: string; bytes?: number; total?: number; port?: number }> {
     const deps = depsFor({ headers: {} } as FastifyRequest);
-    const which = await deps.dispatch.exec(session.runner, `BIN=$(${EDITOR_BIN_RESOLVE}); [ -n "$BIN" ] && [ -x "$BIN" ] && echo yes`, "/", 10_000).catch(() => null);
+    const which = await deps.dispatch
+      .exec(session.runner, `BIN=$(${EDITOR_BIN_RESOLVE}); [ -n "$BIN" ] && [ -x "$BIN" ] && echo yes`, "/", 10_000)
+      .catch(() => null);
     const installed = which?.stdout?.trim().includes("yes");
     if (!installed) return { state: "not_installed" };
     // is it already listening?
@@ -1246,7 +1446,9 @@ echo saved`;
     // NOTE: curl -w '%{http_code}' prints 000 on connection refused, so never
     // pair it with `|| echo 000` (yields "000000" — which is not "000" and once
     // made every down server look ready). Print the code alone.
-    const listening = await deps.dispatch.exec(session.runner, `curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:${EDITOR_PORT}/ 2>/dev/null; echo`, "/", 10_000).catch(() => null);
+    const listening = await deps.dispatch
+      .exec(session.runner, `curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:${EDITOR_PORT}/ 2>/dev/null; echo`, "/", 10_000)
+      .catch(() => null);
     const code = listening?.stdout?.trim();
     if (code && code !== "000" && !code.startsWith("5")) return { state: "ready", port: EDITOR_PORT };
     return { state: "idle", port: EDITOR_PORT };
@@ -1355,19 +1557,41 @@ echo saved`;
       // TEXT → always decode; browser frames are raw bytes → always encode.
       const toB64 = (raw: unknown): string => (typeof raw === "string" ? Buffer.from(raw).toString("base64") : Buffer.from(raw as Buffer).toString("base64"));
       const fromB64 = (raw: unknown): Buffer => Buffer.from(typeof raw === "string" ? raw : (raw as Buffer).toString("latin1"), "base64");
-      upstream.on("message", (raw: unknown) => { if (socket.readyState === socket.OPEN) socket.send(fromB64(raw)); });
-      upstream.on("close", () => { if (socket.readyState === socket.OPEN) socket.close(); });
-      upstream.on("error", () => { if (socket.readyState === socket.OPEN) socket.close(1011, "upstream"); });
-      socket.on("message", (raw: unknown) => { if (upstream.readyState === upstream.OPEN) upstream.send(toB64(raw)); });
-      socket.on("close", () => { try { upstream.close(); } catch { /* ignore */ } });
+      upstream.on("message", (raw: unknown) => {
+        if (socket.readyState === socket.OPEN) socket.send(fromB64(raw));
+      });
+      upstream.on("close", () => {
+        if (socket.readyState === socket.OPEN) socket.close();
+      });
+      upstream.on("error", () => {
+        if (socket.readyState === socket.OPEN) socket.close(1011, "upstream");
+      });
+      socket.on("message", (raw: unknown) => {
+        if (upstream.readyState === upstream.OPEN) upstream.send(toB64(raw));
+      });
+      socket.on("close", () => {
+        try {
+          upstream.close();
+        } catch {
+          /* ignore */
+        }
+      });
       // Keep the hop chain (browser→gateway→artisan→dispatch→runner→code-server)
       // alive: none of the intermediaries sends WS pings, so a backgrounded tab
       // (browser throttles timers) can let an intermediary reap the connection as
       // idle, surfacing in the workbench as a 1006. Ping both ends; the 'pong'
       // frames keep every hop's read deadline fresh.
       const keepalive = setInterval(() => {
-        try { if (socket.readyState === socket.OPEN) (socket as unknown as { ping?: () => void }).ping?.(); } catch { /* ignore */ }
-        try { if (upstream.readyState === upstream.OPEN) (upstream as unknown as { ping?: () => void }).ping?.(); } catch { /* ignore */ }
+        try {
+          if (socket.readyState === socket.OPEN) (socket as unknown as { ping?: () => void }).ping?.();
+        } catch {
+          /* ignore */
+        }
+        try {
+          if (upstream.readyState === upstream.OPEN) (upstream as unknown as { ping?: () => void }).ping?.();
+        } catch {
+          /* ignore */
+        }
       }, 25_000);
       const stop = () => clearInterval(keepalive);
       socket.on("close", stop);
@@ -1392,7 +1616,9 @@ echo saved`;
     const path = "/" + (rest ?? "");
     const headers: Record<string, string> = {};
     for (const [k, v] of Object.entries(req.headers)) if (!HOP_BY_HOP.has(k.toLowerCase())) headers[k] = typeof v === "string" ? v : String(v ?? "");
-    delete headers["host"]; delete headers["content-length"]; delete headers["connection"];
+    delete headers["host"];
+    delete headers["content-length"];
+    delete headers["connection"];
     // force identity so code-server returns plain text — the base64 WS relay corrupts gzip bytes
     headers["accept-encoding"] = "identity";
     const hasBody = !["GET", "HEAD"].includes(req.method);
@@ -1402,11 +1628,19 @@ echo saved`;
     let proxyPath = path + (req.url.includes("?") ? "?" + req.url.split("?")[1] : "");
     let proxied: { status: number; headers: Record<string, string>; body: string } | { error: string } | undefined;
     for (let redirect = 0; redirect < 4; redirect++) {
-      const attempt = await deps.dispatch.proxyHttp(session.runner, {
-        port: EDITOR_PORT, method: req.method, path: proxyPath,
-        headers, bodyBase64: bodyBuf?.toString("base64") ?? "",
-      }).catch((e) => ({ error: String(e) }));
-      if ((attempt as { error?: string }).error) { proxied = attempt as { error: string }; break; }
+      const attempt = await deps.dispatch
+        .proxyHttp(session.runner, {
+          port: EDITOR_PORT,
+          method: req.method,
+          path: proxyPath,
+          headers,
+          bodyBase64: bodyBuf?.toString("base64") ?? "",
+        })
+        .catch((e) => ({ error: String(e) }));
+      if ((attempt as { error?: string }).error) {
+        proxied = attempt as { error: string };
+        break;
+      }
       const pr = attempt as { status: number; headers: Record<string, string>; body: string };
       const loc = pr.headers["location"] ?? pr.headers["Location"];
       if (pr.status >= 300 && pr.status < 400 && loc) {
@@ -1440,12 +1674,14 @@ echo saved`;
       try {
         out = gunzipSync(out);
         delete outHeaders["content-encoding"];
-      } catch { /* leave as-is */ }
+      } catch {
+        /* leave as-is */
+      }
     }
     delete outHeaders["content-length"];
     const contentType = outHeaders["content-type"] ?? "";
     if (/^(text\/html|text\/css|application\/javascript|text\/javascript)/.test(contentType)) {
-      const proto = req.headers["x-forwarded-proto"] ?? (req.raw.socket as { encrypted?: boolean })?.encrypted ? "https" : "http";
+      const proto = (req.headers["x-forwarded-proto"] ?? (req.raw.socket as { encrypted?: boolean })?.encrypted) ? "https" : "http";
       const host = req.headers["host"] ?? "localhost";
       // Origin-RELATIVE path — the browser resolves it against its own origin,
       // so the WS goes to whatever host/port served the page (never the internal
@@ -1455,32 +1691,38 @@ echo saved`;
       // proxy. Replacement FUNCTIONS keep a literal "$" in the source intact. Only
       // rewrite HTML entry points (which reference the tunnel); leave JS/CSS opaque.
       if (contentType.startsWith("text/html")) {
-        out = Buffer.from(out.toString("utf8")
-          .replace(/wss?:\/\/[^"'\\\s]+/g, (m) => {
-            // Rewrite same-origin code-server WS URLs to the WS tunnel, preserving the
-            // <stable-…>?query suffix. Leave external URLs (voice, telemetry) intact.
-            try {
-              const u = new URL(m);
-              if (u.host !== host) return m; // external
-              const edIdx = u.pathname.indexOf("/editor/");
-              const suffix = edIdx >= 0 ? u.pathname.slice(edIdx + "/editor/".length) : u.pathname.replace(/^\/+/, "");
-              const wsProto = u.protocol === "wss:" ? "wss" : "ws";
-              return `${wsProto}://${u.host}${wsBasePath}/${suffix}${u.search}`;
-            } catch { /* not a full URL — leave */ }
-            return m;
-          })
-          .replace(/(["'(])(\/?)(stable-[a-z0-9]+|static|webview|vscode-resource|update|manifest\.json)/g, (_m, p1, slash, p2) => `${p1}${prefix}/${p2}`), "utf8");
+        out = Buffer.from(
+          out
+            .toString("utf8")
+            .replace(/wss?:\/\/[^"'\\\s]+/g, (m) => {
+              // Rewrite same-origin code-server WS URLs to the WS tunnel, preserving the
+              // <stable-…>?query suffix. Leave external URLs (voice, telemetry) intact.
+              try {
+                const u = new URL(m);
+                if (u.host !== host) return m; // external
+                const edIdx = u.pathname.indexOf("/editor/");
+                const suffix = edIdx >= 0 ? u.pathname.slice(edIdx + "/editor/".length) : u.pathname.replace(/^\/+/, "");
+                const wsProto = u.protocol === "wss:" ? "wss" : "ws";
+                return `${wsProto}://${u.host}${wsBasePath}/${suffix}${u.search}`;
+              } catch {
+                /* not a full URL — leave */
+              }
+              return m;
+            })
+            .replace(/(["'(])(\/?)(stable-[a-z0-9]+|static|webview|vscode-resource|update|manifest\.json)/g, (_m, p1, slash, p2) => `${p1}${prefix}/${p2}`),
+          "utf8",
+        );
 
-      // Redirect same-origin code-server socket connects (built from
-      // window.location, so they point at /editor/<stable>…) to the /editor-ws/
-      // tunnel. Done with a WebSocket wrapper because workbench.js derives the
-      // URL at runtime — static rewriting can't reach it.
-      const wsShim = `<script>(() => { const N = window.WebSocket; const basePath = ${JSON.stringify(wsBasePath)}; const wsProto = location.protocol === "https:" ? "wss" : "ws"; const authTok = new URLSearchParams(location.search).get("access_token") || ""; window.WebSocket = function (url, proto) { try { const u = new URL(url, location.href); if (u.host === location.host) { const i = u.pathname.indexOf("/editor/"); if (i >= 0) { const suffix = u.pathname.slice(i + 8); let q = u.search || ""; if (authTok && !/access_token=/.test(q)) q += (q ? "&" : "?") + "access_token=" + encodeURIComponent(authTok); url = wsProto + "://" + location.host + basePath + "/" + suffix + q; } } } catch (e) {} return proto ? new N(url, proto) : new N(url); }; window.WebSocket.prototype = N.prototype; Object.setPrototypeOf(window.WebSocket, N); })();</script>`;
-      const shimIdx = out.toString("utf8").search(/<head[^>]*>/i);
-      if (shimIdx >= 0) {
-        const headEnd = out.toString("utf8").indexOf(">", shimIdx) + 1;
-        out = Buffer.concat([out.subarray(0, headEnd), Buffer.from(wsShim, "utf8"), out.subarray(headEnd)]);
-      }
+        // Redirect same-origin code-server socket connects (built from
+        // window.location, so they point at /editor/<stable>…) to the /editor-ws/
+        // tunnel. Done with a WebSocket wrapper because workbench.js derives the
+        // URL at runtime — static rewriting can't reach it.
+        const wsShim = `<script>(() => { const N = window.WebSocket; const basePath = ${JSON.stringify(wsBasePath)}; const wsProto = location.protocol === "https:" ? "wss" : "ws"; const authTok = new URLSearchParams(location.search).get("access_token") || ""; window.WebSocket = function (url, proto) { try { const u = new URL(url, location.href); if (u.host === location.host) { const i = u.pathname.indexOf("/editor/"); if (i >= 0) { const suffix = u.pathname.slice(i + 8); let q = u.search || ""; if (authTok && !/access_token=/.test(q)) q += (q ? "&" : "?") + "access_token=" + encodeURIComponent(authTok); url = wsProto + "://" + location.host + basePath + "/" + suffix + q; } } } catch (e) {} return proto ? new N(url, proto) : new N(url); }; window.WebSocket.prototype = N.prototype; Object.setPrototypeOf(window.WebSocket, N); })();</script>`;
+        const shimIdx = out.toString("utf8").search(/<head[^>]*>/i);
+        if (shimIdx >= 0) {
+          const headEnd = out.toString("utf8").indexOf(">", shimIdx) + 1;
+          out = Buffer.concat([out.subarray(0, headEnd), Buffer.from(wsShim, "utf8"), out.subarray(headEnd)]);
+        }
       }
     }
     reply.type(outHeaders["content-type"] ?? "application/octet-stream");
@@ -1512,11 +1754,25 @@ echo saved`;
       // would mangle the frame and stall VS Code's handshake.
       const toB64 = (raw: unknown): string => (typeof raw === "string" ? raw : Buffer.from(raw as Buffer).toString("base64"));
       const fromB64 = (raw: unknown): Buffer => (typeof raw === "string" ? Buffer.from(raw, "base64") : Buffer.from(raw as Buffer));
-      upstream.on("message", (raw: unknown) => { if (socket.readyState === socket.OPEN) socket.send(fromB64(raw)); });
-      upstream.on("close", () => { if (socket.readyState === socket.OPEN) socket.close(); });
-      upstream.on("error", () => { if (socket.readyState === socket.OPEN) socket.close(1011, "upstream"); });
-      socket.on("message", (raw: unknown) => { if (upstream.readyState === upstream.OPEN) upstream.send(toB64(raw)); });
-      socket.on("close", () => { try { upstream.close(); } catch { /* ignore */ } });
+      upstream.on("message", (raw: unknown) => {
+        if (socket.readyState === socket.OPEN) socket.send(fromB64(raw));
+      });
+      upstream.on("close", () => {
+        if (socket.readyState === socket.OPEN) socket.close();
+      });
+      upstream.on("error", () => {
+        if (socket.readyState === socket.OPEN) socket.close(1011, "upstream");
+      });
+      socket.on("message", (raw: unknown) => {
+        if (upstream.readyState === upstream.OPEN) upstream.send(toB64(raw));
+      });
+      socket.on("close", () => {
+        try {
+          upstream.close();
+        } catch {
+          /* ignore */
+        }
+      });
     })();
   });
 
@@ -1548,7 +1804,11 @@ echo saved`;
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const body = (req.body ?? {}) as { name?: string; memMb?: number; vcpu?: number };
-    const slug = (body.name ?? "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
+    const slug = (body.name ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 32);
     const identifier = slug || `vm-${newId().slice(-8)}`;
     try {
       const vm = await depsFor(req).dispatch.bootMicrovm({ identifier, memMb: body.memMb, vcpu: body.vcpu });
@@ -1569,7 +1829,9 @@ echo saved`;
       const res = await depsFor(req).dispatch.exec(runner, `${cd} && pwd && ls -1Ap`, "/", 15_000);
       if (res.exitCode !== 0) return reply.code(400).send({ error: (res.stderr || res.stdout || "cannot open directory").trim().split("\n").pop() });
       const [cwd, ...lines] = res.stdout.split("\n");
-      const entries = lines.filter(Boolean).map((l) => (l.endsWith("/") ? { name: l.slice(0, -1), dir: true } : { name: l.replace(/[@*|=]$/, ""), dir: false }));
+      const entries = lines
+        .filter(Boolean)
+        .map((l) => (l.endsWith("/") ? { name: l.slice(0, -1), dir: true } : { name: l.replace(/[@*|=]$/, ""), dir: false }));
       return { path: cwd, entries };
     } catch (e) {
       return reply.code(502).send({ error: (e as Error).message });
@@ -1615,11 +1877,37 @@ function checkpointOut(c: { id: string; session_id: string; label: string | null
   return { id: c.id, sessionId: c.session_id, label: c.label, commitSha: c.commit_sha, ref: c.ref, trigger: c.trigger, createdAt: c.created_at };
 }
 
-function sessionOut(s: { id: string; type: string; title: string; runner: string; directory: string; model: string; interactive: boolean; space_id: string; agent_id: string | null; parent_session_id: string | null; thinking_level: string | null; archived_at?: string | null; created_at: string; updated_at: string }) {
+function sessionOut(s: {
+  id: string;
+  type: string;
+  title: string;
+  runner: string;
+  directory: string;
+  model: string;
+  interactive: boolean;
+  space_id: string;
+  agent_id: string | null;
+  parent_session_id: string | null;
+  thinking_level: string | null;
+  archived_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}) {
   return {
-    id: s.id, type: s.type, title: s.title, runner: s.runner, directory: s.directory,
-    model: s.model, interactive: s.interactive, spaceId: s.space_id, agentId: s.agent_id,
-    parentSessionId: s.parent_session_id, thinkingLevel: s.thinking_level, archivedAt: s.archived_at ?? null, createdAt: s.created_at, updatedAt: s.updated_at,
+    id: s.id,
+    type: s.type,
+    title: s.title,
+    runner: s.runner,
+    directory: s.directory,
+    model: s.model,
+    interactive: s.interactive,
+    spaceId: s.space_id,
+    agentId: s.agent_id,
+    parentSessionId: s.parent_session_id,
+    thinkingLevel: s.thinking_level,
+    archivedAt: s.archived_at ?? null,
+    createdAt: s.created_at,
+    updatedAt: s.updated_at,
   };
 }
 
@@ -1627,34 +1915,81 @@ function messageOut(m: { id: string; role: string; content: string; meta_json: s
   return { id: m.id, role: m.role, content: m.content, meta: JSON.parse(m.meta_json), createdAt: m.created_at };
 }
 
-function agentOut(a: { id: string; type: string; name: string; description: string; instruction?: string; model: string | null; tools_json: string; skill_tags_json: string; tags_json: string; runner: string | null; directory: string | null; space_id: string; space_ids_json?: string }) {
+function agentOut(a: {
+  id: string;
+  type: string;
+  name: string;
+  description: string;
+  instruction?: string;
+  model: string | null;
+  tools_json: string;
+  skill_tags_json: string;
+  tags_json: string;
+  runner: string | null;
+  directory: string | null;
+  space_id: string;
+  space_ids_json?: string;
+}) {
   const ids = a.space_ids_json ? (JSON.parse(a.space_ids_json) as string[]) : [];
   // The llm_chat agent spans every space: it has no space of its own.
   const spaceIds = a.type === "llm_chat" ? [] : ids.length ? ids : [a.space_id];
   return {
-    id: a.id, type: a.type, name: a.name, description: a.description, instruction: a.instruction ?? "", model: a.model,
-    tools: JSON.parse(a.tools_json), skillTags: JSON.parse(a.skill_tags_json), tags: JSON.parse(a.tags_json),
-    runner: a.runner, directory: a.directory, spaceId: spaceIds[0] ?? "", spaceIds,
+    id: a.id,
+    type: a.type,
+    name: a.name,
+    description: a.description,
+    instruction: a.instruction ?? "",
+    model: a.model,
+    tools: JSON.parse(a.tools_json),
+    skillTags: JSON.parse(a.skill_tags_json),
+    tags: JSON.parse(a.tags_json),
+    runner: a.runner,
+    directory: a.directory,
+    spaceId: spaceIds[0] ?? "",
+    spaceIds,
   };
 }
 
 function memoryOut(m: MemoryRow) {
   return {
-    id: m.id, level: m.level, title: m.title, content: m.content,
-    directoryId: m.directory_id, agentId: m.agent_id, sessionId: m.session_id,
-    createdAt: m.created_at, updatedAt: m.updated_at,
+    id: m.id,
+    level: m.level,
+    title: m.title,
+    content: m.content,
+    directoryId: m.directory_id,
+    agentId: m.agent_id,
+    sessionId: m.session_id,
+    createdAt: m.created_at,
+    updatedAt: m.updated_at,
   };
 }
 
 function mcpOut(r: McpServerRow) {
   let headers: Record<string, string> = {};
-  try { headers = JSON.parse(r.headers_json) as Record<string, string>; } catch { /* keep {} */ }
-  return { id: r.id, name: r.name, url: r.url, transport: r.transport, headers, enabled: Number(r.enabled) === 1, scope: mcpScopeOf(r), createdAt: r.created_at, updatedAt: r.updated_at };
+  try {
+    headers = JSON.parse(r.headers_json) as Record<string, string>;
+  } catch {
+    /* keep {} */
+  }
+  return {
+    id: r.id,
+    name: r.name,
+    url: r.url,
+    transport: r.transport,
+    headers,
+    enabled: Number(r.enabled) === 1,
+    scope: mcpScopeOf(r),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
 }
 
 function skillOut(s: SkillRow, withContent = false) {
   return {
-    id: s.id, name: s.name, description: s.description, scope: scopeOf(s),
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    scope: scopeOf(s),
     ...(withContent ? { content: s.content } : {}),
   };
 }

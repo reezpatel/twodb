@@ -151,7 +151,9 @@ export class SessionRunner {
         try {
           await runAgentLoop({
             deps,
-            session, agent, model: session.model,
+            session,
+            agent,
+            model: session.model,
             // Unused: the clients in `deps` carry their own credential
             // providers (same as collaborator runs).
             apiKey: "",
@@ -177,7 +179,13 @@ export class SessionRunner {
   private async recordFailure(sessionId: string, err: unknown): Promise<void> {
     console.error("agent loop failed:", err);
     const t = await this.ctx.repo.currentThread(sessionId);
-    if (t) await this.ctx.repo.addMessage({ threadId: t.id, sessionId, role: "assistant", content: `(run failed: ${(err as Error).message})`, meta: { error: true } });
+    if (t)
+      await this.ctx.repo.addMessage({
+        threadId: t.id,
+        sessionId,
+        role: "assistant",
+        content: `(run failed: ${(err as Error).message})`,
+        meta: { error: true },
+      });
   }
 }
-
