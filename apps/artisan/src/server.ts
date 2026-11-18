@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
+import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import websocket from "@fastify/websocket";
 import { WebSocket } from "ws";
 import { createPgDb } from "@twodb/core-data/db";
@@ -42,7 +42,7 @@ export const INSPECT_RETENTION_DAYS = 3;
 export type ServiceCaller = Pick<TwoDbRuntime, "serviceFetch" | "verifyServiceToken" | "serviceToken" | "actAs">;
 
 export async function buildServer(config: ArtisanConfig, opts: { twodb?: ServiceCaller } = {}) {
-  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
   await app.register(websocket);
 

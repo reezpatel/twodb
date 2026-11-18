@@ -1,5 +1,5 @@
 import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
-import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
+import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { createPgDb } from "@twodb/core-data/db";
 import { createAsyncEngine } from "@twodb/core-async/engine";
 
@@ -18,7 +18,7 @@ import { startCodexOAuth, pollCodexOAuth, completeCodexOAuth } from "./lib/codex
 import { joinUrl } from "./providers/url.js";
 
 export async function buildServer(config: TwoRouteConfig) {
-  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   // Preserve non-JSON request bodies as raw Buffers (audio uploads are
   // multipart/form-data) so pass-through routes forward them byte-for-byte —
   // same parser setup as the Gateway itself.

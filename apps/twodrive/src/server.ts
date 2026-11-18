@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
+import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { createPgDb } from "@twodb/core-data/db";
 import type { Kysely } from "@twodb/core-data/db";
 
@@ -12,7 +12,7 @@ import { registerAppApiRoutes, registerAppOverrideRoutes } from "./routes/app-ap
 import { registerS3Routes, registerAccessKeyRoutes, registerShareRoutes } from "./routes/s3.js";
 
 export async function buildServer(config: TwoDriveConfig) {
-  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   // Raw bodies preserved byte-for-byte (file uploads + S3 PUTs may be any
   // content type) — same parser setup as the Gateway/TwoRoute.
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));

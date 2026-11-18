@@ -1,5 +1,5 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
-import { webappRewriteUrl, registerWebapp, webappDist, appUiUrl } from "@twodb/twodb-core/webapp";
+import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist, appUiUrl } from "@twodb/twodb-core/webapp";
 import websocket from "@fastify/websocket";
 import multipart from "@fastify/multipart";
 import { createPgDb } from "@twodb/core-data/db";
@@ -39,7 +39,7 @@ import { collectAssetIds, collectMentions, blocksToText, messageBlocks, type Mes
 export type ServiceCaller = Pick<TwoDbRuntime, "serviceFetch" | "verifyServiceToken" | "serviceToken">;
 
 export async function buildServer(config: TwoChatConfig, opts: { twodb?: ServiceCaller } = {}) {
-  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
   await app.register(websocket);
   await app.register(multipart, {

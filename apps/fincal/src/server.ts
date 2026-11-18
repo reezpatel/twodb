@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
+import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { createPgDb } from "@twodb/core-data/db";
 import type { FincalConfig } from "./config.js";
 import { applySchema, type Db } from "./db/schema.js";
@@ -7,7 +7,7 @@ import { registerRoutes } from "./lib/route.js";
 import { allRoutes } from "./routes/index.js";
 
 export async function buildServer(config: FincalConfig) {
-  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: 10 * 1024 * 1024 });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   // Tolerate bodiless DELETE/POST that still carry a JSON content-type.
   app.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
     try {

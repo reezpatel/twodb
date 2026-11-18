@@ -1,5 +1,5 @@
 import Fastify,{type FastifyRequest} from "fastify";
-import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
+import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import {createPgDb,type Kysely} from "@twodb/core-data/db";
 import {ulid} from "ulid";
 
@@ -19,7 +19,7 @@ export async function buildServer(config:{databaseUrl:string;dataKey:string;allo
   await db.schema.createIndex("account_scope_idx").ifNotExists().on("account").columns(["workspaceId","spaceId"]).execute();
   await db.schema.createTable("message").ifNotExists().addColumn("id","text",c=>c.primaryKey()).addColumn("accountId","text",c=>c.notNull().references("account.id").onDelete("cascade")).addColumn("providerId","text",c=>c.notNull()).addColumn("folder","text",c=>c.notNull()).addColumn("sender","text",c=>c.notNull()).addColumn("recipient","text",c=>c.notNull()).addColumn("subject","text",c=>c.notNull()).addColumn("text","text",c=>c.notNull()).addColumn("date","text",c=>c.notNull()).addColumn("status","text",c=>c.notNull()).execute();
   await db.schema.createIndex("message_provider_idx").ifNotExists().on("message").columns(["accountId","providerId"]).unique().execute();
-  const app=Fastify({ rewriteUrl: webappRewriteUrl,logger:!injectedDb,bodyLimit:150000});
+  const app=Fastify({ rewriteUrl: webappRewriteUrl,logger:!injectedDb,bodyLimit:BODY_LIMIT});
   app.addHook("onClose",async()=>{if(!injectedDb)await db.destroy();});
   app.setErrorHandler<Error & {statusCode?:number}>((error,_req,reply)=>{ app.log.error({name:error.name},"Mail request failed"); return reply.code(error.statusCode??500).send({error:"Request failed"}); });
   app.get("/healthz",async()=>({ok:true,app:"twomail"}));

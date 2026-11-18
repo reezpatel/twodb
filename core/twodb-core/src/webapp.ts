@@ -26,6 +26,14 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import fastifyStatic from "@fastify/static";
 
 export const API_PREFIX = "/api";
+/**
+ * Shared request-body ceiling for every app's Fastify instance. The gateway
+ * already buffers bodies before proxying (its own limit is far higher), so a
+ * generous per-app cap keeps large payloads — chat contexts with images,
+ * audio, file/zip uploads — from tripping Fastify's tiny 1 MiB default while
+ * still bounding memory. 100 MB.
+ */
+export const BODY_LIMIT = 100 * 1024 * 1024;
 /** Internal mount point of the SPA — never visible to clients, only the rewrite target. */
 const WEB_PREFIX = "/__web";
 const UNPREFIXED = /^\/(healthz|_svc)(\/|\?|$)/;

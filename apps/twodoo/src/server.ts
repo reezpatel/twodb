@@ -1,6 +1,6 @@
 import { z } from "zod";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
-import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
+import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { createPgDb } from "@twodb/core-data/db";
 import { createAsyncEngine } from "@twodb/core-async/engine";
 
@@ -16,7 +16,7 @@ import { readForwardedContext, type ForwardedContext } from "./gateway-context.j
  * Space scoping comes from x-twodb-space-ids (empty = all spaces).
  */
 export async function buildServer(config: TwoDooConfig) {
-  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
 
   const db = createPgDb<TwoDooDb>({ connectionString: config.DATABASE_URL, schema: "twodoo" });

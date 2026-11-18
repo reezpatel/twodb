@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
+import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { createPgDb } from "@twodb/core-data/db";
 
 import type { GardenConfig } from "./config.js";
@@ -11,7 +11,7 @@ import { registerDatabaseRoutes } from "./routes/databases.js";
 import { registerAssetRoutes } from "./routes/assets.js";
 
 export async function buildServer(config: GardenConfig) {
-  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: { level: process.env.LOG_LEVEL ?? "info" }, bodyLimit: 8 * 1024 * 1024 });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: { level: process.env.LOG_LEVEL ?? "info" }, bodyLimit: BODY_LIMIT });
   // Tolerate an empty body under content-type: application/json (browsers send that for body-less POSTs).
   app.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
     if (!body) return done(null, {});

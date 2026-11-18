@@ -1,5 +1,5 @@
 import Fastify, { type FastifyRequest } from "fastify";
-import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
+import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { createPgDb, type Kysely } from "@twodb/core-data/db";
 import { ulid } from "ulid";
 
@@ -31,7 +31,7 @@ export function context(req: FastifyRequest) {
 export async function buildServer(config: { databaseUrl: string }, injectedDb?: Kysely<ContactsDb>) {
   const db = injectedDb ?? createPgDb<ContactsDb>({ connectionString: config.databaseUrl, schema: "twocontacts" });
   await applySchema(db);
-  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: !injectedDb });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: !injectedDb, bodyLimit: BODY_LIMIT });
   app.addHook("onClose", async () => { if (!injectedDb) await db.destroy(); });
   app.setErrorHandler<Error & { code?: string; validation?: unknown; statusCode?: number }>((error, _req, reply) => {
     if (error.code === "23505") return reply.code(409).send({ error: "A contact with that email already exists in this book." });

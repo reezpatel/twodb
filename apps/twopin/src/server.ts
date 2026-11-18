@@ -1,5 +1,5 @@
 import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
-import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
+import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import type { Selectable } from "kysely";
 import { createPgDb } from "@twodb/core-data/db";
 
@@ -49,7 +49,7 @@ function toDataUri(bytes: Buffer | null, contentType: string | null): string | n
 }
 
 export async function buildServer(config: TwoPinConfig) {
-  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   const db = createPgDb<TwoPinDb>({ connectionString: config.DATABASE_URL, schema: "twopin" });
   await applySchema(db);
   const boards = createBoardsRepo(db);

@@ -1,5 +1,5 @@
 import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
-import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
+import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import websocket from "@fastify/websocket";
 import { createPgDb } from "@twodb/core-data/db";
 
@@ -59,7 +59,7 @@ function sseWrite(reply: FastifyReply, event: string, data: unknown): boolean {
 }
 
 export async function buildServer(config: DispatchConfig) {
-  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
   await app.register(websocket);
 

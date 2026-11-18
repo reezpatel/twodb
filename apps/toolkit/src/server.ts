@@ -1,5 +1,5 @@
 import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
-import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
+import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { createPgDb } from "@twodb/core-data/db";
 import { createAsyncEngine } from "@twodb/core-async/engine";
 
@@ -69,7 +69,7 @@ export interface ToolkitPlatform {
 }
 
 export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatform) {
-  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true });
+  const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   const db = createPgDb<ToolkitDb>({ connectionString: config.DATABASE_URL, schema: "toolkit" });
   await applySchema(db);
   const dataKey = config.TWODB_DATA_KEY ?? "dev-only-data-key";
