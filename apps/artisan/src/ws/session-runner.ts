@@ -1,4 +1,5 @@
 import type { ArtisanRepo } from "../db/repository.js";
+import type { Credential } from "../tworoute-client.js";
 import { runAgentLoop, abortSession, type RunDeps } from "./agent-loop.js";
 import type { ServerFrameBody } from "./hub.js";
 
@@ -29,12 +30,22 @@ interface SessionRuntime {
   draining: boolean;
 }
 
+/** Per-audience credentials for one run. Each downstream app (TwoRoute,
+ * Dispatch) needs a token addressed to IT — a service token's `aud` must
+ * match the app being called, so one shared token cannot serve both. */
+export interface RunCredentials {
+  tworoute: Credential;
+  dispatch: Credential;
+}
+
 export interface RunContext {
   repo: ArtisanRepo;
-  depsFor: (workspaceId: string, key: string) => RunDeps;
+  depsFor: (workspaceId: string, creds: RunCredentials) => RunDeps;
   /** Runs started over the WS / drained after the last viewer left have no
-   * user key — they mint a per-call service token (TwoDbSession.actAs). */
-  keyFor: (workspaceId: string) => () => Promise<string>;
+   * user key — they mint per-call service tokens (TwoDbSession.actAs), one
+   * per audience. Returns providers (not resolved strings) so each client
+   * fetches/caches its own token. */
+  keyFor: (workspaceId: string) => RunCredentials;
 }
 
 export class SessionRunner {
@@ -133,14 +144,17 @@ export class SessionRunner {
       while (!r.running && r.queue.length > 0) {
         const items = r.queue.splice(0);
         const content = items.map((i) => i.content).join("\n\n");
-        // Fresh service token + clients per run — tokens are short-lived.
-        const key = await this.ctx.keyFor(workspaceId)();
-        const deps = this.ctx.depsFor(workspaceId, key);
+        // Fresh credentials + clients per run — service tokens are
+        // short-lived (and audience-specific: tworoute ≠ dispatch).
+        const creds = this.ctx.keyFor(workspaceId);
+        const deps = this.ctx.depsFor(workspaceId, creds);
         try {
           await runAgentLoop({
             deps,
             session, agent, model: session.model,
-            apiKey: key,
+            // Unused: the clients in `deps` carry their own credential
+            // providers (same as collaborator runs).
+            apiKey: "",
             userMessage: content,
             emitOverride: this.wrapEmit(workspaceId, sessionId, deps),
           });
@@ -155,7 +169,7 @@ export class SessionRunner {
   }
 
   private emitError(workspaceId: string, sessionId: string, message: string): void {
-    const hub = this.ctx.depsFor(workspaceId, "").hub;
+    const hub = this.ctx.depsFor(workspaceId, { tworoute: "", dispatch: "" }).hub;
     hub.broadcast(workspaceId, sessionId, { type: "error", message });
     hub.broadcast(workspaceId, sessionId, { type: "done", ok: false, message });
   }

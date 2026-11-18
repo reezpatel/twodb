@@ -28,7 +28,7 @@ import type { McpServerRow, MemoryRow, SkillRow } from "./db/schema.js";
 import { canvasTools, listCanvasContent } from "./canvas.js";
 import { toolkitTools } from "./ws/tools/toolkit.js";
 import { isSessionRunning, fileTools, type RunDeps } from "./ws/agent-loop.js";
-import { SessionRunner } from "./ws/session-runner.js";
+import { SessionRunner, type RunCredentials } from "./ws/session-runner.js";
 import { subagentTools } from "./ws/tools/subagents.js";
 import { askUserTool } from "./ws/tools/ask-user.js";
 import { runCompaction } from "./ws/compaction.js";
@@ -129,17 +129,21 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
 
   // Server-side session runtime: message queue + live run/ask state. HTTP
   // runs use the requester's forwarded key; queued drains after the last
-  // viewer disconnected fall back to the service token (same as WS runs).
-  const wsKeyFor = (workspaceId: string): (() => Promise<string>) => {
+  // viewer disconnected fall back to service tokens (one per audience — a
+  // token minted for tworoute is rejected by dispatch, and vice versa).
+  const runCredentialsFor = (workspaceId: string): RunCredentials => {
     const act = opts.twodb?.actAs;
-    return act ? act("tworoute", workspaceId) : async () => "";
+    return {
+      tworoute: act ? act("tworoute", workspaceId) : async () => "",
+      dispatch: act ? act("dispatch", workspaceId) : async () => "",
+    };
   };
   const sessionRunner = new SessionRunner({
     repo,
-    depsFor: (workspaceId, key) => {
-      return { repo, hub, tworoute: new TworouteClient(config, key), dispatch: new DispatchClient(config, key), ...(opts.twodb?.serviceFetch ? { toolkit: createToolkitClient(opts.twodb.serviceFetch) } : {}) };
+    depsFor: (_workspaceId, creds) => {
+      return { repo, hub, tworoute: new TworouteClient(config, creds.tworoute), dispatch: new DispatchClient(config, creds.dispatch), ...(opts.twodb?.serviceFetch ? { toolkit: createToolkitClient(opts.twodb.serviceFetch) } : {}) };
     },
-    keyFor: wsKeyFor,
+    keyFor: runCredentialsFor,
   });
 
   const requireCtx = (req: FastifyRequest, reply: FastifyReply) => {
@@ -1276,7 +1280,7 @@ echo saved`;
       // mkdir is atomic — only one install runs at a time; a second concurrent
       // click exits 0 immediately instead of wiping the first install's tmp.
       'if ! mkdir "$TMP.lock" 2>/dev/null; then echo "install already running"; exit 0; fi',
-      'trap "rm -rf \"$TMP.lock\"" EXIT',
+      'trap "rm -rf "$TMP.lock"" EXIT',
       'rm -rf "$TMP" "$BASE/code-server.new"',
       'mkdir -p "$TMP"',
       'cd "$TMP"',
