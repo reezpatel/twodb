@@ -109,13 +109,13 @@ export function Sidebar(props: SidebarProps) {
       const key = `${d.runner}:${d.path}`;
       const sessions = buckets.get(key) ?? [];
       if (sessions.length === 0) continue; // hide empty directories
-      out.push({ dir: d, key, label: d.title, sessions });
+      out.push({ dir: d, key, label: d.title, sessions: [...sessions].sort(byMarkerThenRecency) });
     }
     // Sessions with no registered directory (legacy / ad-hoc paths).
     for (const [key, sessions] of buckets) {
       if (byPath.has(key)) continue;
       const first = sessions[0];
-      out.push({ dir: null, key, label: first ? `${first.runner} · ${first.directory}` : key, sessions });
+      out.push({ dir: null, key, label: first ? `${first.runner} · ${first.directory}` : key, sessions: [...sessions].sort(byMarkerThenRecency) });
     }
     return out;
   }, [directorySessions, props.directories, archiveMode]);
@@ -124,8 +124,8 @@ export function Sidebar(props: SidebarProps) {
   const chatGroups = useMemo(() => {
     const shown = props.chats.filter((s) => !!s.archivedAt === archiveMode);
     const known = new Set(props.spaces.map((sp) => sp.id));
-    const groups = props.spaces.map((sp) => ({ id: sp.id, name: sp.name, chats: shown.filter((c) => c.spaceId === sp.id) }));
-    const orphans = shown.filter((c) => !known.has(c.spaceId)); // chats whose space is no longer visible
+    const groups = props.spaces.map((sp) => ({ id: sp.id, name: sp.name, chats: shown.filter((c) => c.spaceId === sp.id).sort(byMarkerThenRecency) }));
+    const orphans = shown.filter((c) => !known.has(c.spaceId)).sort(byMarkerThenRecency); // chats whose space is no longer visible
     if (orphans.length) groups.push({ id: "_other", name: "Other", chats: orphans });
     // While archived, hide empty sections (nothing to create there).
     return archiveMode ? groups.filter((g) => g.chats.length > 0) : groups;
@@ -313,6 +313,20 @@ const MARKERS: Array<{ id: "ip" | "do" | "at" | "re" | "ho"; label: string; hint
 
 function markerOf(s: SessionInfo) {
   return MARKERS.find((m) => m.id === s.marker) ?? null;
+}
+
+/** Sidebar order within a group: unmarked first (needs triage), then IP,
+ * RE, HO, AT — DO (completed) always sinks to the bottom. Ties keep the
+ * newest session on top. */
+const MARKER_RANK = new Map<string, number>([["ip", 1], ["re", 2], ["ho", 3], ["at", 4], ["do", 5]]);
+
+function markerRank(s: SessionInfo): number {
+  return MARKER_RANK.get(String(s.marker)) ?? 0;
+}
+
+function byMarkerThenRecency(a: SessionInfo, b: SessionInfo): number {
+  const r = markerRank(a) - markerRank(b);
+  return r !== 0 ? r : b.updatedAt.localeCompare(a.updatedAt);
 }
 
 function SessionRow(props: SidebarProps & { session: SessionInfo; active: boolean }) {
