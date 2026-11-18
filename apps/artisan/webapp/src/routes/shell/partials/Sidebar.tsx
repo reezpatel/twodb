@@ -301,12 +301,13 @@ export function Sidebar(props: SidebarProps) {
   );
 }
 
-/** Marker badge definitions: a tiny faded dot on the row + a colored dot in the item menu. */
-const MARKERS: Array<{ id: "ip" | "do" | "at" | "re"; label: string; hint: string; cls: string }> = [
-  { id: "ip", label: "IP", hint: "In progress", cls: "bg-info" },
-  { id: "re", label: "RE", hint: "Review", cls: "bg-ion" },
-  { id: "do", label: "DO", hint: "Done", cls: "bg-success" },
-  { id: "at", label: "AT", hint: "Attention", cls: "bg-warning" },
+/** Marker badges: a tiny colored pill with the 2-letter code on the row, same dot in the menu.
+ * Faded backgrounds so they read as markers, not buttons. */
+const MARKERS: Array<{ id: "ip" | "do" | "at" | "re"; label: string; hint: string; badge: string; dot: string }> = [
+  { id: "ip", label: "IP", hint: "In progress", badge: "bg-info/15 text-info", dot: "bg-info" },
+  { id: "re", label: "RE", hint: "Review", badge: "bg-ion-deep/15 text-ion-deep", dot: "bg-ion-deep" },
+  { id: "do", label: "DO", hint: "Done", badge: "bg-success/15 text-success", dot: "bg-success" },
+  { id: "at", label: "AT", hint: "Attention", badge: "bg-warning/15 text-warning", dot: "bg-warning" },
 ];
 
 function markerOf(s: SessionInfo) {
@@ -356,7 +357,9 @@ function SessionRow(props: SidebarProps & { session: SessionInfo; active: boolea
             <button type="button" onClick={() => props.onOpenSession(s)} className="flex min-w-0 flex-1 items-center gap-1.5 truncate py-[7px] text-left leading-none" title={s.title}>
         <span className="min-w-0 flex-1 truncate">{s.title}</span>
         {markerOf(s) ? (
-          <span title={markerOf(s)!.hint} className={`size-2 shrink-0 rounded-full opacity-60 ${markerOf(s)!.cls}`} />
+          <span title={markerOf(s)!.hint} className={`shrink-0 rounded px-1 py-px text-[9px] font-semibold leading-tight tracking-wide ${markerOf(s)!.badge}`}>
+            {markerOf(s)!.label}
+          </span>
         ) : null}
       </button>
       <div className="relative shrink-0">
@@ -387,7 +390,7 @@ function SessionRow(props: SidebarProps & { session: SessionInfo; active: boolea
               {MARKERS.map((m) => (
                 <MenuItem
                   key={m.id}
-                  dotCls={m.cls}
+                  dotCls={m.dot}
                   label={`${m.label} — ${m.hint}`}
                   active={s.marker === m.id}
                   onClick={() => {
