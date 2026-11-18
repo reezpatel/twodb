@@ -37,6 +37,8 @@ export interface ArtisanRepo {
   setSessionArchived(workspaceId: string, id: string, archived: boolean): Promise<void>;
   /** Sidebar badge: "ip" in-progress, "do" done, "at" attention; null clears. */
   setSessionMarker(workspaceId: string, id: string, marker: string | null): Promise<void>;
+  /** Link a pull request to the session (or clear with null). */
+  setSessionPr(workspaceId: string, id: string, prUrl: string | null): Promise<void>;
   /** Deletes the session with its threads, messages, usage and checkpoints. */
   deleteSession(workspaceId: string, id: string): Promise<boolean>;
   setSessionModel(workspaceId: string, id: string, model: string): Promise<void>;
@@ -184,6 +186,7 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
         plan_json: null,
         thinking_level: null, archived_at: null,
         marker: null,
+        pr_url: null,
         created_at: now(),
         updated_at: now(),
       };
@@ -234,6 +237,10 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
 
     async setSessionMarker(workspaceId, id, marker) {
       await db.updateTable("session").set({ marker, updated_at: now() }).where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
+    },
+
+    async setSessionPr(workspaceId, id, prUrl) {
+      await db.updateTable("session").set({ pr_url: prUrl, updated_at: now() }).where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
     },
 
     async deleteSession(workspaceId, id) {

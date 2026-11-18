@@ -13,6 +13,8 @@ import { ExpandToggle } from "./partials/ExpandToggle.js";
 import { SessionTabs, type SessionTabId } from "./partials/SessionTabs.js";
 import { SessionSidebar } from "./partials/SessionSidebar.js";
 import { useSessionSide } from "./hooks/useSessionSide.js";
+import { artisanClient } from "../../lib/artisan-client.js";
+import { useWorkspaceWs } from "../../lib/workspace-ws.js";
 
 const MAIN_MIN_WIDTH = 480;
 
@@ -41,6 +43,15 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
     return () => window.removeEventListener("artisan:open-tab", onOpen);
   }, []);
   const side = useSessionSide(props.sessionId);
+  const { onFrame } = useWorkspaceWs();
+  const [prUrl, setPrUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setPrUrl(null);
+    void artisanClient.getSession(props.sessionId).then((d) => setPrUrl(d.prUrl ?? null)).catch(() => undefined);
+  }, [props.sessionId]);
+  useEffect(() => onFrame((f) => {
+    if (f.sessionId === props.sessionId && f.type === "pr") setPrUrl((f.prUrl as string | null) ?? null);
+  }), [onFrame, props.sessionId]);
   const rootRef = useRef<HTMLDivElement>(null);
   // The panel may grow until the main column would drop below MAIN_MIN_WIDTH.
   const maxRight = () => Math.max(200, (rootRef.current?.clientWidth ?? 1200) - MAIN_MIN_WIDTH);
@@ -57,6 +68,7 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
     <SessionSidebar
       sessionId={props.sessionId}
       model={side.model}
+      prUrl={prUrl}
       plan={side.plan}
       children={side.children}
       git={side.git}

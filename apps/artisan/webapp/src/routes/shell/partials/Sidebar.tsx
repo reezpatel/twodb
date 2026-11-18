@@ -315,10 +315,10 @@ function markerOf(s: SessionInfo) {
   return MARKERS.find((m) => m.id === s.marker) ?? null;
 }
 
-/** Sidebar order within a group: unmarked first (needs triage), then IP,
- * RE, HO, AT — DO (completed) always sinks to the bottom. Ties keep the
+/** Sidebar order within a group: unmarked first (needs triage), then AT,
+ * IP, RE, HO — DO (completed) always sinks to the bottom. Ties keep the
  * newest session on top. */
-const MARKER_RANK = new Map<string, number>([["ip", 1], ["re", 2], ["ho", 3], ["at", 4], ["do", 5]]);
+const MARKER_RANK = new Map<string, number>([["at", 1], ["ip", 2], ["re", 3], ["ho", 4], ["do", 5]]);
 
 function markerRank(s: SessionInfo): number {
   return MARKER_RANK.get(String(s.marker)) ?? 0;

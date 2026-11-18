@@ -38,6 +38,7 @@ export type ServerFrameBody =
   | { type: "compaction_done"; summary: string }
   | { type: "new_thread" }
   | { type: "session_renamed"; title: string }
+  | { type: "pr"; prUrl: string | null }
   | { type: "error"; message: string }
   | { type: "done"; ok: boolean; message: string };
 

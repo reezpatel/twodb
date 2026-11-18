@@ -224,6 +224,20 @@ export function fileTools(dispatch: DispatchClient): ToolSpec[] {
       },
     },
     {
+      name: "set_pr",
+      description: "Links a pull request to this session — the sidebar shows a live Pull request card (checks, approval, merge state, comments). Call with an empty string to remove the link.",
+      parameters: { type: "object", properties: { url: { type: "string", description: "PR URL like https://github.com/owner/repo/pull/123, or empty to clear" } }, required: ["url"] },
+      async execute(args, ctx) {
+        const url = String(args.url ?? "").trim();
+        if (url && !/^https?:\/\/[\w.-]+\/[^/]+\/[^/]+\/pull\/\d+/.test(url)) return `not a pull request URL: ${url}`;
+        const prUrl = url || null;
+        await ctx.repo.setSessionPr(ctx.session.workspace_id, ctx.session.id, prUrl);
+        ctx.session.pr_url = prUrl; // keep the in-run snapshot in sync
+        ctx.emit({ type: "pr", prUrl });
+        return prUrl ? `linked ${prUrl}` : "pull request link removed";
+      },
+    },
+    {
       name: "read_skill",
       description: "Reads a skill's full content by name. Skill names are listed in your system prompt.",
       parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },

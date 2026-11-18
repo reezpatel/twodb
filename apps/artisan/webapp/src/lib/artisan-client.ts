@@ -84,6 +84,8 @@ export interface SessionInfo {
   archivedAt?: string | null;
   /** Sidebar badge: "ip" in-progress, "re" review, "do" done, "at" attention, "ho" hold; null = none. */
   marker?: string | null;
+  /** Linked pull request URL (set_pr tool / sidebar); null = none. */
+  prUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -117,6 +119,29 @@ export interface UsageInfo {
   contextTokens?: number;
   calls: number;
   costUsd: number | null;
+}
+
+export interface PrCheckInfo {
+  name: string;
+  status: string;
+  conclusion: string;
+}
+
+export interface PrInfo {
+  number: number;
+  title: string;
+  url: string;
+  state: string;
+  draft: boolean;
+  mergeState: string;
+  reviewDecision: string;
+  autoMerge: boolean;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  checks: PrCheckInfo[];
+  openComments: number;
+  resolvedComments: number;
 }
 
 export interface QueueItemInfo {
@@ -279,7 +304,7 @@ export const artisanClient = {
     return post("/sessions", input);
   },
 
-  updateSession(id: string, patchBody: { title?: string; model?: string; archived?: boolean; marker?: string | null }): Promise<SessionInfo> {
+  updateSession(id: string, patchBody: { title?: string; model?: string; archived?: boolean; marker?: string | null; prUrl?: string | null }): Promise<SessionInfo> {
     return patch(`/sessions/${id}`, patchBody);
   },
 
@@ -302,6 +327,11 @@ export const artisanClient = {
 
   abort(id: string): Promise<{ ok: boolean }> {
     return post(`/sessions/${id}/abort`);
+  },
+
+  /** Live pull-request info (gh on the session's runner); null when no PR linked. */
+  getSessionPr(id: string): Promise<{ pr: PrInfo | null; error?: string }> {
+    return get(`/sessions/${id}/pr`);
   },
 
   removeQueuedMessage(id: string, itemId: string): Promise<{ ok: boolean }> {

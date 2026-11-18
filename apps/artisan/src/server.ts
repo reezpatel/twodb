@@ -366,6 +366,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
       thinkingLevel?: string | null;
       archived?: boolean;
       marker?: string | null;
+      prUrl?: string | null;
       plan?: Array<{ description: string; status: string }> | null;
     };
     if (body.title) await repo.renameSession(ctx.workspaceId, id, body.title);
@@ -374,6 +375,12 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
       const m = body.marker;
       if (m !== null && m !== "ip" && m !== "do" && m !== "at" && m !== "re" && m !== "ho") return reply.code(400).send({ error: "marker must be ip|re|do|at|ho|null" });
       await repo.setSessionMarker(ctx.workspaceId, id, m);
+    }
+    if (body.prUrl !== undefined) {
+      const url = (body.prUrl ?? "").trim();
+      if (url && !/^https?:\/\/[\w.-]+\/[^/]+\/[^/]+\/pull\/\d+/.test(url)) return reply.code(400).send({ error: "not a pull request URL" });
+      await repo.setSessionPr(ctx.workspaceId, id, url || null);
+      hub.broadcast(ctx.workspaceId, id, { type: "pr", prUrl: url || null });
     }
     if (body.model) await repo.setSessionModel(ctx.workspaceId, id, body.model);
     if (body.thinkingLevel !== undefined) await repo.setSessionThinkingLevel(ctx.workspaceId, id, body.thinkingLevel);
@@ -1149,6 +1156,56 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     return { ok: await repo.deleteCheckpoint(ctx.workspaceId, id) };
   });
 
+  // --- pull request info (gh on the session runner) -------------------------------
+  app.get("/sessions/:id/pr", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    if (!session.pr_url) return { pr: null };
+    const deps = depsFor(req);
+    const fields = "number,title,url,state,isDraft,mergeStateStatus,reviewDecision,additions,deletions,changedFiles,statusCheckRollup,reviews,comments,reviewThreads,autoMergeRequest";
+    // gh runs in the session's directory on its runner; -R works even when the
+    // local checkout has no GitHub remote.
+    const script = `gh pr view ${JSON.stringify(session.pr_url)} --json ${fields} 2>&1 || { echo "@@gh_failed"; exit 13; }`;
+    const res = await deps.dispatch.exec(session.runner, script, session.directory, 30_000);
+    if (res.exitCode !== 0) {
+      return { pr: null, error: (res.stdout || res.stderr || "gh failed").replace("@@gh_failed", "").trim().slice(0, 300) };
+    }
+    try {
+      const raw = JSON.parse(res.stdout) as {
+        number: number; title: string; url: string; state: string; isDraft: boolean;
+        mergeStateStatus?: string; reviewDecision?: string;
+        additions?: number; deletions?: number; changedFiles?: number;
+        statusCheckRollup?: Array<{ name?: string; context?: string; status?: string; state?: string; conclusion?: string; __typename?: string }>;
+        reviews?: Array<{ state?: string }>;
+        comments?: unknown[];
+        reviewThreads?: Array<{ isResolved?: boolean }>;
+        autoMergeRequest?: unknown;
+      };
+      const checks = (raw.statusCheckRollup ?? []).map((c) => ({
+        name: c.name ?? c.context ?? "check",
+        status: (c.status ?? "").toUpperCase(),
+        conclusion: (c.conclusion ?? c.state ?? "").toUpperCase(),
+      }));
+      const openComments = (raw.reviewThreads ?? []).filter((t) => !t.isResolved).length + (raw.comments?.length ?? 0);
+      const resolvedComments = (raw.reviewThreads ?? []).filter((t) => t.isResolved).length;
+      return {
+        pr: {
+          number: raw.number, title: raw.title, url: raw.url, state: raw.state, draft: raw.isDraft,
+          mergeState: raw.mergeStateStatus ?? "UNKNOWN",
+          reviewDecision: raw.reviewDecision ?? "NONE",
+          autoMerge: Boolean(raw.autoMergeRequest),
+          additions: raw.additions ?? 0, deletions: raw.deletions ?? 0, changedFiles: raw.changedFiles ?? 0,
+          checks, openComments, resolvedComments,
+        },
+      };
+    } catch {
+      return { pr: null, error: "could not parse gh output" };
+    }
+  });
+
   // --- git status (session directory) -------------------------------------------
   app.get("/sessions/:id/git", async (req, reply) => {
     const ctx = requireCtx(req, reply);
@@ -1897,6 +1954,7 @@ function sessionOut(s: {
   thinking_level: string | null;
   archived_at?: string | null;
   marker?: string | null;
+  pr_url?: string | null;
   created_at: string;
   updated_at: string;
 }) {
@@ -1914,6 +1972,7 @@ function sessionOut(s: {
     thinkingLevel: s.thinking_level,
     archivedAt: s.archived_at ?? null,
     marker: s.marker ?? null,
+    prUrl: s.pr_url ?? null,
     createdAt: s.created_at,
     updatedAt: s.updated_at,
   };

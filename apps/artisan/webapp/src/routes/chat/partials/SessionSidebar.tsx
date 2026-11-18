@@ -4,11 +4,13 @@ import { SideSection, SubagentRow, JobRow } from "./SidePanel.js";
 import { GitSection } from "./GitSection.js";
 import { MemoriesSection } from "./MemoriesSection.js";
 import { ProviderSection } from "./ProviderSection.js";
+import { PrSection } from "./PrSection.js";
 import { PlanList, type PlanStep } from "../../../components/ui/plan-list.js";
 
 export interface SessionSidebarProps {
   sessionId: string;
   model: string | null;
+  prUrl: string | null;
   plan: SessionDetail["plan"];
   children: ChildSession[];
   git: GitInfo | null;
@@ -44,6 +46,8 @@ export function SessionSidebar(props: SessionSidebarProps) {
       </SideSection>
 
       <MemoriesSection sessionId={props.sessionId} />
+
+      <PrSection sessionId={props.sessionId} prUrl={props.prUrl} />
 
       <ProviderSection model={props.model} />
 
