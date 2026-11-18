@@ -227,16 +227,30 @@ export function fileTools(dispatch: DispatchClient): ToolSpec[] {
     },
     {
       name: "set_pr",
-      description: "Links a pull request to this session — the sidebar shows a live Pull request card (checks, approval, merge state, comments). Call with an empty string to remove the link.",
-      parameters: { type: "object", properties: { url: { type: "string", description: "PR URL like https://github.com/owner/repo/pull/123, or empty to clear" } }, required: ["url"] },
+      description: "Links a pull request to this session — the sidebar shows live Pull request cards (checks, approval, merge state, comments). A session can track several PRs; calling set_pr ADDS one (calling it again with the same URL is a no-op). Use clear_pr to unlink.",
+      parameters: { type: "object", properties: { url: { type: "string", description: "PR URL like https://github.com/owner/repo/pull/123" } }, required: ["url"] },
       async execute(args, ctx) {
         const url = String(args.url ?? "").trim();
-        if (url && !/^https?:\/\/[\w.-]+\/[^/]+\/[^/]+\/pull\/\d+/.test(url)) return `not a pull request URL: ${url}`;
-        const prUrl = url || null;
-        await ctx.repo.setSessionPr(ctx.session.workspace_id, ctx.session.id, prUrl);
-        ctx.session.pr_url = prUrl; // keep the in-run snapshot in sync
-        ctx.emit({ type: "pr", prUrl });
-        return prUrl ? `linked ${prUrl}` : "pull request link removed";
+        if (!/^https?:\/\/[\w.-]+\/[^/]+\/[^/]+\/pull\/\d+/.test(url)) return `not a pull request URL: ${url}`;
+        await ctx.repo.addSessionPr(ctx.session.workspace_id, ctx.session.id, url);
+        const rows = await ctx.repo.listSessionPrs(ctx.session.workspace_id, ctx.session.id);
+        ctx.emit({ type: "pr", prs: rows.map((r) => ({ id: r.id, url: r.url })) });
+        return `linked ${url} (${rows.length} pull request${rows.length === 1 ? "" : "s"} on this session)`;
+      },
+    },
+    {
+      name: "clear_pr",
+      description: "Removes a linked pull request from this session. Pass the exact URL previously linked with set_pr.",
+      parameters: { type: "object", properties: { url: { type: "string", description: "The PR URL to remove" } }, required: ["url"] },
+      async execute(args, ctx) {
+        const url = String(args.url ?? "").trim();
+        const rows = await ctx.repo.listSessionPrs(ctx.session.workspace_id, ctx.session.id);
+        const hit = rows.find((r) => r.url === url);
+        if (!hit) return `no linked pull request with url ${url}`;
+        await ctx.repo.removeSessionPr(ctx.session.workspace_id, ctx.session.id, hit.id);
+        const rest = rows.filter((r) => r.id !== hit.id);
+        ctx.emit({ type: "pr", prs: rest.map((r) => ({ id: r.id, url: r.url })) });
+        return `removed ${url} (${rest.length} remaining)`;
       },
     },
     {

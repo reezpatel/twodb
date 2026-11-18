@@ -156,6 +156,11 @@ export interface AskInfo {
   questions: Array<{ question: string; options?: string[]; allowMultiple?: boolean }>;
 }
 
+export interface SessionPrLink {
+  id: string;
+  url: string;
+}
+
 export interface SessionDetail extends SessionInfo {
   thinkingLevel?: string | null;
   plan: Array<{ description: string; status: string }> | null;
@@ -164,6 +169,8 @@ export interface SessionDetail extends SessionInfo {
   queue: QueueItemInfo[];
   /** A live ask_user question, present even when it opened while this client was away. */
   ask: AskInfo | null;
+  /** Pull requests linked to the session. */
+  prs: SessionPrLink[];
   usage: UsageInfo | null;
   messages: MessageInfo[];
 }
@@ -332,8 +339,13 @@ export const artisanClient = {
   },
 
   /** Live pull-request info (gh on the session's runner); null when no PR linked. */
-  getSessionPr(id: string): Promise<{ pr: PrInfo | null; error?: string }> {
-    return get(`/sessions/${id}/pr`);
+  getSessionPr(id: string, url?: string): Promise<{ pr: PrInfo | null; error?: string }> {
+    return get(url ? `/sessions/${id}/pr?url=${encodeURIComponent(url)}` : `/sessions/${id}/pr`);
+  },
+
+  /** Unlink one pull request from the session. */
+  removeSessionPr(id: string, prId: string): Promise<{ ok: boolean }> {
+    return del(`/sessions/${id}/prs/${prId}`);
   },
 
   removeQueuedMessage(id: string, itemId: string): Promise<{ ok: boolean }> {

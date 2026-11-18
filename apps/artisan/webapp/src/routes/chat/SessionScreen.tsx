@@ -13,7 +13,7 @@ import { ExpandToggle } from "./partials/ExpandToggle.js";
 import { SessionTabs, type SessionTabId } from "./partials/SessionTabs.js";
 import { SessionSidebar } from "./partials/SessionSidebar.js";
 import { useSessionSide } from "./hooks/useSessionSide.js";
-import { artisanClient } from "../../lib/artisan-client.js";
+import { artisanClient, type SessionPrLink } from "../../lib/artisan-client.js";
 import { useWorkspaceWs } from "../../lib/workspace-ws.js";
 
 const MAIN_MIN_WIDTH = 480;
@@ -44,13 +44,13 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
   }, []);
   const side = useSessionSide(props.sessionId);
   const { onFrame } = useWorkspaceWs();
-  const [prUrl, setPrUrl] = useState<string | null>(null);
+  const [prs, setPrs] = useState<SessionPrLink[]>([]);
   useEffect(() => {
-    setPrUrl(null);
-    void artisanClient.getSession(props.sessionId).then((d) => setPrUrl(d.prUrl ?? null)).catch(() => undefined);
+    setPrs([]);
+    void artisanClient.getSession(props.sessionId).then((d) => setPrs(d.prs ?? [])).catch(() => undefined);
   }, [props.sessionId]);
   useEffect(() => onFrame((f) => {
-    if (f.sessionId === props.sessionId && f.type === "pr") setPrUrl((f.prUrl as string | null) ?? null);
+    if (f.sessionId === props.sessionId && f.type === "pr") setPrs((f.prs as SessionPrLink[]) ?? []);
   }), [onFrame, props.sessionId]);
   const rootRef = useRef<HTMLDivElement>(null);
   // The panel may grow until the main column would drop below MAIN_MIN_WIDTH.
@@ -68,7 +68,7 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
     <SessionSidebar
       sessionId={props.sessionId}
       model={side.model}
-      prUrl={prUrl}
+      prs={prs}
       plan={side.plan}
       children={side.children}
       git={side.git}

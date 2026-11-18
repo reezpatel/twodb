@@ -1,4 +1,4 @@
-import type { SessionDetail } from "../../../lib/artisan-client.js";
+import type { SessionDetail, SessionPrLink } from "../../../lib/artisan-client.js";
 import type { ChildSession, GitInfo, JobRow as JobRowT } from "../hooks/useSessionSide.js";
 import { SideSection, SubagentRow, JobRow } from "./SidePanel.js";
 import { GitSection } from "./GitSection.js";
@@ -11,7 +11,7 @@ import { PlanList, type PlanStep } from "../../../components/ui/plan-list.js";
 export interface SessionSidebarProps {
   sessionId: string;
   model: string | null;
-  prUrl: string | null;
+  prs: SessionPrLink[];
   plan: SessionDetail["plan"];
   children: ChildSession[];
   git: GitInfo | null;
@@ -48,7 +48,7 @@ export function SessionSidebar(props: SessionSidebarProps) {
 
       <MemoriesSection sessionId={props.sessionId} />
 
-      <PrSection sessionId={props.sessionId} prUrl={props.prUrl} />
+      <PrSection sessionId={props.sessionId} prs={props.prs} />
 
       <NotesSection sessionId={props.sessionId} />
 

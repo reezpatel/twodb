@@ -232,6 +232,15 @@ export interface WorkspaceSettingRow {
 }
 
 /** Artisan owns canvas metadata; content stays in the backing app (Paintress). */
+export interface SessionPrRow {
+  id: string;
+  workspace_id: string;
+  session_id: string;
+  /** Full PR URL (https://host/owner/repo/pull/N). */
+  url: string;
+  created_at: string;
+}
+
 export interface CanvasRow {
   id: string;
   workspace_id: string;
@@ -262,6 +271,7 @@ export interface ArtisanDb {
   message: MessageRow;
   agent: AgentRow;
   skill: SkillRow;
+  session_pr: SessionPrRow;
   session_usage: SessionUsageRow;
   checkpoint: CheckpointRow;
 }
@@ -437,6 +447,23 @@ export async function applySchema(db: Kysely<ArtisanDb>): Promise<void> {
     .addColumn("updated_at", "text", (c) => c.notNull())
     .execute();
   await db.schema.createIndex("canvas_session_idx").ifNotExists().on("canvas").columns(["workspace_id", "session_id"]).execute();
+
+  await db.schema
+    .createTable("session_pr")
+    .ifNotExists()
+    .addColumn("id", "text", (c) => c.primaryKey())
+    .addColumn("workspace_id", "text", (c) => c.notNull())
+    .addColumn("session_id", "text", (c) => c.notNull())
+    .addColumn("url", "text", (c) => c.notNull())
+    .addColumn("created_at", "text", (c) => c.notNull())
+    .execute();
+  await db.schema.createIndex("session_pr_session_idx").ifNotExists().on("session_pr").columns(["workspace_id", "session_id"]).execute();
+  // Move the single pr_url column into the list table (best effort).
+  try {
+    await sql`insert into session_pr (id, workspace_id, session_id, url, created_at) select 'spr_' || lower(hex(randomblob(12))), workspace_id, id, pr_url, updated_at from session where pr_url is not null and pr_url <> '' and not exists (select 1 from session_pr sp where sp.session_id = session.id)`.execute(db as never);
+  } catch {
+    /* nothing to migrate or already done */
+  }
   await db.schema.createIndex("canvas_agent_idx").ifNotExists().on("canvas").columns(["workspace_id", "agent_id"]).execute();
   await db.schema.createIndex("canvas_resource_idx").ifNotExists().on("canvas").column("resource_id").unique().execute();
 

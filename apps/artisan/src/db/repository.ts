@@ -9,7 +9,7 @@ import type { McpScope } from "../mcp.js";
 const CHAT_AGENT_SPACE = "*";
 const CHAT_AGENT_NAME = "Chats";
 const CHAT_AGENT_DESCRIPTION = "All llm_chat conversations — each runs in its own microVM (booted on the first tool call)";
-import type { AgentRow, ArtisanDb, CanvasRow, CheckpointRow, DirectoryRow, McpServerRow, MemoryRow, MessageRow, SessionRow, SessionUsageRow, SkillRow, ThreadRow } from "./schema.js";
+import type { AgentRow, ArtisanDb, CanvasRow, CheckpointRow, DirectoryRow, McpServerRow, MemoryRow, MessageRow, SessionPrRow, SessionRow, SessionUsageRow, SkillRow, ThreadRow } from "./schema.js";
 
 export function newId(): string {
   return ulid().toLowerCase();
@@ -41,6 +41,12 @@ export interface ArtisanRepo {
   setSessionPr(workspaceId: string, id: string, prUrl: string | null): Promise<void>;
   /** User scratchpad (never sent to the model). */
   setSessionNotes(workspaceId: string, id: string, notes: string | null): Promise<void>;
+  /** Pull requests linked to the session. */
+  listSessionPrs(workspaceId: string, sessionId: string): Promise<SessionPrRow[]>;
+  /** Link a PR (idempotent per URL). */
+  addSessionPr(workspaceId: string, sessionId: string, url: string): Promise<SessionPrRow>;
+  /** Unlink one PR by its row id. */
+  removeSessionPr(workspaceId: string, sessionId: string, prId: string): Promise<boolean>;
   /** Deletes the session with its threads, messages, usage and checkpoints. */
   deleteSession(workspaceId: string, id: string): Promise<boolean>;
   setSessionModel(workspaceId: string, id: string, model: string): Promise<void>;
@@ -250,6 +256,23 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
       await db.updateTable("session").set({ notes, updated_at: now() }).where("workspace_id", "=", workspaceId).where("id", "=", id).execute();
     },
 
+    async listSessionPrs(workspaceId, sessionId) {
+      return db.selectFrom("session_pr").selectAll().where("workspace_id", "=", workspaceId).where("session_id", "=", sessionId).orderBy("created_at", "asc").execute();
+    },
+
+    async addSessionPr(workspaceId, sessionId, url) {
+      const existing = await db.selectFrom("session_pr").selectAll().where("workspace_id", "=", workspaceId).where("session_id", "=", sessionId).where("url", "=", url).executeTakeFirst();
+      if (existing) return existing;
+      const row: SessionPrRow = { id: newId(), workspace_id: workspaceId, session_id: sessionId, url, created_at: now() };
+      await db.insertInto("session_pr").values(row).execute();
+      return row;
+    },
+
+    async removeSessionPr(workspaceId, sessionId, prId) {
+      const res = await db.deleteFrom("session_pr").where("workspace_id", "=", workspaceId).where("session_id", "=", sessionId).where("id", "=", prId).executeTakeFirst();
+      return Number(res.numDeletedRows ?? 0) > 0;
+    },
+
     async deleteSession(workspaceId, id) {
       const s = await db.selectFrom("session").select("id").where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
       if (!s) return false;
@@ -261,6 +284,7 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
       await db.deleteFrom("inspect_round").where("session_id", "=", id).execute();
       await db.deleteFrom("inspect_blob").where("session_id", "=", id).execute();
       await db.deleteFrom("memory").where("level", "=", "session").where("session_id", "=", id).execute();
+      await db.deleteFrom("session_pr").where("session_id", "=", id).execute();
       await db.deleteFrom("session").where("id", "=", id).execute();
       return true;
     },

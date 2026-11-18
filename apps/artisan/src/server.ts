@@ -329,7 +329,8 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
       : null;
     const plan = session.plan_json ? JSON.parse(session.plan_json) : null;
     const live = sessionRunner.snapshot(id);
-    return { ...sessionOut(session), plan, running: live.running, queue: live.queue, ask: live.ask, usage, messages: messages.map(messageOut) };
+    const prs = await repo.listSessionPrs(ctx.workspaceId, id);
+    return { ...sessionOut(session), plan, running: live.running, queue: live.queue, ask: live.ask, prs: prs.map((r) => ({ id: r.id, url: r.url })), usage, messages: messages.map(messageOut) };
   });
 
   // Canvas metadata lives in Artisan; document content is fetched from Paintress.
@@ -381,8 +382,9 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     if (body.prUrl !== undefined) {
       const url = (body.prUrl ?? "").trim();
       if (url && !/^https?:\/\/[\w.-]+\/[^/]+\/[^/]+\/pull\/\d+/.test(url)) return reply.code(400).send({ error: "not a pull request URL" });
-      await repo.setSessionPr(ctx.workspaceId, id, url || null);
-      hub.broadcast(ctx.workspaceId, id, { type: "pr", prUrl: url || null });
+      if (url) await repo.addSessionPr(ctx.workspaceId, id, url);
+      const rows = await repo.listSessionPrs(ctx.workspaceId, id);
+      hub.broadcast(ctx.workspaceId, id, { type: "pr", prs: rows.map((r) => ({ id: r.id, url: r.url })) });
     }
     if (body.notes !== undefined) await repo.setSessionNotes(ctx.workspaceId, id, body.notes ? body.notes.slice(0, 100_000) : null);
     if (body.model) await repo.setSessionModel(ctx.workspaceId, id, body.model);
@@ -1159,19 +1161,39 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     return { ok: await repo.deleteCheckpoint(ctx.workspaceId, id) };
   });
 
-  // --- pull request info (gh on the session runner) -------------------------------
+  // --- pull requests linked to the session ------------------------------------------
+  app.get("/sessions/:id/prs", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const rows = await repo.listSessionPrs(ctx.workspaceId, id);
+    return { prs: rows.map((r) => ({ id: r.id, url: r.url })) };
+  });
+
+  app.delete("/sessions/:id/prs/:prId", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id, prId } = req.params as { id: string; prId: string };
+    const ok = await repo.removeSessionPr(ctx.workspaceId, id, prId);
+    const rows = await repo.listSessionPrs(ctx.workspaceId, id);
+    hub.broadcast(ctx.workspaceId, id, { type: "pr", prs: rows.map((r) => ({ id: r.id, url: r.url })) });
+    return { ok };
+  });
+
+  // Live pull request info (gh on the session runner).
   app.get("/sessions/:id/pr", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const { id } = req.params as { id: string };
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
-    if (!session.pr_url) return { pr: null };
+    const url = (req.query as { url?: string }).url ?? (await repo.listSessionPrs(ctx.workspaceId, id))[0]?.url ?? null;
+    if (!url) return { pr: null };
     const deps = depsFor(req);
     const fields = "number,title,url,state,isDraft,mergeStateStatus,reviewDecision,additions,deletions,changedFiles,statusCheckRollup,reviews,comments,reviewThreads,autoMergeRequest";
     // gh runs in the session's directory on its runner; -R works even when the
     // local checkout has no GitHub remote.
-    const script = `gh pr view ${JSON.stringify(session.pr_url)} --json ${fields} 2>&1 || { echo "@@gh_failed"; exit 13; }`;
+    const script = `gh pr view ${JSON.stringify(url)} --json ${fields} 2>&1 || { echo "@@gh_failed"; exit 13; }`;
     const res = await deps.dispatch.exec(session.runner, script, session.directory, 30_000);
     if (res.exitCode !== 0) {
       return { pr: null, error: (res.stdout || res.stderr || "gh failed").replace("@@gh_failed", "").trim().slice(0, 300) };
