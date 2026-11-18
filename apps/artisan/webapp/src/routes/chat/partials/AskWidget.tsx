@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Pencil, SkipForward } from "lucide-react";
 import { Button } from "@twodb/blocks";
 import { cn } from "../../../lib/cn.js";
@@ -37,13 +37,28 @@ export function AskWidget(props: {
 }) {
   const { questions } = props;
   const total = questions.length;
+  // Drafts + step belong to ONE set of questions. A new ask (different
+  // questions) must reset them — otherwise a mounted widget reused for a
+  // shorter ask indexes past the end (q/draft undefined → crash).
+  const questionsKey = useMemo(() => JSON.stringify(questions), [questions]);
   const [drafts, setDrafts] = useState<Draft[]>(() => questions.map(empty));
+  const [step, setStep] = useState(0);
+  const prevKey = useRef(questionsKey);
+  useEffect(() => {
+    if (prevKey.current !== questionsKey) {
+      prevKey.current = questionsKey;
+      setDrafts(questions.map(empty));
+      setStep(0);
+    }
+    // questions identity changes every render in some parents — key on content.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionsKey]);
   // 0..total-1 = questions; total = review (only when there is more than one question)
   const hasReview = total > 1;
-  const [step, setStep] = useState(0);
   const reviewing = hasReview && step === total;
-  const q = questions[Math.min(step, total - 1)];
-  const draft = drafts[Math.min(step, total - 1)];
+  const idx = Math.min(step, total - 1);
+  const q = questions[idx];
+  const draft = drafts[idx] ?? empty();
 
   const patch = (i: number, fn: (d: Draft) => Draft) => setDrafts((prev) => prev.map((d, k) => (k === i ? fn(d) : d)));
 
@@ -145,7 +160,7 @@ export function AskWidget(props: {
             {answeredCount} of {total} answered{answeredCount < total ? " — skipped questions are left to the agent's judgment" : ""}.
           </p>
         </div>
-      ) : (
+      ) : !q ? null : (
         <div className="space-y-2.5 p-3">
           <p className="text-[13px] font-medium text-ink">{q.question}</p>
           {q.options?.length ? (

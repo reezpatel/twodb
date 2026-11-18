@@ -18,6 +18,7 @@ import { ChatUsage, ChatUsageStat, ChatUsageContext, ChatUsageSpacer } from "./p
 import { ChatMessage } from "./partials/ChatMessage.js";
 import { ChatProgress } from "./partials/ChatProgress.js";
 import { AskWidget } from "./partials/AskWidget.js";
+import { ErrorBoundary } from "../../components/ErrorBoundary.js";
 import { ModelPicker, type ModelProvider, type ModelEntry, type TraceNode } from "@twodb/blocks";
 import { apiFetch } from "../../lib/artisan-client.js";
 
@@ -391,11 +392,15 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean; /** llm
         {!connected ? <ChatReconnecting /> : null}
         <QueuePills items={chat.queue} onRemove={chat.removeQueued} onSendNow={chat.sendQueueNow} />
         {chat.ask ? (
-          <AskWidget
-            questions={chat.ask.questions}
-            onAnswer={(answers) => chat.answer(chat.ask!.askId, answers)}
-            onCancel={() => chat.cancelAsk(chat.ask!.askId)}
-          />
+          // Boundary: a malformed ask payload must not take the whole chat
+          // down — the composer survives and the widget can retry.
+          <ErrorBoundary name="Question dialog">
+            <AskWidget
+              questions={chat.ask.questions}
+              onAnswer={(answers) => chat.answer(chat.ask!.askId, answers)}
+              onCancel={() => chat.cancelAsk(chat.ask!.askId)}
+            />
+          </ErrorBoundary>
         ) : (
           <ChatComposer busy={chat.running}>
             <MentionPopup

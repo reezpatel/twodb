@@ -31,6 +31,7 @@ import { useShellSession } from "./routes/shell/hooks/useShellSession.js";
 import { McpView } from "./routes/mcp/McpView.js";
 import { McpDialog } from "./routes/mcp/partials/McpDialog.js";
 import { SkillDialog } from "./routes/skills/partials/SkillDialog.js";
+import { ErrorBoundary } from "./components/ErrorBoundary.js";
 
 /**
  * Artisan shell: sidebar (sessions by directory) + tabbed workspace (one tab
@@ -41,7 +42,10 @@ export function App() {
     <BrowserRouter>
       <RequireAuth>
         <WorkspaceProvider>
-          <Shell />
+          {/* One bad view must not white-page the app. */}
+          <ErrorBoundary name="Artisan">
+            <Shell />
+          </ErrorBoundary>
         </WorkspaceProvider>
       </RequireAuth>
     </BrowserRouter>
