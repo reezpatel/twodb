@@ -17,11 +17,19 @@ import (
 // standard locations are listed explicitly here and prepended to every
 // spawned command's environment.
 func spawnEnv() []string {
-	home, _ := os.UserHomeDir()
+	// $HOME is often overridden by the service manager (the NixOS module sets
+	// HOME=/var/lib/two-runner for state), while the process still runs as the
+	// real user — the passwd entry is the user's actual home, where their nix
+	// profiles live. Prefer it; fall back to $HOME (then the state dir) when
+	// the user isn't in passwd (containers).
 	usr := os.Getenv("USER")
-	if usr == "" {
-		if u, err := user.Current(); err == nil {
+	home := os.Getenv("HOME")
+	if u, err := user.Current(); err == nil {
+		if usr == "" {
 			usr = u.Username
+		}
+		if u.HomeDir != "" {
+			home = u.HomeDir
 		}
 	}
 	extra := []string{

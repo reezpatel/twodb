@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -70,5 +71,30 @@ func TestCommandShellFallsBackToSh(t *testing.T) {
 	}
 	if _, err := os.Stat("/bin/bash"); err == nil && sh == "sh" {
 		t.Fatalf("bash exists at /bin/bash but commandShell returned %q", sh)
+	}
+}
+
+func TestSpawnEnvUsesPasswdHomeOverEnvHome(t *testing.T) {
+	// The NixOS module sets HOME=/var/lib/two-runner (state dir) while the
+	// process runs as the real user — the passwd home (where ~/.nix-profile
+	// lives) must win, or user profile tools stay unreachable.
+	t.Setenv("PATH", "/usr/bin:/bin")
+	t.Setenv("HOME", "/var/lib/two-runner")
+	u, err := user.Current()
+	if err != nil || u.HomeDir == "" || u.HomeDir == "/var/lib/two-runner" {
+		t.Skip("no distinct passwd home on this host")
+	}
+	var path string
+	for _, e := range spawnEnv() {
+		if strings.HasPrefix(e, "PATH=") {
+			path = e[len("PATH="):]
+			break
+		}
+	}
+	if !strings.Contains(path, u.HomeDir+"/.nix-profile/bin") {
+		t.Fatalf("PATH %q missing passwd-home nix profile %q", path, u.HomeDir+"/.nix-profile/bin")
+	}
+	if strings.Contains(path, "/var/lib/two-runner/.nix-profile/bin") {
+		t.Fatalf("PATH %q should not use the overridden $HOME", path)
 	}
 }
