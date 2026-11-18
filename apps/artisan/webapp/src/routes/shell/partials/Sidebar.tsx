@@ -303,9 +303,10 @@ export function Sidebar(props: SidebarProps) {
 
 /** Marker badges: a tiny colored pill with the 2-letter code on the row, same dot in the menu.
  * Faded backgrounds so they read as markers, not buttons. */
-const MARKERS: Array<{ id: "ip" | "do" | "at" | "re"; label: string; hint: string; badge: string; dot: string }> = [
+const MARKERS: Array<{ id: "ip" | "do" | "at" | "re" | "ho"; label: string; hint: string; badge: string; dot: string }> = [
   { id: "ip", label: "IP", hint: "In progress", badge: "bg-info/15 text-info", dot: "bg-info" },
   { id: "re", label: "RE", hint: "Review", badge: "bg-ion-deep/15 text-ion-deep", dot: "bg-ion-deep" },
+  { id: "ho", label: "HO", hint: "Hold", badge: "bg-ink-muted/15 text-ink-muted", dot: "bg-ink-muted" },
   { id: "do", label: "DO", hint: "Done", badge: "bg-success/15 text-success", dot: "bg-success" },
   { id: "at", label: "AT", hint: "Attention", badge: "bg-warning/15 text-warning", dot: "bg-warning" },
 ];

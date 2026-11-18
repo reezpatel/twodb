@@ -372,7 +372,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     if (body.archived !== undefined) await repo.setSessionArchived(ctx.workspaceId, id, body.archived);
     if (body.marker !== undefined) {
       const m = body.marker;
-      if (m !== null && m !== "ip" && m !== "do" && m !== "at" && m !== "re") return reply.code(400).send({ error: "marker must be ip|do|at|re|null" });
+      if (m !== null && m !== "ip" && m !== "do" && m !== "at" && m !== "re" && m !== "ho") return reply.code(400).send({ error: "marker must be ip|re|do|at|ho|null" });
       await repo.setSessionMarker(ctx.workspaceId, id, m);
     }
     if (body.model) await repo.setSessionModel(ctx.workspaceId, id, body.model);

@@ -82,7 +82,7 @@ export interface SessionInfo {
   parentSessionId: string | null;
   thinkingLevel?: string | null;
   archivedAt?: string | null;
-  /** Sidebar badge: "ip" in-progress, "do" done, "at" attention, "re" review; null = none. */
+  /** Sidebar badge: "ip" in-progress, "re" review, "do" done, "at" attention, "ho" hold; null = none. */
   marker?: string | null;
   createdAt: string;
   updatedAt: string;
