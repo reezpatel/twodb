@@ -41,6 +41,8 @@ export interface SessionRow {
   marker: string | null;
   /** Pull request linked to this session (set_pr tool / sidebar); null = none. */
   pr_url: string | null;
+  /** User's private scratchpad — never part of the model context. */
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -291,6 +293,11 @@ export async function applySchema(db: Kysely<ArtisanDb>): Promise<void> {
   } catch {
     /* column already exists */
   }
+  try {
+    await db.schema.alterTable("session").addColumn("notes", "text").execute();
+  } catch {
+    /* column already exists */
+  }
   // TwoDB's provisioner normally creates the schema; self-heal for bare dev DBs. Checked first: the
   // least-privilege app role lacks CREATE on the database, and Postgres checks that BEFORE `IF NOT EXISTS`.
   const exists = await sql<{ n: number }>`select count(*)::int as n from information_schema.schemata where schema_name = 'artisan'`.execute(db as never);
@@ -318,6 +325,7 @@ export async function applySchema(db: Kysely<ArtisanDb>): Promise<void> {
     .addColumn("archived_at", "text")
     .addColumn("marker", "text")
     .addColumn("pr_url", "text")
+    .addColumn("notes", "text")
     .addColumn("created_at", "text", (c) => c.notNull())
     .addColumn("updated_at", "text", (c) => c.notNull())
     .execute();

@@ -86,6 +86,8 @@ export interface SessionInfo {
   marker?: string | null;
   /** Linked pull request URL (set_pr tool / sidebar); null = none. */
   prUrl?: string | null;
+  /** User's private notes for the session (never sent to the model). */
+  notes?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -304,7 +306,7 @@ export const artisanClient = {
     return post("/sessions", input);
   },
 
-  updateSession(id: string, patchBody: { title?: string; model?: string; archived?: boolean; marker?: string | null; prUrl?: string | null }): Promise<SessionInfo> {
+  updateSession(id: string, patchBody: { title?: string; model?: string; archived?: boolean; marker?: string | null; prUrl?: string | null; notes?: string | null }): Promise<SessionInfo> {
     return patch(`/sessions/${id}`, patchBody);
   },
 

@@ -30,6 +30,8 @@ export interface ToolContext {
   repo: ArtisanRepo;
   dispatch: DispatchClient;
   toolkit: ToolkitClient;
+  /** Control-plane service fetch (Paintress canvas) — absent when artisan runs standalone. */
+  serviceFetch?: ServiceFetch;
   session: SessionRow;
   agent: AgentRow;
   model: string;
@@ -552,6 +554,7 @@ export async function runAgentLoop(opts: {
             session, agent, model, deps, emit, apiKey: opts.apiKey,
             dispatch: deps.dispatch, repo: deps.repo,
             toolkit: deps.toolkit!,
+            serviceFetch: deps.serviceFetch,
             tools: visible,
             askUser: async (questions) => {
               if (!session.interactive || deps.hub.roomSize(session.workspace_id, session.id) === 0) {

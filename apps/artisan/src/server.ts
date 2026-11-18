@@ -185,6 +185,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
         hub,
         tworoute: new TworouteClient(config, creds.tworoute),
         dispatch: new DispatchClient(config, creds.dispatch),
+        serviceFetch: opts.twodb?.serviceFetch,
         ...(opts.twodb?.serviceFetch ? { toolkit: createToolkitClient(opts.twodb.serviceFetch) } : {}),
       };
     },
@@ -367,6 +368,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
       archived?: boolean;
       marker?: string | null;
       prUrl?: string | null;
+      notes?: string | null;
       plan?: Array<{ description: string; status: string }> | null;
     };
     if (body.title) await repo.renameSession(ctx.workspaceId, id, body.title);
@@ -382,6 +384,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
       await repo.setSessionPr(ctx.workspaceId, id, url || null);
       hub.broadcast(ctx.workspaceId, id, { type: "pr", prUrl: url || null });
     }
+    if (body.notes !== undefined) await repo.setSessionNotes(ctx.workspaceId, id, body.notes ? body.notes.slice(0, 100_000) : null);
     if (body.model) await repo.setSessionModel(ctx.workspaceId, id, body.model);
     if (body.thinkingLevel !== undefined) await repo.setSessionThinkingLevel(ctx.workspaceId, id, body.thinkingLevel);
     if (body.plan !== undefined) await repo.setSessionPlan(id, body.plan);
@@ -1955,6 +1958,7 @@ function sessionOut(s: {
   archived_at?: string | null;
   marker?: string | null;
   pr_url?: string | null;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 }) {
@@ -1973,6 +1977,7 @@ function sessionOut(s: {
     archivedAt: s.archived_at ?? null,
     marker: s.marker ?? null,
     prUrl: s.pr_url ?? null,
+    notes: s.notes ?? null,
     createdAt: s.created_at,
     updatedAt: s.updated_at,
   };

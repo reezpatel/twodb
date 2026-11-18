@@ -43,7 +43,10 @@ export async function fetchCanvasContent(serviceFetch: ServiceFetch, workspaceId
   };
 }
 
-export function canvasTools(serviceFetch: ServiceFetch): ToolSpec[] {
+/** The service fetch rides the tool context — the SessionRunner's deps
+ * carry it too (a run dispatched after the last viewer disconnected can
+ * still create/update canvases). */
+export function canvasTools(serviceFetch?: ServiceFetch): ToolSpec[] {
   return [{
     name: "update_canvas",
     description: "Creates or updates a document in the Canvas tab. Pass the FULL Markdown content each time; an existing document with the same title is replaced.",
@@ -56,6 +59,8 @@ export function canvasTools(serviceFetch: ServiceFetch): ToolSpec[] {
       required: ["title", "content"],
     },
     async execute(args, ctx) {
+      const sf = serviceFetch ?? ctx.serviceFetch;
+      if (!sf) throw new Error("canvas integration unavailable");
       const title = String(args.title ?? "").trim().slice(0, 120);
       if (!title) throw new Error("title is required");
       const content = String(args.content ?? "");
@@ -63,7 +68,7 @@ export function canvasTools(serviceFetch: ServiceFetch): ToolSpec[] {
       const existing = await ctx.repo.findCanvas(ctx.session.workspace_id, owner, title);
 
       if (existing) {
-        const response = await serviceFetch(PAINTRESS_APP, ctx.session.workspace_id, `/boards/${encodeURIComponent(existing.resource_id)}/doc`, {
+        const response = await sf(PAINTRESS_APP, ctx.session.workspace_id, `/boards/${encodeURIComponent(existing.resource_id)}/doc`, {
           method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ markdown: content }),
         });
         await responseJson(response);
@@ -72,7 +77,7 @@ export function canvasTools(serviceFetch: ServiceFetch): ToolSpec[] {
         return `canvas updated: ${title}`;
       }
 
-      const response = await serviceFetch(PAINTRESS_APP, ctx.session.workspace_id, "/boards", {
+      const response = await sf(PAINTRESS_APP, ctx.session.workspace_id, "/boards", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name: title, kind: "doc", markdown: content,

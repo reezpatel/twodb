@@ -5,6 +5,7 @@ import { GitSection } from "./GitSection.js";
 import { MemoriesSection } from "./MemoriesSection.js";
 import { ProviderSection } from "./ProviderSection.js";
 import { PrSection } from "./PrSection.js";
+import { NotesSection } from "./NotesSection.js";
 import { PlanList, type PlanStep } from "../../../components/ui/plan-list.js";
 
 export interface SessionSidebarProps {
@@ -48,6 +49,8 @@ export function SessionSidebar(props: SessionSidebarProps) {
       <MemoriesSection sessionId={props.sessionId} />
 
       <PrSection sessionId={props.sessionId} prUrl={props.prUrl} />
+
+      <NotesSection sessionId={props.sessionId} />
 
       <ProviderSection model={props.model} />
 
