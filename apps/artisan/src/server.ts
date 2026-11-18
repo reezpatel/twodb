@@ -645,6 +645,22 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     return { ok };
   });
 
+  // --- away mode: ask_user auto-answers with the recommended option -----------
+  app.get("/settings/away-mode", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const s = await repo.getSetting(ctx.workspaceId, "away_mode");
+    return { away: s?.value === "1" };
+  });
+  app.put("/settings/away-mode", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const body = (req.body ?? {}) as { away?: boolean };
+    if (typeof body.away !== "boolean") return reply.code(400).send({ error: "away must be boolean" });
+    await repo.setSetting(ctx.workspaceId, "away_mode", body.away ? "1" : "0");
+    return { away: body.away };
+  });
+
   // --- global instruction: base rules prepended to every agent's prompt ------
   const MAX_GLOBAL_INSTRUCTION = 20_000;
   app.get("/settings/global-instruction", async (req, reply) => {

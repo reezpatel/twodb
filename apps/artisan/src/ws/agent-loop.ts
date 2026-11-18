@@ -574,6 +574,15 @@ export async function runAgentLoop(opts: {
               if (!session.interactive || deps.hub.roomSize(session.workspace_id, session.id) === 0) {
                 return { cancelled: false };
               }
+              // Away mode: nobody is watching — auto-answer with the first
+              // option (or "Use your best judgment" when there are no options).
+              const away = (await deps.repo.getSetting(session.workspace_id, "away_mode"))?.value === "1";
+              if (away) {
+                return {
+                  cancelled: false,
+                  answers: questions.map((q) => [q.options?.[0] ?? "Use your best judgment"]),
+                };
+              }
               emit({ type: "ask_user", askId: tc.id, questions });
               // Broadcast the resolution too: every viewer (including ones
               // that joined while the question was open) clears the widget,
