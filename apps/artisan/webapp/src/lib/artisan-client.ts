@@ -82,6 +82,8 @@ export interface SessionInfo {
   parentSessionId: string | null;
   thinkingLevel?: string | null;
   archivedAt?: string | null;
+  /** Sidebar badge: "ip" in-progress, "do" done, "at" attention, "re" review; null = none. */
+  marker?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -277,7 +279,7 @@ export const artisanClient = {
     return post("/sessions", input);
   },
 
-  updateSession(id: string, patchBody: { title?: string; model?: string; archived?: boolean }): Promise<SessionInfo> {
+  updateSession(id: string, patchBody: { title?: string; model?: string; archived?: boolean; marker?: string | null }): Promise<SessionInfo> {
     return patch(`/sessions/${id}`, patchBody);
   },
 

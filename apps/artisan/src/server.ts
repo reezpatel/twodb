@@ -365,10 +365,16 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
       model?: string;
       thinkingLevel?: string | null;
       archived?: boolean;
+      marker?: string | null;
       plan?: Array<{ description: string; status: string }> | null;
     };
     if (body.title) await repo.renameSession(ctx.workspaceId, id, body.title);
     if (body.archived !== undefined) await repo.setSessionArchived(ctx.workspaceId, id, body.archived);
+    if (body.marker !== undefined) {
+      const m = body.marker;
+      if (m !== null && m !== "ip" && m !== "do" && m !== "at" && m !== "re") return reply.code(400).send({ error: "marker must be ip|do|at|re|null" });
+      await repo.setSessionMarker(ctx.workspaceId, id, m);
+    }
     if (body.model) await repo.setSessionModel(ctx.workspaceId, id, body.model);
     if (body.thinkingLevel !== undefined) await repo.setSessionThinkingLevel(ctx.workspaceId, id, body.thinkingLevel);
     if (body.plan !== undefined) await repo.setSessionPlan(id, body.plan);
@@ -1890,6 +1896,7 @@ function sessionOut(s: {
   parent_session_id: string | null;
   thinking_level: string | null;
   archived_at?: string | null;
+  marker?: string | null;
   created_at: string;
   updated_at: string;
 }) {
@@ -1906,6 +1913,7 @@ function sessionOut(s: {
     parentSessionId: s.parent_session_id,
     thinkingLevel: s.thinking_level,
     archivedAt: s.archived_at ?? null,
+    marker: s.marker ?? null,
     createdAt: s.created_at,
     updatedAt: s.updated_at,
   };

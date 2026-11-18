@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Plus, Bot, BookOpen, Plug, Settings, LogOut, SquareTerminal, MessageCircle, FolderPlus, Pencil, Search, ChevronRight, Archive, Check, MoreHorizontal, Trash2 } from "lucide-react";
+import { Plus, Bot, BookOpen, Plug, Settings, LogOut, SquareTerminal, MessageCircle, FolderPlus, Pencil, Search, ChevronRight, Archive, Check, MoreHorizontal, Trash2, Loader, CircleCheck, TriangleAlert, Eye, Minus } from "lucide-react";
 import { artisanClient, type AgentInfo, type DirectoryInfo, type McpServerInfo, type SessionInfo, type SkillInfo, type SpaceInfo } from "../../../lib/artisan-client.js";
 import { SessionSearchDialog } from "./SessionSearchDialog.js";
 import { useResizableWidth } from "../../../lib/useResizableWidth.js";
@@ -16,6 +16,8 @@ export interface SidebarProps {
   onEditDirectory: (dir: DirectoryInfo) => void;
   onRenameSession: (session: SessionInfo, title: string) => Promise<void> | void;
   onArchiveSession: (session: SessionInfo, archived: boolean) => Promise<void> | void;
+  /** Set the row's marker badge ("ip" in-progress, "do" done, "at" attention; null clears). */
+  onMarkSession: (session: SessionInfo, marker: string | null) => Promise<void> | void;
   onDeleteSession: (session: SessionInfo) => Promise<void> | void;
   skills: SkillInfo[];
   activeSkillId: string | null;
@@ -299,6 +301,18 @@ export function Sidebar(props: SidebarProps) {
   );
 }
 
+/** Marker badge definitions: tiny dot on the row + entries in the item menu. */
+const MARKERS: Array<{ id: "ip" | "do" | "at" | "re"; label: string; hint: string; icon: typeof Bot; cls: string }> = [
+  { id: "ip", label: "IP", hint: "In progress", icon: Loader, cls: "text-info" },
+  { id: "re", label: "RE", hint: "Review", icon: Eye, cls: "text-ion" },
+  { id: "do", label: "DO", hint: "Done", icon: CircleCheck, cls: "text-success" },
+  { id: "at", label: "AT", hint: "Attention", icon: TriangleAlert, cls: "text-warning" },
+];
+
+function markerOf(s: SessionInfo) {
+  return MARKERS.find((m) => m.id === s.marker) ?? null;
+}
+
 function SessionRow(props: SidebarProps & { session: SessionInfo; active: boolean }) {
   const { session: s, active } = props;
   const [editing, setEditing] = useState(false);
@@ -339,8 +353,13 @@ function SessionRow(props: SidebarProps & { session: SessionInfo; active: boolea
         active ? "bg-stone text-ink" : "text-muted-foreground hover:bg-paper-grid hover:text-ink"
       }`}
     >
-            <button type="button" onClick={() => props.onOpenSession(s)} className="min-w-0 flex-1 truncate py-[7px] text-left leading-none" title={s.title}>
-        {s.title}
+            <button type="button" onClick={() => props.onOpenSession(s)} className="flex min-w-0 flex-1 items-center gap-1.5 truncate py-[7px] text-left leading-none" title={s.title}>
+        <span className="min-w-0 flex-1 truncate">{s.title}</span>
+        {markerOf(s) ? (
+          <span title={markerOf(s)!.hint} className={`shrink-0 ${markerOf(s)!.cls}`}>
+            {(() => { const M = markerOf(s)!; return <M.icon className="size-3" strokeWidth={2.5} />; })()}
+          </span>
+        ) : null}
       </button>
       <div className="relative shrink-0">
         <button
@@ -365,6 +384,31 @@ function SessionRow(props: SidebarProps & { session: SessionInfo; active: boolea
                   setEditing(true);
                 }}
               />
+              <div className="my-1 border-t border-outline/60" />
+              <span className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/50">Marker</span>
+              {MARKERS.map((m) => (
+                <MenuItem
+                  key={m.id}
+                  icon={m.icon}
+                  iconCls={m.cls}
+                  label={`${m.label} — ${m.hint}`}
+                  active={s.marker === m.id}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void props.onMarkSession(s, s.marker === m.id ? null : m.id);
+                  }}
+                />
+              ))}
+              <MenuItem
+                icon={Minus}
+                label="None"
+                active={!s.marker}
+                onClick={() => {
+                  setMenuOpen(false);
+                  void props.onMarkSession(s, null);
+                }}
+              />
+              <div className="my-1 border-t border-outline/60" />
               <MenuItem
                 icon={Archive}
                 label={archived ? "Unarchive" : "Archive"}
@@ -530,15 +574,16 @@ function AgentList(props: { agents: AgentInfo[]; activeId: string | null; onEdit
   );
 }
 
-function MenuItem(props: { icon: typeof Bot; label: string; onClick: () => void; danger?: boolean }) {
+function MenuItem(props: { icon: typeof Bot; label: string; onClick: () => void; danger?: boolean; active?: boolean; iconCls?: string }) {
   return (
     <button
       type="button"
       onClick={props.onClick}
       className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] hover:bg-surface-muted ${props.danger ? "text-red-500" : "text-ink"}`}
     >
-      <props.icon className="size-3.5" />
-      {props.label}
+      <props.icon className={`size-3.5 ${props.iconCls ?? ""}`} />
+      <span className="min-w-0 flex-1">{props.label}</span>
+      {props.active ? <Check className="size-3 shrink-0 text-info" /> : null}
     </button>
   );
 }

@@ -215,6 +215,10 @@ function Shell() {
           if (archived) tabs.close(s.id);
           await refreshSessions();
         }}
+        onMarkSession={async (s, marker) => {
+          await artisanClient.updateSession(s.id, { marker });
+          await refreshSessions();
+        }}
         onDeleteSession={async (s) => {
           await artisanClient.deleteSession(s.id);
           tabs.close(s.id);
