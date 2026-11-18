@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Plus, Bot, BookOpen, Plug, Settings, LogOut, SquareTerminal, MessageCircle, FolderPlus, Pencil, Search, ChevronRight, Archive, Check, MoreHorizontal, Trash2, Loader, CircleCheck, TriangleAlert, Eye, Minus } from "lucide-react";
+import { Plus, Bot, BookOpen, Plug, Settings, LogOut, SquareTerminal, MessageCircle, FolderPlus, Pencil, Search, ChevronRight, Archive, Check, MoreHorizontal, Trash2, Minus } from "lucide-react";
 import { artisanClient, type AgentInfo, type DirectoryInfo, type McpServerInfo, type SessionInfo, type SkillInfo, type SpaceInfo } from "../../../lib/artisan-client.js";
 import { SessionSearchDialog } from "./SessionSearchDialog.js";
 import { useResizableWidth } from "../../../lib/useResizableWidth.js";
@@ -301,12 +301,12 @@ export function Sidebar(props: SidebarProps) {
   );
 }
 
-/** Marker badge definitions: tiny dot on the row + entries in the item menu. */
-const MARKERS: Array<{ id: "ip" | "do" | "at" | "re"; label: string; hint: string; icon: typeof Bot; cls: string }> = [
-  { id: "ip", label: "IP", hint: "In progress", icon: Loader, cls: "text-info" },
-  { id: "re", label: "RE", hint: "Review", icon: Eye, cls: "text-ion" },
-  { id: "do", label: "DO", hint: "Done", icon: CircleCheck, cls: "text-success" },
-  { id: "at", label: "AT", hint: "Attention", icon: TriangleAlert, cls: "text-warning" },
+/** Marker badge definitions: a tiny faded dot on the row + a colored dot in the item menu. */
+const MARKERS: Array<{ id: "ip" | "do" | "at" | "re"; label: string; hint: string; cls: string }> = [
+  { id: "ip", label: "IP", hint: "In progress", cls: "bg-info" },
+  { id: "re", label: "RE", hint: "Review", cls: "bg-ion" },
+  { id: "do", label: "DO", hint: "Done", cls: "bg-success" },
+  { id: "at", label: "AT", hint: "Attention", cls: "bg-warning" },
 ];
 
 function markerOf(s: SessionInfo) {
@@ -356,9 +356,7 @@ function SessionRow(props: SidebarProps & { session: SessionInfo; active: boolea
             <button type="button" onClick={() => props.onOpenSession(s)} className="flex min-w-0 flex-1 items-center gap-1.5 truncate py-[7px] text-left leading-none" title={s.title}>
         <span className="min-w-0 flex-1 truncate">{s.title}</span>
         {markerOf(s) ? (
-          <span title={markerOf(s)!.hint} className={`shrink-0 ${markerOf(s)!.cls}`}>
-            {(() => { const M = markerOf(s)!; return <M.icon className="size-3" strokeWidth={2.5} />; })()}
-          </span>
+          <span title={markerOf(s)!.hint} className={`size-2 shrink-0 rounded-full opacity-60 ${markerOf(s)!.cls}`} />
         ) : null}
       </button>
       <div className="relative shrink-0">
@@ -389,8 +387,7 @@ function SessionRow(props: SidebarProps & { session: SessionInfo; active: boolea
               {MARKERS.map((m) => (
                 <MenuItem
                   key={m.id}
-                  icon={m.icon}
-                  iconCls={m.cls}
+                  dotCls={m.cls}
                   label={`${m.label} — ${m.hint}`}
                   active={s.marker === m.id}
                   onClick={() => {
@@ -574,14 +571,14 @@ function AgentList(props: { agents: AgentInfo[]; activeId: string | null; onEdit
   );
 }
 
-function MenuItem(props: { icon: typeof Bot; label: string; onClick: () => void; danger?: boolean; active?: boolean; iconCls?: string }) {
+function MenuItem(props: { icon?: typeof Bot; label: string; onClick: () => void; danger?: boolean; active?: boolean; iconCls?: string; dotCls?: string }) {
   return (
     <button
       type="button"
       onClick={props.onClick}
       className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] hover:bg-surface-muted ${props.danger ? "text-red-500" : "text-ink"}`}
     >
-      <props.icon className={`size-3.5 ${props.iconCls ?? ""}`} />
+      {props.dotCls ? <span className={`size-2.5 shrink-0 rounded-full ${props.dotCls}`} /> : props.icon ? <props.icon className={`size-3.5 ${props.iconCls ?? ""}`} /> : null}
       <span className="min-w-0 flex-1">{props.label}</span>
       {props.active ? <Check className="size-3 shrink-0 text-info" /> : null}
     </button>
