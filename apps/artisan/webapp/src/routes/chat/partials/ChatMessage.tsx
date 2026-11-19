@@ -8,9 +8,11 @@ import { cn } from "../../../lib/cn.js";
  */
 export function ChatMessage({ variant = "assistant", className, children, ...props }: ComponentProps<"div"> & { variant?: "user" | "assistant" }) {
   const user = variant === "user";
+  // break-all on the bubble/line container: long unbroken strings (URLs, ids,
+  // base64) must wrap instead of overflowing the message row.
   return (
-    <div data-slot="chat-message" data-variant={variant} className={cn("flex flex-col", user ? "mt-4" : "gap-0.5", className)} {...props}>
-      <div className={cn(user && "ms-5 rounded-sm bg-bubble px-2.5 py-2 md:px-4 md:py-4 md:ms-20 lg:ms-40")}>{children}</div>
+    <div data-slot="chat-message" data-variant={variant} className={cn("flex flex-col break-all", user ? "mt-4" : "gap-0.5", className)} {...props}>
+      <div className={cn("break-all", user && "ms-5 rounded-sm bg-bubble px-2.5 py-2 md:px-4 md:py-4 md:ms-20 lg:ms-40")}>{children}</div>
     </div>
   );
 }
