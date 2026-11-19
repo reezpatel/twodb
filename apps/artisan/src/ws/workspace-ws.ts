@@ -71,12 +71,19 @@ export function registerWorkspaceWs(app: FastifyInstance, hub: WorkspaceHub, rep
     socket.on("error", () => hub.dropSocket(workspaceId, socket));
   });
 
-  // HTTP-side abort for completeness.
+  // HTTP-side abort: stops the model stream/tools and clears the steering
+  // queue, so nothing drains into a provider that just errored (e.g. quota)
+  // or into a run the user explicitly stopped.
   app.post("/sessions/:id/abort", async (req, reply) => {
     const ctx = readForwardedContext(req);
     if (!ctx) return reply.code(401).send({ error: "unauthorized" });
     const { id } = req.params as { id: string };
+    const workspaceId = ctx.workspaceId;
     const ok = abortSession(id);
+    runner.clearQueue(id);
+    // Nothing was running: end the "thinking" state right away — otherwise a
+    // stuck UI waits forever for a done frame that will never come.
+    if (!ok) hub.broadcast(workspaceId, id, { type: "done", ok: false, message: "stopped" });
     return { ok };
   });
 }

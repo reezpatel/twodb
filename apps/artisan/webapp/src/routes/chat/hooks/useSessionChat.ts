@@ -218,7 +218,15 @@ export function useSessionChat(sessionId: string) {
   }, [sessionId, refresh]);
 
   const abort = useCallback(async () => {
-    await artisanClient.abort(sessionId);
+    // Optimistic: the server clears the steering queue and ends the run; the
+    // queue pills and spinner must not wait for the done frame (which may be
+    // delayed while a stalled provider stream is torn down).
+    setQueue([]);
+    try {
+      await artisanClient.abort(sessionId);
+    } catch (e) {
+      setError((e as Error).message);
+    }
   }, [sessionId]);
 
   return {

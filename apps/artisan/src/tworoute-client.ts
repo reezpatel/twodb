@@ -204,9 +204,22 @@ export class TworouteClient {
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
+    // A stalled SSE stream (provider stuck at quota, dead connection) can hang
+    // reader.read() for minutes — race it against the abort signal so Stop
+    // still works instead of leaving the session "thinking".
+    const abortableRead = (): Promise<{ done: boolean; value: Uint8Array | undefined }> =>
+      new Promise((resolve, reject) => {
+        if (input.signal?.aborted) return reject(input.signal.reason);
+        reader.read().then((r) => resolve({ done: r.done ?? false, value: r.value }), reject);
+        input.signal?.addEventListener("abort", () => reject(input.signal!.reason), { once: true });
+      });
     let buf = "";
     for (;;) {
-      const { done, value } = await reader.read();
+      if (input.signal?.aborted) {
+        await reader.cancel().catch(() => undefined);
+        throw input.signal.reason;
+      }
+      const { done, value } = await abortableRead();
       if (done) break;
       buf += decoder.decode(value, { stream: true });
       let nl: number;

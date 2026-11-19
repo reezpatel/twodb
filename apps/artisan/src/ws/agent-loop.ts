@@ -687,6 +687,12 @@ export async function runAgentLoop(opts: {
     }
 
     if (round >= MAX_ROUNDS) emit({ type: "done", ok: false, message: "round limit reached" });
+  } catch (err) {
+    // Provider error (quota, unreachable) or abort: always tell the room the
+    // run ended — otherwise the UI shows "thinking" forever and queued
+    // messages never drain.
+    emit({ type: "done", ok: false, message: (err as Error).message?.slice(0, 200) || "run failed" });
+    throw err;
   } finally {
     running.delete(session.id);
   }
