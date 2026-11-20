@@ -98,3 +98,24 @@ func TestSpawnEnvUsesPasswdHomeOverEnvHome(t *testing.T) {
 		t.Fatalf("PATH %q should not use the overridden $HOME", path)
 	}
 }
+
+func TestSpawnEnvSinglePathEntry(t *testing.T) {
+	// exec keeps the LAST duplicate key, so spawnEnv must emit exactly one
+	// PATH entry — otherwise the inherited minimal PATH shadows the widened
+	// one (regression: nix tools stayed invisible on the deployed runner).
+	t.Setenv("PATH", "/usr/bin:/bin")
+	count := 0
+	var path string
+	for _, e := range spawnEnv() {
+		if strings.HasPrefix(e, "PATH=") {
+			count++
+			path = e[len("PATH="):]
+		}
+	}
+	if count != 1 {
+		t.Fatalf("spawnEnv emitted %d PATH entries (last wins under exec)", count)
+	}
+	if !strings.Contains(path, "/run/current-system/sw/bin") {
+		t.Fatalf("effective PATH %q missing nix system bin", path)
+	}
+}

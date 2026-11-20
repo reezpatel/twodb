@@ -55,7 +55,15 @@ func spawnEnv() []string {
 			parts = append(parts, p)
 		}
 	}
-	env := append([]string{"PATH=" + strings.Join(parts, ":")}, os.Environ()...)
+	inherited := make([]string, 0, len(os.Environ()))
+	for _, e := range os.Environ() {
+		// The exec syscall keeps the LAST duplicate key — drop the inherited
+		// PATH so our widened PATH above actually reaches the child.
+		if !strings.HasPrefix(e, "PATH=") {
+			inherited = append(inherited, e)
+		}
+	}
+	env := append([]string{"PATH=" + strings.Join(parts, ":")}, inherited...)
 	return env
 }
 
