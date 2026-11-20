@@ -10,6 +10,8 @@ interface EditorStatus {
   bytes?: number;
   total?: number;
   port?: number;
+  /** Install/start failure recorded by the server. */
+  error?: string;
 }
 
 /**
@@ -43,9 +45,8 @@ export function EditorScreen(props: { sessionId: string }) {
   useEffect(() => {
     void refresh();
     const t = setInterval(() => {
-      setStatus((s) => (s.state === "ready" ? s : s));
       void refresh();
-    }, status.state === "installing" ? 1500 : 4000);
+    }, status.state === "installing" || status.state === "idle" ? 1500 : 4000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh, status.state]);
@@ -126,6 +127,7 @@ export function EditorScreen(props: { sessionId: string }) {
       ) : (
         <>
           <p className="text-sm font-medium text-destructive">Editor failed to start</p>
+          {status.error ? <p className="max-w-md break-all text-xs text-ink-muted">{status.error}</p> : null}
           {error ? <p className="max-w-sm text-xs text-ink-muted">{error}</p> : null}
           <button type="button" onClick={() => void refresh()} className="text-[13px] text-info hover:underline">Retry</button>
         </>

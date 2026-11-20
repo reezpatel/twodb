@@ -1554,19 +1554,25 @@ echo saved`;
 
   // --- code editor (code-server on the session's runner, iframed) --------------
   const EDITOR_PORT = 8443;
+  // Last install error per session, surfaced by /editor/status (in-memory — a
+  // restart just clears it, the next install repopulates on failure).
+  const editorInstallErrors = new Map<string, string>();
   // code-server's bin/code-server is a symlink that loops on some installs —
   // resolve the versioned binary under lib/ instead (the same fallback the
   // start script uses).
   const EDITOR_DIR = `${process.env.HOME ?? "/root"}/.local/share/twodb-editor/code-server`;
   const EDITOR_BIN_RESOLVE = `ls ${shellQuote(EDITOR_DIR)}/lib/code-server-*/bin/code-server 2>/dev/null | head -1`;
 
-  async function editorStatus(session: { runner: string; directory: string }): Promise<{ state: string; bytes?: number; total?: number; port?: number }> {
+  async function editorStatus(session: { id: string; runner: string; directory: string }): Promise<{ state: string; bytes?: number; total?: number; port?: number; error?: string }> {
     const deps = depsFor({ headers: {} } as FastifyRequest);
     const which = await deps.dispatch
       .exec(session.runner, `BIN=$(${EDITOR_BIN_RESOLVE}); [ -n "$BIN" ] && [ -x "$BIN" ] && echo yes`, "/", 10_000)
       .catch(() => null);
     const installed = which?.stdout?.trim().includes("yes");
-    if (!installed) return { state: "not_installed" };
+    if (!installed) {
+      const err = editorInstallErrors.get((session as { id?: string }).id ?? "");
+      return err ? { state: "error", error: err } : { state: "not_installed" };
+    }
     // is it already listening?
     // code-server / returns 302 -> /?folder=…; any non-000 response means it is up
     // NOTE: curl -w '%{http_code}' prints 000 on connection refused, so never
@@ -1595,6 +1601,7 @@ echo saved`;
     const { id } = req.params as { id: string };
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
+    editorInstallErrors.delete(session.id);
     const deps = depsFor(req);
     // Install code-server standalone into the runner user's home, atomically:
     // build under a tmp dir and only swap it in once complete — an interrupted
@@ -1620,7 +1627,16 @@ echo saved`;
       'rm -rf "$TMP" "$BASE/code-server.old"',
       "echo installed",
     ].join("\n");
-    void deps.dispatch.exec(session.runner, script, "/", 600_000).catch(() => {});
+    // Run the install in the background but REMEMBER failures — the status
+    // endpoint reports them so the UI doesn't spin on "installing" forever
+    // when the runner can't download (no curl, no network, wrong HOME).
+    void deps.dispatch.exec(session.runner, script, "/", 600_000)
+      .then((r) => {
+        if (r.exitCode !== 0 || !/installed|already running/.test(r.stdout)) {
+          editorInstallErrors.set(session.id, (r.stderr || r.stdout || "install failed").slice(0, 500));
+        }
+      })
+      .catch((e) => editorInstallErrors.set(session.id, (e as Error).message.slice(0, 500)));
     return { ok: true, state: "installing" };
   });
 
