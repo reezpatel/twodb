@@ -75,6 +75,18 @@ let
         description = "Where the runner keeps its key and microvm state.";
       };
 
+      homeDir = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "/home/alice";
+        description = ''
+          HOME for the runner process and every command Dispatch runs. null (default) uses stateDir — right for the
+          dedicated two-runner user, which has no home of its own. Set it to the login user's home when
+          user = "<yourself>" so spawned commands see that account's dotfiles (~/.ssh, ~/.gitconfig, ~/.config/gh,
+          nix profiles). The runner's own state still lives in stateDir (--state flag), unaffected by HOME.
+        '';
+      };
+
       extraArgs = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [ ];
@@ -188,7 +200,7 @@ in
           wants = [ "network-online.target" ];
           path = basePackages pkgs ++ cfg.extraPackages;
           environment = {
-            HOME = cfg.stateDir;
+            HOME = if cfg.homeDir != null then cfg.homeDir else cfg.stateDir;
           } // lib.optionalAttrs cfg.microvm.enable {
             TWO_RUNNER_FC_BIN = "${cfg.microvm.firecracker}/bin/firecracker";
             TWO_RUNNER_KERNEL = toString cfg.microvm.kernel;
@@ -253,7 +265,7 @@ in
             ++ lib.optionals (cfg.keyFile != null) [ "--key-file" (toString cfg.keyFile) ]
             ++ cfg.extraArgs;
           EnvironmentVariables = {
-            HOME = cfg.stateDir;
+            HOME = if cfg.homeDir != null then cfg.homeDir else cfg.stateDir;
             PATH = lib.makeBinPath (basePackages pkgs ++ cfg.extraPackages) + ":/usr/bin:/bin:/usr/sbin:/sbin";
           };
           RunAtLoad = true;
