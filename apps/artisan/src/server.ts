@@ -1515,7 +1515,7 @@ echo saved`;
       const termCallId = newId();
       const upstream = new WebSocket(
         `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(runner)}/term?command=${encodeURIComponent(command)}&cwd=${encodeURIComponent(session.directory)}&callId=${termCallId}`,
-        { headers: { authorization: `Bearer ${apiKeyFor(req)}` } },
+        { headers: { authorization: `Bearer ${apiKeyFor(req)}`, "x-twodb-workspace-id": ctx.workspaceId } },
       );
       upstream.on("message", (raw: unknown) => {
         if (socket.readyState === socket.OPEN) socket.send(String(raw));
@@ -1670,7 +1670,7 @@ echo saved`;
       url.searchParams.delete("access_token");
       const upstream = new WebSocket(
         `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(session.runner)}/proxy-ws?port=${EDITOR_PORT}&path=${encodeURIComponent("/" + sub + url.search)}`,
-        { headers: { authorization: `Bearer ${apiKeyFor(req)}` } },
+        { headers: { authorization: `Bearer ${apiKeyFor(req)}`, "x-twodb-workspace-id": ctx.workspaceId } },
       );
       // Binary-safe relay. VS Code's Management/ExtensionHost protocol sends
       // BINARY frames when skipWebSocketFrames=false; dispatch's proxy-ws and the
@@ -1870,7 +1870,7 @@ echo saved`;
       const path = url.searchParams.get("path") ?? "/";
       const upstream = new WebSocket(
         `${config.DISPATCH_URL.replace(/^http/, "ws")}/runners/${encodeURIComponent(session.runner)}/proxy-ws?port=${port}&path=${encodeURIComponent(path)}`,
-        { headers: { authorization: `Bearer ${apiKeyFor(req)}` } },
+        { headers: { authorization: `Bearer ${apiKeyFor(req)}`, "x-twodb-workspace-id": ctx.workspaceId } },
       );
       // Binary-safe relay. VS Code's Management/ExtensionHost protocol sends
       // BINARY frames when skipWebSocketFrames=false; dispatch's proxy-ws and the
