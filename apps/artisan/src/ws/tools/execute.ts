@@ -36,7 +36,11 @@ export async function executeSubagentTool(args: Record<string, unknown>, ctx: To
     const agent = await deps.repo.getAgent(ctx.session.workspace_id, agentId);
     if (!agent) return `unknown agent_id ${agentId}`;
     if (!canInvoke(callerType, agent.type)) return `cannot invoke ${agent.type} from a ${callerType} session`;
-    if (agent.space_id !== ctx.session.space_id) return "agent belongs to a different space";
+    // An agent may live in several spaces (space_ids_json); the primary
+    // space_id is just the first. Only block when the session's space isn't
+    // among the agent's spaces at all.
+    const agentSpaces = parseJson<string[]>(agent.space_ids_json, agent.space_id ? [agent.space_id] : []);
+    if (agentSpaces.length > 0 && !agentSpaces.includes(ctx.session.space_id)) return "agent belongs to a different space";
     // tag visibility
     const tags = parseJson<string[]>(agent.tags_json, ["default"]);
     if (!(tags.includes("default") || tags.some((t) => callerTags.includes(t)))) return "agent not visible in this session";
@@ -85,21 +89,21 @@ export async function executeSubagentTool(args: Record<string, unknown>, ctx: To
     childAgent.tools_json = toolsAllow ? JSON.stringify(toolsAllow) : targetAgent.tools_json;
   }
 
-  // Buffer child frames → the tool result (children stream to their parent,
-  // not to a room; the UI can still watch via the session endpoint).
+  // Buffer the summary AND stream every frame to the child's own room, so a
+  // viewer of the subagent thread sees thinking/deltas/tool activity live
+  // (previously emitOverride swallowed everything except the final text).
   let finalMessage = "";
+  const emitChild: import("../agent-loop.js").AgentFrameEmitter = (frame) => {
+    if (frame.type === "delta") finalMessage += String(frame.text ?? "");
+    deps.hub.broadcast(childSession.workspace_id, childSession.id, frame);
+  };
   await runAgentLoop({
     deps,
     session: childSession,
     agent: childAgent,
     model,
     apiKey: (ctx as ToolContext & { apiKey?: string }).apiKey ?? "",
-    emitOverride: (frame) => {
-      if (frame.type === "delta") finalMessage += String(frame.text ?? "");
-      if (frame.type === "done") {
-        // finalMessage already accumulated deltas
-      }
-    },
+    emitOverride: emitChild,
   });
 
   // The loop's final assistant message is the summary.
