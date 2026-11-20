@@ -1,6 +1,6 @@
 import { TOGGLE_EXPAND_EVENT, announceExpandState } from "./hooks/useExpandToggle.js";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, Scissors, Paperclip } from "lucide-react";
+import { Sparkles, Scissors, Paperclip, Undo2 } from "lucide-react";
 import { Markdown, ThinkingState } from "@twodb/blocks";
 import { toolToNode, thinkingToNode, liveToolToNode, type ToolCallMeta, type ThinkingMeta } from "./trace.js";
 import { useSessionChat } from "./hooks/useSessionChat.js";
@@ -333,9 +333,21 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean; /** llm
         {groupThread(chat.messages, liveById).map((it) => (
           <ChatThreadRow key={it.key}>
             {it.kind === "user" ? (
-              <ChatMessage variant="user">
-                <Markdown text={it.m.content} />
-              </ChatMessage>
+              <div className="group/msg relative">
+                <ChatMessage variant="user">
+                  <Markdown text={it.m.content} />
+                </ChatMessage>
+                {!chat.running ? (
+                  <button
+                    type="button"
+                    title="Unsend — delete this message and everything after it"
+                    onClick={() => { if (window.confirm("Unsend this message? It and everything after it will be deleted.")) void chat.unsend(it.m.id); }}
+                    className="absolute right-2 top-1 rounded p-1 text-ink-muted opacity-0 transition-opacity hover:bg-surface-muted hover:text-destructive group-hover/msg:opacity-100"
+                  >
+                    <Undo2 className="size-3.5" />
+                  </button>
+                ) : null}
+              </div>
             ) : it.kind === "note" ? (
               it.m.role === "compaction" ? (
                 <div className="my-2 rounded-md border border-outline bg-surface-muted/40 px-3 py-2">

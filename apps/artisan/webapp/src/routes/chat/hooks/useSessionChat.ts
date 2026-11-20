@@ -217,6 +217,16 @@ export function useSessionChat(sessionId: string) {
     void refresh();
   }, [sessionId, refresh]);
 
+  /** Unsend a message: it and everything after it are deleted server-side. */
+  const unsend = useCallback(async (messageId: string) => {
+    try {
+      await artisanClient.unsendMessage(sessionId, messageId);
+      void refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }, [sessionId, refresh]);
+
   const abort = useCallback(async () => {
     // Optimistic: the server clears the steering queue and ends the run; the
     // queue pills and spinner must not wait for the done frame (which may be
@@ -233,7 +243,7 @@ export function useSessionChat(sessionId: string) {
     detail, error, running, compacting, status, streamText, thinking, toolEvents, ask, usage,
     queue,
     messages: detail?.messages ?? [] as MessageInfo[],
-    scroller, send, removeQueued, sendQueueNow, answer, cancelAsk, newThread, clearThread, compact, abort, refresh,
+    scroller, send, removeQueued, sendQueueNow, unsend, answer, cancelAsk, newThread, clearThread, compact, abort, refresh,
   };
 }
 

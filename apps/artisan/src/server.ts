@@ -451,6 +451,19 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     return { ok: true };
   });
 
+  // Unsend: delete a message and every message after it (transcript + context).
+  app.delete("/sessions/:id/messages/:messageId", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id, messageId } = req.params as { id: string; messageId: string };
+    if (!sessionRunner.isIdle(id)) return reply.code(409).send({ error: "session running" });
+    const removed = await repo.deleteMessagesFrom(id, messageId);
+    if (removed === 0) return reply.code(404).send({ error: "not found" });
+    // Transcript rows changed — every viewer reloads.
+    hub.broadcast(ctx.workspaceId, id, { type: "new_thread" });
+    return { ok: true, removed };
+  });
+
   // /new — close the current thread, open a fresh one.
   app.post("/sessions/:id/new", async (req, reply) => {
     const ctx = requireCtx(req, reply);

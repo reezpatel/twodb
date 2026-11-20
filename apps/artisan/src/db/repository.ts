@@ -70,6 +70,8 @@ export interface ArtisanRepo {
   }): Promise<MessageRow>;
   listThreadMessages(threadId: string): Promise<MessageRow[]>;
   listSessionMessages(sessionId: string): Promise<MessageRow[]>;
+  /** Unsend: delete this message and every message created after it. Returns how many were removed. */
+  deleteMessagesFrom(sessionId: string, messageId: string): Promise<number>;
   updateMessageContent(id: string, content: string, meta?: unknown): Promise<void>;
 
   // agents
@@ -379,6 +381,18 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
 
     async listSessionMessages(sessionId) {
       return db.selectFrom("message").selectAll().where("session_id", "=", sessionId).orderBy("created_at", "asc").execute();
+    },
+
+    async deleteMessagesFrom(sessionId, messageId) {
+      const target = await db.selectFrom("message").selectAll().where("id", "=", messageId).where("session_id", "=", sessionId).executeTakeFirst();
+      if (!target) return 0;
+      // created_at has millisecond resolution and ties are possible — include
+      // same-timestamp rows except the target itself, then the target too.
+      const rows = await db.selectFrom("message").select(["id", "created_at"]).where("session_id", "=", sessionId).where("created_at", ">=", target.created_at).execute();
+      const ids = rows.filter((r) => r.created_at > target.created_at || r.id === messageId).map((r) => r.id);
+      if (ids.length === 0) return 0;
+      await db.deleteFrom("message").where("id", "in", ids).execute();
+      return ids.length;
     },
 
     async updateMessageContent(id, content, meta) {

@@ -348,6 +348,11 @@ export const artisanClient = {
     return del(`/sessions/${id}/prs/${prId}`);
   },
 
+  /** Unsend: delete a message and everything after it. */
+  unsendMessage(id: string, messageId: string): Promise<{ ok: boolean; removed: number }> {
+    return del(`/sessions/${id}/messages/${messageId}`);
+  },
+
   removeQueuedMessage(id: string, itemId: string): Promise<{ ok: boolean }> {
     return del(`/sessions/${id}/queue/${itemId}`);
   },
