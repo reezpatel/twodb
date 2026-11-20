@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -18,18 +18,19 @@ import (
 // spawned command's environment.
 func spawnEnv() []string {
 	// $HOME is often overridden by the service manager (the NixOS module sets
-	// HOME=/var/lib/two-runner for state), while the process still runs as the
-	// real user — the passwd entry is the user's actual home, where their nix
-	// profiles live. Prefer it; fall back to $HOME (then the state dir) when
-	// the user isn't in passwd (containers).
+	// HOME=/var/lib/two-runner for state) and the unit sets no $USER — worse,
+	// the release build is CGO_ENABLED=0, where user.Current() errors with
+	// "user: Current requires cgo". Resolve the uid from /proc/self/loginuid
+	// and parse /etc/passwd by hand so the real user's home (nix profiles,
+	// dotfiles) is found without cgo. Falls back to $USER/$HOME (containers).
 	usr := os.Getenv("USER")
 	home := os.Getenv("HOME")
-	if u, err := user.Current(); err == nil {
+	if name, dir := passwdLookup(); name != "" {
 		if usr == "" {
-			usr = u.Username
+			usr = name
 		}
-		if u.HomeDir != "" {
-			home = u.HomeDir
+		if dir != "" {
+			home = dir
 		}
 	}
 	extra := []string{
@@ -88,4 +89,33 @@ func commandShell() string {
 		}
 	}
 	return "sh"
+}
+
+// passwdLookup resolves the invoking user's name + home without cgo (the
+// release build is CGO_ENABLED=0, where os/user.Current errors). The uid
+// comes from /proc/self/loginuid (survives sudo/su) or, when unset there
+// (4294967295), from getuid — a systemd service's uid is the real user's
+// either way. /etc/passwd is parsed by hand. "" when unavailable (non-Linux,
+// containers) — spawnEnv then falls back to $USER/$HOME.
+func passwdLookup() (name, home string) {
+	uid := ""
+	if raw, err := os.ReadFile("/proc/self/loginuid"); err == nil {
+		if v := strings.TrimSpace(string(raw)); v != "" && v != "4294967295" {
+			uid = v
+		}
+	}
+	if uid == "" {
+		uid = strconv.Itoa(os.Getuid())
+	}
+	passwd, err := os.ReadFile("/etc/passwd")
+	if err != nil {
+		return "", ""
+	}
+	for _, line := range strings.Split(string(passwd), "\n") {
+		f := strings.Split(line, ":")
+		if len(f) >= 6 && f[2] == uid {
+			return f[0], f[5]
+		}
+	}
+	return "", ""
 }
