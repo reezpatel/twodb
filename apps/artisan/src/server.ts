@@ -1554,14 +1554,18 @@ echo saved`;
 
   // --- code editor (code-server on the session's runner, iframed) --------------
   const EDITOR_PORT = 8443;
+  // The editor lives on the RUNNER — resolve the target user's home there at
+  // exec time ($HOME, else passwd, else /tmp). Never process.env.HOME: that is
+  // the artisan container's home (/root), which the runner user can't write.
+  const EDITOR_HOME = 'HOME_DIR="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)"; HOME_DIR="${HOME_DIR:-${HOME:-/tmp}}"';
+  const EDITOR_BASE = '"$HOME_DIR/.local/share/twodb-editor"';
   // Last install error per session, surfaced by /editor/status (in-memory — a
   // restart just clears it, the next install repopulates on failure).
   const editorInstallErrors = new Map<string, string>();
   // code-server's bin/code-server is a symlink that loops on some installs —
   // resolve the versioned binary under lib/ instead (the same fallback the
   // start script uses).
-  const EDITOR_DIR = `${process.env.HOME ?? "/root"}/.local/share/twodb-editor/code-server`;
-  const EDITOR_BIN_RESOLVE = `ls ${shellQuote(EDITOR_DIR)}/lib/code-server-*/bin/code-server 2>/dev/null | head -1`;
+  const EDITOR_BIN_RESOLVE = `${EDITOR_HOME}; ls "$HOME_DIR"/.local/share/twodb-editor/code-server/lib/code-server-*/bin/code-server 2>/dev/null | head -1`;
 
   async function editorStatus(session: { id: string; runner: string; directory: string }): Promise<{ state: string; bytes?: number; total?: number; port?: number; error?: string }> {
     const deps = depsFor({ headers: {} } as FastifyRequest);
@@ -1609,7 +1613,8 @@ echo saved`;
     // check then mistakes for "installed".
     const script = [
       "set -e",
-      `BASE=${shellQuote(process.env.HOME ?? "/root")}/.local/share/twodb-editor`,
+      EDITOR_HOME,
+      `BASE=${EDITOR_BASE}`,
       'mkdir -p "$BASE"',
       'TMP="$BASE/.install-tmp"',
       // mkdir is atomic — only one install runs at a time; a second concurrent
@@ -1650,8 +1655,7 @@ echo saved`;
     // Start code-server as a persistent job bound to localhost, no auth (proxied).
     const status = await editorStatus(session);
     if (status.state === "ready") return { ok: true, port: EDITOR_PORT };
-    const csBase = `${process.env.HOME ?? "/root"}/.local/share/twodb-editor/code-server`;
-    const script = `CSBIN=$(ls ${shellQuote(csBase)}/lib/code-server-*/bin/code-server 2>/dev/null | head -1); export PASSWORD=; "$CSBIN" --bind-addr 127.0.0.1:${EDITOR_PORT} --auth none --user-data-dir ${shellQuote(session.directory + "/.code-server")} ${shellQuote(session.directory)} > /tmp/code-server.log 2>&1`;
+    const script = `${EDITOR_HOME}; CSBIN=$(ls "$HOME_DIR"/.local/share/twodb-editor/code-server/lib/code-server-*/bin/code-server 2>/dev/null | head -1); export PASSWORD=; "$CSBIN" --bind-addr 127.0.0.1:${EDITOR_PORT} --auth none --user-data-dir ${shellQuote(session.directory + "/.code-server")} ${shellQuote(session.directory)} > /tmp/code-server.log 2>&1`;
     const job = await deps.dispatch.createJob(session.runner, script, session.directory, session.id).catch((e) => ({ id: "", error: String(e) }));
     if ((job as { error?: string }).error) return reply.code(502).send({ error: (job as { error: string }).error });
     // wait for the port to come up
