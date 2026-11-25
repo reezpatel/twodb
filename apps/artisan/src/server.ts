@@ -38,6 +38,9 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 /** How long inspector request snapshots are kept. */
 export const INSPECT_RETENTION_DAYS = 3;
 
+/** Rounds of transcript served on session load / per scroll-up page. */
+const MESSAGE_PAGE_ROUNDS = 2;
+
 /** What the server needs from the control-plane session to talk to other apps. */
 export type ServiceCaller = Pick<TwoDbRuntime, "serviceFetch" | "verifyServiceToken" | "serviceToken" | "actAs">;
 
@@ -305,17 +308,24 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const { id } = req.params as { id: string };
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
-    const messages = await repo.listSessionMessages(id);
+    // The transcript is windowed (last MESSAGE_PAGE_ROUNDS rounds) — older
+    // rounds stream in via GET /sessions/:id/messages as the user scrolls up.
+    const tail = await repo.listSessionMessagesTail(id, MESSAGE_PAGE_ROUNDS);
     const usageRow = await repo.getUsage(id);
     // Context fill = prompt size of the most recent request, not the lifetime sum.
     let contextTokens = 0;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role !== "assistant") continue;
-      const u = (JSON.parse(messages[i].meta_json || "{}") as { usage?: { prompt_tokens?: number } | null }).usage;
+    for (let i = tail.messages.length - 1; i >= 0; i--) {
+      if (tail.messages[i].role !== "assistant") continue;
+      const u = (JSON.parse(tail.messages[i].meta_json || "{}") as { usage?: { prompt_tokens?: number } | null }).usage;
       if (u?.prompt_tokens) {
         contextTokens = u.prompt_tokens;
         break;
       }
+    }
+    if (!contextTokens) {
+      // The latest assistant round fell outside the loaded window — look it up
+      // directly so the context ring is right even for very long threads.
+      contextTokens = await repo.lastPromptTokens(id);
     }
     const usage = usageRow
       ? {
@@ -330,7 +340,21 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const plan = session.plan_json ? JSON.parse(session.plan_json) : null;
     const live = sessionRunner.snapshot(id);
     const prs = await repo.listSessionPrs(ctx.workspaceId, id);
-    return { ...sessionOut(session), plan, running: live.running, queue: live.queue, ask: live.ask, prs: prs.map((r) => ({ id: r.id, url: r.url })), usage, messages: messages.map(messageOut) };
+    return { ...sessionOut(session), plan, running: live.running, queue: live.queue, ask: live.ask, prs: prs.map((r) => ({ id: r.id, url: r.url })), usage, messages: tail.messages.map(messageOut), hasMoreMessages: tail.hasMore };
+  });
+
+  /** Older transcript rounds (chat scroll-up pagination). */
+  app.get("/sessions/:id/messages", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    const q = req.query as { before?: string; rounds?: string };
+    if (!q.before) return reply.code(400).send({ error: "before is required" });
+    const session = await repo.getSession(ctx.workspaceId, id);
+    if (!session) return reply.code(404).send({ error: "not found" });
+    const rounds = Math.max(1, Math.min(50, Number(q.rounds) || MESSAGE_PAGE_ROUNDS));
+    const tail = await repo.listSessionMessagesTail(id, rounds, q.before);
+    return { messages: tail.messages.map(messageOut), hasMore: tail.hasMore };
   });
 
   // Canvas metadata lives in Artisan; document content is fetched from Paintress.

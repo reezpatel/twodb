@@ -70,6 +70,17 @@ export interface ArtisanRepo {
   }): Promise<MessageRow>;
   listThreadMessages(threadId: string): Promise<MessageRow[]>;
   listSessionMessages(sessionId: string): Promise<MessageRow[]>;
+  /**
+   * The tail of a session transcript as complete rounds: a "round" is one
+   * user message plus every row after it until the next user message (the
+   * assistant/tool rounds of that exchange). `rounds` counts user messages;
+   * leading assistant rows orphaned by the cut are attached to the first
+   * included round. `before` paginates backwards (exclusive, created_at of
+   * the oldest loaded row).
+   */
+  listSessionMessagesTail(sessionId: string, rounds: number, before?: string): Promise<{ messages: MessageRow[]; hasMore: boolean }>;
+  /** Prompt size of the most recent assistant request (context-window fill). */
+  lastPromptTokens(sessionId: string): Promise<number>;
   /** Unsend: delete this message and every message created after it. Returns how many were removed. */
   deleteMessagesFrom(sessionId: string, messageId: string): Promise<number>;
   updateMessageContent(id: string, content: string, meta?: unknown): Promise<void>;
@@ -381,6 +392,35 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
 
     async listSessionMessages(sessionId) {
       return db.selectFrom("message").selectAll().where("session_id", "=", sessionId).orderBy("created_at", "asc").execute();
+    },
+
+    async listSessionMessagesTail(sessionId, rounds, before) {
+      // All user messages before the window; the last `rounds` of them bound
+      // the rounds we return.
+      let anchors = db.selectFrom("message").selectAll().where("session_id", "=", sessionId).where("role", "=", "user");
+      if (before) anchors = anchors.where("created_at", "<", before);
+      const anchorRows = await anchors.orderBy("created_at", "desc").limit(rounds + 1).execute();
+      const hasMore = anchorRows.length > rounds;
+      const window = anchorRows.slice(0, rounds);
+      if (window.length === 0) return { messages: [], hasMore };
+      // Oldest first.
+      window.reverse();
+      let rows = db.selectFrom("message").selectAll().where("session_id", "=", sessionId).where("created_at", ">=", window[0].created_at);
+      if (before) rows = rows.where("created_at", "<", before);
+      const messages = await rows.orderBy("created_at", "asc").execute();
+      // created_at has millisecond resolution — another row may share the
+      // first anchor's timestamp; keep only rows at/after the anchor.
+      const firstIdx = messages.findIndex((m) => m.id === window[0].id);
+      return { messages: firstIdx > 0 ? messages.slice(firstIdx) : messages, hasMore };
+    },
+
+    async lastPromptTokens(sessionId) {
+      const row = await db.selectFrom("message").select("meta_json")
+        .where("session_id", "=", sessionId).where("role", "=", "assistant")
+        .orderBy("created_at", "desc").limit(1).executeTakeFirst();
+      if (!row) return 0;
+      const u = (JSON.parse(row.meta_json || "{}") as { usage?: { prompt_tokens?: number } | null }).usage;
+      return u?.prompt_tokens ?? 0;
     },
 
     async deleteMessagesFrom(sessionId, messageId) {

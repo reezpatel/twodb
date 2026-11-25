@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type UIEvent } from "react";
 import { artisanClient, type AskInfo, type MessageInfo, type QueueItemInfo, type SessionDetail, type UsageInfo } from "../../../lib/artisan-client.js";
 import { useWorkspaceWs } from "../../../lib/workspace-ws.js";
 
@@ -26,7 +26,12 @@ export function useSessionChat(sessionId: string) {
   const [status, setStatus] = useState<string | null>(null);
   const [compacting, setCompacting] = useState(false);
   const [queue, setQueue] = useState<QueueItemInfo[]>([]);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
+  /** Prepend scroll compensation: captured before prepending older rounds. */
+  const anchorRef = useRef<{ height: number; top: number } | null>(null);
+  /** True while the user is scrolled up (reading history / paging back). */
+  const userScrolledUpRef = useRef(false);
   /** Set until the first state frame/refresh arrives: a live ask from the
    * server must win over optimistic local clears after a reconnect. */
   const syncedRef = useRef(false);
@@ -180,9 +185,46 @@ export function useSessionChat(sessionId: string) {
   }, [onFrame, sessionId, refresh]);
 
   useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
-  }, [streamText, toolEvents.length, detail?.messages.length]);
+    const el = scroller.current;
+    if (!el) return;
+    // Older rounds were just prepended — keep the same content in view
+    // instead of jumping (and without triggering another top-load).
+    if (anchorRef.current) {
+      el.scrollTop = el.scrollHeight - anchorRef.current.height + anchorRef.current.top;
+      anchorRef.current = null;
+      return;
+    }
+    if (!userScrolledUpRef.current) el.scrollTo({ top: el.scrollHeight });
+  }, [streamText, toolEvents.length, detail?.messages.length, detail?.messages[0]?.id]);
 
+
+  /** Load the previous rounds of history (scroll-up pagination). Prepends
+   * to the loaded window and keeps the viewport on the same message. */
+  const loadOlder = useCallback(async () => {
+    if (loadingOlder) return;
+    const oldest = detail?.messages[0];
+    if (!oldest || !detail?.hasMoreMessages) return;
+    const el = scroller.current;
+    anchorRef.current = el ? { height: el.scrollHeight, top: el.scrollTop } : null;
+    setLoadingOlder(true);
+    try {
+      const page = await artisanClient.getSessionMessages(sessionId, oldest.createdAt);
+      setDetail((d) => (d ? { ...d, messages: [...page.messages, ...d.messages], hasMoreMessages: page.hasMore } : d));
+    } catch (e) {
+      anchorRef.current = null;
+      setError((e as Error).message);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [sessionId, detail, loadingOlder]);
+
+  /** Track the user's scroll position: near the top loads older rounds; the
+   * stick-to-bottom effect only runs while the user is at the bottom. */
+  const onScroll = useCallback((e: UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    userScrolledUpRef.current = el.scrollHeight - el.scrollTop - el.clientHeight > 80;
+    if (el.scrollTop < 80 && !loadingOlder && detail?.hasMoreMessages) void loadOlder();
+  }, [loadingOlder, detail?.hasMoreMessages, loadOlder]);
 
   const answer = useCallback((askId: string, answers: Array<string | string[]>) => {
     socket.send({ type: "answer", sessionId, askId, answers });
@@ -243,6 +285,9 @@ export function useSessionChat(sessionId: string) {
     detail, error, running, compacting, status, streamText, thinking, toolEvents, ask, usage,
     queue,
     messages: detail?.messages ?? [] as MessageInfo[],
+    hasMoreMessages: detail?.hasMoreMessages ?? false,
+    loadingOlder,
+    onScroll,
     scroller, send, removeQueued, sendQueueNow, unsend, answer, cancelAsk, newThread, clearThread, compact, abort, refresh,
   };
 }

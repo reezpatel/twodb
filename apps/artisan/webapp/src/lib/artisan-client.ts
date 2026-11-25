@@ -173,6 +173,8 @@ export interface SessionDetail extends SessionInfo {
   prs: SessionPrLink[];
   usage: UsageInfo | null;
   messages: MessageInfo[];
+  /** True when older transcript rounds exist beyond the loaded window. */
+  hasMoreMessages?: boolean;
 }
 
 export interface AgentInfo {
@@ -304,6 +306,11 @@ export const artisanClient = {
 
   getSession(id: string): Promise<SessionDetail> {
     return get(`/sessions/${id}`);
+  },
+
+  /** Older transcript rounds, for scroll-up pagination. */
+  getSessionMessages(id: string, before: string, rounds = 2): Promise<{ messages: MessageInfo[]; hasMore: boolean }> {
+    return get(`/sessions/${id}/messages?before=${encodeURIComponent(before)}&rounds=${rounds}`);
   },
 
   createSession(input: {

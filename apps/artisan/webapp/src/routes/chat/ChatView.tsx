@@ -329,7 +329,12 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean; /** llm
         </ChatHeader>
       )}
 
-      <ChatThread className="overflow-y-auto" ref={chat.scroller}>
+      <ChatThread className="overflow-y-auto" ref={chat.scroller} onScroll={chat.onScroll}>
+        {chat.hasMoreMessages || chat.loadingOlder ? (
+          <div className="mx-auto py-2 text-center text-[11px] text-ink-muted">
+            {chat.loadingOlder ? "Loading earlier messages…" : "Scroll up for earlier messages"}
+          </div>
+        ) : null}
         {groupThread(chat.messages, liveById).map((it) => (
           <ChatThreadRow key={it.key}>
             {it.kind === "user" ? (
