@@ -226,6 +226,15 @@ export function useSessionChat(sessionId: string) {
     if (el.scrollTop < 80 && !loadingOlder && detail?.hasMoreMessages) void loadOlder();
   }, [loadingOlder, detail?.hasMoreMessages, loadOlder]);
 
+  // Short threads don't overflow the viewport, so there is no scrollbar and
+  // no scroll event to trigger pagination — pull older rounds until the
+  // thread fills the screen (or history runs out).
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || loadingOlder || !detail?.hasMoreMessages) return;
+    if (el.scrollHeight <= el.clientHeight + 1) void loadOlder();
+  }, [detail?.hasMoreMessages, detail?.messages.length, loadingOlder, loadOlder]);
+
   const answer = useCallback((askId: string, answers: Array<string | string[]>) => {
     socket.send({ type: "answer", sessionId, askId, answers });
     // Clear immediately instead of waiting for the ask_resolved echo — a fresh
@@ -287,6 +296,7 @@ export function useSessionChat(sessionId: string) {
     messages: detail?.messages ?? [] as MessageInfo[],
     hasMoreMessages: detail?.hasMoreMessages ?? false,
     loadingOlder,
+    loadOlder,
     onScroll,
     scroller, send, removeQueued, sendQueueNow, unsend, answer, cancelAsk, newThread, clearThread, compact, abort, refresh,
   };

@@ -331,9 +331,14 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean; /** llm
 
       <ChatThread className="overflow-y-auto" ref={chat.scroller} onScroll={chat.onScroll}>
         {chat.hasMoreMessages || chat.loadingOlder ? (
-          <div className="mx-auto py-2 text-center text-[11px] text-ink-muted">
-            {chat.loadingOlder ? "Loading earlier messages…" : "Scroll up for earlier messages"}
-          </div>
+          <button
+            type="button"
+            onClick={() => void chat.loadOlder()}
+            disabled={chat.loadingOlder}
+            className="mx-auto block py-2 text-center text-[11px] text-ink-muted hover:text-ink disabled:cursor-default disabled:hover:text-ink-muted"
+          >
+            {chat.loadingOlder ? "Loading earlier messages…" : "Load earlier messages"}
+          </button>
         ) : null}
         {groupThread(chat.messages, liveById).map((it) => (
           <ChatThreadRow key={it.key}>
