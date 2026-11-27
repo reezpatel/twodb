@@ -28,7 +28,7 @@ function QueueRow({ item, enabled, onMove, children }: { item: QueuedMessage; en
       value={item}
       dragListener={false}
       dragControls={controls}
-      className="group/queue-row relative flex items-center gap-2 rounded-[6px] bg-paper py-1.5"
+      className="group/queue-row relative flex items-center gap-2 rounded-[6px] bg-paper px-2 py-1.5"
       whileDrag={{ zIndex: 10 }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -63,7 +63,7 @@ function MessageQueue({ className, items, onRemove, onSendNow, onMoveToTop, onRe
     <section
       aria-label="Queued messages"
       data-slot="message-queue"
-      className={cn("rounded-[12px] border border-outline bg-stone p-2 font-sans text-[13px] text-muted-foreground", className)}
+      className={cn("rounded-[12px] border border-outline bg-stone p-0 font-sans text-[13px] text-muted-foreground", className)}
       {...props}
     >
       <Reorder.Group as="ol" axis="y" values={items} onReorder={(next: QueuedMessage[]) => onReorder?.(next)} className="flex flex-col gap-0.5">
