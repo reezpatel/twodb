@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { FileText, Palette } from "lucide-react";
+import { FileText, Palette, X } from "lucide-react";
 import { Markdown } from "@twodb/blocks";
 import { apiFetch } from "../../lib/artisan-client.js";
 
@@ -13,8 +13,11 @@ interface CanvasDocument {
   updatedAt: string;
 }
 
-/** Session/agent canvas list. Artisan owns references; Paintress owns the documents. */
-export function CanvasScreen({ sessionId }: { sessionId: string }) {
+/** Session/agent canvas documents. Artisan owns references; Paintress owns the
+ * content. Rendered inside the right sidebar (docked) or as a full tab on
+ * small viewports — pass onClose for a button that returns to the default
+ * sidebar. */
+export function CanvasScreen({ sessionId, onClose }: { sessionId: string; onClose?: () => void }) {
   const [documents, setDocuments] = useState<CanvasDocument[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,29 +48,42 @@ export function CanvasScreen({ sessionId }: { sessionId: string }) {
   const selected = documents.find((row) => row.id === selectedId) ?? documents[0] ?? null;
 
   return (
-    <div className="flex min-h-0 flex-1 bg-paper">
-      <aside className="w-56 shrink-0 overflow-y-auto border-r border-outline bg-surface">
-        <div className="flex items-center gap-2 border-b border-outline px-3 py-2 text-sm font-medium">
-          <Palette className="size-4 text-ink-muted" /> Canvas
-        </div>
-        {documents.map((document) => (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center gap-2 border-b border-outline px-3 py-2">
+        <Palette className="size-4 shrink-0 text-ink-muted" />
+        <span className="text-[13px] font-medium">Canvas</span>
+        {onClose ? (
           <button
-            key={document.id}
             type="button"
-            onClick={() => setSelectedId(document.id)}
-            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${selected?.id === document.id ? "bg-surface-muted text-ink" : "text-ink-muted hover:bg-surface-muted/60 hover:text-ink"}`}
+            aria-label="Back to sidebar"
+            title="Back to sidebar"
+            onClick={onClose}
+            className="ml-auto rounded-md p-1 text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
           >
-            <FileText className="size-4 shrink-0" />
-            <span className="truncate">{document.title}</span>
+            <X className="size-4" />
           </button>
-        ))}
-      </aside>
-
+        ) : null}
+      </div>
+      {documents.length > 1 ? (
+        <div className="flex shrink-0 flex-wrap gap-1 border-b border-outline px-2 py-1.5">
+          {documents.map((document) => (
+            <button
+              key={document.id}
+              type="button"
+              onClick={() => setSelectedId(document.id)}
+              className={`flex items-center gap-1 rounded-md px-2 py-1 text-[12px] ${selected?.id === document.id ? "bg-surface-muted text-ink" : "text-ink-muted hover:bg-surface-muted/60 hover:text-ink"}`}
+            >
+              <FileText className="size-3.5 shrink-0" />
+              <span className="max-w-40 truncate">{document.title}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       {selected ? (
-        <div className="min-w-0 flex-1 overflow-y-auto">
-          <article className="mx-auto max-w-3xl px-8 py-8">
-            <div className="mb-5 flex items-center gap-2 border-b border-outline pb-3">
-              <h1 className="text-xl font-semibold">{selected.title}</h1>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <article className="px-4 py-4">
+            <div className="mb-3 flex items-center gap-2 border-b border-outline pb-2">
+              <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">{selected.title}</h1>
               <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[10px] uppercase text-ink-muted">{selected.type}</span>
             </div>
             <Markdown text={selected.markdown} />
@@ -83,3 +99,4 @@ export function CanvasScreen({ sessionId }: { sessionId: string }) {
     </div>
   );
 }
+

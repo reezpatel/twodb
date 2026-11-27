@@ -29,6 +29,9 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
   const isLarge = useLargeViewport();
   // Docked on lg+ (open by default); on mobile it is a slide-over sheet, hidden until toggled.
   const [showSidebar, setShowSidebar] = useState(isLarge);
+  // Canvas replaces the right sidebar content (with an X to return); on small
+  // viewports there is no docked sidebar, so canvas falls back to a full view.
+  const [sidebarView, setSidebarView] = useState<"default" | "canvas">("default");
   useEffect(() => {
     setShowSidebar(isLarge);
   }, [isLarge, props.sessionId]);
@@ -36,12 +39,18 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
   // footer shortcuts (terminal button) request a tab switch
   useEffect(() => {
     const onOpen = (e: Event) => {
-      const t = (e as CustomEvent<SessionTabId>).detail;
-      if (t === "terminal" || t === "editor" || t === "changes" || t === "chat" || t === "checkpoints" || t === "canvas" || t === "inspector") setTab(t);
+      const t = (e as CustomEvent<SessionTabId | "canvas">).detail;
+      if (t === "canvas") {
+        // Docked sidebar on lg+; a full-view overlay on small screens.
+        setSidebarView("canvas");
+        if (isLarge) setShowSidebar(true);
+        return;
+      }
+      if (t === "terminal" || t === "editor" || t === "changes" || t === "chat" || t === "checkpoints" || t === "inspector") setTab(t);
     };
     window.addEventListener("artisan:open-tab", onOpen);
     return () => window.removeEventListener("artisan:open-tab", onOpen);
-  }, []);
+  }, [isLarge]);
   const side = useSessionSide(props.sessionId);
   const { onFrame } = useWorkspaceWs();
   const [prs, setPrs] = useState<SessionPrLink[]>([]);
@@ -64,27 +73,31 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
   }, []);
   const rightWidth = Math.min(right.width, maxRight());
 
-  const panel = (
-    <SessionSidebar
-      sessionId={props.sessionId}
-      model={side.model}
-      prs={prs}
-      plan={side.plan}
-      children={side.children}
-      git={side.git}
-      jobs={side.jobs}
-      busy={side.busy}
-      onRefreshGit={side.refresh}
-      onOpenChild={(id) => {
-        if (!isLarge) setShowSidebar(false);
-        props.onOpenChild(id);
-      }}
-    />
-  );
+  const panel =
+    sidebarView === "canvas" ? (
+      <CanvasScreen sessionId={props.sessionId} onClose={() => setSidebarView("default")} />
+    ) : (
+      <SessionSidebar
+        sessionId={props.sessionId}
+        model={side.model}
+        prs={prs}
+        plan={side.plan}
+        children={side.children}
+        git={side.git}
+        jobs={side.jobs}
+        busy={side.busy}
+        onRefreshGit={side.refresh}
+        onOpenCanvas={() => setSidebarView("canvas")}
+        onOpenChild={(id) => {
+          if (!isLarge) setShowSidebar(false);
+          props.onOpenChild(id);
+        }}
+      />
+    );
 
   return (
     <div ref={rootRef} className="flex min-h-0 flex-1">
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         <header className="flex shrink-0 items-center gap-1.5 border-b border-outline bg-surface px-3 py-2">
           <SessionTabs active={tab} onChange={setTab} />
           <div className="mx-1.5 hidden h-4 w-px bg-outline lg:block" />
@@ -112,9 +125,14 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
           {tab === "terminal" ? <TerminalScreen sessionId={props.sessionId} /> : null}
           {tab === "changes" ? <ChangesScreen sessionId={props.sessionId} /> : null}
           {tab === "checkpoints" ? <CheckpointsScreen sessionId={props.sessionId} /> : null}
-          {tab === "canvas" ? <CanvasScreen sessionId={props.sessionId} /> : null}
           {tab === "inspector" ? <InspectorScreen sessionId={props.sessionId} /> : null}
         </div>
+        {/* Small viewports have no docked sidebar — canvas opens as a full view. */}
+        {!isLarge && sidebarView === "canvas" ? (
+          <div className="absolute inset-0 z-30 bg-paper">
+            <CanvasScreen sessionId={props.sessionId} onClose={() => setSidebarView("default")} />
+          </div>
+        ) : null}
       </div>
       {showSidebar ? (
         isLarge ? (

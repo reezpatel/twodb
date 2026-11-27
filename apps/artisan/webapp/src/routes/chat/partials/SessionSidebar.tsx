@@ -1,3 +1,4 @@
+import { Palette } from "lucide-react";
 import type { SessionDetail, SessionPrLink } from "../../../lib/artisan-client.js";
 import type { ChildSession, GitInfo, JobRow as JobRowT } from "../hooks/useSessionSide.js";
 import { SideSection, SubagentRow, JobRow } from "./SidePanel.js";
@@ -19,6 +20,8 @@ export interface SessionSidebarProps {
   busy: boolean;
   onRefreshGit: () => void;
   onOpenChild: (sessionId: string) => void;
+  /** Open the canvas view (replaces the sidebar content). */
+  onOpenCanvas: () => void;
 }
 
 /** Right sidebar (legacy code sidebar): Plan, Subagents, Skills hint, Git. */
@@ -47,6 +50,15 @@ export function SessionSidebar(props: SessionSidebarProps) {
       </SideSection>
 
       <MemoriesSection sessionId={props.sessionId} />
+
+      <button
+        type="button"
+        onClick={props.onOpenCanvas}
+        className="flex w-full items-center gap-2 border-b px-3 py-2 text-left text-[13px] font-medium text-ink hover:bg-surface-muted/50"
+      >
+        <Palette className="size-4 text-ink-muted" />
+        Canvas
+      </button>
 
       <PrSection sessionId={props.sessionId} prs={props.prs} />
 
