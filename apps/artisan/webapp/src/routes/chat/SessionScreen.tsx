@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { GitBranch, Palette, PanelRight, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useLargeViewport } from "@twodb/blocks";
+import { readSessionUi, sessionUiKey, writeJson } from "../../lib/persist.js";
 import { useResizableWidth } from "../../lib/useResizableWidth.js";
 import { ChatView } from "./ChatView.js";
 import { EditorScreen } from "./EditorScreen.js";
@@ -10,7 +11,8 @@ import { InspectorScreen } from "./InspectorScreen.js";
 import { ChangesScreen } from "./ChangesScreen.js";
 import { CanvasScreen } from "./CanvasScreen.js";
 import { ExpandToggle } from "./partials/ExpandToggle.js";
-import { SessionTabs, type SessionTabId } from "./partials/SessionTabs.js";
+import { SESSION_TABS, SessionTabs, type SessionTabId } from "./partials/SessionTabs.js";
+import { GitSection } from "./partials/GitSection.js";
 import { SessionSidebar } from "./partials/SessionSidebar.js";
 import { useSessionSide } from "./hooks/useSessionSide.js";
 import { artisanClient, type SessionPrLink } from "../../lib/artisan-client.js";
@@ -25,32 +27,36 @@ const MAIN_MIN_WIDTH = 480;
  * chat tab and always pins to the bottom of the column.
  */
 export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionId: string) => void; title?: string; connected?: boolean }) {
-  const [tab, setTab] = useState<SessionTabId>("chat");
+  // Per-session UI state (restored from localStorage; SessionScreen is keyed by session).
+  const saved = useMemo(() => readSessionUi(props.sessionId), [props.sessionId]);
+  const [tab, setTab] = useState<SessionTabId>(() => (SESSION_TABS.some((t) => t.id === saved.tab) ? (saved.tab as SessionTabId) : "chat"));
   const isLarge = useLargeViewport();
   // Docked on lg+ (open by default); on mobile it is a slide-over sheet, hidden until toggled.
-  const [showSidebar, setShowSidebar] = useState(isLarge);
-  // Canvas replaces the right sidebar content (with an X to return); on small
-  // viewports there is no docked sidebar, so canvas falls back to a full view.
-  const [sidebarView, setSidebarView] = useState<"default" | "canvas">("default");
+  const [showSidebar, setShowSidebar] = useState(isLarge ? (saved.sidebarOpen ?? true) : false);
+  // Right sidebar tabs: Details (plan, git, …) and Canvas.
+  const [sidebarView, setSidebarView] = useState<"default" | "canvas" | "git">(() => (["default", "canvas", "git"].includes(saved.sidebarView) ? (saved.sidebarView as "default" | "canvas" | "git") : "default"));
   useEffect(() => {
-    setShowSidebar(isLarge);
+    setShowSidebar(isLarge ? (readSessionUi(props.sessionId).sidebarOpen ?? true) : false);
   }, [isLarge, props.sessionId]);
+  // Remember this session's tab, sidebar tab and (docked) sidebar open state.
+  useEffect(() => {
+    writeJson(sessionUiKey(props.sessionId), { tab, sidebarView, sidebarOpen: isLarge ? showSidebar : readSessionUi(props.sessionId).sidebarOpen });
+  }, [props.sessionId, tab, sidebarView, showSidebar, isLarge]);
 
   // footer shortcuts (terminal button) request a tab switch
   useEffect(() => {
     const onOpen = (e: Event) => {
       const t = (e as CustomEvent<SessionTabId | "canvas">).detail;
       if (t === "canvas") {
-        // Docked sidebar on lg+; a full-view overlay on small screens.
         setSidebarView("canvas");
-        if (isLarge) setShowSidebar(true);
+        setShowSidebar(true);
         return;
       }
       if (t === "terminal" || t === "editor" || t === "changes" || t === "chat" || t === "checkpoints" || t === "inspector") setTab(t);
     };
     window.addEventListener("artisan:open-tab", onOpen);
     return () => window.removeEventListener("artisan:open-tab", onOpen);
-  }, [isLarge]);
+  }, []);
   const side = useSessionSide(props.sessionId);
   const { onFrame } = useWorkspaceWs();
   const [prs, setPrs] = useState<SessionPrLink[]>([]);
@@ -64,7 +70,7 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
   const rootRef = useRef<HTMLDivElement>(null);
   // The panel may grow until the main column would drop below MAIN_MIN_WIDTH.
   const maxRight = () => Math.max(200, (rootRef.current?.clientWidth ?? 1200) - MAIN_MIN_WIDTH);
-  const right = useResizableWidth("artisan.sidebar.right", 288, 200, maxRight);
+  const right = useResizableWidth(`artisan.session.${props.sessionId}.sidebar.right`, 288, 200, maxRight);
   const [, forceRender] = useState(0);
   useEffect(() => {
     const onResize = () => forceRender((n) => n + 1);
@@ -73,27 +79,48 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
   }, []);
   const rightWidth = Math.min(right.width, maxRight());
 
-  const panel =
-    sidebarView === "canvas" ? (
-      <CanvasScreen sessionId={props.sessionId} onClose={() => setSidebarView("default")} />
-    ) : (
-      <SessionSidebar
-        sessionId={props.sessionId}
-        model={side.model}
-        prs={prs}
-        plan={side.plan}
-        children={side.children}
-        git={side.git}
-        jobs={side.jobs}
-        busy={side.busy}
-        onRefreshGit={side.refresh}
-        onOpenCanvas={() => setSidebarView("canvas")}
-        onOpenChild={(id) => {
-          if (!isLarge) setShowSidebar(false);
-          props.onOpenChild(id);
-        }}
-      />
-    );
+  const panel = (
+    <div className="flex h-full min-h-0 w-full flex-col border-l border-outline">
+      <div role="tablist" className="flex shrink-0 items-stretch border-b border-outline">
+        {([["default", "Details", PanelRight], ["canvas", "Canvas", Palette], ["git", "Git", GitBranch]] as const).map(([id, label, Icon]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={sidebarView === id}
+            aria-label={label}
+            title={label}
+            onClick={() => setSidebarView(id)}
+            className={`flex size-9 items-center justify-center border-r border-outline transition-colors ${sidebarView === id ? "bg-surface-muted text-ink" : "text-ink-muted hover:bg-surface-muted/60 hover:text-ink"}`}
+          >
+            <Icon className="size-4" />
+          </button>
+        ))}
+      </div>
+      <div className="min-h-0 flex-1 pb-2.5">
+        {sidebarView === "canvas" ? (
+          <CanvasScreen sessionId={props.sessionId} hideHeader />
+        ) : sidebarView === "git" ? (
+          <div className="h-full min-h-0 overflow-y-auto">
+            <GitSection git={side.git} refreshing={side.busy} onRefresh={side.refresh} />
+          </div>
+        ) : (
+          <SessionSidebar
+            sessionId={props.sessionId}
+            model={side.model}
+            prs={prs}
+            plan={side.plan}
+            children={side.children}
+            jobs={side.jobs}
+            onOpenChild={(id) => {
+              if (!isLarge) setShowSidebar(false);
+              props.onOpenChild(id);
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div ref={rootRef} className="flex min-h-0 flex-1">
@@ -127,12 +154,6 @@ export function SessionScreen(props: { sessionId: string; onOpenChild: (sessionI
           {tab === "checkpoints" ? <CheckpointsScreen sessionId={props.sessionId} /> : null}
           {tab === "inspector" ? <InspectorScreen sessionId={props.sessionId} /> : null}
         </div>
-        {/* Small viewports have no docked sidebar — canvas opens as a full view. */}
-        {!isLarge && sidebarView === "canvas" ? (
-          <div className="absolute inset-0 z-30 bg-paper">
-            <CanvasScreen sessionId={props.sessionId} onClose={() => setSidebarView("default")} />
-          </div>
-        ) : null}
       </div>
       {showSidebar ? (
         isLarge ? (

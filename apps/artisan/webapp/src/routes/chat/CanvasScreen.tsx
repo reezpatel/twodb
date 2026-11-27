@@ -17,7 +17,7 @@ interface CanvasDocument {
  * content. Rendered inside the right sidebar (docked) or as a full tab on
  * small viewports — pass onClose for a button that returns to the default
  * sidebar. */
-export function CanvasScreen({ sessionId, onClose }: { sessionId: string; onClose?: () => void }) {
+export function CanvasScreen({ sessionId, onClose, hideHeader }: { sessionId: string; onClose?: () => void; hideHeader?: boolean }) {
   const [documents, setDocuments] = useState<CanvasDocument[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,7 @@ export function CanvasScreen({ sessionId, onClose }: { sessionId: string; onClos
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center gap-2 border-b border-outline px-3 py-2">
+      {hideHeader ? null : <div className="flex shrink-0 items-center gap-2 border-b border-outline px-3 py-2">
         <Palette className="size-4 shrink-0 text-ink-muted" />
         <span className="text-[13px] font-medium">Canvas</span>
         {onClose ? (
@@ -63,7 +63,7 @@ export function CanvasScreen({ sessionId, onClose }: { sessionId: string; onClos
             <X className="size-4" />
           </button>
         ) : null}
-      </div>
+      </div>}
       {documents.length > 1 ? (
         <div className="flex shrink-0 flex-wrap gap-1 border-b border-outline px-2 py-1.5">
           {documents.map((document) => (
@@ -90,10 +90,16 @@ export function CanvasScreen({ sessionId, onClose }: { sessionId: string; onClos
           </article>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-          <Palette className="size-7 text-ink-muted/40" />
-          <p className="text-sm font-medium text-ink-muted">{loading ? "Loading canvas…" : "No canvas documents yet"}</p>
-          {!loading ? <p className="max-w-sm text-xs text-ink-muted/70">Ask the agent to create a document in Canvas. Documents created with update_canvas appear here.</p> : null}
+        <div className="flex flex-1 flex-col p-3">
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-[8px] border border-dashed border-outline px-6 py-10 text-center">
+            <div className="grid size-10 place-items-center rounded-md bg-stone text-ink-muted">
+              <Palette className="size-5" strokeWidth={1.5} />
+            </div>
+            <div className="text-[15px] font-normal">{loading ? "Loading canvas…" : "No canvas documents yet"}</div>
+            {!loading ? (
+              <div className="max-w-sm text-sm font-light text-ink-muted">Ask the agent to create a document in Canvas. Documents created with update_canvas appear here.</div>
+            ) : null}
+          </div>
         </div>
       )}
     </div>

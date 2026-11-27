@@ -3,20 +3,20 @@ import { ChevronUp } from "lucide-react";
 import { cn } from "../../../lib/cn.js";
 
 /** Collapsible sidebar section (legacy code-sidebar-section). */
-export function SideSection(props: { title: string; count?: number | string; defaultOpen?: boolean; children: ReactNode; className?: string }) {
+export function SideSection(props: { title: string; count?: number | string; defaultOpen?: boolean; children: ReactNode; className?: string; /** Drop the body padding (content runs edge to edge). */ flush?: boolean }) {
   const [open, setOpen] = useState(props.defaultOpen ?? true);
   return (
     <div data-slot="side-section" className={cn("border-b last:border-b-0", props.className)}>
       <button
         type="button"
-        className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[13px] font-medium hover:bg-surface-muted/50"
+        className={cn("flex w-full items-center gap-1.5 bg-surface-muted/40 px-3 py-2 text-left text-[13px] font-medium hover:bg-surface-muted/70", open && "border-b border-outline")}
         onClick={() => setOpen((o) => !o)}
       >
         {props.title}
         {props.count !== undefined && props.count !== "" ? <span className="font-normal text-ink-muted">({props.count})</span> : null}
         <ChevronUp size={14} className="ml-auto text-ink-muted transition-transform" style={{ transform: open ? undefined : "rotate(180deg)" }} />
       </button>
-      {open ? <div className="px-3 pb-3">{props.children}</div> : null}
+      {open ? <div className={props.flush ? undefined : "px-3 pt-3 pb-4"}>{props.children}</div> : null}
     </div>
   );
 }

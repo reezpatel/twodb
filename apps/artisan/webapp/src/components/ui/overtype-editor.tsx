@@ -47,10 +47,14 @@ export interface OvertypeEditorProps {
   className?: string;
   /** Called on ⌘/Ctrl+S inside the editor. */
   onSave?: () => void;
+  /** CSS font size, default 13px. */
+  fontSize?: string;
+  /** CSS padding inside the editor, default 16px. */
+  padding?: string;
 }
 
 /** OverType markdown source editor. Uncontrolled — remount via `key` to swap documents. */
-export function OvertypeEditor({ value, onChange, placeholder, ariaLabel, className, onSave }: OvertypeEditorProps) {
+export function OvertypeEditor({ value, onChange, placeholder, ariaLabel, className, onSave, fontSize = "13px", padding = "16px" }: OvertypeEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
@@ -64,9 +68,9 @@ export function OvertypeEditor({ value, onChange, placeholder, ariaLabel, classN
       value,
       placeholder,
       theme: THEME,
-      fontSize: "13px",
+      fontSize,
       lineHeight: 1.65,
-      padding: "16px",
+      padding,
       spellcheck: false,
       textareaProps: ariaLabel ? { "aria-label": ariaLabel } : undefined,
       onChange: (next: string) => onChangeRef.current(next),

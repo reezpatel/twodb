@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@twodb/blocks";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
@@ -31,6 +31,7 @@ import { useShellSession } from "./routes/shell/hooks/useShellSession.js";
 import { McpView } from "./routes/mcp/McpView.js";
 import { McpDialog } from "./routes/mcp/partials/McpDialog.js";
 import { SkillDialog } from "./routes/skills/partials/SkillDialog.js";
+import { ProviderQuotaProvider } from "./lib/provider-quota.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
 
 /**
@@ -42,10 +43,12 @@ export function App() {
     <BrowserRouter>
       <RequireAuth>
         <WorkspaceProvider>
-          {/* One bad view must not white-page the app. */}
-          <ErrorBoundary name="Artisan">
-            <Shell />
-          </ErrorBoundary>
+          <ProviderQuotaProvider>
+            {/* One bad view must not white-page the app. */}
+            <ErrorBoundary name="Artisan">
+              <Shell />
+            </ErrorBoundary>
+          </ProviderQuotaProvider>
         </WorkspaceProvider>
       </RequireAuth>
     </BrowserRouter>
@@ -75,6 +78,7 @@ function Shell() {
   const [newOpen, setNewOpen] = useState(false);
   const [dirDialog, setDirDialog] = useState<{ open: boolean; directory?: DirectoryInfo }>({ open: false });
   const [quickCreateDir, setQuickCreateDir] = useState<DirectoryInfo | null>(null);
+  const [sessionsLoaded, setSessionsLoaded] = useState(false);
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -85,6 +89,7 @@ function Shell() {
       setAgents(await artisanClient.listAgents());
       setSkills(await artisanClient.listSkills());
       setMcpServers(await artisanClient.listMcpServers());
+      setSessionsLoaded(true);
     } catch {
       // offline
     }
@@ -108,6 +113,18 @@ function Shell() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // After the first successful load: drop restored tabs for deleted sessions, and
+  // reopen the last active session when landing on "/".
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (!sessionsLoaded || restoredRef.current) return;
+    restoredRef.current = true;
+    const valid = new Set([...sessions, ...chats].map((s) => s.id));
+    tabs.prune(valid);
+    if (location.pathname === "/" && tabs.active && valid.has(tabs.active)) navigate(`/s/${tabs.active}`, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionsLoaded]);
 
   // URL → tab (deep links: /s/<id>)
   useEffect(() => {
@@ -478,7 +495,7 @@ function ChatViewRoute(props: { tabs: ReturnType<typeof useTabs>; connected: boo
   }, [sessionId, found]);
   if (!sessionId) return null;
   if (props.chatIds.has(sessionId)) return <ChatScreen connected={props.connected} sessionId={sessionId} title={props.tabs.tabs.find((t) => t.sessionId === sessionId)?.label} />;
-  return <SessionScreen connected={props.connected} sessionId={sessionId} onOpenChild={(id) => props.tabs.open(id)} title={undefined} />;
+  return <SessionScreen key={sessionId} connected={props.connected} sessionId={sessionId} onOpenChild={(id) => props.tabs.open(id)} title={undefined} />;
 }
 
 function useParams2(): { sessionId?: string } {

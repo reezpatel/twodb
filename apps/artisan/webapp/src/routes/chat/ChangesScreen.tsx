@@ -20,10 +20,9 @@ import { cn } from "../../lib/cn.js";
 import { useSessionSide, type GitInfo } from "./hooks/useSessionSide.js";
 import { apiFetch } from "../../lib/artisan-client.js";
 import { FileDiff, type DiffHunk } from "../../components/ui/file-diff.js";
-import { FileTree, type FileTreeItem } from "../../components/ui/file-tree.js";
+import { FileTree } from "../../components/ui/file-tree.js";
+import { buildItems, type GitFile, type Kind } from "./gitTree.js";
 
-type GitFile = NonNullable<GitInfo["files"]>[number];
-type Kind = "modified" | "added" | "deleted" | "renamed" | "untracked";
 
 const KIND: Record<Kind, { icon: LucideIcon; tone: string; label: string }> = {
   modified: { icon: FilePen, tone: "text-warning", label: "Modified" },
@@ -65,58 +64,6 @@ function parseHunks(diff: string): DiffHunk[] {
   const ll = last?.lines[last.lines.length - 1];
   if (last && ll && ll.type === "context" && ll.content === "") last.lines.pop();
   return hunks;
-}
-
-// ---- tree items -----------------------------------------------------------------
-
-interface Dir {
-  name: string;
-  dirs: Map<string, Dir>;
-  files: GitFile[];
-}
-
-/** Nested folder tree from flat paths; single-child folder chains are compacted ("src/routes/chat"). */
-function buildItems(files: GitFile[]): FileTreeItem[] {
-  const root: Dir = { name: "", dirs: new Map(), files: [] };
-  for (const f of files) {
-    const parts = f.path.split("/");
-    let d = root;
-    for (const part of parts.slice(0, -1)) {
-      let next = d.dirs.get(part);
-      if (!next) d.dirs.set(part, (next = { name: part, dirs: new Map(), files: [] }));
-      d = next;
-    }
-    d.files.push(f);
-  }
-  const out: FileTreeItem[] = [];
-  const emit = (d: Dir, prefix: string, depth: number) => {
-    for (const dir of [...d.dirs.values()].sort((a, b) => a.name.localeCompare(b.name))) {
-      let cur = dir;
-      let name = dir.name;
-      while (cur.files.length === 0 && cur.dirs.size === 1) {
-        cur = [...cur.dirs.values()][0];
-        name += `/${cur.name}`;
-      }
-      const path = prefix ? `${prefix}/${name}` : name;
-      out.push({ id: `dir:${path}`, name, kind: "folder", depth, expanded: true, title: path });
-      emit(cur, path, depth + 1);
-    }
-    for (const f of [...d.files].sort((a, b) => a.path.localeCompare(b.path))) {
-      const k = kindOf(f);
-      out.push({
-        id: f.path,
-        name: f.path.split("/").pop() ?? f.path,
-        kind: "file",
-        depth,
-        title: `${f.path} — ${KIND[k].label}`,
-        status: k === "added" || k === "untracked" ? "added" : k === "deleted" ? "deleted" : "modified",
-        additions: f.additions,
-        deletions: f.deletions,
-      });
-    }
-  };
-  emit(root, "", 0);
-  return out;
 }
 
 // ---- small pieces ----------------------------------------------------------------

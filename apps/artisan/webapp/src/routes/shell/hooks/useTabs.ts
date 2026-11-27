@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { readJson, writeJson } from "../../../lib/persist.js";
 
 /** Tab state: one tab per open session; active tab renders its chat view.
  *  Tabs persist across navigation; closing = leave room only. */
@@ -7,9 +8,34 @@ export interface SessionTab {
   label: string;
 }
 
+const TABS_KEY = "artisan.tabs";
+interface SavedTabs {
+  tabs: SessionTab[];
+  active: string | null;
+}
+
+/** Open session tabs + the active one are global and survive a reload. */
 export function useTabs() {
-  const [tabs, setTabs] = useState<SessionTab[]>([]);
-  const [active, setActive] = useState<string | null>(null);
+  const [restored] = useState(() => {
+    const s = readJson<SavedTabs>(TABS_KEY, { tabs: [], active: null });
+    const tabs = Array.isArray(s.tabs) ? s.tabs.filter((t) => t && typeof t.sessionId === "string") : [];
+    return { tabs, active: tabs.some((t) => t.sessionId === s.active) ? s.active : null };
+  });
+  const [tabs, setTabs] = useState<SessionTab[]>(restored.tabs);
+  const [active, setActive] = useState<string | null>(restored.active);
+
+  useEffect(() => {
+    writeJson(TABS_KEY, { tabs, active });
+  }, [tabs, active]);
+
+  /** Drop restored tabs whose session no longer exists. */
+  const prune = useCallback((validIds: Set<string>) => {
+    setTabs((prev) => {
+      const next = prev.filter((t) => validIds.has(t.sessionId));
+      return next.length === prev.length ? prev : next;
+    });
+    setActive((cur) => (cur && !validIds.has(cur) ? null : cur));
+  }, []);
 
   const open = useCallback((sessionId: string, label?: string) => {
     setTabs((prev) => {
@@ -35,5 +61,5 @@ export function useTabs() {
     });
   }, []);
 
-  return { tabs, active, open, close, rename, setActive };
+  return { tabs, active, open, close, rename, setActive, prune };
 }

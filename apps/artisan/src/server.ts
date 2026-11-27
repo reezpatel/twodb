@@ -21,7 +21,7 @@ import { TworouteClient } from "./tworoute-client.js";
 import { DispatchClient, MICROVM_PREFIX } from "./dispatch-client.js";
 import { WorkspaceHub } from "./ws/hub.js";
 import { registerWorkspaceWs } from "./ws/workspace-ws.js";
-import { scopeOf, validateScope, type SkillMode, type SkillScope } from "./skills.js";
+import { scopeOf, skillApplies, validateScope, type SkillMode, type SkillScope } from "./skills.js";
 import { MCP_TRANSPORTS, NAME_RE, mcpScopeOf, parseHeaders, parseMcpServersJson, validateMcpScope, validUrl, type McpMode, type McpScope } from "./mcp.js";
 import { createToolkitClient } from "./toolkit-client.js";
 import type { McpServerRow, MemoryRow, SkillRow } from "./db/schema.js";
@@ -889,8 +889,16 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
   app.get("/skills", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
-    const q = req.query as { content?: string };
-    const rows = await repo.listSkills(ctx.workspaceId);
+    const q = req.query as { content?: string; sessionId?: string };
+    let rows = await repo.listSkills(ctx.workspaceId);
+    // ?sessionId= → only the skills this session's agent can actually use
+    // (same rule the agent loop applies), so the `/` palette doesn't offer
+    // skills scoped to other agents / spaces / agent types.
+    if (q.sessionId) {
+      const session = await repo.getSession(ctx.workspaceId, q.sessionId);
+      const agent = session ? await repo.agentForSession(session) : undefined;
+      if (session && agent) rows = rows.filter((r) => skillApplies(r, agent, session));
+    }
     return rows.map((r) => skillOut(r, q.content === "1"));
   });
 
@@ -1462,7 +1470,9 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     const deps = depsFor(req);
     const res = await deps.dispatch.exec(
       session.runner,
-      "find . -maxdepth 3 -not -path '*/node_modules*' -not -path '*/.git/*' | head -300",
+      // Git repos: tracked + untracked-but-not-ignored files (whole tree, honours
+      // .gitignore). Otherwise a deeper, capped find. Output is "./path" per line.
+      "if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then git ls-files --cached --others --exclude-standard | sed 's|^|./|' | head -5000; else find . -maxdepth 6 -type f -not -path '*/node_modules*' -not -path '*/.git/*' | head -5000; fi",
       session.directory,
       15_000,
     );

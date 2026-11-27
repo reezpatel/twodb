@@ -9,6 +9,7 @@ import { ChatShell, ChatThread, ChatThreadRow, ChatThreadHeader } from "./partia
 import { ChatHeader, ChatHeaderTitle, ChatHeaderStatus, ChatHeaderActions, ChatHeaderAction } from "./partials/ChatHeader.js";
 import { ChatFooter, ChatFooterNotice, ChatReconnecting, ChatStatusBar } from "./partials/ChatFooter.js";
 import { AttachmentChips, MentionPopup, QueuePills } from "./partials/ChatAttachments.js";
+import { fuzzyFilter } from "../../lib/fuzzy.js";
 import { useDirectoryFiles, useSkills, uploadAttachment } from "./hooks/useDirectoryFiles.js";
 import { BUILTIN_COMMANDS, filterCommands, SlashPopup, useSlashCommands } from "./partials/SlashCommands.js";
 import { useWorkspaceWs } from "../../lib/workspace-ws.js";
@@ -127,7 +128,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean; /** llm
   const [slashIndex, setSlashIndex] = useState(0);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const skills = useSkills(detail?.spaceId);
+  const skills = useSkills(props.sessionId);
   const slashCommands = useSlashCommands(skills);
 
   useEffect(() => {
@@ -141,7 +142,7 @@ export function ChatView(props: { sessionId: string; noHeader?: boolean; /** llm
     const m = /(?:^|\s)@(\S*)$/.exec(draft);
     return m ? m[1] : null;
   })();
-  const mentionMatches = mentionQuery === null ? [] : files.filter((f) => f.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 8);
+  const mentionMatches = mentionQuery === null ? [] : fuzzyFilter(files, mentionQuery, (f) => f, 8);
 
   // Trailing `/query` (null when not slashing) — but not when mentioning (@ wins).
   const slashQuery = (() => {

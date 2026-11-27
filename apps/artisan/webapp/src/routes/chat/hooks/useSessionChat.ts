@@ -35,10 +35,13 @@ export function useSessionChat(sessionId: string) {
   /** Set until the first state frame/refresh arrives: a live ask from the
    * server must win over optimistic local clears after a reconnect. */
   const syncedRef = useRef(false);
+  const activeIdRef = useRef(sessionId);
+  activeIdRef.current = sessionId;
 
   const refresh = useCallback(async () => {
     try {
       const d = await artisanClient.getSession(sessionId);
+      if (activeIdRef.current !== sessionId) return;
       setDetail(d);
       setUsage(d.usage);
       setRunning(d.running);
@@ -52,6 +55,15 @@ export function useSessionChat(sessionId: string) {
   }, [sessionId]);
 
   useEffect(() => {
+    // Drop the previous session's transcript immediately so it never shows
+    // (or feeds pagination) while the new session loads.
+    setDetail(null);
+    setUsage(null);
+    setRunning(false);
+    setThinking("");
+    setLoadingOlder(false);
+    anchorRef.current = null;
+    userScrolledUpRef.current = false;
     void refresh();
     setStreamText("");
     setToolEvents([]);
@@ -124,6 +136,7 @@ export function useSessionChat(sessionId: string) {
           // Swap the streamed text for the saved message in one render, so the
           // text never disappears (or shows twice) while the transcript reloads.
           void artisanClient.getSession(sessionId).then((d) => {
+            if (activeIdRef.current !== sessionId) return;
             setDetail(d);
             setUsage(d.usage);
             setRunning(d.running);
@@ -171,6 +184,7 @@ export function useSessionChat(sessionId: string) {
           setStatus(null);
           // Saved messages now carry every tool call — drop the live copies once loaded.
           void artisanClient.getSession(sessionId).then((d) => {
+            if (activeIdRef.current !== sessionId) return;
             setDetail(d);
             setUsage(d.usage);
             setQueue(d.queue);
@@ -209,6 +223,7 @@ export function useSessionChat(sessionId: string) {
     setLoadingOlder(true);
     try {
       const page = await artisanClient.getSessionMessages(sessionId, oldest.createdAt);
+      if (activeIdRef.current !== sessionId) return;
       setDetail((d) => (d ? { ...d, messages: [...page.messages, ...d.messages], hasMoreMessages: page.hasMore } : d));
     } catch (e) {
       anchorRef.current = null;

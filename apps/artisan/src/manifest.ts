@@ -291,8 +291,8 @@ export const artisanManifest = defineAppManifest({
       method: "GET",
       path: "/skills",
       auth: "session-or-apiKey",
-      description: "All skills in the workspace with their availability scope (?content=1 includes the content).",
-      request: z.object({ content: z.string().optional() }),
+      description: "All skills in the workspace with their availability scope (?content=1 includes the content; ?sessionId= keeps only skills that session's agent can use).",
+      request: z.object({ content: z.string().optional(), sessionId: z.string().optional() }),
       response: z.array(skillOut),
     }),
     defineEndpoint({

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { artisanClient } from "../../../lib/artisan-client.js";
+import { OvertypeEditor } from "../../../components/ui/overtype-editor.js";
 import { SideSection } from "./SidePanel.js";
 
 /**
@@ -48,25 +49,27 @@ export function NotesSection({ sessionId }: { sessionId: string }) {
   }, [sessionId]);
 
   return (
-    <SideSection title="Notes">
+    // Explicit bottom border: Notes is often the last child, where the default `last:border-b-0` would drop it.
+    <SideSection title="Notes" flush className="last:border-b">
       {loaded ? (
-        <div className="flex flex-col gap-1">
-          <textarea
+        <div className="relative">
+          <OvertypeEditor
+            key={sessionId}
             value={text}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={onChange}
+            ariaLabel="Session notes"
             placeholder="Private notes — markdown, never sent to the agent…"
-            spellCheck={false}
-            rows={6}
-            className="min-h-24 w-full resize-y rounded-md border border-outline bg-surface px-2 py-1.5 font-mono text-[12px] leading-relaxed text-ink outline-none placeholder:text-ink-faint focus:border-info/50"
+            fontSize="12px"
+            padding="12px"
+            className="h-44 overflow-hidden border-0 border-b border-outline bg-transparent shadow-none outline-none"
           />
-          <span className={`self-end text-[10px] ${saving === "error" ? "text-destructive" : "text-ink-muted/60"}`}>
+          <span className={`pointer-events-none absolute right-3 bottom-1.5 text-[10px] ${saving === "error" ? "text-destructive" : "text-ink-muted/60"}`}>
             {saving === "saving" ? "saving…" : saving === "saved" ? "saved" : saving === "error" ? "save failed" : "\u00a0"}
           </span>
         </div>
       ) : (
-        <p className="py-1 text-[11px] text-ink-muted">loading…</p>
+        <p className="px-3 py-3 text-[11px] text-ink-muted">loading…</p>
       )}
     </SideSection>
   );
 }
-

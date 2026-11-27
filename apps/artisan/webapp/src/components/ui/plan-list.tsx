@@ -190,15 +190,15 @@ function PlanItemRow({ item, animate }: { item: PlanStep; animate: boolean }) {
     <li
       data-slot="plan-item"
       data-task-status={item.status}
-      className={cn("flex min-w-0 items-start gap-2.5 py-1", animate && "transition-opacity duration-200 starting:opacity-0")}
+      className={cn("flex min-w-0 items-start gap-2.5 py-0", animate && "transition-opacity duration-200 starting:opacity-0")}
     >
-      <span className="flex h-5 shrink-0 items-center">
+      <span className="flex h-4 shrink-0 items-center">
         <StatusGlyph status={item.status} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span
           className={cn(
-            "text-pretty text-[12px] leading-snug transition-colors duration-150",
+            "text-pretty text-[13px] leading-4 transition-colors duration-150",
             active ? "font-medium text-ink" : "text-ink",
             struck && "text-ink-muted line-through decoration-1",
             item.status === "pending" && "text-ink-muted",
@@ -227,6 +227,8 @@ export interface PlanListProps extends Omit<React.ComponentProps<"div">, "title"
   collapsible?: boolean;
   /** Hide the built-in header row (e.g. when an outer section already provides one). */
   hideHeader?: boolean;
+  /** Hide the per-step progress rail. */
+  hideProgress?: boolean;
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -254,6 +256,7 @@ export function PlanList({
   loading = false,
   collapsible = true,
   hideHeader = false,
+  hideProgress = false,
   open: openProp,
   defaultOpen = true,
   onOpenChange,
@@ -280,7 +283,7 @@ export function PlanList({
     items.length === 0 && !loading ? (
       <p className="py-1 text-[11px] text-ink-muted">{empty}</p>
     ) : (
-      <ul aria-label={typeof title === "string" ? title : "Plan"} className="flex flex-col">
+      <ul aria-label={typeof title === "string" ? title : "Plan"} className="flex flex-col gap-2.5">
         {items.map((item) => (
           <PlanItemRow key={item.id} item={item} animate={!initial.has(item.id)} />
         ))}
@@ -342,7 +345,7 @@ export function PlanList({
       </button>
       )}
 
-      <div className="px-1 pb-1"><PlanProgress items={items} /></div>
+      {hideProgress ? null : <div className="px-1 pb-1"><PlanProgress items={items} /></div>}
 
       <div
         className={cn(

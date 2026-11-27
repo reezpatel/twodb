@@ -1,5 +1,6 @@
 import { FileCode2, Terminal, Trash2, Sparkles } from "lucide-react";
 import { cn } from "../../../lib/cn.js";
+import { fuzzyScore } from "../../../lib/fuzzy.js";
 
 export interface SlashCommandItem {
   id: string;
@@ -24,18 +25,19 @@ export function useSlashCommands(skills: Array<{ id: string; name: string; descr
   ];
 }
 
-/** Name matches first (prefix before substring), then description matches; stable within each tier. */
+/** Fuzzy: name matches rank above description matches (description score is discounted). */
 export function filterCommands(items: SlashCommandItem[], query: string, limit = 9): SlashCommandItem[] {
-  const q = query.trim().toLowerCase();
+  const q = query.trim();
   if (!q) return items.slice(0, limit);
-  const rank = (c: SlashCommandItem) => {
-    const l = c.label.toLowerCase();
-    return l.startsWith(q) ? 0 : l.includes(q) ? 1 : c.description.toLowerCase().includes(q) ? 2 : 3;
-  };
   return items
-    .map((c, i) => ({ c, i, r: rank(c) }))
-    .filter((x) => x.r < 3)
-    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map((c, i) => {
+      const name = fuzzyScore(c.label, q);
+      const desc = fuzzyScore(c.description, q);
+      const s = name !== null ? name + 20 : desc !== null ? desc : null;
+      return { c, i, s };
+    })
+    .filter((x): x is { c: SlashCommandItem; i: number; s: number } => x.s !== null)
+    .sort((a, b) => b.s - a.s || a.i - b.i)
     .slice(0, limit)
     .map((x) => x.c);
 }

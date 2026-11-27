@@ -1,5 +1,7 @@
 import { Paperclip, X } from "lucide-react";
+import { MessageQueue } from "@twodb/blocks";
 import { cn } from "../../../lib/cn.js";
+import { fuzzyFilter } from "../../../lib/fuzzy.js";
 
 /** Attached-file chips above the composer (legacy code-chat-attachments).
  *  `items` are { path, uploaded?, name? }; uploaded files show their basename. */
@@ -37,9 +39,7 @@ export function MentionPopup(props: {
   onPick: (index: number) => void;
   onHover: (index: number) => void;
 }) {
-  const matches = props.files
-    .filter((f) => f.toLowerCase().includes(props.query.toLowerCase()))
-    .slice(0, 8);
+  const matches = fuzzyFilter(props.files, props.query, (f) => f, 8);
   if (matches.length === 0) return null;
   return (
     <div
@@ -67,44 +67,15 @@ export function MentionPopup(props: {
   );
 }
 
-/** Queued (steering) messages above the composer. The queue lives on the
- * server, so every viewer sees the same items and a reload loses nothing. */
+/** Queued (steering) messages above the composer, using the shared blocks
+ * MessageQueue. The queue lives on the server, so every viewer sees the same
+ * items and a reload loses nothing. "Steer" sends the whole queue now (stops
+ * the current run); reordering isn't supported server-side. */
 export function QueuePills(props: {
   items: Array<{ id: string; content: string }>;
   onRemove: (id: string) => void;
   onSendNow: () => void;
 }) {
   if (props.items.length === 0) return null;
-  return (
-    <div data-slot="queue-pills" className="flex flex-col gap-1 px-1">
-      <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] uppercase tracking-wide text-ink-faint">queued — sent when this run finishes</span>
-        <button
-          type="button"
-          title="Send now (stops the current run)"
-          className="text-[10px] text-info hover:underline"
-          onClick={() => props.onSendNow()}
-        >
-          send now
-        </button>
-      </div>
-      {props.items.map((item, i) => (
-        <div
-          key={item.id}
-          className="group flex items-center gap-2 rounded-md border border-outline bg-surface px-2 py-1 text-[12px]"
-        >
-          <span className="shrink-0 rounded bg-info/15 px-1 py-px text-[10px] text-info">{i === 0 ? "next" : `queued ${i + 1}`}</span>
-          <span className="min-w-0 flex-1 truncate text-ink-muted">{item.content}</span>
-          <button
-            type="button"
-            aria-label="Remove queued message"
-            className="shrink-0 text-ink-muted opacity-0 hover:text-destructive group-hover:opacity-100"
-            onClick={() => props.onRemove(item.id)}
-          >
-            <X className="size-3" />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
+  return <MessageQueue items={props.items} onRemove={props.onRemove} onSendNow={() => props.onSendNow()} />;
 }

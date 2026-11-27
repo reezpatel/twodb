@@ -3,6 +3,17 @@ import { apiFetch } from "../../../lib/artisan-client.js";
 
 /** File walk for the composer's @ mentions — one fetch, cached 60s, filtered client-side. */
 
+/** Adds each parent folder (with a trailing "/") so `@` can pick folders too. */
+function withFolders(paths: string[]): string[] {
+  const out = new Set<string>();
+  for (const p of paths) {
+    const parts = p.split("/");
+    for (let i = 1; i < parts.length; i++) out.add(`${parts.slice(0, i).join("/")}/`);
+    out.add(p);
+  }
+  return [...out];
+}
+
 const cache = new Map<string, { at: number; files: string[] }>();
 const TTL = 60_000;
 
@@ -23,7 +34,7 @@ export function useDirectoryFiles(sessionId: string | null): string[] {
     apiFetch(`/sessions/${sessionId}/files`)
       .then((r) => (r.ok ? r.json() : { files: [] }))
       .then((d: { files?: string[] }) => {
-        const list = (d.files ?? []).filter((f) => !f.startsWith("."));
+        const list = withFolders((d.files ?? []).filter((f) => !f.startsWith(".")));
         cache.set(sessionId, { at: Date.now(), files: list });
         if (!cancelled) setFiles(list);
       })
@@ -53,31 +64,31 @@ export async function buildAttachmentBlock(sessionId: string, paths: string[]): 
 /** Skills for the `/` slash palette — fetched once per session. */
 const skillCache = new Map<string, { at: number; skills: Array<{ id: string; name: string; description: string; content: string }> }>();
 
-export function useSkills(spaceId?: string): Array<{ id: string; name: string; description: string; content: string }> {
-  const [skills, setSkills] = useState<Array<{ id: string; name: string; description: string; content: string }>>(spaceId ? (skillCache.get(spaceId)?.skills ?? []) : []);
+export function useSkills(sessionId?: string): Array<{ id: string; name: string; description: string; content: string }> {
+  const [skills, setSkills] = useState<Array<{ id: string; name: string; description: string; content: string }>>(sessionId ? (skillCache.get(sessionId)?.skills ?? []) : []);
 
   useEffect(() => {
-    if (!spaceId) {
+    if (!sessionId) {
       setSkills([]);
       return;
     }
-    const hit = skillCache.get(spaceId);
+    const hit = skillCache.get(sessionId);
     if (hit && Date.now() - hit.at < TTL) {
       setSkills(hit.skills);
       return;
     }
     let cancelled = false;
-    apiFetch(`/skills?spaceId=${encodeURIComponent(spaceId)}&content=1`)
+    apiFetch(`/skills?sessionId=${encodeURIComponent(sessionId)}&content=1`)
       .then((r) => (r.ok ? r.json() : []))
       .then((list: Array<{ id: string; name: string; description: string; content: string }>) => {
-        skillCache.set(spaceId, { at: Date.now(), skills: list });
+        skillCache.set(sessionId, { at: Date.now(), skills: list });
         if (!cancelled) setSkills(list);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [spaceId]);
+  }, [sessionId]);
 
   return skills;
 }
