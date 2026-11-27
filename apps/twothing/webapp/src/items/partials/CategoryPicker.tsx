@@ -11,7 +11,10 @@ export function CategoryPicker({ value, onChange }: { value: string; onChange: (
             type="button"
             key={c.id}
             onClick={() => onChange(c.id)}
-            className={cn("flex flex-col items-center gap-1.5 rounded-2xl border px-1 py-2.5 text-center text-[11px] leading-tight font-semibold transition active:scale-95", active ? "border-transparent text-white shadow-md" : "border-outline bg-paper text-ink hover:border-ink/25")}
+            className={cn(
+              "flex flex-col items-center gap-1.5 rounded-lg border px-1 py-2.5 text-center text-[11px] leading-tight font-semibold transition active:scale-95",
+              active ? "border-transparent text-white shadow-md" : "border-outline bg-paper text-ink hover:border-ink/25",
+            )}
             style={active ? { background: c.color } : undefined}
           >
             <c.icon className="size-5" style={active ? undefined : { color: c.color }} />

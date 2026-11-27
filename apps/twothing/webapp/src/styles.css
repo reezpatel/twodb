@@ -13,12 +13,6 @@
 }
 .tt-hit { animation: tt-hit 0.6s ease-out forwards; }
 
-/* Subtle drafting-paper grid behind page content. */
-.tt-grid-bg {
-  background-image: linear-gradient(var(--paper-grid) 1px, transparent 1px), linear-gradient(90deg, var(--paper-grid) 1px, transparent 1px);
-  background-size: 28px 28px;
-  background-position: -1px -1px;
-}
 
 .tt-safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 

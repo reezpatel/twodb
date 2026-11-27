@@ -17,9 +17,9 @@ export function TagInput({
 }) {
   return (
     <div className="space-y-2">
-      <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-xl border border-outline bg-paper px-2 py-1.5 focus-within:border-ink/30">
+      <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-md border border-outline bg-paper px-2 py-1.5 focus-within:border-ink/30">
         {tags.map((t) => (
-          <span key={t} className="inline-flex items-center gap-1 rounded-full bg-ink px-2.5 py-0.5 text-xs font-semibold text-paper">
+          <span key={t} className="inline-flex items-center gap-1 rounded-[6px] bg-ink px-2.5 py-0.5 text-xs font-semibold text-paper">
             {t}
             <button type="button" aria-label={`Remove ${t}`} onClick={() => onRemove(t)} className="opacity-60 hover:opacity-100">
               <X className="size-3" />
@@ -42,7 +42,12 @@ export function TagInput({
       {suggestions.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {suggestions.map((s) => (
-            <button type="button" key={s} onClick={() => onAdd(s)} className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-outline px-2 py-0.5 text-xs text-ink-muted hover:border-ink/30 hover:text-ink">
+            <button
+              type="button"
+              key={s}
+              onClick={() => onAdd(s)}
+              className="inline-flex items-center gap-0.5 rounded-[6px] border border-dashed border-outline px-2 py-0.5 text-xs text-ink-muted hover:border-ink/30 hover:text-ink"
+            >
               <Plus className="size-3" />
               {s}
             </button>

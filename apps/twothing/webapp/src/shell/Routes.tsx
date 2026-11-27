@@ -26,7 +26,13 @@ export function Routes() {
     case undefined:
       return <Dashboard />;
     case "items":
-      if (b === "new") return <ItemEditor key={r.query.toString()} />;
+      if (b === "new")
+        return (
+          <>
+            <ItemsPage />
+            <ItemEditor key={r.query.toString()} sheet />
+          </>
+        );
       if (b && c === "edit") return <ItemEditor key={b} id={b} />;
       if (b) return <ItemDetail key={b} id={b} />;
       return <ItemsPage />;

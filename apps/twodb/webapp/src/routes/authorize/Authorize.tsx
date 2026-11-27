@@ -1,33 +1,29 @@
-import { Button } from "@twodb/blocks";
 import { useAuthorize } from "./hooks/useAuthorize.js";
+import { ConsentCard } from "./partials/ConsentCard.js";
 
 /** "Login with TwoDB" consent step — only calls its holding hook and renders. */
 export function Authorize() {
   const { target, email, invalid, pending, error, approve, cancel } = useAuthorize();
   return (
     <div className="flex min-h-screen items-center justify-center bg-paper p-6">
-      <div className="flex w-full max-w-sm flex-col gap-4 rounded-md border border-outline bg-card p-8 text-ink">
-        <h1 className="text-lg font-semibold tracking-[-0.01em]">Sign in to an app</h1>
-        {invalid ? (
-          <p className="text-sm text-red-600">{invalid}</p>
-        ) : (
-          <>
-            <p className="text-sm text-ink-muted">
-              <span className="font-mono break-all text-ink">{target}</span> wants to sign you in as{" "}
-              <span className="font-medium text-ink">{email}</span>.
-            </p>
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
-            <div className="flex gap-2">
-              <Button className="flex-1" disabled={pending} onClick={() => void approve()}>
-                {pending ? "Signing in…" : "Continue"}
-              </Button>
-              <Button variant="ghost" disabled={pending} onClick={cancel}>
-                Cancel
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
+      {invalid || !target ? (
+        <div className="w-full max-w-sm rounded-2xl border border-outline bg-card p-8 text-ink shadow-lg">
+          <h1 className="text-lg font-medium">Sign in to an app</h1>
+          <p role="alert" className="mt-3 text-sm text-red-600">
+            {invalid ?? "This sign-in link is invalid."}
+          </p>
+        </div>
+      ) : (
+        <ConsentCard
+          appName={new URL(target).host}
+          target={target}
+          email={email ?? ""}
+          error={error}
+          pending={pending}
+          onApprove={() => void approve()}
+          onDeny={cancel}
+        />
+      )}
     </div>
   );
 }

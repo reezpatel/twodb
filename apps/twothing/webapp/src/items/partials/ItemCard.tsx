@@ -14,14 +14,14 @@ export function ItemCard({
   onOpen,
   onDelta,
   onFavorite,
-  selecting,
+  onSelect,
   selected,
 }: {
   item: Item;
   onOpen: () => void;
   onDelta: (d: number) => void;
   onFavorite: () => void;
-  selecting?: boolean;
+  onSelect: () => void;
   selected?: boolean;
 }) {
   const cat = categoryOf(item.category);
@@ -31,7 +31,7 @@ export function ItemCard({
     <div
       onClick={onOpen}
       className={cn(
-        "group relative flex cursor-pointer flex-col overflow-hidden rounded-[18px] border border-outline bg-card transition hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-lg",
+        "group relative flex cursor-pointer flex-col overflow-hidden rounded-[6px] border border-outline bg-card transition hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-lg",
         selected && "ring-2 ring-ink",
       )}
     >
@@ -43,25 +43,43 @@ export function ItemCard({
             <Icon className="size-12 opacity-70" strokeWidth={1.5} />
           </div>
         )}
-        <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-paper/90 px-2 py-0.5 text-[11px] font-semibold backdrop-blur" style={{ color: cat.color }}>
+        <span
+          className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-[6px] bg-paper/90 px-2 py-0.5 text-[11px] font-semibold backdrop-blur"
+          style={{ color: cat.color }}
+        >
           <Icon className="size-3" /> {cat.short}
         </span>
-        {selecting ? (
-          <span className={cn("absolute top-2 right-2 grid size-6 place-items-center rounded-full border-2 border-paper", selected ? "bg-ink text-paper" : "bg-paper/80")}>{selected && <Check className="size-3.5" />}</span>
-        ) : (
-          <button
-            aria-label={item.favorite ? "Unstar" : "Star"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onFavorite();
-            }}
-            className={cn("absolute top-2 right-2 grid size-7 place-items-center rounded-full bg-paper/80 backdrop-blur transition", item.favorite ? "text-amber-500" : "text-ink-muted opacity-0 group-hover:opacity-100")}
-          >
-            <Star className="size-3.5" fill={item.favorite ? "currentColor" : "none"} />
-          </button>
-        )}
+        <button
+          type="button"
+          role="radio"
+          aria-checked={!!selected}
+          aria-label={selected ? "Deselect" : "Select"}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+          className={cn(
+            "absolute top-2 right-2 grid size-5 place-items-center rounded-full border-2 border-paper shadow-sm transition",
+            selected ? "bg-ink text-paper" : "bg-paper/80 hover:bg-paper",
+          )}
+        >
+          {selected && <Check className="size-3" />}
+        </button>
+        <button
+          aria-label={item.favorite ? "Unstar" : "Star"}
+          onClick={(e) => {
+            e.stopPropagation();
+            onFavorite();
+          }}
+          className={cn(
+            "absolute top-2 right-9 grid size-5 place-items-center rounded-[6px] bg-paper/80 backdrop-blur transition",
+            item.favorite ? "text-amber-500" : "text-ink-muted opacity-0 group-hover:opacity-100",
+          )}
+        >
+          <Star className="size-3" fill={item.favorite ? "currentColor" : "none"} />
+        </button>
         {item.low && (
-          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-destructive px-2 py-0.5 text-[11px] font-semibold text-destructive-foreground">
+          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-[6px] bg-destructive px-2 py-0.5 text-[11px] font-semibold text-destructive-foreground">
             <TriangleAlert className="size-3" /> Low
           </span>
         )}

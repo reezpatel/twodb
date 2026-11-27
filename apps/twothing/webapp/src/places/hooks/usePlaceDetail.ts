@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { adjustItem, refreshAll } from "../../lib/actions";
 import { api, errorMessage } from "../../lib/api";
 import { useQuery } from "../../lib/query";
@@ -14,6 +14,17 @@ export function usePlaceDetail(id: string) {
   const [moveOpen, setMoveOpen] = useState(false);
   const place = q.data?.location;
 
+  // Every place always has a label: allocate a pool code the first time one is opened without it.
+  const autoLabeled = useRef(new Set<string>());
+  useEffect(() => {
+    if (!place || place.code || autoLabeled.current.has(place.id)) return;
+    autoLabeled.current.add(place.id);
+    api
+      .updatePlace(place.id, { autoCode: true })
+      .then(refreshAll)
+      .catch((e) => toast(errorMessage(e), { tone: "error" }));
+  }, [place]);
+
   return {
     place,
     children: q.data?.children ?? [],
@@ -26,7 +37,13 @@ export function usePlaceDetail(id: string) {
     addChild: () => navigate(`/places/new?parent=${id}`),
     edit: () => navigate(`/places/${id}/edit`),
     print: () => navigate(`/labels/print?places=${id}`),
-    printContents: () => navigate(`/labels/print?items=${(q.data?.items ?? []).filter((i) => i.code).map((i) => i.id).join(",")}`),
+    printContents: () =>
+      navigate(
+        `/labels/print?items=${(q.data?.items ?? [])
+          .filter((i) => i.code)
+          .map((i) => i.id)
+          .join(",")}`,
+      ),
     allItems: () => navigate(`/items?locationId=${id}`),
     openItem: (it: Item) => navigate(`/items/${it.id}`),
     onDelta: (it: Item, d: number) => void adjustItem(it, d),

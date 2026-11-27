@@ -1,5 +1,21 @@
 import { Dialog, DialogContent, DialogDescription, DialogTitle, cn } from "@twodb/blocks";
-import { Barcode, Copy, ExternalLink, FileText, History, MapPin, MoveRight, Pencil, Printer, QrCode, ScanLine, Sparkles, Star, Tag, TriangleAlert } from "lucide-react";
+import {
+  Barcode,
+  Copy,
+  ExternalLink,
+  FileText,
+  History,
+  MapPin,
+  MoveRight,
+  Pencil,
+  Printer,
+  QrCode,
+  ScanLine,
+  Sparkles,
+  Star,
+  Tag,
+  TriangleAlert,
+} from "lucide-react";
 import { api } from "../lib/api";
 import { categoryOf } from "../lib/catalog";
 import { formatMoney, formatQty, timeAgo } from "../lib/format";
@@ -15,7 +31,12 @@ import { useItemDetail } from "./hooks/useItemDetail";
 export function ItemDetail({ id }: { id: string }) {
   const h = useItemDetail(id);
   const it = h.item;
-  if (h.notFound) return <Page><PageHeader title="Item not found" subtitle="It may have been deleted." onBack="/items" /></Page>;
+  if (h.notFound)
+    return (
+      <Page>
+        <PageHeader title="Item not found" subtitle="It may have been deleted." onBack="/items" />
+      </Page>
+    );
   if (h.loading || !it) return <Spinner />;
   const cat = categoryOf(it.category);
   const Icon = cat.icon;
@@ -27,14 +48,22 @@ export function ItemDetail({ id }: { id: string }) {
       <PageHeader
         onBack="/items"
         eyebrow={
-          <Link to={`/items?category=${cat.id}`} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: `color-mix(in oklab, ${cat.color} 14%, transparent)`, color: cat.color }}>
+          <Link
+            to={`/items?category=${cat.id}`}
+            className="inline-flex items-center gap-1.5 rounded-[6px] px-2.5 py-0.5 text-xs font-semibold"
+            style={{ background: `color-mix(in oklab, ${cat.color} 14%, transparent)`, color: cat.color }}
+          >
             <Icon className="size-3.5" /> {cat.label}
           </Link>
         }
         title={
           <span className="inline-flex items-center gap-2">
             {it.name}
-            <button aria-label="Star" onClick={h.toggleFavorite} className={cn("rounded-full p-1 transition hover:bg-stone", it.favorite ? "text-amber-500" : "text-ink-muted/50")}>
+            <button
+              aria-label="Star"
+              onClick={h.toggleFavorite}
+              className={cn("rounded-[6px] p-1 transition hover:bg-stone", it.favorite ? "text-amber-500" : "text-ink-muted/50")}
+            >
               <Star className="size-5" fill={it.favorite ? "currentColor" : "none"} />
             </button>
           </span>
@@ -55,7 +84,7 @@ export function ItemDetail({ id }: { id: string }) {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-4">
           {/* gallery */}
-          <div className="overflow-hidden rounded-[18px] border border-outline bg-card">
+          <div className="overflow-hidden rounded-[6px] border border-outline bg-card">
             <div className="relative aspect-[16/10] w-full" style={{ background: `color-mix(in oklab, ${cat.color} 9%, var(--card))` }}>
               {it.imageIds.length ? (
                 <img src={api.imageUrl(it.imageIds[Math.min(h.photo, it.imageIds.length - 1)])} alt={it.name} className="size-full object-contain" />
@@ -68,7 +97,7 @@ export function ItemDetail({ id }: { id: string }) {
                 </button>
               )}
               {it.low && (
-                <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-destructive px-2.5 py-1 text-xs font-semibold text-destructive-foreground shadow">
+                <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-[6px] bg-destructive px-2.5 py-1 text-xs font-semibold text-destructive-foreground shadow">
                   <TriangleAlert className="size-3.5" /> Low stock
                 </span>
               )}
@@ -76,7 +105,11 @@ export function ItemDetail({ id }: { id: string }) {
             {it.imageIds.length > 1 && (
               <div className="flex gap-2 overflow-x-auto p-2">
                 {it.imageIds.map((img, i) => (
-                  <button key={img} onClick={() => h.setPhoto(i)} className={cn("size-16 shrink-0 overflow-hidden rounded-lg border-2", i === h.photo ? "border-ink" : "border-transparent opacity-70")}>
+                  <button
+                    key={img}
+                    onClick={() => h.setPhoto(i)}
+                    className={cn("size-16 shrink-0 overflow-hidden rounded-lg border-2", i === h.photo ? "border-ink" : "border-transparent opacity-70")}
+                  >
                     <img src={api.imageUrl(img)} alt="" className="size-full object-cover" />
                   </button>
                 ))}
@@ -86,9 +119,12 @@ export function ItemDetail({ id }: { id: string }) {
 
           {specs.length > 0 && (
             <Section title="Specs">
-              <dl className="grid grid-cols-1 overflow-hidden rounded-xl border border-outline sm:grid-cols-2">
+              <dl className="grid grid-cols-1 overflow-hidden rounded-md border border-outline sm:grid-cols-2">
                 {specs.map(([k, v]) => (
-                  <div key={k} className="flex gap-3 border-b border-outline px-3 py-2.5 last:border-b-0 sm:[&:nth-last-child(2):nth-child(odd)]:border-b-0 sm:odd:border-r">
+                  <div
+                    key={k}
+                    className="flex gap-3 border-b border-outline px-3 py-2.5 last:border-b-0 sm:[&:nth-last-child(2):nth-child(odd)]:border-b-0 sm:odd:border-r"
+                  >
                     <dt className="w-28 shrink-0 text-xs font-semibold text-ink-muted uppercase">{k}</dt>
                     <dd className="min-w-0 text-sm font-medium break-words">{v}</dd>
                   </div>
@@ -101,12 +137,20 @@ export function ItemDetail({ id }: { id: string }) {
             <Section title="Tags & barcodes">
               <div className="flex flex-wrap gap-1.5">
                 {it.tags.map((t) => (
-                  <Link key={t} to={`/items?tag=${encodeURIComponent(t)}`} className="inline-flex items-center gap-1 rounded-full border border-outline bg-paper px-2.5 py-1 text-xs font-medium hover:border-ink/30">
+                  <Link
+                    key={t}
+                    to={`/items?tag=${encodeURIComponent(t)}`}
+                    className="inline-flex items-center gap-1 rounded-[6px] border border-outline bg-paper px-2.5 py-1 text-xs font-medium hover:border-ink/30"
+                  >
                     <Tag className="size-3" /> {t}
                   </Link>
                 ))}
                 {it.barcodes.map((b) => (
-                  <span key={b} className="inline-flex max-w-full items-center gap-1 rounded-lg border border-outline bg-paper px-2 py-1 font-mono text-xs" title={b}>
+                  <span
+                    key={b}
+                    className="inline-flex max-w-full items-center gap-1 rounded-lg border border-outline bg-paper px-2 py-1 font-mono text-xs"
+                    title={b}
+                  >
                     <Barcode className="size-3.5 shrink-0" /> <span className="truncate">{b}</span>
                   </span>
                 ))}
@@ -136,11 +180,17 @@ export function ItemDetail({ id }: { id: string }) {
                   )}
                 </div>
               )}
-              {it.notes && <p className="mt-4 rounded-xl bg-paper p-3 text-sm whitespace-pre-wrap">{it.notes}</p>}
+              {it.notes && <p className="mt-4 rounded-md bg-paper p-3 text-sm whitespace-pre-wrap">{it.notes}</p>}
             </Section>
           )}
 
-          <Section title={<span className="inline-flex items-center gap-1.5"><History className="size-3.5" /> History</span>}>
+          <Section
+            title={
+              <span className="inline-flex items-center gap-1.5">
+                <History className="size-3.5" /> History
+              </span>
+            }
+          >
             <ActivityList entries={h.activity} />
           </Section>
         </div>
@@ -162,7 +212,10 @@ export function ItemDetail({ id }: { id: string }) {
             {stockPct !== null && (
               <div className="mt-4">
                 <div className="h-2 overflow-hidden rounded-full bg-stone">
-                  <div className={cn("h-full rounded-full transition-all", it.low ? "bg-destructive" : "bg-emerald-500")} style={{ width: `${Math.max(3, stockPct)}%` }} />
+                  <div
+                    className={cn("h-full rounded-full transition-all", it.low ? "bg-destructive" : "bg-emerald-500")}
+                    style={{ width: `${Math.max(3, stockPct)}%` }}
+                  />
                 </div>
                 <div className="mt-1.5 text-xs text-ink-muted">
                   Alert at {formatQty(it.minQuantity!)} {it.unit}
@@ -172,7 +225,11 @@ export function ItemDetail({ id }: { id: string }) {
           </Section>
 
           <Section
-            title={<span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5" /> Location</span>}
+            title={
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin className="size-3.5" /> Location
+              </span>
+            }
             action={
               <div className="flex gap-1">
                 <button className={cn(btn.ghost, "px-2 py-1 text-xs")} onClick={() => void h.scanMove()}>
@@ -188,7 +245,11 @@ export function ItemDetail({ id }: { id: string }) {
           </Section>
 
           <Section
-            title={<span className="inline-flex items-center gap-1.5"><QrCode className="size-3.5" /> Label</span>}
+            title={
+              <span className="inline-flex items-center gap-1.5">
+                <QrCode className="size-3.5" /> Label
+              </span>
+            }
             action={
               it.code ? (
                 <button className={cn(btn.ghost, "px-2 py-1 text-xs")} onClick={h.print}>
@@ -241,7 +302,13 @@ export function ItemDetail({ id }: { id: string }) {
               if (Number.isFinite(v) && v >= 0) h.setExact(v);
             }}
           >
-            <input name="q" autoFocus inputMode="decimal" defaultValue={it.quantity} className="h-10 min-w-0 flex-1 rounded-xl border border-outline bg-paper px-3 text-lg font-semibold tabular-nums outline-none" />
+            <input
+              name="q"
+              autoFocus
+              inputMode="decimal"
+              defaultValue={it.quantity}
+              className="h-10 min-w-0 flex-1 rounded-md border border-outline bg-paper px-3 text-lg font-semibold tabular-nums outline-none"
+            />
             <button className={btn.primary}>Set</button>
           </form>
         </DialogContent>

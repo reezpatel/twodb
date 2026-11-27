@@ -29,7 +29,7 @@ export function ScanEntryView({
       {entry.outcome && (
         <div
           className={cn(
-            "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium",
+            "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium",
             entry.outcome.tone === "ok" && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
             entry.outcome.tone === "warn" && "bg-amber-500/10 text-amber-700 dark:text-amber-300",
             entry.outcome.tone === "error" && "bg-rose-500/10 text-rose-700 dark:text-rose-300",
@@ -38,7 +38,7 @@ export function ScanEntryView({
           <OutIcon className="size-4 shrink-0" />
           <span className="flex-1">{entry.outcome.text}</span>
           {entry.undo && (
-            <button className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold hover:bg-black/5" onClick={onUndo}>
+            <button className="inline-flex items-center gap-1 rounded-[6px] px-2 py-0.5 text-xs font-semibold hover:bg-black/5" onClick={onUndo}>
               <Undo2 className="size-3" /> Undo
             </button>
           )}

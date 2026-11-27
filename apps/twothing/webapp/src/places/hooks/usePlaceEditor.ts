@@ -21,7 +21,8 @@ interface Draft {
 
 /** Suggest a sensible kind for a child of `parentKind`. */
 const childKind = (parentKind?: string) =>
-  ({ room: "shelf", cabinet: "shelf", rack: "shelf", shelf: "box", drawer: "organizer", organizer: "bin" } as Record<string, string>)[parentKind ?? ""] ?? "box";
+  (({ room: "shelf", cabinet: "shelf", rack: "shelf", shelf: "box", drawer: "organizer", organizer: "bin" }) as Record<string, string>)[parentKind ?? ""] ??
+  "box";
 
 /** Holding hook for <PlaceEditor>. */
 export function usePlaceEditor(id?: string) {
@@ -35,7 +36,8 @@ export function usePlaceEditor(id?: string) {
     parentId: query.get("parent"),
     description: "",
     code: query.get("code") ? displayCode(query.get("code")!) : "",
-    autoCode: false,
+    // New places get a generated label unless one was passed in (e.g. from a scan).
+    autoCode: !id && !query.get("code"),
     imageId: null,
   });
   const [loaded, setLoaded] = useState(!id);
@@ -48,7 +50,15 @@ export function usePlaceEditor(id?: string) {
 
   useEffect(() => {
     if (id && existing && !loaded) {
-      setDraft({ name: existing.name, kind: existing.kind, parentId: existing.parentId, description: existing.description, code: existing.codeDisplay ?? "", autoCode: false, imageId: existing.imageId });
+      setDraft({
+        name: existing.name,
+        kind: existing.kind,
+        parentId: existing.parentId,
+        description: existing.description,
+        code: existing.codeDisplay ?? "",
+        autoCode: !existing.codeDisplay,
+        imageId: existing.imageId,
+      });
       setLoaded(true);
     }
   }, [id, existing, loaded]);
@@ -69,7 +79,8 @@ export function usePlaceEditor(id?: string) {
     const t = setTimeout(async () => {
       const res = await api.resolve(raw).catch(() => null);
       const holder = res?.matches.find((m) => m.type === "location") ?? res?.matches.find((m) => m.type === "item" && m.via === "label");
-      if (holder?.type === "location") setLabelStatus(holder.location.id === id ? { state: "mine" } : { state: "taken", by: `place “${holder.location.name}”` });
+      if (holder?.type === "location")
+        setLabelStatus(holder.location.id === id ? { state: "mine" } : { state: "taken", by: `place “${holder.location.name}”` });
       else if (holder?.type === "item") setLabelStatus({ state: "taken", by: `item “${holder.item.name}”` });
       else if (res?.matches[0]?.type === "free_code") setLabelStatus({ state: "free", inPool: res.matches[0].inPool });
       else setLabelStatus({ state: "custom" });
@@ -82,7 +93,7 @@ export function usePlaceEditor(id?: string) {
   const save = async (andAnother = false) => {
     setError(null);
     if (!draft.name.trim()) return setError("Give it a name.");
-    if (labelStatus.state === "taken") return setError(`That label is already on ${labelStatus.by}.`);
+    if (!draft.autoCode && labelStatus.state === "taken") return setError(`That label is already on ${labelStatus.by}.`);
     setSaving(true);
     try {
       const body = {
@@ -90,15 +101,15 @@ export function usePlaceEditor(id?: string) {
         kind: draft.kind,
         parentId: draft.parentId,
         description: draft.description,
-        code: draft.code.trim() || null,
-        autoCode: draft.autoCode && !draft.code.trim(),
+        code: draft.autoCode ? null : draft.code.trim() || null,
+        autoCode: draft.autoCode,
         imageId: draft.imageId,
       };
       const saved = id ? await api.updatePlace(id, body) : await api.createPlace(body);
       refreshAll();
       if (andAnother) {
         toast(`Created ${saved.name}${saved.codeDisplay ? ` · ${saved.codeDisplay}` : ""}`, { tone: "success" });
-        setDraft((d) => ({ ...d, name: "", description: "", code: "", imageId: null }));
+        setDraft((d) => ({ ...d, name: "", description: "", code: "", autoCode: true, imageId: null }));
       } else {
         toast(id ? "Saved" : `Created ${saved.name}`, { tone: "success" });
         navigate(`/places/${saved.id}`, { replace: true });

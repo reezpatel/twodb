@@ -3,6 +3,7 @@ import { ArrowRightLeft, FilePlus2, Minus, Pencil, Plus, QrCode, Trash2, Upload 
 import { formatQty, timeAgo } from "../lib/format";
 import { Link } from "../lib/router";
 import type { Activity } from "../lib/types";
+import type { TimelineItem } from "./Timeline";
 
 const ICON = { created: FilePlus2, updated: Pencil, moved: ArrowRightLeft, labeled: QrCode, deleted: Trash2, imported: Upload } as const;
 
@@ -10,7 +11,9 @@ export function describe(a: Activity): string {
   const d = a.detail as Record<string, unknown>;
   switch (a.action) {
     case "created":
-      return a.targetKind === "item" ? `Added${d.quantity !== undefined ? ` (${formatQty(Number(d.quantity))} ${d.unit ?? ""})` : ""}` : `Created ${d.kind ?? "place"}${d.parent ? ` in ${d.parent}` : ""}`;
+      return a.targetKind === "item"
+        ? `Added${d.quantity !== undefined ? ` (${formatQty(Number(d.quantity))} ${d.unit ?? ""})` : ""}`
+        : `Created ${d.kind ?? "place"}${d.parent ? ` in ${d.parent}` : ""}`;
     case "quantity": {
       const delta = Number(d.delta);
       return `${delta > 0 ? "+" : ""}${formatQty(delta)} → ${formatQty(Number(d.to))}${d.reason ? ` · ${d.reason}` : ""}`;
@@ -39,10 +42,10 @@ export function ActivityList({ entries, showTarget, empty = "No activity yet." }
         const Icon = a.action === "quantity" ? (delta >= 0 ? Plus : Minus) : ICON[a.action];
         const linkable = showTarget && a.action !== "deleted" && a.targetId !== "import";
         return (
-          <li key={a.id} className="flex items-start gap-3 rounded-xl px-2 py-2 hover:bg-stone/50">
+          <li key={a.id} className="flex items-start gap-3 rounded-md px-2 py-2 hover:bg-stone/50">
             <span
               className={cn(
-                "mt-0.5 grid size-7 shrink-0 place-items-center rounded-full border",
+                "mt-0.5 grid size-7 shrink-0 place-items-center rounded-[6px] border",
                 a.action === "quantity" && delta >= 0 && "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
                 a.action === "quantity" && delta < 0 && "border-amber-500/30 bg-amber-500/10 text-amber-600",
                 a.action === "deleted" && "border-destructive/30 bg-destructive/10 text-destructive",
@@ -70,4 +73,28 @@ export function ActivityList({ entries, showTarget, empty = "No activity yet." }
       })}
     </ol>
   );
+}
+
+/** Activity entries → <Timeline> items (colour by action, icon per action, target name links to the item/place). */
+export function toTimelineItems(entries: Activity[], opts: { icons?: boolean } = {}): TimelineItem[] {
+  const icons = opts.icons ?? true;
+  return entries.map((a) => {
+    const delta = a.action === "quantity" ? Number((a.detail as { delta?: number }).delta) : 0;
+    const Icon = a.action === "quantity" ? (delta >= 0 ? Plus : Minus) : ICON[a.action];
+    const linkable = a.action !== "deleted" && a.targetId !== "import";
+    return {
+      id: a.id,
+      time: new Date(a.at),
+      icon: icons ? <Icon /> : undefined,
+      color: a.action === "quantity" ? (delta >= 0 ? "success" : "warning") : a.action === "deleted" ? "danger" : "neutral",
+      title: linkable ? (
+        <Link to={`/${a.targetKind === "item" ? "items" : "places"}/${a.targetId}`} className="hover:underline">
+          {a.targetName}
+        </Link>
+      ) : (
+        a.targetName
+      ),
+      description: describe(a),
+    };
+  });
 }

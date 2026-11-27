@@ -32,7 +32,7 @@ export function ScanOverlay({ request, onClose }: { request: OverlayRequest; onC
         )}
       </div>
 
-      <div className="relative z-10 -mt-4 flex min-h-0 flex-1 flex-col rounded-t-3xl bg-paper text-ink md:mt-0 md:w-[440px] md:flex-none md:rounded-none md:border-l md:border-outline">
+      <div className="relative z-10 -mt-4 flex min-h-0 flex-1 flex-col rounded-t-xl bg-paper text-ink md:mt-0 md:w-[440px] md:flex-none md:rounded-none md:border-l md:border-outline">
         <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-outline md:hidden" />
         <div className="space-y-3 p-3">
           {!o.isPick && s.mode === "putaway" && <TargetBanner target={s.target} onClear={() => s.setTarget(null)} />}

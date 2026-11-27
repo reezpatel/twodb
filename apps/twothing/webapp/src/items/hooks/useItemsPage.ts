@@ -31,7 +31,6 @@ export function useItemsPage() {
     setViewState(v);
   };
 
-  const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [moveOpen, setMoveOpen] = useState(false);
 
@@ -62,11 +61,7 @@ export function useItemsPage() {
     open: (it: Item) => navigate(`/items/${it.id}`),
     onDelta: (it: Item, d: number) => void adjustItem(it, d),
     toggleFavorite: (it: Item) => void api.updateItem(it.id, { favorite: !it.favorite }).then(refreshAll),
-    selecting,
-    setSelecting: (on: boolean) => {
-      setSelecting(on);
-      if (!on) setSelected(new Set());
-    },
+    clearSelection: () => setSelected(new Set()),
     selected,
     toggleSelect: (id: string) =>
       setSelected((s) => {
@@ -82,7 +77,6 @@ export function useItemsPage() {
       setMoveOpen(false);
       if (await moveItemsTo(selectedItems, p)) {
         setSelected(new Set());
-        setSelecting(false);
       }
     },
     printSelected: () => navigate(`/labels/print?items=${[...selected].join(",")}`),

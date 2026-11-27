@@ -19,6 +19,18 @@ export function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+/** Short relative time: "now", "3m ago", "5h ago", "5d ago", "2w ago", "3mo ago", "1y ago". */
+export function timeAgoShort(d: Date | string): string {
+  const s = Math.max(0, (Date.now() - new Date(d).getTime()) / 1000);
+  if (s < 45) return "now";
+  if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  if (s < 86400 * 7) return `${Math.round(s / 86400)}d ago`;
+  if (s < 86400 * 30) return `${Math.round(s / (86400 * 7))}w ago`;
+  if (s < 86400 * 365) return `${Math.round(s / (86400 * 30))}mo ago`;
+  return `${Math.round(s / (86400 * 365))}y ago`;
+}
+
 export const pathText = (path: { name: string }[]) => path.map((c) => c.name).join(" › ");
 
 /** "K7QM2X" → "K7Q-M2X" (other strings unchanged). */

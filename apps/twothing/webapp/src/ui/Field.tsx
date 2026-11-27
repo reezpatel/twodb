@@ -14,13 +14,13 @@ export function Field({ label, hint, children, className, htmlFor }: { label: Re
 }
 
 export const inputCls =
-  "h-10 w-full rounded-xl border border-outline bg-paper px-3 text-[15px] outline-none transition placeholder:text-ink-muted focus:border-ink/30 focus:shadow-[0_0_0_4px_color-mix(in_oklab,var(--ion)_22%,transparent)]";
+  "h-10 w-full rounded-md border border-outline bg-paper px-3 text-[15px] outline-none transition placeholder:text-ink-muted focus:border-ink/30 focus:shadow-[0_0_0_4px_color-mix(in_oklab,var(--ion)_22%,transparent)]";
 export const textareaCls =
-  "w-full rounded-xl border border-outline bg-paper px-3 py-2 text-[15px] outline-none transition placeholder:text-ink-muted focus:border-ink/30 focus:shadow-[0_0_0_4px_color-mix(in_oklab,var(--ion)_22%,transparent)]";
+  "w-full rounded-md border border-outline bg-paper px-3 py-2 text-[15px] outline-none transition placeholder:text-ink-muted focus:border-ink/30 focus:shadow-[0_0_0_4px_color-mix(in_oklab,var(--ion)_22%,transparent)]";
 
 export function Card({ children, className, title, icon }: { children: ReactNode; className?: string; title?: ReactNode; icon?: ReactNode }) {
   return (
-    <div className={cn("space-y-4 rounded-[18px] border border-outline bg-card p-4 md:p-5", className)}>
+    <div className={cn("space-y-4 rounded-[6px] border border-outline bg-card p-4 md:p-5", className)}>
       {title && (
         <div className="flex items-center gap-2 text-[13px] font-semibold tracking-wider text-ink-muted uppercase">
           {icon}

@@ -1,6 +1,6 @@
 import { Flashlight, FlashlightOff, SwitchCamera, X } from "lucide-react";
 
-const iconBtn = "grid size-10 place-items-center rounded-full bg-black/40 text-white backdrop-blur transition hover:bg-black/60 active:scale-90";
+const iconBtn = "grid size-10 place-items-center rounded-[6px] bg-black/40 text-white backdrop-blur transition hover:bg-black/60 active:scale-90";
 
 export function ScanHeader({
   title,

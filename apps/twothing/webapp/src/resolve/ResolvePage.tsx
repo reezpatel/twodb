@@ -33,7 +33,7 @@ export function ResolvePage({ code }: { code: string }) {
   };
 
   return (
-    <Page className="max-w-2xl">
+    <Page>
       <PageHeader title={<span className="font-mono tracking-wider">{displayCode(code)}</span>} subtitle="Scanned code" onBack />
       {loading || !data ? (
         <Spinner />

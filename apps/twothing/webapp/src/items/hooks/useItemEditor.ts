@@ -16,12 +16,7 @@ export interface SpecRow {
 }
 
 export type LabelStatus =
-  | { state: "empty" }
-  | { state: "checking" }
-  | { state: "free"; inPool: boolean }
-  | { state: "mine" }
-  | { state: "taken"; by: string }
-  | { state: "custom" };
+  { state: "empty" } | { state: "checking" } | { state: "free"; inPool: boolean } | { state: "mine" } | { state: "taken"; by: string } | { state: "custom" };
 
 interface Draft {
   name: string;
@@ -50,7 +45,12 @@ interface Draft {
 const templateRows = (category: string, existing: SpecRow[] = []): SpecRow[] => {
   const have = new Set(existing.filter((r) => r.key.trim()).map((r) => r.key.toLowerCase()));
   const kept = existing.filter((r) => r.key.trim() || r.value.trim());
-  return [...kept, ...categoryOf(category).specs.filter((k) => !have.has(k.toLowerCase())).map((key) => ({ key, value: "" }))];
+  return [
+    ...kept,
+    ...categoryOf(category)
+      .specs.filter((k) => !have.has(k.toLowerCase()))
+      .map((key) => ({ key, value: "" })),
+  ];
 };
 
 function blank(q: URLSearchParams): Draft {
@@ -63,7 +63,8 @@ function blank(q: URLSearchParams): Draft {
     minQuantity: "",
     locationId: q.get("loc"),
     code: q.get("code") ? displayCode(q.get("code")!) : "",
-    autoCode: false,
+    // New items get a generated label unless one was passed in (e.g. from a scan).
+    autoCode: !q.get("code"),
     barcodes: q.get("barcode") ? [q.get("barcode")!] : [],
     specs: templateRows(category),
     tags: [],
@@ -89,9 +90,12 @@ function fromItem(it: Item): Draft {
     minQuantity: it.minQuantity === null ? "" : String(it.minQuantity),
     locationId: it.locationId,
     code: it.codeDisplay ?? "",
-    autoCode: false,
+    autoCode: !it.codeDisplay,
     barcodes: it.barcodes,
-    specs: templateRows(it.category, Object.entries(it.specs).map(([key, value]) => ({ key, value }))),
+    specs: templateRows(
+      it.category,
+      Object.entries(it.specs).map(([key, value]) => ({ key, value })),
+    ),
     tags: it.tags,
     imageIds: it.imageIds,
     description: it.description,
@@ -165,7 +169,15 @@ export function useItemEditor(id?: string) {
     setDraft((d) => {
       const prevUnits = categoryOf(d.category).units;
       const unit = !d.unit || prevUnits.includes(d.unit) ? (categoryOf(c).units[0] ?? d.unit) : d.unit;
-      return { ...d, category: c, unit, specs: templateRows(c, d.specs.filter((r) => r.value.trim() || !categoryOf(d.category).specs.includes(r.key))) };
+      return {
+        ...d,
+        category: c,
+        unit,
+        specs: templateRows(
+          c,
+          d.specs.filter((r) => r.value.trim() || !categoryOf(d.category).specs.includes(r.key)),
+        ),
+      };
     });
 
   // ---- scanning helpers
@@ -216,7 +228,11 @@ export function useItemEditor(id?: string) {
       }
     }
   };
-  const removePhoto = (imageId: string) => set("imageIds", draft.imageIds.filter((x) => x !== imageId));
+  const removePhoto = (imageId: string) =>
+    set(
+      "imageIds",
+      draft.imageIds.filter((x) => x !== imageId),
+    );
   const makeCover = (imageId: string) => set("imageIds", [imageId, ...draft.imageIds.filter((x) => x !== imageId)]);
 
   // ---- tags
@@ -241,8 +257,8 @@ export function useItemEditor(id?: string) {
     unit: draft.unit.trim() || "pcs",
     minQuantity: num(draft.minQuantity),
     locationId: draft.locationId,
-    code: draft.code.trim() || null,
-    autoCode: draft.autoCode && !draft.code.trim(),
+    code: draft.autoCode ? null : draft.code.trim() || null,
+    autoCode: draft.autoCode,
     barcodes: draft.barcodes,
     specs: Object.fromEntries(draft.specs.filter((r) => r.key.trim() && r.value.trim()).map((r) => [r.key.trim(), r.value.trim()])),
     tags: draft.tags,
@@ -265,24 +281,39 @@ export function useItemEditor(id?: string) {
       nameRef.current?.focus();
       return;
     }
-    if (labelStatus.state === "taken") {
+    if (!draft.autoCode && labelStatus.state === "taken") {
       setError(`That label is already on ${labelStatus.by}.`);
       return;
     }
-    for (const [k, label] of [["quantity", "Quantity"], ["minQuantity", "Min stock"], ["unitCost", "Unit cost"]] as const) {
+    for (const [k, label] of [
+      ["quantity", "Quantity"],
+      ["minQuantity", "Min stock"],
+      ["unitCost", "Unit cost"],
+    ] as const) {
       const v = num(draft[k]);
       if (v !== null && (Number.isNaN(v) || v < 0)) return setError(`${label} must be a positive number.`);
     }
     setSaving(true);
     try {
-      const saved = id ? await api.updateItem(id, { ...payload(), autoCode: draft.autoCode && !draft.code.trim() }) : await api.createItem(payload());
+      const saved = id ? await api.updateItem(id, payload()) : await api.createItem(payload());
       localStorage.setItem("twothing.lastCategory", draft.category);
       refreshAll();
       if (andAnother && !id) {
         savedCount.current++;
-        toast(`Added “${saved.name}”${saved.codeDisplay ? ` · ${saved.codeDisplay}` : ""}`, { tone: "success", action: { label: "View", run: () => navigate(`/items/${saved.id}`) } });
+        toast(`Added “${saved.name}”${saved.codeDisplay ? ` · ${saved.codeDisplay}` : ""}`, {
+          tone: "success",
+          action: { label: "View", run: () => navigate(`/items/${saved.id}`) },
+        });
         // Keep the context (where + what kind) for fast batch entry.
-        setDraft((d) => ({ ...blank(new URLSearchParams()), category: d.category, unit: d.unit, locationId: d.locationId, tags: d.tags, specs: templateRows(d.category), autoCode: d.autoCode }));
+        setDraft((d) => ({
+          ...blank(new URLSearchParams()),
+          category: d.category,
+          unit: d.unit,
+          locationId: d.locationId,
+          tags: d.tags,
+          specs: templateRows(d.category),
+          autoCode: d.autoCode,
+        }));
         setTimeout(() => nameRef.current?.focus(), 30);
       } else {
         toast(id ? "Saved" : `Added “${saved.name}”${saved.codeDisplay ? ` · label ${saved.codeDisplay}` : ""}`, { tone: "success" });
@@ -325,12 +356,28 @@ export function useItemEditor(id?: string) {
     tagInput,
     setTagInput,
     addTag,
-    removeTag: (t: string) => set("tags", draft.tags.filter((x) => x !== t)),
+    removeTag: (t: string) =>
+      set(
+        "tags",
+        draft.tags.filter((x) => x !== t),
+      ),
     tagSuggestions,
-    setSpec: (i: number, row: SpecRow) => set("specs", draft.specs.map((r, j) => (j === i ? row : r))),
+    setSpec: (i: number, row: SpecRow) =>
+      set(
+        "specs",
+        draft.specs.map((r, j) => (j === i ? row : r)),
+      ),
     addSpec: () => set("specs", [...draft.specs, { key: "", value: "" }]),
-    removeSpec: (i: number) => set("specs", draft.specs.filter((_, j) => j !== i)),
-    removeBarcode: (b: string) => set("barcodes", draft.barcodes.filter((x) => x !== b)),
+    removeSpec: (i: number) =>
+      set(
+        "specs",
+        draft.specs.filter((_, j) => j !== i),
+      ),
+    removeBarcode: (b: string) =>
+      set(
+        "barcodes",
+        draft.barcodes.filter((x) => x !== b),
+      ),
     addBarcode: (b: string) => b.trim() && !draft.barcodes.includes(b.trim()) && set("barcodes", [...draft.barcodes, b.trim()]),
     moreOpen,
     setMoreOpen,

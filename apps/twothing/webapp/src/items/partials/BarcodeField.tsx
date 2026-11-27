@@ -1,7 +1,17 @@
 import { Barcode, ScanBarcode, X } from "lucide-react";
 
 /** Manufacturer barcodes / product QR payloads. Enter adds (USB scanners type + Enter too). */
-export function BarcodeField({ barcodes, onAdd, onRemove, onScan }: { barcodes: string[]; onAdd: (b: string) => void; onRemove: (b: string) => void; onScan: () => void }) {
+export function BarcodeField({
+  barcodes,
+  onAdd,
+  onRemove,
+  onScan,
+}: {
+  barcodes: string[];
+  onAdd: (b: string) => void;
+  onRemove: (b: string) => void;
+  onScan: () => void;
+}) {
   return (
     <div className="space-y-2">
       {barcodes.length > 0 && (
@@ -29,9 +39,13 @@ export function BarcodeField({ barcodes, onAdd, onRemove, onScan }: { barcodes: 
               e.currentTarget.value = "";
             }
           }}
-          className="h-10 min-w-0 flex-1 rounded-xl border border-outline bg-paper px-3 font-mono text-sm outline-none placeholder:font-sans placeholder:text-ink-muted focus:border-ink/30"
+          className="h-10 min-w-0 flex-1 rounded-md border border-outline bg-paper px-3 font-mono text-sm outline-none placeholder:font-sans placeholder:text-ink-muted focus:border-ink/30"
         />
-        <button type="button" onClick={onScan} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-outline bg-paper px-3 text-sm font-semibold hover:bg-stone active:scale-95">
+        <button
+          type="button"
+          onClick={onScan}
+          className="inline-flex h-10 items-center gap-1.5 rounded-md border border-outline bg-paper px-3 text-sm font-semibold hover:bg-stone active:scale-95"
+        >
           <ScanBarcode className="size-4" /> Scan
         </button>
       </div>

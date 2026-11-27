@@ -1,13 +1,19 @@
-import { cn } from "@twodb/blocks";
-import { LayoutGrid, List, MapPin, MapPinOff, Star, Tag, TriangleAlert, X } from "lucide-react";
-import { CATEGORIES } from "../../lib/catalog";
+import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@twodb/blocks";
+import { ChevronDown, LayoutGrid, List, MapPin, MapPinOff, Star, Tag, TriangleAlert, X } from "lucide-react";
 import type { ItemQuery } from "../../lib/api";
 import type { Place } from "../../lib/types";
 import type { ViewMode } from "../hooks/useItemsPage";
 
-const chip = "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition whitespace-nowrap";
+const chip = "inline-flex shrink-0 items-center gap-1.5 rounded-[6px] border px-2.5 h-8 text-[12px] font-medium transition whitespace-nowrap";
 const on = "border-ink bg-ink text-paper";
 const off = "border-outline bg-card text-ink hover:border-ink/30";
+
+const SORTS = [
+  { value: "name", label: "Name A–Z" },
+  { value: "updated", label: "Recently changed" },
+  { value: "created", label: "Newest" },
+  { value: "quantity", label: "Lowest quantity" },
+];
 
 export function FilterBar({
   filters,
@@ -26,20 +32,6 @@ export function FilterBar({
 }) {
   return (
     <div className="space-y-3">
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0">
-        <button className={cn(chip, !filters.category ? on : off)} onClick={() => setFilter("category", null)}>
-          All
-        </button>
-        {CATEGORIES.map((c) => {
-          const active = filters.category === c.id;
-          return (
-            <button key={c.id} className={cn(chip, active ? on : off)} onClick={() => setFilter("category", active ? null : c.id)}>
-              <c.icon className="size-3.5" style={{ color: active ? undefined : c.color }} />
-              {c.short}
-            </button>
-          );
-        })}
-      </div>
       <div className="flex flex-wrap items-center gap-2">
         <button className={cn(chip, filters.low ? "border-destructive bg-destructive text-destructive-foreground" : off)} onClick={() => toggle("low")}>
           <TriangleAlert className="size-3.5" /> Low stock
@@ -63,21 +55,33 @@ export function FilterBar({
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <select
-            value={filters.sort ?? "name"}
-            onChange={(e) => setFilter("sort", e.target.value === "name" ? null : e.target.value)}
-            className="h-8 rounded-full border border-outline bg-card px-3 text-[13px] outline-none"
-          >
-            <option value="name">Name A–Z</option>
-            <option value="updated">Recently changed</option>
-            <option value="created">Newest</option>
-            <option value="quantity">Lowest quantity</option>
-          </select>
-          <div className="flex rounded-full border border-outline bg-card p-0.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="inline-flex h-8 items-center gap-1.5 rounded-[6px] border border-outline bg-card px-2.5 text-[12px] outline-none transition hover:border-ink/30">
+                {SORTS.find((o) => o.value === (filters.sort ?? "name"))?.label}
+                <ChevronDown className="size-3.5 text-ink-muted" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup value={filters.sort ?? "name"} onValueChange={(v) => setFilter("sort", v === "name" ? null : v)}>
+                {SORTS.map((o) => (
+                  <DropdownMenuRadioItem key={o.value} value={o.value}>
+                    {o.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <div className="flex h-8 items-center gap-1 rounded-[6px] border border-outline bg-card p-[3px]">
             {(["grid", "list"] as const).map((v) => {
               const I = v === "grid" ? LayoutGrid : List;
               return (
-                <button key={v} aria-label={`${v} view`} onClick={() => setView(v)} className={cn("grid size-7 place-items-center rounded-full", view === v ? "bg-ink text-paper" : "text-ink-muted")}>
+                <button
+                  key={v}
+                  aria-label={`${v} view`}
+                  onClick={() => setView(v)}
+                  className={cn("grid size-[22px] place-items-center rounded-[4px]", view === v ? "bg-ink text-paper" : "text-ink-muted")}
+                >
                   <I className="size-3.5" />
                 </button>
               );

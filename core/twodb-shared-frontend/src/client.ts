@@ -104,15 +104,29 @@ export async function startLogin(cfg: ResolvedConfig, returnTo: string = window.
   window.location.assign(url.toString());
 }
 
+/** In-flight code exchanges, keyed by auth code. React StrictMode (dev) runs the provider's effect twice; the second
+ *  run must wait for the first exchange instead of seeing the already-consumed pending login and giving up. */
+const exchanges = new Map<string, Promise<boolean>>();
+
 /**
  * If the URL carries ?code&state from TwoDB, exchanges it for a session token, stores it and
- * cleans the URL. Returns true when a login was completed.
+ * cleans the URL. Returns true when a login was completed. Concurrent calls for the same code share one exchange.
  */
-export async function completeLoginIfCallback(cfg: ResolvedConfig): Promise<boolean> {
+export function completeLoginIfCallback(cfg: ResolvedConfig): Promise<boolean> {
   const url = new URL(window.location.href);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  if (!code || !state) return false;
+  if (!code || !state) return Promise.resolve(false);
+  const existing = exchanges.get(code);
+  if (existing) return existing;
+  const run = exchangeCode(cfg, code, state);
+  exchanges.set(code, run);
+  // Keep a finished result around briefly so a late duplicate call (still on the same URL) resolves the same way.
+  void run.finally(() => setTimeout(() => exchanges.delete(code), 5000));
+  return run;
+}
+
+async function exchangeCode(cfg: ResolvedConfig, code: string, state: string): Promise<boolean> {
   const raw = sessionStorage.getItem(`${cfg.storageKey}.${PENDING}`);
   if (!raw) return false;
   const pending = JSON.parse(raw) as { verifier: string; state: string; redirectUri: string; returnTo: string };

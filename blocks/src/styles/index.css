@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @source "../components";
+/* The shared sign-in screen (RequireTwoDbAuth) lives outside blocks; apps reach it through a node_modules symlink Tailwind does not scan. */
+@source "../../../core/twodb-shared-frontend/src";
 @import "tw-animate-css";
 /* Legacy TwoDB type: Outfit (variable). Loaded here so every app importing
    this stylesheet gets the font with no extra wiring. */

@@ -42,11 +42,11 @@ export function PrintLabelsPage() {
 
   if ((itemIds.length && items.loading) || places.loading) return <Spinner />;
   return (
-    <Page wide>
+    <Page>
       <PageHeader onBack title="Print labels" subtitle={`${selectedItems.length} item${selectedItems.length === 1 ? "" : "s"}, ${selectedPlaces.length} place${selectedPlaces.length === 1 ? "" : "s"}`} />
       <PrintStudio labels={labels}>
         {unlabeled.length > 0 && (
-          <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
             <div>
               <b>{unlabeled.length}</b> selected {unlabeled.length === 1 ? "has" : "have"} no label yet.
             </div>

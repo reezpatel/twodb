@@ -26,7 +26,9 @@ export function usePlacesPage() {
   const visible: Place[] = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
     if (terms.length) {
-      return all.filter((p) => terms.every((t) => `${p.path.map((c) => c.name).join(" ")} ${p.codeDisplay ?? ""} ${p.kind} ${p.description}`.toLowerCase().includes(t)));
+      return all.filter((p) =>
+        terms.every((t) => `${p.path.map((c) => c.name).join(" ")} ${p.codeDisplay ?? ""} ${p.kind} ${p.description}`.toLowerCase().includes(t)),
+      );
     }
     // Hide descendants of collapsed nodes.
     return all.filter((p) => !p.path.slice(0, -1).some((c) => collapsed.has(c.id)));

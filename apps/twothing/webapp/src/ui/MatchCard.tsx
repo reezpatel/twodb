@@ -18,8 +18,8 @@ export interface MatchHandlers {
   onChoose?: (item: Item) => void;
 }
 
-const card = "flex items-center gap-3 rounded-2xl border border-outline bg-paper p-3";
-const pill = "inline-flex items-center gap-1.5 rounded-full border border-outline px-3 py-1.5 text-[13px] font-semibold hover:bg-stone active:scale-95 transition";
+const card = "flex items-center gap-3 rounded-lg border border-outline bg-paper p-3";
+const pill = "inline-flex items-center gap-1.5 rounded-[6px] border border-outline px-3 py-1.5 text-[13px] font-semibold hover:bg-stone active:scale-95 transition";
 
 /** One resolved scan result with the actions that make sense for it. */
 export function MatchCard({ match, h, choosing }: { match: ResolveMatch; h: MatchHandlers; choosing?: boolean }) {
@@ -52,7 +52,7 @@ export function MatchCard({ match, h, choosing }: { match: ResolveMatch; h: Matc
     const Icon = kindOf(p.kind).icon;
     return (
       <div className={cn(card, "flex-wrap")}>
-        <div className="grid size-14 shrink-0 place-items-center rounded-[10px] border border-outline bg-stone">
+        <div className="grid size-14 shrink-0 place-items-center rounded-[6px] border border-outline bg-stone">
           <Icon className="size-6" />
         </div>
         <div className="min-w-0 flex-1">
@@ -79,7 +79,7 @@ export function MatchCard({ match, h, choosing }: { match: ResolveMatch; h: Matc
 
   return (
     <div className={cn(card, "flex-wrap border-dashed")}>
-      <div className="grid size-14 shrink-0 place-items-center rounded-[10px] bg-emerald-500/10 text-emerald-600">
+      <div className="grid size-14 shrink-0 place-items-center rounded-[6px] bg-emerald-500/10 text-emerald-600">
         <Sparkles className="size-6" />
       </div>
       <div className="min-w-0 flex-1">
@@ -103,7 +103,7 @@ export function MatchCard({ match, h, choosing }: { match: ResolveMatch; h: Matc
 export function NoMatchCard({ raw, onNewItem, onSearch }: { raw: string; onNewItem: () => void; onSearch: () => void }) {
   return (
     <div className={cn(card, "flex-wrap border-dashed")}>
-      <div className="grid size-14 shrink-0 place-items-center rounded-[10px] bg-amber-500/10 text-amber-600">
+      <div className="grid size-14 shrink-0 place-items-center rounded-[6px] bg-amber-500/10 text-amber-600">
         <Barcode className="size-6" />
       </div>
       <div className="min-w-0 flex-1">

@@ -11,13 +11,13 @@ const MODES: { id: ScanMode; label: string; icon: typeof ScanSearch }[] = [
 
 export function ModeTabs({ mode, onChange }: { mode: ScanMode; onChange: (m: ScanMode) => void }) {
   return (
-    <div className="flex gap-1 rounded-full bg-white/10 p-1 backdrop-blur">
+    <div className="flex gap-1 rounded-[6px] bg-white/10 p-1 backdrop-blur">
       {MODES.map((m) => (
         <button
           key={m.id}
           onClick={() => onChange(m.id)}
           className={cn(
-            "inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap transition",
+            "inline-flex flex-1 items-center justify-center gap-1.5 rounded-[6px] px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap transition",
             mode === m.id ? "bg-white text-black shadow" : "text-white/75 hover:text-white",
           )}
         >

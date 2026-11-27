@@ -19,7 +19,7 @@ export function QtyStepper({
   className?: string;
 }) {
   const btn = cn(
-    "grid place-items-center rounded-full border border-outline bg-paper text-ink transition active:scale-90 hover:bg-stone disabled:opacity-40",
+    "grid place-items-center rounded-[6px] border border-outline bg-paper text-ink transition active:scale-90 hover:bg-stone disabled:opacity-40",
     size === "sm" ? "size-7" : size === "lg" ? "size-12" : "size-9",
   );
   return (

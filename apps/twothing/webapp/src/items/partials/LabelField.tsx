@@ -33,12 +33,16 @@ export function LabelField({
             autoCorrect="off"
             spellCheck={false}
             className={cn(
-              "h-11 w-full rounded-xl border bg-paper pr-3 pl-9 font-mono text-[16px] font-semibold tracking-[0.15em] uppercase outline-none placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:normal-case placeholder:text-ink-muted",
+              "h-11 w-full rounded-md border bg-paper pr-3 pl-9 font-mono text-[16px] font-semibold tracking-[0.15em] uppercase outline-none placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:normal-case placeholder:text-ink-muted",
               status.state === "taken" ? "border-destructive" : status.state === "free" || status.state === "mine" ? "border-emerald-500/60" : "border-outline",
             )}
           />
         </div>
-        <button type="button" onClick={onScan} className="inline-flex h-11 items-center gap-1.5 rounded-xl bg-ink px-4 text-sm font-semibold text-paper active:scale-95">
+        <button
+          type="button"
+          onClick={onScan}
+          className="inline-flex h-11 items-center gap-1.5 rounded-md bg-ink px-4 text-sm font-semibold text-paper active:scale-95"
+        >
           <ScanLine className="size-4" /> Scan
         </button>
       </div>

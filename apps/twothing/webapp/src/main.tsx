@@ -4,6 +4,9 @@ import { TwoDbAuthProvider, RequireTwoDbAuth } from "@twodb/twodb-shared-fronten
 import "@twodb/blocks/styles.css";
 import "./styles.css";
 import { App } from "./App";
+import { registerServiceWorker } from "./register-sw";
+
+registerServiceWorker();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

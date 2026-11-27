@@ -11,16 +11,16 @@ export function Onboarding() {
   return (
     <div className="grid gap-3 md:grid-cols-3">
       {STEPS.map((s, i) => (
-        <div key={s.title} className="relative flex flex-col gap-3 overflow-hidden rounded-[18px] border border-outline bg-card p-5">
+        <div key={s.title} className="relative flex flex-col gap-3 overflow-hidden rounded-[6px] border border-outline bg-card p-5">
           <span className="absolute top-3 right-4 text-5xl font-black text-ink/5">{i + 1}</span>
-          <span className="grid size-11 place-items-center rounded-2xl bg-ink text-paper">
+          <span className="grid size-11 place-items-center rounded-lg bg-ink text-paper">
             <s.icon className="size-5" />
           </span>
           <div>
             <div className="font-semibold">{s.title}</div>
             <div className="mt-1 text-sm text-ink-muted">{s.body}</div>
           </div>
-          <Link to={s.to} className="mt-auto inline-flex w-fit items-center rounded-full border border-outline bg-paper px-4 py-1.5 text-sm font-semibold hover:bg-stone">
+          <Link to={s.to} className="mt-auto inline-flex w-fit items-center rounded-[6px] border border-outline bg-paper px-4 py-1.5 text-sm font-semibold hover:bg-stone">
             {s.cta} →
           </Link>
         </div>
