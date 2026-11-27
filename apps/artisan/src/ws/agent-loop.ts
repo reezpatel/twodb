@@ -11,7 +11,7 @@ import { memoryTools } from "./tools/memory.js";
 import { toolkitTools } from "./tools/toolkit.js";
 import type { ToolkitClient } from "../toolkit-client.js";
 import { memoryPrompt, sessionMemories } from "../memory.js";
-import { canvasTools, type ServiceFetch } from "../canvas.js";
+import { canvasTools, type CanvasClient } from "../canvas.js";
 
 /** Invocation matrix — caller agent type (null = main session) → allowed target types. */
 const INVOKABLE_BY: Record<string, string[]> = {
@@ -30,8 +30,8 @@ export interface ToolContext {
   repo: ArtisanRepo;
   dispatch: DispatchClient;
   toolkit: ToolkitClient;
-  /** Control-plane service fetch (Paintress canvas) — absent when artisan runs standalone. */
-  serviceFetch?: ServiceFetch;
+  /** Paintress canvas client — absent when artisan runs standalone. */
+  canvas?: CanvasClient;
   session: SessionRow;
   agent: AgentRow;
   model: string;
@@ -276,7 +276,7 @@ export interface RunDeps {
   hub: WorkspaceHub;
   tworoute: TworouteClient;
   dispatch: DispatchClient;
-  serviceFetch?: ServiceFetch;
+  canvas?: CanvasClient;
   /** Toolkit app client — absent when the toolkit app isn't registered. */
   toolkit?: ToolkitClient;
 }
@@ -362,7 +362,7 @@ export async function runAgentLoop(opts: {
       ...fileTools(deps.dispatch),
       ...subagentTools(),
       ...memoryTools(),
-      ...(deps.serviceFetch ? canvasTools(deps.serviceFetch) : []),
+      ...(deps.canvas ? canvasTools(deps.canvas) : []),
       ...(deps.toolkit ? toolkitTools(deps.toolkit) : []),
       ...(opts.collab ? [] : [askUserTool()]), // collaborators never block on a question: they post buttons/inputs and end the run
     ];
@@ -568,7 +568,7 @@ export async function runAgentLoop(opts: {
             session, agent, model, deps, emit, apiKey: opts.apiKey,
             dispatch: deps.dispatch, repo: deps.repo,
             toolkit: deps.toolkit!,
-            serviceFetch: deps.serviceFetch,
+            canvas: deps.canvas,
             tools: visible,
             askUser: async (questions) => {
               if (!session.interactive || deps.hub.roomSize(session.workspace_id, session.id) === 0) {

@@ -25,7 +25,7 @@ import { scopeOf, validateScope, type SkillMode, type SkillScope } from "./skill
 import { MCP_TRANSPORTS, NAME_RE, mcpScopeOf, parseHeaders, parseMcpServersJson, validateMcpScope, validUrl, type McpMode, type McpScope } from "./mcp.js";
 import { createToolkitClient } from "./toolkit-client.js";
 import type { McpServerRow, MemoryRow, SkillRow } from "./db/schema.js";
-import { canvasTools, listCanvasContent } from "./canvas.js";
+import { canvasTools, createCanvasClient, listCanvasContent } from "./canvas.js";
 import { toolkitTools } from "./ws/tools/toolkit.js";
 import { isSessionRunning, fileTools, type RunDeps } from "./ws/agent-loop.js";
 import { SessionRunner, type RunCredentials } from "./ws/session-runner.js";
@@ -157,6 +157,9 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
     return q ?? "";
   };
 
+  /** Paintress canvas client (act-scoped service fetch). */
+  const canvas = opts.twodb?.serviceFetch ? createCanvasClient(opts.twodb.serviceFetch) : undefined;
+
   const depsFor = (req: FastifyRequest): RunDeps & { tworoute: TworouteClient; dispatch: DispatchClient } => {
     const key = apiKeyFor(req);
     return {
@@ -164,7 +167,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
       hub,
       tworoute: new TworouteClient(config, key),
       dispatch: new DispatchClient(config, key),
-      serviceFetch: opts.twodb?.serviceFetch,
+      canvas,
       ...(opts.twodb?.serviceFetch ? { toolkit: createToolkitClient(opts.twodb.serviceFetch) } : {}),
     };
   };
@@ -188,7 +191,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
         hub,
         tworoute: new TworouteClient(config, creds.tworoute),
         dispatch: new DispatchClient(config, creds.dispatch),
-        serviceFetch: opts.twodb?.serviceFetch,
+        canvas,
         ...(opts.twodb?.serviceFetch ? { toolkit: createToolkitClient(opts.twodb.serviceFetch) } : {}),
       };
     },
@@ -361,13 +364,13 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
   app.get("/sessions/:id/canvases", async (req, reply) => {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
-    if (!opts.twodb?.serviceFetch) return reply.code(503).send({ error: "Paintress integration unavailable" });
+    if (!canvas) return reply.code(503).send({ error: "Paintress integration unavailable" });
     const { id } = req.params as { id: string };
     const session = await repo.getSession(ctx.workspaceId, id);
     if (!session) return reply.code(404).send({ error: "not found" });
     const agent = await repo.agentForSession(session);
     if (!agent) return reply.code(404).send({ error: "agent not found" });
-    return listCanvasContent({ repo, serviceFetch: opts.twodb.serviceFetch, session, agent });
+    return listCanvasContent({ repo, canvas, session, agent });
   });
 
   // Inspector: the exact request sent for one round (kept INSPECT_RETENTION_DAYS days).
@@ -631,7 +634,7 @@ export async function buildServer(config: ArtisanConfig, opts: { twodb?: Service
       ...fileTools(deps.dispatch),
       ...subagentTools(),
       ...memoryTools(),
-      ...(deps.serviceFetch ? canvasTools(deps.serviceFetch) : []),
+      ...(deps.canvas ? canvasTools(deps.canvas) : []),
       ...(deps.toolkit ? toolkitTools(deps.toolkit) : []),
       askUserTool(),
     ];

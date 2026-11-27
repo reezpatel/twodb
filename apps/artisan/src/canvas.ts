@@ -5,6 +5,24 @@ import type { ToolSpec } from "./ws/agent-loop.js";
 export const PAINTRESS_APP = "paintress";
 export type ServiceFetch = (audience: string, workspaceId: string, path: string, init?: RequestInit & { scopes?: string[]; act?: { type: string; id: string } }) => Promise<Response>;
 
+/** Plain service tokens may only reach another app's /_svc/* surface — the
+ * gateway 403s everything else. Canvas routes are regular /api endpoints, so
+ * Paintress calls must ride the act scope (grant `artisan>paintress`), which
+ * the gateway forwards as kind "service" + x-twodb-service-app. */
+const ACT_SCOPES = ["gateway.act"];
+
+export interface CanvasClient {
+  fetch(workspaceId: string, path: string, init?: RequestInit): Promise<Response>;
+}
+
+export function createCanvasClient(serviceFetch: ServiceFetch): CanvasClient {
+  return {
+    fetch(workspaceId, path, init) {
+      return serviceFetch(PAINTRESS_APP, workspaceId, path, { ...init, scopes: ACT_SCOPES });
+    },
+  };
+}
+
 export interface CanvasContent {
   id: string;
   title: string;
@@ -34,8 +52,8 @@ async function responseJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function fetchCanvasContent(serviceFetch: ServiceFetch, workspaceId: string, row: CanvasRow): Promise<CanvasContent> {
-  const response = await serviceFetch(PAINTRESS_APP, workspaceId, `/boards/${encodeURIComponent(row.resource_id)}`);
+export async function fetchCanvasContent(canvas: CanvasClient, workspaceId: string, row: CanvasRow): Promise<CanvasContent> {
+  const response = await canvas.fetch(workspaceId, `/api/boards/${encodeURIComponent(row.resource_id)}`);
   const body = await responseJson<{ doc: { markdown: string; version: number } | null }>(response);
   return {
     id: row.id, title: row.title, type: row.type, resourceId: row.resource_id,
@@ -43,10 +61,10 @@ export async function fetchCanvasContent(serviceFetch: ServiceFetch, workspaceId
   };
 }
 
-/** The service fetch rides the tool context — the SessionRunner's deps
+/** The canvas client rides the tool context — the SessionRunner's deps
  * carry it too (a run dispatched after the last viewer disconnected can
  * still create/update canvases). */
-export function canvasTools(serviceFetch?: ServiceFetch): ToolSpec[] {
+export function canvasTools(canvas?: CanvasClient): ToolSpec[] {
   return [{
     name: "update_canvas",
     description: "Creates or updates a document in the Canvas tab. Pass the FULL Markdown content each time; an existing document with the same title is replaced.",
@@ -59,8 +77,8 @@ export function canvasTools(serviceFetch?: ServiceFetch): ToolSpec[] {
       required: ["title", "content"],
     },
     async execute(args, ctx) {
-      const sf = serviceFetch ?? ctx.serviceFetch;
-      if (!sf) throw new Error("canvas integration unavailable");
+      const cv = canvas ?? ctx.canvas;
+      if (!cv) throw new Error("canvas integration unavailable");
       const title = String(args.title ?? "").trim().slice(0, 120);
       if (!title) throw new Error("title is required");
       const content = String(args.content ?? "");
@@ -68,7 +86,7 @@ export function canvasTools(serviceFetch?: ServiceFetch): ToolSpec[] {
       const existing = await ctx.repo.findCanvas(ctx.session.workspace_id, owner, title);
 
       if (existing) {
-        const response = await sf(PAINTRESS_APP, ctx.session.workspace_id, `/boards/${encodeURIComponent(existing.resource_id)}/doc`, {
+        const response = await cv.fetch(ctx.session.workspace_id, `/api/boards/${encodeURIComponent(existing.resource_id)}/doc`, {
           method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ markdown: content }),
         });
         await responseJson(response);
@@ -77,7 +95,7 @@ export function canvasTools(serviceFetch?: ServiceFetch): ToolSpec[] {
         return `canvas updated: ${title}`;
       }
 
-      const response = await sf(PAINTRESS_APP, ctx.session.workspace_id, "/boards", {
+      const response = await cv.fetch(ctx.session.workspace_id, "/api/boards", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name: title, kind: "doc", markdown: content,
@@ -96,9 +114,9 @@ export function canvasTools(serviceFetch?: ServiceFetch): ToolSpec[] {
 }
 
 export async function listCanvasContent(input: {
-  repo: ArtisanRepo; serviceFetch: ServiceFetch; session: SessionRow; agent: AgentRow;
+  repo: ArtisanRepo; canvas: CanvasClient; session: SessionRow; agent: AgentRow;
 }): Promise<CanvasContent[]> {
   const rows = await input.repo.listCanvases(input.session.workspace_id, canvasOwner(input.session, input.agent));
-  const fetched = await Promise.all(rows.map((row) => fetchCanvasContent(input.serviceFetch, input.session.workspace_id, row).catch(() => null)));
+  const fetched = await Promise.all(rows.map((row) => fetchCanvasContent(input.canvas, input.session.workspace_id, row).catch(() => null)));
   return fetched.filter((row): row is CanvasContent => row !== null);
 }

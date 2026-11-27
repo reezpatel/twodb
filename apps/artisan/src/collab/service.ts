@@ -9,6 +9,7 @@ import type { ArtisanRepo } from "../db/repository.js";
 import type { WorkspaceHub } from "../ws/hub.js";
 import { abortSession, runAgentLoop, type CollabRunHooks, type RunDeps } from "../ws/agent-loop.js";
 import { createToolkitClient } from "../toolkit-client.js";
+import { createCanvasClient } from "../canvas.js";
 import { createCollabRepo, type CollabRepo } from "./repo.js";
 import { buildFrame, collabSystemPrompt } from "./frame.js";
 import { collabTools, type CollabToolDeps, type RunState } from "./tools.js";
@@ -128,7 +129,7 @@ export function createCollabService(d: CollabServiceDeps) {
       const folded = await collab.supersededSince(p.taskId, p.runId);
       state.answeredTriggers = [...folded.map((r) => r.trigger_message_id ?? ""), p.trigger.messageId].filter(Boolean);
 
-      const deps: RunDeps = { repo: d.repo, hub: d.hub, serviceFetch: d.serviceFetch, ...(d.serviceFetch ? { toolkit: createToolkitClient(d.serviceFetch) } : {}), ...clientsFor(p.workspaceId) };
+      const deps: RunDeps = { repo: d.repo, hub: d.hub, canvas: d.serviceFetch ? createCanvasClient(d.serviceFetch) : undefined, ...(d.serviceFetch ? { toolkit: createToolkitClient(d.serviceFetch) } : {}), ...clientsFor(p.workspaceId) };
 
       // Session: resume the task's own, or start a new one.
       let session: SessionRow | undefined = sessionId ? await d.repo.getSession(p.workspaceId, sessionId) : undefined;
