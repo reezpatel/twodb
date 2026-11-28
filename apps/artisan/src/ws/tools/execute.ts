@@ -33,7 +33,9 @@ export async function executeSubagentTool(args: Record<string, unknown>, ctx: To
   let toolsAllow: string[] | null = null;
 
   if (agentId) {
-    const agent = await deps.repo.getAgent(ctx.session.workspace_id, agentId);
+    // Models pass the agent's name (that's what list_subagents prints), not its
+    // ULID — resolve either.
+    const agent = (await deps.repo.getAgent(ctx.session.workspace_id, agentId)) ?? (await deps.repo.getAgentByName(ctx.session.workspace_id, agentId));
     if (!agent) return `unknown agent_id ${agentId}`;
     if (!canInvoke(callerType, agent.type)) return `cannot invoke ${agent.type} from a ${callerType} session`;
     // An agent may live in several spaces (space_ids_json); the primary

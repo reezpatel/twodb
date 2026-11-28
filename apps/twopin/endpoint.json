@@ -7,6 +7,7 @@
   "capabilities": [
     "boards",
     "pins",
+    "bookmarks",
     "link-metadata"
   ],
   "coreDeps": [
@@ -15,7 +16,7 @@
     "core-async"
   ],
   "basePath": "/apps/twopin/api",
-  "generatedAt": "2026-11-15T19:04:19.089Z",
+  "generatedAt": "2026-11-28T18:38:27.992Z",
   "endpoints": [
     {
       "name": "listBoards",
@@ -265,12 +266,15 @@
       "method": "GET",
       "path": "/pins",
       "auth": "session-or-apiKey",
-      "description": "Lists pins in the workspace, newest first; pass `?boardId=` to scope to one board. Binary assets are never inlined — use hasImage/hasFavicon with the /pins/:id/image and /pins/:id/favicon endpoints.",
+      "description": "Lists pins in the workspace, newest first; pass `?boardId=` to scope to one board and `?tag=` to filter by a tag. Binary assets are never inlined — use hasImage/hasFavicon/hasMedia with the /pins/:id/{image,favicon,media} endpoints.",
       "request": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "properties": {
           "boardId": {
+            "type": "string"
+          },
+          "tag": {
             "type": "string"
           }
         },
@@ -289,7 +293,10 @@
               "type": "string"
             },
             "url": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "finalUrl": {
               "type": [
@@ -347,6 +354,41 @@
             "hasFavicon": {
               "type": "boolean"
             },
+            "hasMedia": {
+              "type": "boolean"
+            },
+            "mediaContentType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "heroKind": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "video"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "heroContentType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "createdBy": {
               "type": [
                 "string",
@@ -371,6 +413,11 @@
             "fetchedAt",
             "hasImage",
             "hasFavicon",
+            "hasMedia",
+            "mediaContentType",
+            "heroKind",
+            "heroContentType",
+            "tags",
             "createdBy",
             "createdAt"
           ],
@@ -408,7 +455,10 @@
             "type": "string"
           },
           "url": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "finalUrl": {
             "type": [
@@ -466,6 +516,41 @@
           "hasFavicon": {
             "type": "boolean"
           },
+          "hasMedia": {
+            "type": "boolean"
+          },
+          "mediaContentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "heroKind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "video"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "heroContentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "createdBy": {
             "type": [
               "string",
@@ -490,6 +575,11 @@
           "fetchedAt",
           "hasImage",
           "hasFavicon",
+          "hasMedia",
+          "mediaContentType",
+          "heroKind",
+          "heroContentType",
+          "tags",
           "createdBy",
           "createdAt"
         ],
@@ -497,11 +587,38 @@
       }
     },
     {
+      "name": "listTags",
+      "method": "GET",
+      "path": "/tags",
+      "auth": "session-or-apiKey",
+      "description": "Lists distinct pin tags in the workspace with counts, most-used first (for filter chips / suggestions).",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "type": "string"
+            },
+            "count": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "tag",
+            "count"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
       "name": "createPin",
       "method": "POST",
       "path": "/pins",
       "auth": "session-or-apiKey",
-      "description": "Adds a link to a board and immediately fetches its metadata server-side (Open Graph/Twitter Card/meta fallbacks; redirects followed; private IPs refused). The preview image and favicon are downloaded and stored so clients never hotlink. A missing scheme is assumed to be https://. The returned pin carries status ok/error with fetchError detail — the pin is saved either way.",
+      "description": "Adds a pin to a board. Provide `url` to fetch its metadata server-side (Open Graph/Twitter Card/meta fallbacks; redirects followed; private IPs refused; the preview image and favicon are downloaded and stored so clients never hotlink), OR provide `mediaBase64` (image/* or video/*) for a direct media pin with no source link. Provide both to attach media to a link. A missing scheme is assumed to be https://.",
       "request": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -510,15 +627,32 @@
             "type": "string"
           },
           "url": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "note": {
             "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "mediaBase64": {
+            "type": "string"
+          },
+          "mediaContentType": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
-          "boardId",
-          "url"
+          "boardId"
         ],
         "additionalProperties": false
       },
@@ -533,7 +667,10 @@
             "type": "string"
           },
           "url": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "finalUrl": {
             "type": [
@@ -591,6 +728,41 @@
           "hasFavicon": {
             "type": "boolean"
           },
+          "hasMedia": {
+            "type": "boolean"
+          },
+          "mediaContentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "heroKind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "video"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "heroContentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "createdBy": {
             "type": [
               "string",
@@ -615,6 +787,11 @@
           "fetchedAt",
           "hasImage",
           "hasFavicon",
+          "hasMedia",
+          "mediaContentType",
+          "heroKind",
+          "heroContentType",
+          "tags",
           "createdBy",
           "createdAt"
         ],
@@ -657,6 +834,12 @@
           },
           "url": {
             "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -675,7 +858,10 @@
             "type": "string"
           },
           "url": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "finalUrl": {
             "type": [
@@ -733,6 +919,41 @@
           "hasFavicon": {
             "type": "boolean"
           },
+          "hasMedia": {
+            "type": "boolean"
+          },
+          "mediaContentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "heroKind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "video"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "heroContentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "createdBy": {
             "type": [
               "string",
@@ -757,6 +978,11 @@
           "fetchedAt",
           "hasImage",
           "hasFavicon",
+          "hasMedia",
+          "mediaContentType",
+          "heroKind",
+          "heroContentType",
+          "tags",
           "createdBy",
           "createdAt"
         ],
@@ -793,7 +1019,10 @@
             "type": "string"
           },
           "url": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "finalUrl": {
             "type": [
@@ -851,6 +1080,41 @@
           "hasFavicon": {
             "type": "boolean"
           },
+          "hasMedia": {
+            "type": "boolean"
+          },
+          "mediaContentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "heroKind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "video"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "heroContentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "createdBy": {
             "type": [
               "string",
@@ -875,6 +1139,11 @@
           "fetchedAt",
           "hasImage",
           "hasFavicon",
+          "hasMedia",
+          "mediaContentType",
+          "heroKind",
+          "heroContentType",
+          "tags",
           "createdBy",
           "createdAt"
         ],
@@ -959,6 +1228,197 @@
       },
       "response": {
         "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "pinMedia",
+      "method": "GET",
+      "path": "/pins/:id/media",
+      "auth": "session-or-apiKey",
+      "description": "Serves the pin's directly-uploaded media bytes (image or video, content-type preserved, 24h private cache). 404 when none.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "uploadPinMedia",
+      "method": "POST",
+      "path": "/pins/:id/media",
+      "auth": "session-or-apiKey",
+      "description": "Uploads or replaces a pin's media (image/* or video/*), base64 JSON body.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "mediaBase64": {
+            "type": "string"
+          },
+          "mediaContentType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "mediaBase64"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "boardId": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finalUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "siteName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "ok",
+              "error"
+            ]
+          },
+          "fetchError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fetchedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasImage": {
+            "type": "boolean"
+          },
+          "hasFavicon": {
+            "type": "boolean"
+          },
+          "hasMedia": {
+            "type": "boolean"
+          },
+          "mediaContentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "heroKind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "video"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "heroContentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "boardId",
+          "url",
+          "finalUrl",
+          "title",
+          "description",
+          "note",
+          "siteName",
+          "status",
+          "fetchError",
+          "fetchedAt",
+          "hasImage",
+          "hasFavicon",
+          "hasMedia",
+          "mediaContentType",
+          "heroKind",
+          "heroContentType",
+          "tags",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -1053,6 +1513,754 @@
             "additionalProperties": false
           }
         ]
+      }
+    },
+    {
+      "name": "listBookmarkFolders",
+      "method": "GET",
+      "path": "/bookmark-folders",
+      "auth": "session-or-apiKey",
+      "description": "Lists the caller's workspace bookmark folders with bookmark counts, oldest first.",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "parentId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "bookmarkCount": {
+              "type": "number"
+            },
+            "createdBy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "parentId",
+            "bookmarkCount",
+            "createdBy",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createBookmarkFolder",
+      "method": "POST",
+      "path": "/bookmark-folders",
+      "auth": "session-or-apiKey",
+      "description": "Creates a bookmark folder; pass `parentId` to nest it under another folder.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bookmarkCount": {
+            "type": "number"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "parentId",
+          "bookmarkCount",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateBookmarkFolder",
+      "method": "PATCH",
+      "path": "/bookmark-folders/:id",
+      "auth": "session-or-apiKey",
+      "description": "Renames a bookmark folder or moves it under another folder (`parentId`, null = top level).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bookmarkCount": {
+            "type": "number"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "parentId",
+          "bookmarkCount",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteBookmarkFolder",
+      "method": "DELETE",
+      "path": "/bookmark-folders/:id",
+      "auth": "session-or-apiKey",
+      "description": "Deletes a bookmark folder and all its bookmarks (cascade).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "listBookmarks",
+      "method": "GET",
+      "path": "/bookmarks",
+      "auth": "session-or-apiKey",
+      "description": "Lists bookmarks, newest first. Pass `?folderId=<id>` for one folder or `?folderId=unfiled` for folderless bookmarks. Binary favicons are never inlined — use hasFavicon with /bookmarks/:id/favicon.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "folderId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "folderId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "url": {
+              "type": "string"
+            },
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hasFavicon": {
+              "type": "boolean"
+            },
+            "createdBy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "folderId",
+            "url",
+            "title",
+            "description",
+            "hasFavicon",
+            "createdBy",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "name": "createBookmark",
+      "method": "POST",
+      "path": "/bookmarks",
+      "auth": "session-or-apiKey",
+      "description": "Saves a bookmark. Metadata (title, description, favicon) is fetched server-side best-effort; a missing scheme is assumed to be https://. `folderId` is optional (null = unfiled).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasFavicon": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "folderId",
+          "url",
+          "title",
+          "description",
+          "hasFavicon",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateBookmark",
+      "method": "PATCH",
+      "path": "/bookmarks/:id",
+      "auth": "session-or-apiKey",
+      "description": "Edits a bookmark: move folders, override title/description, or change the URL (re-fetches the favicon).",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasFavicon": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "folderId",
+          "url",
+          "title",
+          "description",
+          "hasFavicon",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "deleteBookmark",
+      "method": "DELETE",
+      "path": "/bookmarks/:id",
+      "auth": "session-or-apiKey",
+      "description": "Removes a bookmark.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "bookmarkFavicon",
+      "method": "GET",
+      "path": "/bookmarks/:id/favicon",
+      "auth": "session-or-apiKey",
+      "description": "Serves the bookmark's stored favicon bytes (content-type preserved, 24h private cache). 404 when none was fetched.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "getSettings",
+      "method": "GET",
+      "path": "/settings",
+      "auth": "session-or-apiKey",
+      "description": "Returns the workspace's TwoPin settings (currently just the default board for the PWA share target).",
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "defaultBoardId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "defaultBoardId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "updateSettings",
+      "method": "PATCH",
+      "path": "/settings",
+      "auth": "session-or-apiKey",
+      "description": "Sets the workspace's TwoPin settings. `defaultBoardId` is the board shared links land in.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "defaultBoardId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "defaultBoardId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "defaultBoardId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "shareSave",
+      "method": "POST",
+      "path": "/share-save",
+      "auth": "session-or-apiKey",
+      "description": "Saves a shared URL straight into the workspace's configured default board (this is what the PWA share target posts to). Metadata is fetched server-side. Falls back to the first board, or a lazily-created 'Shared' board.",
+      "request": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "response": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "boardId": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finalUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "siteName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "ok",
+              "error"
+            ]
+          },
+          "fetchError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fetchedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasImage": {
+            "type": "boolean"
+          },
+          "hasFavicon": {
+            "type": "boolean"
+          },
+          "hasMedia": {
+            "type": "boolean"
+          },
+          "mediaContentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "heroKind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "video"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "heroContentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "boardId",
+          "url",
+          "finalUrl",
+          "title",
+          "description",
+          "note",
+          "siteName",
+          "status",
+          "fetchError",
+          "fetchedAt",
+          "hasImage",
+          "hasFavicon",
+          "hasMedia",
+          "mediaContentType",
+          "heroKind",
+          "heroContentType",
+          "tags",
+          "createdBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
       }
     }
   ]

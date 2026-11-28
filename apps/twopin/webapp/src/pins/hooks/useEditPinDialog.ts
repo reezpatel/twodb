@@ -4,7 +4,7 @@ import type { BoardDto, PinDto } from "../../lib/twopin-client.js";
 interface UseEditPinDialogArgs {
   pin: PinDto | null;
   onOpenChange: (open: boolean) => void;
-  onSave: (id: string, patch: { boardId?: string; title?: string | null; description?: string | null; note?: string | null }) => Promise<unknown>;
+  onSave: (id: string, patch: { boardId?: string; title?: string | null; description?: string | null; note?: string | null; tags?: string[] }) => Promise<unknown>;
 }
 
 /** Holding hook for EditPinDialog: form state seeded from the pin. */
@@ -13,6 +13,7 @@ export function useEditPinDialog({ pin, onOpenChange, onSave }: UseEditPinDialog
   const [description, setDescription] = useState("");
   const [note, setNote] = useState("");
   const [boardId, setBoardId] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,6 +23,7 @@ export function useEditPinDialog({ pin, onOpenChange, onSave }: UseEditPinDialog
       setDescription(pin.description ?? "");
       setNote(pin.note ?? "");
       setBoardId(pin.boardId);
+      setTags(pin.tags ?? []);
       setError(null);
     }
   }, [pin]);
@@ -36,6 +38,7 @@ export function useEditPinDialog({ pin, onOpenChange, onSave }: UseEditPinDialog
         title: title.trim() || null,
         description: description.trim() || null,
         note: note.trim() || null,
+        tags,
       });
       onOpenChange(false);
     } catch (err) {
@@ -45,5 +48,5 @@ export function useEditPinDialog({ pin, onOpenChange, onSave }: UseEditPinDialog
     }
   };
 
-  return { title, setTitle, description, setDescription, note, setNote, boardId, setBoardId, busy, error, save };
+  return { title, setTitle, description, setDescription, note, setNote, boardId, setBoardId, tags, setTags, busy, error, save };
 }

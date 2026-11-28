@@ -25,7 +25,8 @@ export function subagentTools(): ToolSpec[] {
           return tags.includes("default") || tags.some((t) => myTags.includes(t));
         });
         if (!matching.length) return "no subagents available";
-        return matching.map((a) => `- ${a.name} (${a.type}): ${a.description || "(no description)"}`).join("\n");
+        // Include the ULID so invoke_subagent can resolve it directly (name works too).
+        return matching.map((a) => `- agent_id: ${a.id} · name: ${a.name} (${a.type}): ${a.description || "(no description)"}`).join("\n");
       },
     },
     {

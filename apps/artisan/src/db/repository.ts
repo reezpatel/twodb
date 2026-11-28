@@ -92,6 +92,8 @@ export interface ArtisanRepo {
     tags?: string[]; runner?: string | null; directory?: string | null;
   }): Promise<AgentRow>;
   getAgent(workspaceId: string, id: string): Promise<AgentRow | undefined>;
+  /** Resolve by name too — models pass the name they saw in list_subagents. */
+  getAgentByName(workspaceId: string, name: string): Promise<AgentRow | undefined>;
   /** Agents visible in a space (an agent can belong to several). */
   listAgents(workspaceId: string, spaceId?: string): Promise<AgentRow[]>;
   /** Directory agent config for (runner, directory) — auto-created on first use. */
@@ -466,6 +468,10 @@ export function createArtisanRepo(db: Kysely<ArtisanDb>): ArtisanRepo {
 
     async getAgent(workspaceId, id) {
       return db.selectFrom("agent").selectAll().where("workspace_id", "=", workspaceId).where("id", "=", id).executeTakeFirst();
+    },
+
+    async getAgentByName(workspaceId, name) {
+      return db.selectFrom("agent").selectAll().where("workspace_id", "=", workspaceId).where("name", "=", name).executeTakeFirst();
     },
 
     async listAgents(workspaceId, spaceId) {

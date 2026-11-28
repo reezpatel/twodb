@@ -1,23 +1,34 @@
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Label, Textarea } from "@twodb/blocks";
+import { useEffect, useState } from "react";
 import type { BoardDto, PinDto } from "../lib/twopin-client.js";
+import { twopinClient } from "../lib/twopin-client.js";
 import { useEditPinDialog } from "./hooks/useEditPinDialog.js";
+import { TagInput } from "./partials/TagInput.js";
 
 interface EditPinDialogProps {
   pin: PinDto | null;
   boards: BoardDto[];
   onOpenChange: (open: boolean) => void;
-  onSave: (id: string, patch: { boardId?: string; title?: string | null; description?: string | null; note?: string | null }) => Promise<unknown>;
+  onSave: (id: string, patch: { boardId?: string; title?: string | null; description?: string | null; note?: string | null; tags?: string[] }) => Promise<unknown>;
 }
 
-/** Edit-pin dialog: override title/description, edit note, or move boards. */
+/** Edit-pin dialog: override title/description, edit note, tags, or move boards. */
 export function EditPinDialog(props: EditPinDialogProps) {
   const state = useEditPinDialog({ pin: props.pin, onOpenChange: props.onOpenChange, onSave: props.onSave });
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (props.pin) {
+      void twopinClient.listTags().then((ts) => setSuggestions(ts.map((t) => t.tag))).catch(() => {});
+    }
+  }, [props.pin]);
+
   return (
     <Dialog open={props.pin !== null} onOpenChange={props.onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit pin</DialogTitle>
-          <DialogDescription className="truncate">{props.pin?.url}</DialogDescription>
+          <DialogDescription className="truncate">{props.pin?.url ?? "media pin"}</DialogDescription>
         </DialogHeader>
         <form
           className="grid gap-3"
@@ -37,6 +48,10 @@ export function EditPinDialog(props: EditPinDialogProps) {
           <div className="grid gap-1.5">
             <Label htmlFor="edit-pin-note">Note</Label>
             <Textarea id="edit-pin-note" value={state.note} onChange={(e) => state.setNote(e.target.value)} rows={2} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Tags</Label>
+            <TagInput tags={state.tags} onChange={state.setTags} suggestions={suggestions} />
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="edit-pin-board">Board</Label>

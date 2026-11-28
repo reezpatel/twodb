@@ -29,6 +29,8 @@ export interface LinkMetadata {
   siteName: string | null;
   image: Buffer | null;
   imageContentType: string | null;
+  /** og:video / twitter:player — a remote video URL (NOT downloaded; host usually blocks it). */
+  videoUrl: string | null;
   favicon: Buffer | null;
   faviconContentType: string | null;
 }
@@ -202,6 +204,10 @@ export async function fetchLinkMetadata(rawUrl: string): Promise<LinkMetadata> {
     firstAttr($, ['meta[property="og:image"]', 'meta[property="og:image:url"]', 'meta[name="twitter:image"]'], "content"),
     finalUrl,
   );
+  const videoUrl = absolutize(
+    firstAttr($, ['meta[property="og:video"]', 'meta[property="og:video:url"]', 'meta[property="og:video:secure_url"]'], "content"),
+    finalUrl,
+  );
   const faviconUrl = absolutize(
     firstAttr(
       $,
@@ -223,6 +229,7 @@ export async function fetchLinkMetadata(rawUrl: string): Promise<LinkMetadata> {
     siteName,
     image: image?.bytes ?? null,
     imageContentType: image?.contentType ?? null,
+    videoUrl,
     favicon: favicon?.bytes ?? null,
     faviconContentType: favicon?.contentType ?? null,
   };

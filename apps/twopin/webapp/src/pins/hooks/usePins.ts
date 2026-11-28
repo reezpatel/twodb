@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { twopinClient, type PinDto } from "../../lib/twopin-client.js";
 
-/** Business hook: pins for the selected board (undefined = all boards). */
-export function usePins(boardId: string | undefined) {
+/** Business hook: pins for the selected board (undefined = all boards), optionally filtered by tag. */
+export function usePins(boardId: string | undefined, tag?: string) {
   const [pins, setPins] = useState<PinDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -11,13 +11,13 @@ export function usePins(boardId: string | undefined) {
     setLoading(true);
     try {
       setError(null);
-      setPins(await twopinClient.listPins(boardId));
+      setPins(await twopinClient.listPins(boardId, tag));
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [boardId]);
+  }, [boardId, tag]);
 
   useEffect(() => {
     void reload();
@@ -36,7 +36,7 @@ export function usePins(boardId: string | undefined) {
   }, [boardId]);
 
   const createPin = useCallback(
-    async (input: { boardId: string; url: string; note?: string }) => {
+    async (input: { boardId: string; url?: string | null; note?: string; title?: string; mediaBase64?: string; mediaContentType?: string }) => {
       const pin = await twopinClient.createPin(input);
       upsert(pin);
       return pin;
@@ -45,7 +45,7 @@ export function usePins(boardId: string | undefined) {
   );
 
   const updatePin = useCallback(
-    async (id: string, patch: { boardId?: string; title?: string | null; description?: string | null; note?: string | null }) => {
+    async (id: string, patch: { boardId?: string; title?: string | null; description?: string | null; note?: string | null; url?: string }) => {
       const pin = await twopinClient.updatePin(id, patch);
       upsert(pin);
       return pin;

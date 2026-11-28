@@ -1679,9 +1679,6 @@ importers:
       '@twodb/core-runtime':
         specifier: workspace:*
         version: link:../../../core/core-runtime
-      '@twodb/editor':
-        specifier: workspace:*
-        version: link:../../../editor
       '@twodb/twodb-shared-frontend':
         specifier: workspace:*
         version: link:../../../core/twodb-shared-frontend

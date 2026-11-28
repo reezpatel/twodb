@@ -13,6 +13,8 @@ export type NavItemData = {
 
 export type NavGroupData = {
   heading?: string;
+  /** Optional action rendered at the right of the heading (e.g. a "+" to create an item in this group). */
+  headingAction?: { icon: React.ElementType; label: string; onClick: () => void };
   items: NavItemData[];
 };
 
@@ -89,10 +91,24 @@ export interface NavSectionProps {
 
 /** A labeled (or unlabeled) group of nav items. */
 function NavSection({ group, activeId, onSelect }: NavSectionProps) {
+  const Action = group.headingAction?.icon;
   return (
     <div data-slot="nav-section" className="flex flex-col gap-0.5">
       {group.heading ? (
-        <span className="px-2.5 pb-1 font-sans text-[11px] font-semibold tracking-wider text-muted-foreground/50 uppercase">{group.heading}</span>
+        <div className="flex items-center justify-between pr-1">
+          <span className="px-2.5 pb-1 font-sans text-[11px] font-semibold tracking-wider text-muted-foreground/50 uppercase">{group.heading}</span>
+          {Action ? (
+            <button
+              type="button"
+              aria-label={group.headingAction!.label}
+              title={group.headingAction!.label}
+              onClick={() => group.headingAction!.onClick()}
+              className="flex size-5 items-center justify-center rounded-[5px] text-muted-foreground/60 transition-colors hover:bg-paper-grid hover:text-ink"
+            >
+              <Action className="size-3.5" strokeWidth={2} />
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {group.items.map((item) => (
         <NavItem key={item.id} item={item} activeId={activeId} onSelect={onSelect} />

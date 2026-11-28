@@ -1,19 +1,24 @@
-import { AppShell, AppShellBody, AppShellMain } from "@twodb/blocks";
-import { TwoPinPage } from "./pins/TwoPinPage.js";
+import { useRoute } from "./lib/router.js";
+import { TwoPinProvider } from "./state/TwoPinProvider.js";
+import { Frame } from "./shell/Frame.js";
+import { Routes } from "./shell/Routes.js";
 
 /**
- * TwoPin webapp: Pinterest-style boards of links. Left rail lists boards;
- * the main pane is a masonry grid of pin cards whose metadata (title,
- * description, preview image, favicon) was fetched server-side.
+ * TwoPin webapp: Pinterest-style boards of links plus a bookmarks manager.
+ * Chrome comes from Frame (NavSidebar + TopBar); the hash router picks the
+ * page. Board selection lives in the URL so sidebar and grid stay in sync.
  */
 export function App() {
+  const route = useRoute();
+  const [section, id] = route.segments;
+  const boardId = section === "boards" || section === undefined ? id : undefined;
+
   return (
-    <AppShell>
-      <AppShellBody>
-        <AppShellMain>
-          <TwoPinPage />
-        </AppShellMain>
-      </AppShellBody>
-    </AppShell>
+    <TwoPinProvider boardId={boardId}>
+      <Frame>
+        <Routes />
+      </Frame>
+    </TwoPinProvider>
   );
 }
+
