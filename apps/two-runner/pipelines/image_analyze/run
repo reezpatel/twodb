@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec "$(dirname "$0")/../_common/py" "$(dirname "$0")/main.py"

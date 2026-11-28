@@ -1,0 +1,12 @@
+{
+  "id": "image_analyze",
+  "version": "1",
+  "gpu": true,
+  "description": "Finds text (OCR) with bounding boxes and, optionally, objects with bounding boxes in images. Accepts images and/or zip files of images. Output: annotated/<name>.jpg (boxes drawn) and result.json with every box, text and confidence per image.",
+  "params": {
+    "images": { "type": "assets", "description": "Storage keys of images and/or zips of images (an array).", "required": true },
+    "ocr": { "type": "boolean", "description": "Run OCR (default true)." },
+    "detect": { "type": "boolean", "description": "Detect objects with bounding boxes (default false; downloads a detector model on first use)." },
+    "minConfidence": { "type": "number", "description": "Drop boxes below this confidence, 0-1 (default 0.5)." }
+  }
+}

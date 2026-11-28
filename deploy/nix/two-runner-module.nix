@@ -98,9 +98,46 @@ let
         default = [ ];
         description = "Packages added to PATH of the commands Dispatch runs on this machine.";
       };
+
+      pipelines = {
+        enable = lib.mkEnableOption ''
+          the ai-pipelines capability: the runner advertises its bundled AI pipelines (video → frames, OCR, transcription,
+          document/PDF → markdown, video → audio) to Dispatch, where a Toolkit "AI Runner" connector instance turns each
+          one into a tool. Pipelines get ffmpeg and uv (Python environments are resolved and cached on first use under
+          the state dir) and, with `gpu = true`, the NVIDIA driver libraries
+        '';
+        gpu = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Expose the NVIDIA driver (/run/opengl-driver/lib) to pipelines so CUDA models (faster-whisper) run on the GPU. Needs hardware.nvidia / hardware.graphics enabled on the host.";
+        };
+        concurrency = lib.mkOption {
+          type = lib.types.ints.positive;
+          default = 1;
+          description = "Pipelines run at the same time; further runs queue. 1 suits a single GPU.";
+        };
+        extraPackages = lib.mkOption {
+          type = lib.types.listOf lib.types.package;
+          default = [ ];
+          description = "Extra tools on PATH for pipelines only (e.g. pkgs.tesseract).";
+        };
+      };
     };
 
   basePackages = pkgs: with pkgs; [ bashInteractive coreutils findutils gnugrep gnused git ];
+
+  # Tools every pipeline may call, and the shared libraries PyPI wheels (numpy, opencv, onnxruntime, ctranslate2) dlopen
+  # — NixOS has no system libstdc++/zlib, so wheels fail to import without them.
+  pipelinePackages = pkgs: with pkgs; [ ffmpeg uv python3 ];
+  pipelineLibPath = { pkgs, gpu }:
+    pkgs.lib.makeLibraryPath ([ pkgs.stdenv.cc.cc.lib pkgs.zlib pkgs.libglvnd pkgs.glib ])
+    + pkgs.lib.optionalString gpu ":/run/opengl-driver/lib";
+  pipelineEnv = { cfg, pkgs }: {
+    TWO_RUNNER_PIPELINES = "true";
+    TWO_RUNNER_PIPELINE_CONCURRENCY = toString cfg.pipelines.concurrency;
+    TWO_RUNNER_PIPELINE_LD_LIBRARY_PATH = pipelineLibPath { inherit pkgs; gpu = cfg.pipelines.gpu; };
+    UV_PYTHON_PREFERENCE = "system";
+  };
 in
 {
   nixos =
@@ -198,10 +235,12 @@ in
           wantedBy = [ "multi-user.target" ];
           after = [ "network-online.target" ] ++ cfg.after;
           wants = [ "network-online.target" ];
-          path = basePackages pkgs ++ cfg.extraPackages;
+          path = basePackages pkgs ++ cfg.extraPackages
+            ++ lib.optionals cfg.pipelines.enable (pipelinePackages pkgs ++ cfg.pipelines.extraPackages);
           environment = {
             HOME = if cfg.homeDir != null then cfg.homeDir else cfg.stateDir;
-          } // lib.optionalAttrs cfg.microvm.enable {
+          } // lib.optionalAttrs cfg.pipelines.enable (pipelineEnv { inherit cfg pkgs; })
+          // lib.optionalAttrs cfg.microvm.enable {
             TWO_RUNNER_FC_BIN = "${cfg.microvm.firecracker}/bin/firecracker";
             TWO_RUNNER_KERNEL = toString cfg.microvm.kernel;
             TWO_RUNNER_ROOTFS = toString cfg.microvm.rootfs;
@@ -266,7 +305,13 @@ in
             ++ cfg.extraArgs;
           EnvironmentVariables = {
             HOME = if cfg.homeDir != null then cfg.homeDir else cfg.stateDir;
-            PATH = lib.makeBinPath (basePackages pkgs ++ cfg.extraPackages) + ":/usr/bin:/bin:/usr/sbin:/sbin";
+            PATH = lib.makeBinPath (basePackages pkgs ++ cfg.extraPackages
+              ++ lib.optionals cfg.pipelines.enable (pipelinePackages pkgs ++ cfg.pipelines.extraPackages)) + ":/usr/bin:/bin:/usr/sbin:/sbin";
+          } // lib.optionalAttrs cfg.pipelines.enable {
+            # macOS wheels bundle their own libraries: no LD_LIBRARY_PATH, and no NVIDIA GPU.
+            TWO_RUNNER_PIPELINES = "true";
+            TWO_RUNNER_PIPELINE_CONCURRENCY = toString cfg.pipelines.concurrency;
+            UV_PYTHON_PREFERENCE = "system";
           };
           RunAtLoad = true;
           KeepAlive = true;

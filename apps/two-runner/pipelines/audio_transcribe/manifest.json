@@ -1,0 +1,13 @@
+{
+  "id": "audio_transcribe",
+  "version": "1",
+  "gpu": true,
+  "description": "Transcribes speech from an audio (or video) file with faster-whisper, on the GPU when available. Output: transcript.txt, transcript.srt, transcript.vtt and result.json (language, segments with timestamps).",
+  "params": {
+    "audio": { "type": "asset", "description": "Storage key of the audio or video file.", "required": true },
+    "model": { "type": "enum", "description": "Whisper model size (default large-v3-turbo on GPU, small on CPU).", "options": ["tiny", "base", "small", "medium", "large-v3", "large-v3-turbo"] },
+    "language": { "type": "string", "description": "ISO language code (e.g. en, hi). Default: auto-detect." },
+    "task": { "type": "enum", "description": "transcribe (default) or translate to English.", "options": ["transcribe", "translate"] },
+    "wordTimestamps": { "type": "boolean", "description": "Include per-word timestamps in result.json (default false)." }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "id": "doc_to_markdown",
+  "version": "1",
+  "description": "Converts a document (docx, pptx, xlsx, html, epub, csv, json, xml, txt, and PDF text) to Markdown with MarkItDown. Output: document.md. For PDFs with images use pdf_to_markdown.",
+  "params": {
+    "document": { "type": "asset", "description": "Storage key of the document.", "required": true }
+  }
+}

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Runs a pipeline's Python script with its inline (PEP 723) dependencies via uv, cached under $PIPELINE_CACHE.
+#   usage: "$(dirname "$0")/../_common/py" "$PIPELINE_DIR/main.py"
+set -euo pipefail
+export UV_CACHE_DIR="${PIPELINE_CACHE:-$HOME/.cache}/uv"
+export UV_PYTHON_PREFERENCE=system
+export PYTHONUNBUFFERED=1
+exec uv run --quiet --script "$1"

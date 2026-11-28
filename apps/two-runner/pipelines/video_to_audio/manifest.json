@@ -1,0 +1,11 @@
+{
+  "id": "video_to_audio",
+  "version": "1",
+  "description": "Extracts the audio track of a video with ffmpeg. Output: audio.<format> (mp3 | wav | m4a | flac | opus).",
+  "params": {
+    "video": { "type": "asset", "description": "Storage key of the video file.", "required": true },
+    "format": { "type": "enum", "description": "Audio format (default mp3).", "options": ["mp3", "wav", "m4a", "flac", "opus"] },
+    "sampleRate": { "type": "number", "description": "Resample to this rate in Hz (e.g. 16000 for speech models). Default: keep source rate." },
+    "mono": { "type": "boolean", "description": "Mix down to mono (default false)." }
+  }
+}

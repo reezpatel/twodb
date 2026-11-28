@@ -74,6 +74,13 @@ type runner struct {
 
 	// set after helloAck: workspace this runner serves (archive uploads).
 	workspaceID string
+
+	// ai-pipelines capability (pipelines.go)
+	pipelinesOn  bool
+	pipelinesDir string
+	pipelines    []pipelineManifest
+	gpu          string
+	pipelineSem  chan struct{}
 }
 
 // connect dials the gateway's WS passthrough and serves frames until the
@@ -110,17 +117,27 @@ func (r *runner) connect() error {
 	if r.microvm {
 		kind = "microvm-host"
 	}
+	meta := map[string]any{
+		"os":       runtimeOS(),
+		"arch":     runtimeArch(),
+		"hostname": r.name,
+		"version":  version,
+		"pid":      os.Getpid(),
+	}
+	if r.pipelinesOn {
+		// Re-read each connect so pipelines dropped into the dir show up without a restart.
+		r.pipelines = loadPipelines(r.pipelinesDir)
+		meta["capabilities"] = []string{"ai-pipelines"}
+		meta["pipelines"] = r.pipelines
+		if r.gpu != "" {
+			meta["gpu"] = r.gpu
+		}
+	}
 	if err := r.send(frame{
 		"type": "hello",
 		"name": r.name,
 		"kind": kind,
-		"meta": map[string]any{
-			"os":       runtimeOS(),
-			"arch":     runtimeArch(),
-			"hostname": r.name,
-			"version":  version,
-			"pid":      os.Getpid(),
-		},
+		"meta": meta,
 	}); err != nil {
 		return err
 	}
@@ -217,6 +234,8 @@ func (r *runner) handle(f frame) {
 		r.doExec(f)
 	case "call":
 		r.doCall(f)
+	case "pipelineRun":
+		r.doPipelineRun(f)
 	case "jobCreate":
 		r.doJobCreate(f)
 	case "jobSignal":

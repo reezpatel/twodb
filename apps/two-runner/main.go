@@ -65,6 +65,8 @@ func main() {
 	enrollFile := flag.String("enroll-file", envOr("", "TWO_RUNNER_ENROLL_FILE"), "file holding the enrollment token (env TWO_RUNNER_ENROLL_FILE)")
 	name := flag.String("name", envOr("", "TWO_RUNNER_NAME"), "friendly runner name, defaults to the hostname (env TWO_RUNNER_NAME)")
 	vmHost := flag.Bool("microvm", envOr("", "TWO_RUNNER_MICROVM") == "true", "also host Firecracker microvms (needs /dev/kvm) (env TWO_RUNNER_MICROVM=true)")
+	pipelinesOn := flag.Bool("pipelines", envOr("", "TWO_RUNNER_PIPELINES") == "true", "enable the ai-pipelines capability: run the bundled AI pipelines (ffmpeg, whisper, OCR...) for Dispatch/Toolkit (env TWO_RUNNER_PIPELINES=true)")
+	pipelinesDir := flag.String("pipelines-dir", envOr("", "TWO_RUNNER_PIPELINES_DIR"), "directory of pipelines to serve; default: the bundled ones extracted to <state>/pipelines (env TWO_RUNNER_PIPELINES_DIR)")
 	stateDir := flag.String("state", envOr("", "TWO_RUNNER_STATE"), "state dir: runner key + microvms (default ~/.two-runner) (env TWO_RUNNER_STATE)")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
@@ -135,6 +137,20 @@ func main() {
 		resultWaiters:  map[string]chan map[string]any{},
 	}
 	globalRunner = r
+
+	if *pipelinesOn {
+		pdir := *pipelinesDir
+		if pdir == "" {
+			pdir = dir + "/pipelines"
+			if err := extractPipelines(pdir); err != nil {
+				log.Fatalf("extracting bundled pipelines to %s: %v", pdir, err)
+			}
+		}
+		r.pipelinesOn, r.pipelinesDir = true, pdir
+		r.gpu = hasNvidiaGPU()
+		r.pipelineSem = make(chan struct{}, pipelineConcurrency())
+		log.Printf("ai-pipelines enabled: %d pipelines in %s (gpu: %q)", len(loadPipelines(pdir)), pdir, r.gpu)
+	}
 
 	if *vmHost {
 		if err := r.initMicrovmHost(); err != nil {

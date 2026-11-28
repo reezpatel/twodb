@@ -1,0 +1,12 @@
+{
+  "id": "video_to_frames",
+  "version": "1",
+  "description": "Extracts one frame per visual change from a video (slides, reels with typed text, image slideshows): a frame is saved when the picture has settled after changing, so text is complete and images fully shown. Output: frames/NNN_<seconds>s.jpg plus a result.json index.",
+  "params": {
+    "video": { "type": "asset", "description": "Storage key of the video file.", "required": true },
+    "fps": { "type": "number", "description": "Sampling rate for change detection (default 10)." },
+    "settleSeconds": { "type": "number", "description": "How long the picture must stay still before it is saved (default 0.6). Raise it for slow typing." },
+    "minChange": { "type": "number", "description": "Fraction of pixels that must differ from the last saved frame to count as new (default 0.2%, i.e. 0.002)." },
+    "maxFrames": { "type": "number", "description": "Stop after this many frames (default 500)." }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "pdf_to_markdown",
+  "version": "1",
+  "description": "Converts a PDF to Markdown (headings, lists, tables) with PyMuPDF and extracts every embedded image as a separate file. Output: document.md (images referenced as images/NNN.ext) and images/*.",
+  "params": {
+    "pdf": { "type": "asset", "description": "Storage key of the PDF.", "required": true },
+    "minImageSize": { "type": "number", "description": "Skip images smaller than this many pixels on their short side (default 64; drops icons and rules)." },
+    "pages": { "type": "string", "description": "Page range such as 1-5 (1-based). Default: all pages." }
+  }
+}

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# video_to_audio — a single ffmpeg invocation. Contract: $PIPELINE_INPUT (json), writes into $PIPELINE_OUT_DIR.
+set -euo pipefail
+param() { python3 -c 'import json,os,sys; v=json.load(open(os.environ["PIPELINE_INPUT"])).get(sys.argv[1], ""); print("" if v is None else str(v).lower() if isinstance(v,bool) else v)' "$1"; }
+video="$(param video)"; fmt="$(param format)"; rate="$(param sampleRate)"; mono="$(param mono)"
+fmt="${fmt:-mp3}"
+[ -f "$video" ] || { echo "video input missing" >&2; exit 2; }
+args=(-hide_banner -loglevel error -y -i "$video" -vn)
+[ -n "$rate" ] && args+=(-ar "$rate")
+[ "$mono" = "true" ] && args+=(-ac 1)
+case "$fmt" in
+  mp3)  args+=(-c:a libmp3lame -q:a 2) ;;
+  wav)  args+=(-c:a pcm_s16le) ;;
+  m4a)  args+=(-c:a aac -b:a 192k) ;;
+  flac) args+=(-c:a flac) ;;
+  opus) args+=(-c:a libopus -b:a 96k) ;;
+  *) echo "unsupported format $fmt" >&2; exit 2 ;;
+esac
+out="$PIPELINE_OUT_DIR/audio.$fmt"
+ffmpeg "${args[@]}" "$out"
+dur="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$out" || echo 0)"
+printf '{"file":"audio.%s","durationSeconds":%s}\n' "$fmt" "${dur:-0}" > "$PIPELINE_OUT_DIR/result.json"
