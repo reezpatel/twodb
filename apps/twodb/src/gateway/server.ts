@@ -719,6 +719,47 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
     return { ok: true };
   });
 
+  /**
+   * Presigned URLs for ANY key in the shared bucket, for granted apps only (TWODB_S3_PRESIGN_GRANTS, default toolkit).
+   * Apps normally see just their `<slug>/` prefix; this is the controlled way for a platform app (toolkit) to let a
+   * machine without S3 credentials (a runner) read another app's object or write next to it. The caller is trusted to
+   * have authorised the key for its workspace (the bucket has no workspace segment) — every mint is audit-logged.
+   */
+  app.post("/registry/s3/presign", async (req, reply) => {
+    const caller = req.callerApp.slug;
+    if (!req.callerApp.verified || !caller) return reply.code(401).send({ error: "invalid app token" });
+    if (!config.TWODB_S3_PRESIGN_GRANTS.includes(caller)) return reply.code(403).send({ error: `app "${caller}" may not presign bucket keys` });
+    if (!s3Configured) return reply.code(503).send({ error: "S3 is not configured (TWODB_S3_* unset)" });
+    const b = (req.body ?? {}) as { ops?: Array<{ method?: string; key?: string; expiresIn?: number; contentType?: string }> };
+    const ops = Array.isArray(b.ops) ? b.ops : [];
+    if (ops.length === 0 || ops.length > 500) return reply.code(400).send({ error: "ops must hold 1-500 entries" });
+    const { S3Client, GetObjectCommand, PutObjectCommand } = await import("@aws-sdk/client-s3");
+    const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+    const endpoint = config.TWODB_S3_PUBLIC_ENDPOINT ?? config.TWODB_S3_ENDPOINT;
+    // Signing is local (no network); the client only needs the host runners will call.
+    const client = new S3Client({
+      region: config.TWODB_S3_REGION ?? "us-east-1",
+      endpoint,
+      forcePathStyle: config.TWODB_S3_FORCE_PATH_STYLE ?? Boolean(endpoint),
+      credentials: { accessKeyId: config.TWODB_S3_ACCESS_KEY_ID!, secretAccessKey: config.TWODB_S3_SECRET_ACCESS_KEY! },
+    });
+    const urls: Array<{ method: string; key: string; url: string; expiresAt: string }> = [];
+    for (const op of ops) {
+      const method = String(op.method ?? "").toUpperCase();
+      const key = cleanS3Key(String(op.key ?? ""));
+      if (!key || (method !== "GET" && method !== "PUT")) return reply.code(400).send({ error: "each op needs method GET|PUT and a valid key" });
+      const expiresIn = Math.min(Math.max(Math.floor(Number(op.expiresIn) || 3600), 60), 6 * 3600);
+      const cmd = method === "GET"
+        ? new GetObjectCommand({ Bucket: config.TWODB_S3_BUCKET, Key: key })
+        : new PutObjectCommand({ Bucket: config.TWODB_S3_BUCKET, Key: key, ...(op.contentType ? { ContentType: op.contentType } : {}) });
+      const url = await getSignedUrl(client, cmd, { expiresIn, ...(method === "PUT" && op.contentType ? { signableHeaders: new Set(["content-type"]) } : {}) });
+      urls.push({ method, key, url, expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString() });
+    }
+    req.log.info({ caller, ops: urls.map((u) => `${u.method} ${u.key}`) }, "s3 presign");
+    reply.header("cache-control", "no-store");
+    return { urls };
+  });
+
   /** Register an external (unmanaged) app: URL-based entry for the gateway; lifecycle stays with the app. */
   app.post("/registry/apps/external", async (req, reply) => {
     const ctx = await resolveContext(new Headers(req.headers as any));

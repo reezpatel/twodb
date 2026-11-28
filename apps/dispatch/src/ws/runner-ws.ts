@@ -40,6 +40,12 @@ let hub: DispatchHub;
 let repo: import("../db/repository.js").DispatchRepo;
 let archiveStorage: import("@twodb/core-data/storage").StorageAdapter;
 
+/** Calls Toolkit's /_svc surface as dispatch (service token, scope toolkit.runs.upload). Set by buildServer. */
+let pipelineSvcFetch: (workspaceId: string, path: string, body: unknown) => Promise<{ ok: boolean; status: number; body: any }> = async () => {
+  throw new Error("service calls are not wired");
+};
+export function setPipelineSvcFetch(fn: typeof pipelineSvcFetch): void { pipelineSvcFetch = fn; }
+
 export function registerRunnerWs(
   app: FastifyInstance,
   hubArg: DispatchHub,
@@ -225,6 +231,22 @@ function handleFrame(socket: WebSocket, runner: RunnerRow, raw: unknown, enrolle
       if (!registered) return;
       void repo_.finishJob(String(frame.jobId), frame.status, frame.exitCode ?? null).catch(() => {});
       hub_.publish(`job:${frame.jobId}`, { type: "jobStatus", jobId: frame.jobId, status: frame.status, exitCode: frame.exitCode });
+      return;
+    }
+    case "pipelineUpload": {
+      // The runner wants presigned PUT urls for output files. Only for a run dispatch started on THIS runner; the url
+      // minting (and the output-prefix check) belongs to Toolkit, which owns the run.
+      const reply = (body: Record<string, unknown>) => socket.send(JSON.stringify({ type: "result", callId: frame.callId, ...body }));
+      const runId = String(frame.runId ?? "");
+      if (!runId || hub_.pipelineRunOwner(runId) !== runner.id) { reply({ error: "unknown run" }); return; }
+      void (async () => {
+        try {
+          const res = await pipelineSvcFetch(runner.workspace_id, `/_svc/runs/${encodeURIComponent(runId)}/upload-url`, { files: frame.files });
+          reply(res.ok ? { urls: res.body?.urls ?? [] } : { error: res.body?.error ?? `toolkit answered ${res.status}` });
+        } catch (err) {
+          reply({ error: (err as Error).message });
+        }
+      })();
       return;
     }
     case "vmArchive": {

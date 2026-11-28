@@ -10,7 +10,7 @@ import { createDispatchRepo, generateEnrollmentKey, newId } from "./db/repositor
 import type { DispatchRepo } from "./db/repository.js";
 import { readForwardedContext } from "./gateway-context.js";
 import { DispatchHub } from "./ws/hub.js";
-import { registerRunnerWs } from "./ws/runner-ws.js";
+import { registerRunnerWs, setPipelineSvcFetch } from "./ws/runner-ws.js";
 import { registerArchiveStore, readLatestArchive, archiveExists } from "./ws/archive-store.js";
 import * as fs from "node:fs/promises";
 
@@ -58,7 +58,7 @@ function sseWrite(reply: FastifyReply, event: string, data: unknown): boolean {
   return true;
 }
 
-export async function buildServer(config: DispatchConfig, deps: { storage?: import("@twodb/core-data/storage").StorageAdapter | null } = {}) {
+export async function buildServer(config: DispatchConfig, deps: { storage?: import("@twodb/core-data/storage").StorageAdapter | null; serviceFetch?: (audience: string, workspaceId: string, path: string, init?: RequestInit & { scopes?: string[] }) => Promise<Response> } = {}) {
   // /app archive store lives in the install's shared S3 bucket (prefix-scoped
   // by the control plane) — mandatory, no local fallback.
   const archiveStorage = deps.storage;
@@ -77,6 +77,17 @@ export async function buildServer(config: DispatchConfig, deps: { storage?: impo
 
   // --- runner WS (auth = runner key, not session) --------------------------
   registerRunnerWs(app, hub, repo, archiveStorage);
+  setPipelineSvcFetch(async (workspaceId, path, body) => {
+    if (!deps.serviceFetch) throw new Error("no platform connection for service calls");
+    const res = await deps.serviceFetch("toolkit", workspaceId, path, {
+      method: "POST", scopes: ["toolkit.runs.upload"], headers: { "content-type": "application/json" },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(30_000),
+    });
+    const text = await res.text();
+    let parsed: any = text;
+    try { parsed = text ? JSON.parse(text) : null; } catch { /* plain text */ }
+    return { ok: res.ok, status: res.status, body: parsed };
+  });
 
   // --- runners ---------------------------------------------------------------
   app.post("/runners", async (req, reply) => {
@@ -185,6 +196,47 @@ export async function buildServer(config: DispatchConfig, deps: { storage?: impo
     const { id } = req.params as { id: string };
     const ok = await repo.deleteEnrollmentToken(ctx.workspaceId, id);
     return { ok };
+  });
+
+  // --- ai pipelines ------------------------------------------------------------
+  const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+
+  app.get("/pipelines", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const out: Array<{ runnerId: string; runnerName: string; gpu: string | null; pipelines: unknown[] }> = [];
+    for (const r of await repo.listRunners(ctx.workspaceId)) {
+      if (!hub.isOnline(r.id)) continue;
+      const meta = JSON.parse(r.meta_json) as { capabilities?: string[]; pipelines?: unknown[]; gpu?: string };
+      if (!meta.capabilities?.includes("ai-pipelines")) continue;
+      out.push({ runnerId: r.name, runnerName: r.name, gpu: meta.gpu ?? null, pipelines: meta.pipelines ?? [] });
+    }
+    return out;
+  });
+
+  app.post("/pipelines/run", async (req, reply) => {
+    const ctx = requireCtx(req, reply);
+    if (!ctx) return reply;
+    const body = (req.body ?? {}) as { runnerId?: string; pipeline?: string; runId?: string; params?: Record<string, unknown>; assets?: Record<string, unknown>; timeoutMs?: number };
+    if (!body.runnerId || !body.pipeline || !body.runId) return reply.code(400).send({ error: "runnerId, pipeline and runId are required" });
+    const runner = mustRunner(ctx, body.runnerId, reply);
+    if (!runner) return reply;
+    const timeoutMs = Math.min(body.timeoutMs ?? FOUR_HOURS_MS, FOUR_HOURS_MS);
+    hub.beginPipelineRun(body.runId, runner.runnerId);
+    const started = Date.now();
+    try {
+      const res = (await hub.sendToRunner(runner, {
+        type: "pipelineRun", callId: newId(), runId: body.runId, pipeline: body.pipeline,
+        params: body.params ?? {}, assets: body.assets ?? {}, timeoutMs,
+        // the runner enforces timeoutMs itself; this outer wait only has to outlive it (queueing + transfers included)
+      }, { timeoutMs: timeoutMs + 10 * 60_000 })) as Record<string, any>;
+      if (res.error) return reply.code(422).send({ error: res.error, stdout: res.stdout ?? "", stderr: res.stderr ?? "" });
+      return { output: res.output ?? null, files: res.files ?? [], stdout: String(res.stdout ?? ""), stderr: String(res.stderr ?? ""), durationMs: Date.now() - started };
+    } catch (err) {
+      return reply.code(502).send({ error: (err as Error).message });
+    } finally {
+      hub.endPipelineRun(body.runId);
+    }
   });
 
   // --- exec (one-shot) -------------------------------------------------------

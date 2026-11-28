@@ -8,7 +8,8 @@
     "build": "tsc --noEmit",
     "start": "tsx src/index.ts",
     "gen:docs": "tsx scripts/gen-docs.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "@twodb/core-async": "workspace:*",
@@ -18,6 +19,7 @@
     "fastify": "^5.11.2",
     "kysely": "^0.29.5",
     "pg": "^8.23.0",
+    "undici": "^7.2.0",
     "ulid": "^3.0.2",
     "zod": "^4.5.2"
   },

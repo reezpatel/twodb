@@ -664,6 +664,9 @@ importers:
       ulid:
         specifier: ^3.0.2
         version: 3.0.2
+      undici:
+        specifier: ^7.2.0
+        version: 7.30.2
       zod:
         specifier: ^4.5.2
         version: 4.6.5
@@ -1018,6 +1021,9 @@ importers:
   apps/twodb:
     dependencies:
       '@aws-sdk/client-s3':
+        specifier: ^3.1149.0
+        version: 3.1149.0
+      '@aws-sdk/s3-request-presigner':
         specifier: ^3.1149.0
         version: 3.1149.0
       '@fastify/cors':
@@ -1673,6 +1679,9 @@ importers:
       '@twodb/core-runtime':
         specifier: workspace:*
         version: link:../../../core/core-runtime
+      '@twodb/editor':
+        specifier: workspace:*
+        version: link:../../../editor
       '@twodb/twodb-shared-frontend':
         specifier: workspace:*
         version: link:../../../core/twodb-shared-frontend

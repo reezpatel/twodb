@@ -93,6 +93,13 @@ export const configSchema = z.object({
   TWODB_S3_ENDPOINT: z.string().url().optional(),
   TWODB_S3_ACCESS_KEY_ID: z.string().optional(),
   TWODB_S3_SECRET_ACCESS_KEY: z.string().optional(),
+  /**
+   * Endpoint put into presigned URLs when machines outside the docker network (runners) must reach the bucket and
+   * TWODB_S3_ENDPOINT is an internal name. Defaults to TWODB_S3_ENDPOINT.
+   */
+  TWODB_S3_PUBLIC_ENDPOINT: z.string().url().optional(),
+  /** Apps allowed to mint presigned URLs for ANY bucket key (POST /registry/s3/presign), comma-separated slugs. */
+  TWODB_S3_PRESIGN_GRANTS: z.string().default("toolkit").transform((v) => v.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)),
   TWODB_S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).optional().transform((v) => (v === undefined ? undefined : v === "true")),
   /**
    * Passkey sign-up policy. Default (false): only the very first user can

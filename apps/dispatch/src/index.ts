@@ -14,7 +14,7 @@ async function main() {
 
   const server = await buildServer(
     { ...config, DATABASE_URL: twodb.config.postgres.connectionString, TWODB_DATA_KEY: twodb.dataKey ?? config.TWODB_DATA_KEY },
-    { storage: twodb.storage },
+    { storage: twodb.storage, serviceFetch: twodb.serviceFetch },
   );
   await server.listen({ port: config.PORT, host: "0.0.0.0" });
   server.log.info(`Dispatch listening on :${config.PORT}`);

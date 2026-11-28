@@ -1,11 +1,15 @@
 import { z } from "zod";
 import { defineAppManifest, defineEndpoint } from "@twodb/core-platform/manifest";
 
+/** Longest a synchronous exec / call / pipeline run may take. */
+const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+
 const runnerSummary = z.object({
   id: z.string(),
   name: z.string(),
   kind: z.enum(["host", "microvm-host"]),
   status: z.enum(["online", "offline"]),
+  /** Includes `capabilities` (e.g. "ai-pipelines") and `pipelines` for runners started with --pipelines. */
   meta: z.record(z.string(), z.unknown()),
   lastSeenAt: z.string().nullable(),
   createdAt: z.string(),
@@ -44,7 +48,7 @@ const execRequest = z.object({
   command: z.string(),
   cwd: z.string().optional(),
   env: z.record(z.string(), z.string()).optional(),
-  timeoutMs: z.number().int().positive().max(600_000).optional(),
+  timeoutMs: z.number().int().positive().max(FOUR_HOURS_MS).optional(),
 });
 
 const execResult = z.object({
@@ -71,7 +75,7 @@ const vmRequest = z.object({
 const vmExecRequest = vmRequest.extend({
   command: z.string(),
   cwd: z.string().optional(),
-  timeoutMs: z.number().int().positive().max(600_000).optional(),
+  timeoutMs: z.number().int().positive().max(FOUR_HOURS_MS).optional(),
 });
 
 const vmBootRequest = z.object({
@@ -290,6 +294,55 @@ export const dispatchManifest = defineAppManifest({
       }),
       streaming: true,
       response: z.string(),
+    }),
+    // --- ai pipelines -----------------------------------------------------------
+    defineEndpoint({
+      name: "listPipelines",
+      method: "GET",
+      path: "/pipelines",
+      auth: "session-or-apiKey",
+      description:
+        "Runners that advertise the ai-pipelines capability (started with --pipelines) and the pipelines each offers " +
+        "(id, description, params schema). Online runners only.",
+      response: z.array(z.object({
+        runnerId: z.string(),
+        runnerName: z.string(),
+        gpu: z.string().nullable(),
+        pipelines: z.array(z.object({
+          id: z.string(),
+          version: z.string().optional(),
+          description: z.string(),
+          gpu: z.boolean().optional(),
+          params: z.record(z.string(), z.object({ type: z.string(), description: z.string(), required: z.boolean().optional(), options: z.array(z.string()).optional() })),
+        })),
+      })),
+    }),
+    defineEndpoint({
+      name: "runPipeline",
+      method: "POST",
+      path: "/pipelines/run",
+      auth: "session-or-apiKey",
+      description:
+        "Runs a pipeline on a runner and waits for it (synchronous, up to 4 hours). `assets` maps asset params to presigned " +
+        "GET urls ({url,name} or an array of them) which the runner downloads; outputs are uploaded by the runner to " +
+        "presigned PUT urls it requests per file through the owning Toolkit run (`runId`). Normally called by the Toolkit " +
+        "ai-runner connector, not directly.",
+      request: z.object({
+        runnerId: z.string(),
+        pipeline: z.string(),
+        /** The Toolkit run that owns the output prefix; upload urls are only minted for it. */
+        runId: z.string(),
+        params: z.record(z.string(), z.unknown()).optional(),
+        assets: z.record(z.string(), z.unknown()).optional(),
+        timeoutMs: z.number().int().positive().max(FOUR_HOURS_MS).optional(),
+      }),
+      response: z.object({
+        output: z.unknown(),
+        files: z.array(z.object({ path: z.string(), size: z.number(), contentType: z.string() })),
+        stdout: z.string(),
+        stderr: z.string(),
+        durationMs: z.number(),
+      }),
     }),
     // --- microvms ------------------------------------------------------------
     defineEndpoint({

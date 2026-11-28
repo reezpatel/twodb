@@ -62,10 +62,14 @@ export interface ConnectorField {
   optional?: boolean;
   placeholder?: string;
   help?: string;
+  /** "select": options come from GET /connector-templates/:id/fields/:key/options. */
+  type?: "text" | "select";
 }
 
+export interface FieldOption { value: string; label: string }
+
 export interface CommandParam {
-  type: "string" | "number" | "boolean" | "enum" | "date";
+  type: "string" | "number" | "boolean" | "enum" | "date" | "asset" | "assets";
   description: string;
   required?: boolean;
   options?: string[];
@@ -190,6 +194,7 @@ export const toolkitClient = {
 
   // --- templates + instances ---
   listTemplates: () => get<ConnectorTemplate[]>("/connector-templates"),
+  fieldOptions: (templateId: string, key: string) => get<FieldOption[]>(`/connector-templates/${encodeURIComponent(templateId)}/fields/${encodeURIComponent(key)}/options`),
   listInstances: () => get<ConnectorInstance[]>("/instances"),
   getInstance: (id: string) => get<ConnectorInstance & { template: ConnectorTemplate; tools: Tool[] }>(`/instances/${id}`),
   createInstance: (input: { templateId: string; name: string; config: Record<string, string>; enabled?: boolean; scope?: Scope; agentIds?: string[]; force?: boolean }) =>

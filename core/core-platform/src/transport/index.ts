@@ -19,17 +19,23 @@ export interface Dialer {
   fetch(path: string, init?: RequestInit): Promise<Response>;
 }
 
+// Long synchronous app calls (Dispatch pipeline runs and execs take up to 4 hours) send no response headers or body
+// bytes while they run; undici's default 300s headers/body timeouts would cut them. The caller's own deadline
+// (AbortSignal) and the target app are the bounds, so the dialer itself imposes none.
+const NO_IDLE_TIMEOUT = { headersTimeout: 0, bodyTimeout: 0 } as const;
+const httpAgent = new Agent(NO_IDLE_TIMEOUT);
+
 export function createDialer(target: DialTarget): Dialer {
   if (target.kind === "http") {
     return {
       target,
       fetch(path, init) {
-        return undiciFetch(new URL(path, target.baseUrl), init as any) as unknown as Promise<Response>;
+        return undiciFetch(new URL(path, target.baseUrl), { ...(init as any), dispatcher: httpAgent }) as unknown as Promise<Response>;
       },
     };
   }
 
-  const agent = new Agent({ connect: { socketPath: target.socketPath } });
+  const agent = new Agent({ ...NO_IDLE_TIMEOUT, connect: { socketPath: target.socketPath } });
   const base = target.baseUrl ?? "http://unix";
   return {
     target,

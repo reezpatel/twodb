@@ -10,7 +10,8 @@ import { createToolkitRepo, type ToolkitRepo } from "./db/repository.js";
 import { readForwardedContext, type ForwardedContext } from "./gateway-context.js";
 import { MCP_TRANSPORTS, NAME_RE, validUrl, parseHeaders, parseMcpServersJson, validateScope, type McpTransport } from "./mcp.js";
 import { listTemplates, getTemplate } from "./connectors/registry.js";
-import type { ConnectorTemplate, ConnectorRuntime } from "./connectors/types.js";
+import type { ConnectorTemplate, ConnectorRuntime, ConnectorCommand, ConnectorHost } from "./connectors/types.js";
+import { RunRegistry, outputKey } from "./runs.js";
 import { startPoller } from "./poller.js";
 import { decryptSecret } from "./crypto.js";
 import { slugifyOwner, connectorToolName, agentCanUse, TOOL_NAME_RE } from "./tool-names.js";
@@ -55,8 +56,8 @@ function instanceOut(repo: ToolkitRepo, row: Selectable<ConnectorInstanceRow>) {
   };
 }
 
-function toolsOf(row: Selectable<ConnectorInstanceRow>, template: ConnectorTemplate) {
-  return template.commands.map((cmd) => ({
+function toolsOf(row: Selectable<ConnectorInstanceRow>, template: ConnectorTemplate, commands: ConnectorCommand[] = template.commands) {
+  return commands.map((cmd) => ({
     id: `${row.id}.${cmd.name}`, instanceId: row.id, instanceName: row.name, templateId: template.id,
     name: connectorToolName(row.name, cmd.name), description: cmd.description, params: cmd.params,
   }));
@@ -66,6 +67,7 @@ function toolsOf(row: Selectable<ConnectorInstanceRow>, template: ConnectorTempl
 export interface ToolkitPlatform {
   gatewayFetch(path: string, init?: RequestInit): Promise<Response>;
   serviceFetch(audience: string, workspaceId: string, path: string, init?: RequestInit & { scopes?: string[] }): Promise<Response>;
+  verifyServiceToken?(token: string, opts?: { scope?: string }): Promise<{ wid: string }>;
 }
 
 export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatform) {
@@ -175,7 +177,58 @@ export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatf
   };
 
   /** Build the runtime used by command execution + manual poll runs. */
+  const runs = new RunRegistry();
+
+  /** Platform services for connector templates (service calls to other apps, presigned bucket URLs, run registry). */
+  const hostFor = (workspaceId: string, instanceId: string): ConnectorHost | undefined => {
+    if (!platform) return undefined;
+    return {
+      workspaceId, instanceId, runs,
+      async callApp(appSlug, path, init = {}) {
+        const res = await platform.serviceFetch(appSlug, workspaceId, path, {
+          method: init.method ?? (init.body !== undefined ? "POST" : "GET"),
+          scopes: ["gateway.act"],
+          headers: init.body !== undefined ? { "content-type": "application/json" } : {},
+          ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+          signal: AbortSignal.timeout(init.timeoutMs ?? 60_000),
+        });
+        const text = await res.text();
+        let body: any = text;
+        try { body = text ? JSON.parse(text) : null; } catch { /* plain text */ }
+        return { status: res.status, body };
+      },
+      async presign(ops) {
+        const res = await platform.gatewayFetch("/registry/s3/presign", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ops }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        const body = (await res.json().catch(() => ({}))) as { urls?: Array<{ key: string; url: string }>; error?: string };
+        if (!res.ok || !body.urls) throw new Error(`presign failed (${res.status}): ${body.error ?? "no urls"}`);
+        return body.urls;
+      },
+    };
+  };
+
+  /** Per-instance commands (e.g. the pipelines a runner advertises) with a short cache; static commands on failure. */
+  const commandCache = new Map<string, { at: number; commands: ConnectorCommand[] }>();
+  const commandsFor = async (row: Selectable<ConnectorInstanceRow>, template: ConnectorTemplate, config?: Record<string, string>): Promise<ConnectorCommand[]> => {
+    if (!template.resolveCommands) return template.commands;
+    const hit = commandCache.get(row.id);
+    if (hit && Date.now() - hit.at < 15_000) return hit.commands;
+    const host = hostFor(row.workspace_id, row.id);
+    if (!host) return template.commands;
+    try {
+      const commands = await template.resolveCommands(config ?? decryptConfig(template, row), host);
+      commandCache.set(row.id, { at: Date.now(), commands });
+      return commands;
+    } catch (err) {
+      app.log.warn({ err, instance: row.name }, "resolveCommands failed");
+      return hit?.commands ?? template.commands;
+    }
+  };
+
   const makeRuntime = (row: Selectable<ConnectorInstanceRow>, decryptedConfig: Record<string, string>): ConnectorRuntime => ({
+    host: hostFor(row.workspace_id, row.id),
     config: decryptedConfig,
     async getState() {
       const s = await repo.state.get(row.id);
@@ -323,6 +376,57 @@ export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatf
     return listTemplates().map((t) => ({ id: t.id, name: t.name, description: t.description, icon: t.icon, fields: t.fields, commands: t.commands, broadcasts: t.broadcasts, ...(t.pollIntervalMs ? { pollIntervalMs: t.pollIntervalMs } : {}) }));
   });
 
+  /** Options for a `select` field (e.g. the runners an ai-runner connector can use). */
+  app.get("/connector-templates/:id/fields/:key/options", async (req, reply) => {
+    const ctx = auth(req, reply); if (!ctx) return reply;
+    const { id, key } = req.params as { id: string; key: string };
+    const template = getTemplate(id);
+    const field = template?.fields.find((f) => f.key === key);
+    if (!template || !field || field.type !== "select" || !template.fieldOptions) return reply.code(404).send({ error: "no such select field" });
+    const host = hostFor(ctx.workspaceId, "");
+    if (!host) return reply.code(503).send({ error: "platform not connected" });
+    try {
+      return await template.fieldOptions(key, host);
+    } catch (err: any) {
+      return reply.code(502).send({ error: `could not load options: ${err?.message ?? String(err)}` });
+    }
+  });
+
+  // ==================================================== Pipeline runs (service) ==
+  // Dispatch calls this on behalf of a runner that wants to upload one output file. Authenticated by a control-plane
+  // service token scoped "toolkit.runs.upload" (the workspace comes from the token). The path must stay inside the run's
+  // output prefix — the runner can never write anywhere else in the bucket.
+  app.post("/_svc/runs/:id/upload-url", async (req, reply) => {
+    if (!platform?.verifyServiceToken) return reply.code(503).send({ error: "platform not connected" });
+    const bearer = String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+    if (!bearer) return reply.code(401).send({ error: "missing service token" });
+    let workspaceId: string;
+    try {
+      workspaceId = (await platform.verifyServiceToken(bearer, { scope: "toolkit.runs.upload" })).wid;
+    } catch (err) {
+      return reply.code(401).send({ error: (err as Error).message });
+    }
+    const { id } = req.params as { id: string };
+    const run = runs.get(id);
+    if (!run || run.workspaceId !== workspaceId) return reply.code(404).send({ error: "unknown or finished run" });
+    const b = (req.body ?? {}) as { files?: Array<{ path?: string; contentType?: string }> };
+    const files = Array.isArray(b.files) ? b.files.slice(0, 200) : [];
+    if (files.length === 0) return reply.code(400).send({ error: "files[] required" });
+    const ops: Array<{ method: "PUT"; key: string; contentType?: string; expiresIn: number }> = [];
+    for (const f of files) {
+      const key = outputKey(run, String(f.path ?? ""));
+      if (!key) return reply.code(400).send({ error: `path "${f.path}" is not allowed (must be relative, inside the run output folder)` });
+      ops.push({ method: "PUT", key, ...(f.contentType ? { contentType: f.contentType } : {}), expiresIn: 4 * 3600 });
+    }
+    try {
+      const urls = await hostFor(workspaceId, run.instanceId)!.presign(ops);
+      for (const [i, u] of urls.entries()) run.uploads.set(String(files[i]!.path), { key: u.key, contentType: files[i]!.contentType });
+      return { urls: urls.map((u, i) => ({ path: files[i]!.path, url: u.url, key: u.key })) };
+    } catch (err: any) {
+      return reply.code(502).send({ error: err?.message ?? String(err) });
+    }
+  });
+
   // ==================================================== Connector instances ==
   app.get("/instances", async (req, reply) => {
     const ctx = auth(req, reply); if (!ctx) return reply;
@@ -376,7 +480,8 @@ export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatf
     const row = await repo.instances.get(ctx.workspaceId, id);
     if (!row) return reply.code(404).send({ error: "not found" });
     const template = getTemplate(row.template_id)!;
-    return { ...instanceOut(repo, row), template: { id: template.id, name: template.name, description: template.description, icon: template.icon, fields: template.fields, commands: template.commands, broadcasts: template.broadcasts, ...(template.pollIntervalMs ? { pollIntervalMs: template.pollIntervalMs } : {}) }, tools: toolsOf(row, template) };
+    const commands = await commandsFor(row, template);
+    return { ...instanceOut(repo, row), template: { id: template.id, name: template.name, description: template.description, icon: template.icon, fields: template.fields, commands, broadcasts: template.broadcasts, ...(template.pollIntervalMs ? { pollIntervalMs: template.pollIntervalMs } : {}) }, tools: toolsOf(row, template, commands) };
   });
 
   app.patch("/instances/:id", async (req, reply) => {
@@ -485,7 +590,7 @@ export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatf
       const template = getTemplate(row.template_id);
       if (!template) continue;
       const agentIds = JSON.parse(row.agent_ids_json ?? "[]") as string[];
-      for (const t of toolsOf(row, template)) {
+      for (const t of toolsOf(row, template, await commandsFor(row, template))) {
         out.push({ ...t, agentIds, spaceAll: Number(row.scope_all) === 1, spaceIds: JSON.parse(row.scope_ids_json) as string[] });
       }
     }
@@ -518,7 +623,7 @@ export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatf
     for (const row of rows) {
       const template = getTemplate(row.template_id);
       if (!template) continue;
-      const cmd = template.commands.find((c) => connectorToolName(row.name, c.name) === name);
+      const cmd = (await commandsFor(row, template)).find((c) => connectorToolName(row.name, c.name) === name);
       if (cmd) return { row, template, command: cmd };
     }
     return undefined;
@@ -603,7 +708,7 @@ export async function buildServer(config: ToolkitConfig, platform?: ToolkitPlatf
 
     if (Number(instanceRow.enabled) !== 1) return reply.code(409).send({ error: `connector "${instanceRow.name}" is disabled` });
     const template = getTemplate(instanceRow.template_id)!;
-    const cmdSpec = template.commands.find((c) => c.name === command);
+    const cmdSpec = (await commandsFor(instanceRow, template)).find((c) => c.name === command);
     if (!cmdSpec) return reply.code(404).send({ error: `unknown command "${command}"` });
 
     const params = ((req.body as { params?: Record<string, unknown> })?.params ?? {}) as Record<string, unknown>;

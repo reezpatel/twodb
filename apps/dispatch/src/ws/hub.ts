@@ -58,6 +58,13 @@ export class DispatchHub {
   /** Sockets superseded by a reconnect — their close events are ignored. */
   private replaced = new Set<WebSocket>();
 
+  /** runId -> runner running it. Upload urls are only minted for runs dispatch itself started on that runner. */
+  private pipelineRuns = new Map<string, string>();
+
+  beginPipelineRun(runId: string, runnerId: string): void { this.pipelineRuns.set(runId, runnerId); }
+  endPipelineRun(runId: string): void { this.pipelineRuns.delete(runId); }
+  pipelineRunOwner(runId: string): string | undefined { return this.pipelineRuns.get(runId); }
+
   constructor(private repo: DispatchRepo) {}
 
   registerRunner(runner: RunnerSocket): void {
