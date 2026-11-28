@@ -49,19 +49,8 @@ export const conversationImportedEvent = defineBroadcastEvent({
   }),
 });
 
-export const notificationCreatedEvent = defineBroadcastEvent({
-  event: "twochat.notification.created",
-  description: "Published when a user notification is created (mention, DM, bot post) — the hook for future push/email delivery.",
-  direction: "produces",
-  relatedApps: [],
-  payload: z.object({
-    notificationId: z.string(),
-    userId: z.string(),
-    kind: z.enum(["mention", "dm", "channel", "bot-post", "system"]),
-    channelId: z.string().nullable(),
-    createdAt: z.string(),
-  }),
-});
+// twochat.notification.created is gone: notifications are now created + pushed
+// by the control plane (TwoDB), which owns the cross-app inbox and Web Push.
 
 export const sweepReadStateJob = defineJob({
   type: "twochat.read_state.sweep",
@@ -101,7 +90,7 @@ export const messages = defineAppMessages({
   name: "TwoChat",
   slug: "twochat",
   jobs: [sweepReadStateJob, collabReplyJob, collabEditJob, collabStatusJob, collabBotJob],
-  events: [messagePostedEvent, messageActionEvent, conversationImportedEvent, notificationCreatedEvent],
+  events: [messagePostedEvent, messageActionEvent, conversationImportedEvent],
 });
 
 export default messages;

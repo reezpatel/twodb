@@ -6,6 +6,7 @@ import { createPgDb } from "@twodb/core-data/db";
 import { createAsyncEngine } from "@twodb/core-async/engine";
 import { createRelay } from "@twodb/core-async/relay";
 import { createInboxHandler, serviceDeliver, type TwoDbRuntime } from "@twodb/twodb-core";
+import { createNotifier, type Notifier } from "@twodb/core-notify";
 import { createCollabService } from "./collab/service.js";
 import { messageFormat, composeAgentMessage } from "./collab/guide.js";
 import { BOT_MSG, EDIT_MSG, REPLY_MSG, STATUS_MSG, type BotPayloadIn, type EditPayload, type ReplyPayload, type StatusPayload } from "./collab/types.js";
@@ -15,7 +16,7 @@ import type { TwoChatConfig } from "./config.js";
 import { applySchema, type TwoChatDb } from "./db/schema.js";
 import { createChatRepo, userActor, botActor, type Actor } from "./db/repository.js";
 import { readForwardedContext, type ForwardedContext } from "./gateway-context.js";
-import { createChatStorage, type ChatStorage } from "./storage.js";
+import { wrapS3Storage, type ChatStorage } from "./storage.js";
 import { ChatHub } from "./ws/hub.js";
 import { registerWs } from "./ws/chat-ws.js";
 import { ulid } from "ulid";
@@ -36,9 +37,12 @@ import { collectAssetIds, collectMentions, blocksToText, messageBlocks, type Mes
  * users exactly like human messages.
  */
 /** What the server needs from the control-plane session to talk to other apps. */
-export type ServiceCaller = Pick<TwoDbRuntime, "serviceFetch" | "verifyServiceToken" | "serviceToken">;
+export type ServiceCaller = Pick<TwoDbRuntime, "serviceFetch" | "verifyServiceToken" | "serviceToken" | "gatewayFetch">;
 
-export async function buildServer(config: TwoChatConfig, opts: { twodb?: ServiceCaller } = {}) {
+export async function buildServer(
+  config: TwoChatConfig,
+  opts: { twodb?: ServiceCaller; storage?: import("@twodb/core-data/storage").StorageAdapter } = {},
+) {
   const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
   await app.register(websocket);
@@ -52,13 +56,15 @@ export async function buildServer(config: TwoChatConfig, opts: { twodb?: Service
   const asyncEngine = createAsyncEngine({ connectionString: config.DATABASE_URL, schema: "twochat" });
   await asyncEngine.init();
   const hub = new ChatHub();
+  // Notifications live in the control plane (cross-app inbox + Web Push). May be
+  // absent in tests that don't pass a control-plane caller — sends are skipped then.
+  const notifier: Notifier | null = opts.twodb ? createNotifier(opts.twodb) : null;
   // Late-bound: the collab service needs publishMessage/publishToChannel, which are defined further down.
   let collab: ReturnType<typeof createCollabService> | null = null;
-  const storage: ChatStorage = createChatStorage({
-    backend: config.TWOCHAT_STORAGE_BACKEND,
-    dir: config.TWOCHAT_STORAGE_DIR,
-    twoDriveUrl: config.TWOCHAT_TWODRIVE_URL,
-  });
+  // Attachments live in the install's shared S3 bucket — mandatory. Tests can
+  // inject any StorageAdapter (e.g. in-memory) via opts.storage.
+  if (!opts.storage) throw new Error("twochat: S3 storage required (control plane must have TWODB_S3_* configured)");
+  const storage: ChatStorage = wrapS3Storage(opts.storage);
 
   // --- identity helpers -----------------------------------------------------
 
@@ -145,24 +151,19 @@ export async function buildServer(config: TwoChatConfig, opts: { twodb?: Service
     });
     for (const userId of result.notifyUserIds) {
       void (async () => {
-        const notification = await repo.createNotification({
-          workspaceId: ctx.workspaceId,
+        if (!notifier) return;
+        const { notification } = await notifier.send({
           userId,
           kind: result.notification.kind,
           title: result.notification.title,
           body: result.notification.body,
-          channelId: result.message.channelId,
-          messageId: result.message.id,
+          deepLink: `/chat?channel=${result.message.channelId}&message=${result.message.id}`,
+          data: { channelId: result.message.channelId, messageId: result.message.id },
         });
+        // Online users get the live frame on TwoChat's own WS hub; offline users
+        // get Web Push from the control plane. Both read state from TwoDB.
         hub.publishToUsers(ctx.workspaceId, [userId], { type: "notification", notification });
-        await asyncEngine.broadcast.publish("twochat.notification.created", {
-          notificationId: notification.id,
-          userId,
-          kind: notification.kind,
-          channelId: notification.channelId,
-          createdAt: notification.createdAt,
-        });
-      })();
+      })().catch((err) => app.log.warn({ err }, "notify.send failed"));
     }
   };
 
@@ -954,34 +955,6 @@ export async function buildServer(config: TwoChatConfig, opts: { twodb?: Service
     await asyncEngine.broadcast.publish("twochat.conversation.imported", { conversationId: id, ...result, importedAt });
     void publishToChannel(auth.ctx.workspaceId, id, { type: "channel_updated", channel: await repo.hydrateChannel(auth.ctx.workspaceId, (await repo.getChannel(auth.ctx.workspaceId, id))!, auth.ctx.userId ?? "") });
     return reply.code(202).send(result);
-  });
-
-  // --- notifications -------------------------------------------------------------------------
-
-  app.get("/notifications", async (req, reply) => {
-    const auth = await requireActor(req, reply);
-    if (!auth) return reply;
-    if (auth.ctx.kind !== "session") return reply.code(403).send({ error: "session_required" });
-    const items = await repo.listNotifications(auth.ctx.workspaceId, auth.ctx.userId!);
-    const unread = await repo.unreadNotificationCount(auth.ctx.workspaceId, auth.ctx.userId!);
-    return { notifications: items, unread };
-  });
-
-  app.post("/notifications/:id/read", async (req, reply) => {
-    const auth = await requireActor(req, reply);
-    if (!auth) return reply;
-    if (auth.ctx.kind !== "session") return reply.code(403).send({ error: "session_required" });
-    const { id } = req.params as { id: string };
-    await repo.markNotificationRead(auth.ctx.workspaceId, auth.ctx.userId!, id);
-    return { ok: true };
-  });
-
-  app.post("/notifications/read-all", async (req, reply) => {
-    const auth = await requireActor(req, reply);
-    if (!auth) return reply;
-    if (auth.ctx.kind !== "session") return reply.code(403).send({ error: "session_required" });
-    await repo.markAllNotificationsRead(auth.ctx.workspaceId, auth.ctx.userId!);
-    return { ok: true };
   });
 
   // --- search (Gateway federated search fan-out) ------------------------------------------------

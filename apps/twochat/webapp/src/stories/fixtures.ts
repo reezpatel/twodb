@@ -149,10 +149,10 @@ export const message = (id: string): Message => {
 };
 
 export const notifications: Notification[] = [
-  { id: "n_mention", kind: "mention", title: "Ada mentioned you", body: "…can you take a look at the auth flow @you before EOD?", channelId: "ch_eng", messageId: "msg_9", readAt: null, createdAt: iso(5) },
-  { id: "n_dm", kind: "dm", title: "New message from Ada", body: "quick q about the sidebar tabs", channelId: "dm_ada", messageId: "msg_10", readAt: null, createdAt: iso(12) },
-  { id: "n_bot", kind: "bot-post", title: "Scout posted in deploys", body: "Deploy #482 succeeded — 4 files changed", channelId: "ch_status", messageId: "msg_11", readAt: iso(20), createdAt: iso(25) },
-  { id: "n_system", kind: "system", title: "Workspace", body: "Two new members joined Engineering", channelId: null, messageId: null, readAt: iso(40), createdAt: iso(45) },
+  { id: "n_mention", kind: "mention", title: "Ada mentioned you", body: "…can you take a look at the auth flow @you before EOD?", channelId: "ch_eng", readAt: null, createdAt: iso(5) },
+  { id: "n_dm", kind: "dm", title: "New message from Ada", body: "quick q about the sidebar tabs", channelId: "dm_ada", readAt: null, createdAt: iso(12) },
+  { id: "n_bot", kind: "bot-post", title: "Scout posted in deploys", body: "Deploy #482 succeeded — 4 files changed", channelId: "ch_status", readAt: iso(20), createdAt: iso(25) },
+  { id: "n_system", kind: "system", title: "Workspace", body: "Two new members joined Engineering", channelId: null, readAt: iso(40), createdAt: iso(45) },
 ];
 
 export const bots: Bot[] = [

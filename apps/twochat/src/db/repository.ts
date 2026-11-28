@@ -100,17 +100,6 @@ export interface MessagePayload {
   collab: { taskId: string; runId: string; sessionId: string | null; outcome: string } | null;
 }
 
-export interface NotificationPayload {
-  id: string;
-  kind: "mention" | "dm" | "channel" | "bot-post" | "system";
-  title: string;
-  body: string;
-  channelId: string | null;
-  messageId: string | null;
-  readAt: string | null;
-  createdAt: string;
-}
-
 export interface BotPayload {
   id: string;
   name: string;
@@ -571,7 +560,6 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
         await trx.deleteFrom("message_action").where("message_id", "in", ids).execute();
       }
       await trx.deleteFrom("pin").where("channel_id", "=", id).execute();
-      await trx.deleteFrom("notification").where("channel_id", "=", id).execute();
       await trx.deleteFrom("draft").where("channel_id", "=", id).execute();
       await trx.deleteFrom("read_state").where("channel_id", "=", id).execute();
       await trx.deleteFrom("asset").where("channel_id", "=", id).execute();
@@ -962,77 +950,6 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
     return db.selectFrom("bot").selectAll().where("workspace_id", "=", workspaceId).where("name", "=", name).executeTakeFirst();
   }
 
-  // -- notifications ------------------------------------------------------------------
-
-  async function createNotification(input: {
-    workspaceId: string;
-    userId: string;
-    kind: NotificationPayload["kind"];
-    title: string;
-    body: string;
-    channelId?: string | null;
-    messageId?: string | null;
-  }): Promise<NotificationPayload> {
-    const id = ulid();
-    const ts = new Date().toISOString();
-    await db
-      .insertInto("notification")
-      .values({
-        id,
-        workspace_id: input.workspaceId,
-        user_id: input.userId,
-        kind: input.kind,
-        title: input.title,
-        body: input.body,
-        channel_id: input.channelId ?? null,
-        message_id: input.messageId ?? null,
-        read_at: null,
-        created_at: ts,
-      })
-      .execute();
-    return { id, kind: input.kind, title: input.title, body: input.body, channelId: input.channelId ?? null, messageId: input.messageId ?? null, readAt: null, createdAt: ts };
-  }
-
-  async function listNotifications(workspaceId: string, userId: string, limit = 50): Promise<NotificationPayload[]> {
-    const rows = await db
-      .selectFrom("notification")
-      .selectAll()
-      .where("workspace_id", "=", workspaceId)
-      .where("user_id", "=", userId)
-      .orderBy("created_at", "desc")
-      .limit(limit)
-      .execute();
-    return rows.map((r) => ({
-      id: r.id,
-      kind: r.kind,
-      title: r.title,
-      body: r.body,
-      channelId: r.channel_id,
-      messageId: r.message_id,
-      readAt: iso(r.read_at),
-      createdAt: isoReq(r.created_at),
-    }));
-  }
-
-  async function markNotificationRead(workspaceId: string, userId: string, id: string) {
-    await db.updateTable("notification").set({ read_at: new Date().toISOString() }).where("workspace_id", "=", workspaceId).where("id", "=", id).where("user_id", "=", userId).execute();
-  }
-
-  async function markAllNotificationsRead(workspaceId: string, userId: string) {
-    await db.updateTable("notification").set({ read_at: new Date().toISOString() }).where("workspace_id", "=", workspaceId).where("user_id", "=", userId).where("read_at", "is", null).execute();
-  }
-
-  async function unreadNotificationCount(workspaceId: string, userId: string): Promise<number> {
-    const row = await db
-      .selectFrom("notification")
-      .select((eb) => eb.fn.countAll<number>().as("count"))
-      .where("workspace_id", "=", workspaceId)
-      .where("user_id", "=", userId)
-      .where("read_at", "is", null)
-      .executeTakeFirst();
-    return Number(row?.count ?? 0);
-  }
-
   // -- interactive bot message actions ----------------------------------------------
 
   async function createMessageAction(input: {
@@ -1219,11 +1136,6 @@ export function createChatRepo(db: Kysely<TwoChatDb>) {
     createBot,
     findBotByApiKey,
     findBotByName,
-    createNotification,
-    listNotifications,
-    markNotificationRead,
-    markAllNotificationsRead,
-    unreadNotificationCount,
     createMessageAction,
     listMessageActions,
     acknowledgeMessageAction,

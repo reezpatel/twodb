@@ -151,20 +151,6 @@ export interface BotRow {
   created_at: string;
 }
 
-export interface NotificationRow {
-  id: string;
-  workspace_id: string;
-  /** Recipient user id. */
-  user_id: string;
-  kind: "mention" | "dm" | "channel" | "bot-post" | "system";
-  title: string;
-  body: string;
-  channel_id: string | null;
-  message_id: string | null;
-  read_at: string | null;
-  created_at: string;
-}
-
 /**
  * Durable interaction created when a human clicks a bot message button.
  * Agents fetch their action inbox through GET /bots/actions and acknowledge
@@ -208,7 +194,6 @@ export interface TwoChatDb {
   read_state: ReadStateRow;
   asset: AssetRow;
   bot: BotRow;
-  notification: NotificationRow;
   message_action: MessageActionRow;
   conversation_list: ConversationListRow;
   collab_task: CollabTaskRow;
@@ -406,26 +391,8 @@ export async function applySchema(db: Kysely<TwoChatDb>): Promise<void> {
   await db.schema.createIndex("bot_workspace_idx").ifNotExists().on("bot").columns(["workspace_id"]).execute();
   await db.schema.createIndex("bot_api_key_idx").ifNotExists().on("bot").columns(["workspace_id", "api_key_id"]).execute();
 
-  await db.schema
-    .createTable("notification")
-    .ifNotExists()
-    .addColumn("id", "text", (c) => c.primaryKey())
-    .addColumn("workspace_id", "text", (c) => c.notNull())
-    .addColumn("user_id", "text", (c) => c.notNull())
-    .addColumn("kind", "text", (c) => c.notNull())
-    .addColumn("title", "text", (c) => c.notNull())
-    .addColumn("body", "text", (c) => c.notNull().defaultTo(""))
-    .addColumn("channel_id", "text")
-    .addColumn("message_id", "text")
-    .addColumn("read_at", "timestamptz")
-    .addColumn("created_at", "timestamptz", (c) => c.notNull().defaultTo(now))
-    .execute();
-  await db.schema
-    .createIndex("notification_user_created_idx")
-    .ifNotExists()
-    .on("notification")
-    .columns(["user_id", "created_at"])
-    .execute();
+  // Notifications moved to the control plane (TwoDB) — see core/core-notify. The
+  // legacy `notification` table is left in place on existing databases (harmless).
 
   await db.schema
     .createTable("message_action")

@@ -14,7 +14,7 @@
     "core-async"
   ],
   "basePath": "/apps/twochat/api",
-  "generatedAt": "2026-11-15T19:04:18.765Z",
+  "generatedAt": "2026-11-28T16:15:06.283Z",
   "websocketPaths": [
     "/ws"
   ],
@@ -9031,139 +9031,6 @@
         "required": [
           "inserted",
           "duplicate"
-        ],
-        "additionalProperties": false
-      }
-    },
-    {
-      "name": "listNotifications",
-      "method": "GET",
-      "path": "/notifications",
-      "auth": "session",
-      "description": "The caller's notification inbox (mentions, DMs, bot posts) with unread count.",
-      "response": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "properties": {
-          "notifications": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string",
-                  "enum": [
-                    "mention",
-                    "dm",
-                    "channel",
-                    "bot-post",
-                    "system"
-                  ]
-                },
-                "title": {
-                  "type": "string"
-                },
-                "body": {
-                  "type": "string"
-                },
-                "channelId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "messageId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "readAt": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "createdAt": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "kind",
-                "title",
-                "body",
-                "channelId",
-                "messageId",
-                "readAt",
-                "createdAt"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "unread": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "notifications",
-          "unread"
-        ],
-        "additionalProperties": false
-      }
-    },
-    {
-      "name": "markNotificationRead",
-      "method": "POST",
-      "path": "/notifications/:id/read",
-      "auth": "session",
-      "description": "Marks one notification read.",
-      "request": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "additionalProperties": false
-      },
-      "response": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok"
-        ],
-        "additionalProperties": false
-      }
-    },
-    {
-      "name": "markAllNotificationsRead",
-      "method": "POST",
-      "path": "/notifications/read-all",
-      "auth": "session",
-      "description": "Marks the whole inbox read.",
-      "response": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok"
         ],
         "additionalProperties": false
       }

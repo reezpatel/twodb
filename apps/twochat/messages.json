@@ -1,7 +1,7 @@
 {
   "name": "TwoChat",
   "slug": "twochat",
-  "generatedAt": "2026-11-15T19:04:18.796Z",
+  "generatedAt": "2026-11-28T16:15:06.300Z",
   "jobs": [
     {
       "type": "twochat.read_state.sweep",
@@ -293,51 +293,6 @@
           "inserted",
           "duplicate",
           "importedAt"
-        ],
-        "additionalProperties": false
-      }
-    },
-    {
-      "event": "twochat.notification.created",
-      "description": "Published when a user notification is created (mention, DM, bot post) — the hook for future push/email delivery.",
-      "direction": "produces",
-      "relatedApps": [],
-      "payload": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "properties": {
-          "notificationId": {
-            "type": "string"
-          },
-          "userId": {
-            "type": "string"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "mention",
-              "dm",
-              "channel",
-              "bot-post",
-              "system"
-            ]
-          },
-          "channelId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "createdAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "notificationId",
-          "userId",
-          "kind",
-          "channelId",
-          "createdAt"
         ],
         "additionalProperties": false
       }

@@ -20,6 +20,9 @@ import { registerWsPassthrough } from "./ws-passthrough.js";
 import { federatedSearch } from "./federated-search.js";
 import { createHostRouter, isRootDomainOrigin } from "./host-routing.js";
 import { ACT_SCOPE, deriveSigningKey, signServiceToken, looksLikeServiceToken, verifyServiceToken, ServiceTokenError } from "@twodb/core-platform/service-token";
+import { pushSubscriptionBody } from "@twodb/core-notify";
+import { createNotifyService } from "../notify/service.js";
+import { ulid } from "ulid";
 import { APP_CATALOG, getCatalogEntry } from "../orchestrator/catalog.js";
 import {
   installApp,
@@ -64,6 +67,140 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
 
   const registry = createRegistryRepo(db);
   const { resolveContext, authEngine, workspacePlatform } = setupAuth(db, config);
+
+  // Cross-app notifications: TwoDB owns the inbox + push subscriptions.
+  const appBaseUrl = (slug: string): string => {
+    const tpl = config.TWODB_APP_URL_TEMPLATE;
+    if (tpl) return tpl.replace("{slug}", slug).replace(/\/+$/, "");
+    return `${config.AUTH_BASE_URL.replace(/\/+$/, "")}/apps/${slug}`;
+  };
+  const notify = createNotifyService(db, config, { appBaseUrl });
+
+  // --- Cross-app notifications ------------------------------------------------
+  // Apps send (app-token verified); users read/manage their inbox and register
+  // push subscriptions with their own session.
+
+  /** POST /apps/twodb/api/notify/send — create a notification for a user. Caller app is verified. */
+  app.post("/apps/twodb/api/notify/send", async (req, reply) => {
+    if (!req.callerApp?.verified || !req.callerApp.slug) {
+      return reply.code(401).send({ error: "app authentication required" });
+    }
+    try {
+      return await notify.send(req.callerApp.slug, req.body);
+    } catch (err) {
+      if ((err as { name?: string }).name === "ZodError") return reply.code(400).send({ error: String(err) });
+      throw err;
+    }
+  });
+
+  /** GET /apps/twodb/api/notify/notifications?app=<slug> — the caller's inbox, newest first. */
+  app.get("/apps/twodb/api/notify/notifications", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || !ctx.userId) return reply.code(401).send({ error: "unauthorized" });
+    const q = req.query as { app?: string; limit?: string };
+    let query = db
+      .selectFrom("notification")
+      .selectAll()
+      .where("user_id", "=", ctx.userId)
+      .orderBy("created_at", "desc")
+      .limit(Math.min(Number(q.limit ?? 50) || 50, 200));
+    if (q.app) query = query.where("app", "=", q.app);
+    const rows = await query.execute();
+    const unread = await db
+      .selectFrom("notification")
+      .where("user_id", "=", ctx.userId)
+      .where("read_at", "is", null)
+      .select((eb) => eb.fn.countAll().as("n"))
+      .executeTakeFirst();
+    return {
+      notifications: rows.map((r) => ({
+        id: r.id, app: r.app, kind: r.kind, title: r.title, body: r.body,
+        deepLink: r.deep_link, readAt: r.read_at, createdAt: r.created_at,
+      })),
+      unread: Number((unread as { n?: unknown } | undefined)?.n ?? 0),
+    };
+  });
+
+  /** POST /apps/twodb/api/notify/notifications/:id/read — mark one read. */
+  app.post("/apps/twodb/api/notify/notifications/:id/read", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || !ctx.userId) return reply.code(401).send({ error: "unauthorized" });
+    const { id } = req.params as { id: string };
+    await db
+      .updateTable("notification")
+      .set({ read_at: new Date().toISOString() })
+      .where("id", "=", id)
+      .where("user_id", "=", ctx.userId)
+      .where("read_at", "is", null)
+      .execute();
+    return { ok: true };
+  });
+
+  /** POST /apps/twodb/api/notify/read-all — mark the whole inbox read. */
+  app.post("/apps/twodb/api/notify/read-all", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || !ctx.userId) return reply.code(401).send({ error: "unauthorized" });
+    await db
+      .updateTable("notification")
+      .set({ read_at: new Date().toISOString() })
+      .where("user_id", "=", ctx.userId)
+      .where("read_at", "is", null)
+      .execute();
+    return { ok: true };
+  });
+
+  /** The public VAPID key the webapp needs to subscribe to push. Public by design. */
+  app.get("/apps/twodb/api/notify/push-key", async (_req, reply) => {
+    const key = notify.vapidPublicKey();
+    if (!key) return reply.code(503).send({ error: "push not configured" });
+    return { key };
+  });
+
+  /** Register a Web Push subscription for the signed-in user, for the given app. */
+  app.post("/apps/twodb/api/notify/push-subscriptions", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || !ctx.userId) return reply.code(401).send({ error: "unauthorized" });
+    const body = pushSubscriptionBody.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: "invalid subscription" });
+    const { app: appSlug } = req.query as { app?: string };
+    if (!appSlug) return reply.code(400).send({ error: "app is required" });
+    const s = body.data;
+    // Endpoint is the dedupe key: a re-subscription (key rotation) updates in place.
+    await db
+      .insertInto("push_subscription")
+      .values({
+        id: `ps_${ulid()}`,
+        user_id: ctx.userId,
+        endpoint: s.endpoint,
+        p256dh: s.keys.p256dh,
+        auth: s.keys.auth,
+        app: appSlug,
+        device_label: s.deviceLabel ?? null,
+        created_at: new Date().toISOString(),
+      })
+      .onConflict((oc) =>
+        oc.column("endpoint").doUpdateSet({
+          user_id: ctx.userId!,
+          p256dh: s.keys.p256dh,
+          auth: s.keys.auth,
+          app: appSlug,
+          device_label: s.deviceLabel ?? null,
+        }),
+      )
+      .execute();
+    return { ok: true };
+  });
+
+  /** Remove a subscription (user signed out / notifications disabled). */
+  app.delete("/apps/twodb/api/notify/push-subscriptions", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || !ctx.userId) return reply.code(401).send({ error: "unauthorized" });
+    const { endpoint } = req.body as { endpoint?: string };
+    if (!endpoint) return reply.code(400).send({ error: "endpoint is required" });
+    await db.deleteFrom("push_subscription").where("endpoint", "=", endpoint).where("user_id", "=", ctx.userId).execute();
+    return { ok: true };
+  });
+
 
   // --- Identity: better-auth owns everything under /api/auth/* -----------
   app.all("/api/auth/*", async (req, reply) => {
@@ -476,6 +613,110 @@ export async function buildServer(db: Kysely<ControlPlaneDb>, config: TwoDbConfi
       httpUrl: a.http_url,
       capabilities: JSON.parse(a.capabilities || "[]"),
     }));
+  });
+
+  // --- S3 explorer (the install's shared bucket; every app's blobs live
+  // under its `<slug>/` prefix). Session-only, like the other admin APIs.
+  // Root keys can never collide with an app prefix (slugs match
+  // /^[a-z0-9][a-z0-9-]*$/), so "/" is a valid place for install-level files.
+  const s3Configured = Boolean(config.TWODB_S3_BUCKET && config.TWODB_S3_ACCESS_KEY_ID && config.TWODB_S3_SECRET_ACCESS_KEY);
+  const s3Client = async () => {
+    const { S3Client } = await import("@aws-sdk/client-s3");
+    return new S3Client({
+      region: config.TWODB_S3_REGION ?? "us-east-1",
+      endpoint: config.TWODB_S3_ENDPOINT,
+      forcePathStyle: config.TWODB_S3_FORCE_PATH_STYLE ?? Boolean(config.TWODB_S3_ENDPOINT),
+      credentials: { accessKeyId: config.TWODB_S3_ACCESS_KEY_ID!, secretAccessKey: config.TWODB_S3_SECRET_ACCESS_KEY! },
+    });
+  };
+  const EXPLORER_MAX_UPLOAD = 256 * 1024 * 1024;
+  /** Guards against the key tricks S3 happily accepts but explorers shouldn't: absolute paths, dot segments, NUL. */
+  const cleanS3Key = (raw: string): string | null => {
+    const key = raw.trim().replace(/^\/+|\/+$/g, "");
+    if (!key || key.includes("\0")) return null;
+    if (key.split("/").some((seg) => seg === "." || seg === "..")) return null;
+    return key;
+  };
+
+  app.get("/registry/s3", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    return {
+      configured: s3Configured,
+      bucket: config.TWODB_S3_BUCKET ?? null,
+      endpoint: config.TWODB_S3_ENDPOINT ?? null,
+      region: config.TWODB_S3_REGION ?? null,
+    };
+  });
+
+  app.get("/registry/s3/objects", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    if (!s3Configured) return reply.code(503).send({ error: "S3 is not configured (TWODB_S3_* unset)" });
+    const q = req.query as { prefix?: string };
+    const raw = (q.prefix ?? "").trim().replace(/^\/+/, "");
+    if (raw.includes("\0") || raw.split("/").some((s) => s === "." || s === "..")) return reply.code(400).send({ error: "invalid prefix" });
+    const prefix = raw && !raw.endsWith("/") ? `${raw}/` : raw;
+    const { ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+    const out = await (await s3Client()).send(
+      new ListObjectsV2Command({ Bucket: config.TWODB_S3_BUCKET, Prefix: prefix, Delimiter: "/", MaxKeys: 1000 }),
+    );
+    return {
+      bucket: config.TWODB_S3_BUCKET,
+      prefix,
+      folders: (out.CommonPrefixes ?? []).map((p) => p.Prefix!.slice(prefix.length).replace(/\/$/, "")),
+      objects: (out.Contents ?? [])
+        .filter((o) => o.Key !== prefix)
+        .map((o) => ({ key: o.Key, name: o.Key!.slice(prefix.length), size: o.Size ?? 0, lastModified: o.LastModified?.toISOString() ?? null })),
+      truncated: out.IsTruncated ?? false,
+    };
+  });
+
+  app.get("/registry/s3/object", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    if (!s3Configured) return reply.code(503).send({ error: "S3 is not configured (TWODB_S3_* unset)" });
+    const key = cleanS3Key(String((req.query as { key?: string }).key ?? ""));
+    if (!key) return reply.code(400).send({ error: "invalid key" });
+    const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+    try {
+      const out = await (await s3Client()).send(new GetObjectCommand({ Bucket: config.TWODB_S3_BUCKET, Key: key }));
+      if (!out.Body) return reply.code(404).send({ error: "not found" });
+      reply.header("content-disposition", `attachment; filename="${encodeURIComponent(key.split("/").pop() ?? "blob")}"`);
+      reply.type(out.ContentType ?? "application/octet-stream");
+      if (out.ContentLength != null) reply.header("content-length", String(out.ContentLength));
+      return reply.send(out.Body as NodeJS.ReadableStream);
+    } catch (err) {
+      if ((err as { name?: string }).name === "NoSuchKey") return reply.code(404).send({ error: "not found" });
+      throw err;
+    }
+  });
+
+  app.put("/registry/s3/object", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    if (!s3Configured) return reply.code(503).send({ error: "S3 is not configured (TWODB_S3_* unset)" });
+    const key = cleanS3Key(String((req.query as { key?: string }).key ?? ""));
+    if (!key) return reply.code(400).send({ error: "invalid key" });
+    const body = req.body as Buffer | undefined;
+    if (!body || !body.length) return reply.code(400).send({ error: "body required" });
+    if (body.length > EXPLORER_MAX_UPLOAD) return reply.code(413).send({ error: `object too large (max ${EXPLORER_MAX_UPLOAD / 1048576}MB)` });
+    const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+    await (await s3Client()).send(
+      new PutObjectCommand({ Bucket: config.TWODB_S3_BUCKET, Key: key, Body: body, ContentType: (req.headers["content-type"] as string) || "application/octet-stream" }),
+    );
+    return { ok: true, key, size: body.length };
+  });
+
+  app.delete("/registry/s3/object", async (req, reply) => {
+    const ctx = await resolveContext(new Headers(req.headers as any));
+    if (!ctx || ctx.kind !== "session") return reply.code(401).send({ error: "unauthorized" });
+    if (!s3Configured) return reply.code(503).send({ error: "S3 is not configured (TWODB_S3_* unset)" });
+    const key = cleanS3Key(String((req.query as { key?: string }).key ?? ""));
+    if (!key) return reply.code(400).send({ error: "invalid key" });
+    const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+    await (await s3Client()).send(new DeleteObjectCommand({ Bucket: config.TWODB_S3_BUCKET, Key: key }));
+    return { ok: true };
   });
 
   /** Register an external (unmanaged) app: URL-based entry for the gateway; lifecycle stays with the app. */

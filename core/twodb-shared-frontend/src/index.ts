@@ -14,3 +14,5 @@ export { LoginWithTwoDbButton, RequireTwoDbAuth } from "./components.js";
 export type { TwoDbAuthConfig, TwoDbUser } from "./client.js";
 export { currentToken, appOrigin, authBaseUrl, consoleUrl } from "./client.js";
 export { challengeFor, randomString } from "./pkce.js";
+export { notifyApi, type AppNotification } from "./notify.js";
+export { usePushSubscription, type PushPermission, type UsePushSubscription, type UsePushSubscriptionOptions } from "./pwa.js";

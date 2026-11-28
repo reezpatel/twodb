@@ -16,6 +16,7 @@
     "@hono/node-server": "^1.19.18",
     "@twodb/core-async": "workspace:*",
     "@twodb/core-data": "workspace:*",
+    "@twodb/core-notify": "workspace:*",
     "@twodb/core-platform": "workspace:*",
     "@twodb/twodb-core": "workspace:*",
     "fastify": "^5.11.2",

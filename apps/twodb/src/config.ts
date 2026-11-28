@@ -74,6 +74,16 @@ export const configSchema = z.object({
   /** An app that hasn't pinged for this long is marked inactive (apps ping every 10s). */
   TWODB_HEARTBEAT_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   /**
+   * Web Push (VAPID) for cross-app notifications. One keypair = the sender
+   * identity for every app (per-app differences live in push_subscription rows,
+   * not keys). Generate once: `npx web-push generate-vapid-keys`. Unset = push
+   * delivery disabled (inbox + live relay still work).
+   */
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  /** VAPID "subject" — a mailto: or https: contact the push services can reach you at. */
+  VAPID_SUBJECT: z.string().default("mailto:admin@localhost"),
+  /**
    * Global S3-compatible storage, configured like the Postgres cluster: one
    * bucket + credentials for the whole install; every app gets its own key
    * prefix (`<slug>/`). All optional — unset = apps get no `s3` config.

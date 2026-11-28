@@ -2,7 +2,7 @@
 
 > **Generated file — do not hand-edit.** Source of truth is `src/messages.ts` (Zod schemas via `@twodb/core-async/registry`). Regenerate with `pnpm gen:docs`.
 
-_Generated: 2026-11-15T19:04:18.797Z_
+_Generated: 2026-11-28T16:15:06.300Z_
 
 ## Queue jobs
 
@@ -327,55 +327,6 @@ Published after external messages are idempotently copied into a read-only conve
     "inserted",
     "duplicate",
     "importedAt"
-  ],
-  "additionalProperties": false
-}
-```
-
-### `twochat.notification.created`
-
-Published when a user notification is created (mention, DM, bot post) — the hook for future push/email delivery.
-
-- **Direction**: `produces`
-
-**Payload**
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "notificationId": {
-      "type": "string"
-    },
-    "userId": {
-      "type": "string"
-    },
-    "kind": {
-      "type": "string",
-      "enum": [
-        "mention",
-        "dm",
-        "channel",
-        "bot-post",
-        "system"
-      ]
-    },
-    "channelId": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "createdAt": {
-      "type": "string"
-    }
-  },
-  "required": [
-    "notificationId",
-    "userId",
-    "kind",
-    "channelId",
-    "createdAt"
   ],
   "additionalProperties": false
 }

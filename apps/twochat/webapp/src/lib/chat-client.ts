@@ -2,6 +2,8 @@
 // /twochat-api → /apps/twochat), so identity is the shared control-plane
 // session resolved by TwoDB and forwarded as x-twodb-* headers.
 
+import { notifyApi, type AppNotification } from "@twodb/twodb-shared-frontend";
+
 export interface MessageBlock {
   type: string;
   [key: string]: unknown;
@@ -72,13 +74,17 @@ export interface Message {
   collab?: { taskId: string; runId: string; sessionId: string | null; outcome: "ok" | "failed" | "stopped" | string } | null;
 }
 
+/**
+ * TwoChat's notification projection. Notifications live in the control plane
+ * (see core/twodb-shared-frontend/notify) — this shape maps the control-plane
+ * record to what the panel renders, deriving channelId from the deep link.
+ */
 export interface Notification {
   id: string;
   kind: "mention" | "dm" | "channel" | "bot-post" | "system";
   title: string;
   body: string;
   channelId: string | null;
-  messageId: string | null;
   readAt: string | null;
   createdAt: string;
 }
@@ -244,12 +250,38 @@ export const chatApi = {
     sourceUrl?: string;
     sentAt: string;
   }>) => call<{ inserted: number; duplicate: number }>(`/conversations/${conversationId}/import`, { method: "POST", body: JSON.stringify({ messages }) }),
+};
 
-  listNotifications: () => call<{ notifications: Notification[]; unread: number }>("/notifications"),
+/** Derive the channel id from the notification's deep link (/chat?channel=<id>&message=<id>). */
+function channelIdFrom(deepLink: string | null): string | null {
+  if (!deepLink) return null;
+  try {
+    return new URL(deepLink, window.location.origin).searchParams.get("channel");
+  } catch {
+    return null;
+  }
+}
 
-  markNotificationRead: (id: string) => call<{ ok: boolean }>(`/notifications/${id}/read`, { method: "POST" }),
+function toNotification(n: AppNotification): Notification {
+  return {
+    id: n.id,
+    kind: (["mention", "dm", "channel", "bot-post", "system"].includes(n.kind) ? n.kind : "system") as Notification["kind"],
+    title: n.title,
+    body: n.body,
+    channelId: channelIdFrom(n.deepLink),
+    readAt: n.readAt,
+    createdAt: n.createdAt,
+  };
+}
 
-  markAllNotificationsRead: () => call<{ ok: boolean }>("/notifications/read-all", { method: "POST" }),
+/** Notifications come from the control plane (cross-app inbox), scoped to TwoChat. */
+export const notificationsApi = {
+  listNotifications: async () => {
+    const res = await notifyApi.list("twochat");
+    return { notifications: res.notifications.map(toNotification), unread: res.unread };
+  },
+  markNotificationRead: (id: string) => notifyApi.markRead(id),
+  markAllNotificationsRead: () => notifyApi.markAllRead(),
 };
 
 export const controlPlaneClient = {

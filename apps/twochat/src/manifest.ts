@@ -73,17 +73,6 @@ const message = z.object({
   saved: z.boolean(),
 });
 
-const notification = z.object({
-  id: z.string(),
-  kind: z.enum(["mention", "dm", "channel", "bot-post", "system"]),
-  title: z.string(),
-  body: z.string(),
-  channelId: z.string().nullable(),
-  messageId: z.string().nullable(),
-  readAt: z.string().nullable(),
-  createdAt: z.string(),
-});
-
 const bot = z.object({
   id: z.string(),
   name: z.string(),
@@ -603,34 +592,6 @@ const importConversationMessages = defineEndpoint({
   response: z.object({ inserted: z.number(), duplicate: z.number() }),
 });
 
-const listNotifications = defineEndpoint({
-  name: "listNotifications",
-  method: "GET",
-  path: "/notifications",
-  auth: "session",
-  description: "The caller's notification inbox (mentions, DMs, bot posts) with unread count.",
-  response: z.object({ notifications: z.array(notification), unread: z.number() }),
-});
-
-const markNotificationRead = defineEndpoint({
-  name: "markNotificationRead",
-  method: "POST",
-  path: "/notifications/:id/read",
-  auth: "session",
-  description: "Marks one notification read.",
-  request: z.object({ id: z.string() }),
-  response: z.object({ ok: z.boolean() }),
-});
-
-const markAllNotificationsRead = defineEndpoint({
-  name: "markAllNotificationsRead",
-  method: "POST",
-  path: "/notifications/read-all",
-  auth: "session",
-  description: "Marks the whole inbox read.",
-  response: z.object({ ok: z.boolean() }),
-});
-
 const search = defineEndpoint({
   name: "search",
   method: "GET",
@@ -699,9 +660,6 @@ export const twochatManifest = defineAppManifest({
     listListConversations,
     createListConversation,
     importConversationMessages,
-    listNotifications,
-    markNotificationRead,
-    markAllNotificationsRead,
     search,
   ],
 });
@@ -709,4 +667,4 @@ export const twochatManifest = defineAppManifest({
 export default twochatManifest;
 
 // Re-exported for consumers (webapp types via endpoint.json, tests).
-export { message, channel, notification, bot, asset, member, reactionSummary, actorInfo, blockTextObject, blockMention };
+export { message, channel, bot, asset, member, reactionSummary, actorInfo, blockTextObject, blockMention };

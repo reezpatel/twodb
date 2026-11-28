@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   chatApi,
+  notificationsApi,
   dmTitle,
   type Channel,
   type Member,
@@ -8,6 +9,7 @@ import {
   type Notification,
 } from "./chat-client";
 import { useChatSocketRef, type ServerFrame } from "./chat-socket";
+import { usePushSubscription } from "@twodb/twodb-shared-frontend";
 
 /**
  * App-level chat state: channels, live messages per channel, notifications,
@@ -72,6 +74,11 @@ export function ChatProvider(props: { myUserId: string | null; myUserName: strin
   const [typingByChannel, setTypingByChannel] = useState<Record<string, { actorId: string; name: string; at: number }[]>>({});
   const [collabWorking, setCollabWorking] = useState<Record<string, string>>({});
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+
+  // Background notifications: register the service worker and subscribe this
+  // device to Web Push (control plane fans notifications out to it when the
+  // tab is closed). No-op where push isn't supported/configured.
+  usePushSubscription({ app: "twochat", auto: Boolean(myUserId) });
 
   // The client overlay for user display names: server knows ids, the session
   // knows this user's name. Other members show their fallback name until the
@@ -246,7 +253,7 @@ export function ChatProvider(props: { myUserId: string | null; myUserName: strin
   useEffect(() => {
     if (!myUserId) return;
     void refreshChannels();
-    void chatApi
+    void notificationsApi
       .listNotifications()
       .then((res) => {
         setNotifications(res.notifications);
@@ -362,13 +369,13 @@ export function ChatProvider(props: { myUserId: string | null; myUserName: strin
   );
 
   const markNotificationRead = useCallback(async (id: string) => {
-    await chatApi.markNotificationRead(id);
+    await notificationsApi.markNotificationRead(id);
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n)));
     setUnreadNotifications((n) => Math.max(0, n - 1));
   }, []);
 
   const markAllNotificationsRead = useCallback(async () => {
-    await chatApi.markAllNotificationsRead();
+    await notificationsApi.markAllNotificationsRead();
     setNotifications((prev) => prev.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })));
     setUnreadNotifications(0);
   }, []);

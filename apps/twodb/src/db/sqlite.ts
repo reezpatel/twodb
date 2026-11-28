@@ -93,6 +93,33 @@ export interface ControlPlaneDb extends AuthPlatformDb {
   registered_app: RegisteredAppRow;
   app_token: AppTokenRow;
   cli_code: CliCodeRow;
+  notification: NotificationRow;
+  push_subscription: PushSubscriptionRow;
+}
+
+/** A cross-app notification (see migrations/0008). Owned by the control plane, addressed to one user, attributed to one app. */
+export interface NotificationRow {
+  id: string;
+  user_id: string;
+  app: string;
+  kind: string;
+  title: string;
+  body: string;
+  deep_link: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+/** One browser Web Push subscription (a device registered for one app's notifications). */
+export interface PushSubscriptionRow {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  app: string;
+  device_label: string | null;
+  created_at: string;
 }
 
 export function openControlPlaneDb(file: string): Kysely<ControlPlaneDb> {
