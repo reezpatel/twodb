@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import { BODY_LIMIT, webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
 import { createPgDb } from "@twodb/core-data/db";
-import { createLocalStorage } from "@twodb/core-data/storage";
+import type { StorageAdapter } from "@twodb/core-data/storage";
 
 import { manifest } from "./manifest.js";
 import type { TwoPlanConfig } from "./config.js";
@@ -9,7 +9,7 @@ import { applySchema, type Db } from "./db/schema.js";
 import { registerRoutes } from "./lib/route.js";
 import { allRoutes } from "./routes/index.js";
 
-export async function buildServer(config: TwoPlanConfig) {
+export async function buildServer(config: TwoPlanConfig, deps: { storage: StorageAdapter }) {
   const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   // File uploads arrive as raw bodies (any non-JSON content type); JSON stays default.
   app.removeContentTypeParser("text/plain");
@@ -25,7 +25,9 @@ export async function buildServer(config: TwoPlanConfig) {
 
   const db = createPgDb<any>({ connectionString: config.DATABASE_URL, schema: "twoplan" }) as Db;
   await applySchema(db);
-  const storage = createLocalStorage({ rootDir: config.TWOPLAN_BLOB_DIR });
+  // Attachment blobs live in the install's shared S3 bucket (prefix-scoped by
+  // the control plane) — mandatory, no local fallback.
+  const storage = deps.storage;
 
   app.get("/healthz", async () => ({ ok: true, app: "twoplan" }));
 

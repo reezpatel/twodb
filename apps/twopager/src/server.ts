@@ -1,9 +1,8 @@
 import Fastify from "fastify";
 import * as path from "node:path";
 import { webappRewriteUrl, registerWebapp, webappDist } from "@twodb/twodb-core/webapp";
-import { withKeyPrefix } from "@twodb/twodb-core";
 import { createPgDb } from "@twodb/core-data/db";
-import { createLocalStorage, type StorageAdapter } from "@twodb/core-data/storage";
+import type { StorageAdapter } from "@twodb/core-data/storage";
 import type { TwoPagerConfig } from "./config.js";
 import { applySchema, type Db } from "./db/schema.js";
 import { registerRoutes } from "./lib/route.js";
@@ -19,7 +18,7 @@ import { SITE_PREFIX, createAdminHostCheck, registerSiteServing, requestHost } f
  *   everything else             by Host: admin hosts -> the bundled admin SPA; any other host -> the site published there
  * The gateway sends unknown hosts here (CATCH_ALL_SERVICE=twopager) and `<slug>.<ROOT_DOMAIN>` for the admin host.
  */
-export async function buildServer(config: TwoPagerConfig, deps: { storage?: StorageAdapter | null } = {}) {
+export async function buildServer(config: TwoPagerConfig, deps: { storage: StorageAdapter }) {
   const isAdminHost = createAdminHostCheck(config.ADMIN_HOSTS);
   const zipBodyLimit = Math.ceil(config.MAX_ZIP_MB * 1048576 * 1.4) + 1048576; // base64 JSON is ~1.37x
 
@@ -48,7 +47,9 @@ export async function buildServer(config: TwoPagerConfig, deps: { storage?: Stor
   const db = createPgDb<any>({ connectionString: config.DATABASE_URL, schema: "twopager" }) as Db;
   await applySchema(db);
 
-  const storage = deps.storage ?? withKeyPrefix(createLocalStorage({ rootDir: path.resolve(config.LOCAL_STORAGE_DIR) }), "twopager/");
+  // Site blobs live in the install's shared S3 bucket (prefix-scoped by the
+  // control plane) — mandatory, no local fallback.
+  const storage = deps.storage;
   const cache = new BlobCache(path.resolve(config.CACHE_DIR), config.CACHE_MAX_MB * 1048576);
   const blobs = new Blobs(storage, cache, db);
   const resolver = new SiteResolver(db, config.SITES_DOMAIN?.replace(/^\.+/, "").toLowerCase() || null);

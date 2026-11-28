@@ -1,6 +1,4 @@
-import { createLocalStorage, type StorageAdapter } from "@twodb/core-data/storage";
-import { withKeyPrefix } from "@twodb/twodb-core";
-import type { PaintressConfig } from "./config.js";
+import type { StorageAdapter } from "@twodb/core-data/storage";
 
 const PREFIX = "paintress/";
 
@@ -23,12 +21,12 @@ function stripPrefix(inner: StorageAdapter): StorageAdapter {
 }
 
 /**
- * Blob storage. When the control plane has S3 configured, twodb-core hands us
- * a storage already scoped to this app's prefix (`paintress/`); otherwise fall
- * back to a local directory with the same key layout.
+ * Blob storage. The control plane hands us a storage already scoped to this
+ * app's prefix (`paintress/`) — S3 is mandatory (paintress refuses to boot
+ * without it), there is no local-disk path.
  */
-export async function createBlobStorage(config: PaintressConfig, s3?: StorageAdapter | null): Promise<StorageAdapter> {
-  return stripPrefix(s3 ?? withKeyPrefix(createLocalStorage({ rootDir: config.LOCAL_STORAGE_DIR }), PREFIX));
+export function createBlobStorage(s3: StorageAdapter): StorageAdapter {
+  return stripPrefix(s3);
 }
 
 /** Folder layout required by the product: paintress/{workspaceId}/{boardId}/{assetId} */

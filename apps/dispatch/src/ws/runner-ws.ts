@@ -38,10 +38,17 @@ import type { DispatchHub } from "./hub.js";
 
 let hub: DispatchHub;
 let repo: import("../db/repository.js").DispatchRepo;
+let archiveStorage: import("@twodb/core-data/storage").StorageAdapter;
 
-export function registerRunnerWs(app: FastifyInstance, hubArg: DispatchHub, repoArg: import("../db/repository.js").DispatchRepo): void {
+export function registerRunnerWs(
+  app: FastifyInstance,
+  hubArg: DispatchHub,
+  repoArg: import("../db/repository.js").DispatchRepo,
+  storage: import("@twodb/core-data/storage").StorageAdapter,
+): void {
   hub = hubArg;
   repo = repoArg;
+  archiveStorage = storage;
   app.get("/runner-ws", { websocket: true }, (socket: WebSocket, req) => {
     const url = new URL(req.url, "http://internal");
     const key = url.searchParams.get("key");
@@ -233,7 +240,7 @@ function handleFrame(socket: WebSocket, runner: RunnerRow, raw: unknown, enrolle
     }
     case "vmArchiveGet": {
       void (async () => {
-        const zip = await readLatestArchive(String(frame.identifier ?? "")).catch(() => null);
+        const zip = await readLatestArchive(archiveStorage, String(frame.identifier ?? "")).catch(() => null);
         if (!zip) {
           socket.send(JSON.stringify({ type: "result", callId: frame.callId, error: "no archive" }));
           return;

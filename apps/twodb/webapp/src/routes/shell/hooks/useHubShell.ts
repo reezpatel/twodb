@@ -28,7 +28,9 @@ export function useHubShell() {
       ? "keys"
       : location.pathname.startsWith("/spaces")
         ? "spaces"
-        : "apps";
+        : location.pathname.startsWith("/storage")
+          ? "storage"
+          : "apps";
 
   const signOut = useCallback(async () => {
     setSigningOut(true);
@@ -45,6 +47,7 @@ export function useHubShell() {
       if (id === "apps") navigate("/apps");
       else if (id === "keys") navigate("/keys");
       else if (id === "spaces") navigate("/spaces");
+      else if (id === "storage") navigate("/storage");
     },
     [navigate, signOut],
   );

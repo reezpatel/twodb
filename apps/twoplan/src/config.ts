@@ -7,8 +7,6 @@ export const configSchema = z.object({
   /** Stable per-app key — delivered by the control plane at boot (twodb-core), never set by hand. */
   TWODB_DATA_KEY: z.string().optional(),
   HTTP_URL: z.string().url().default("http://localhost:6417"),
-  /** Root dir for attachment blobs (local storage adapter). */
-  TWOPLAN_BLOB_DIR: z.string().default(".data/twoplan/blobs"),
 });
 
 export type TwoPlanConfig = z.infer<typeof configSchema>;

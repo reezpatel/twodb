@@ -25,7 +25,7 @@
 #   postgres/        all app databases
 #   rustfs/          all object storage (drive files, uploads, TwoPager sites, ...)
 #   twodb/           control-plane SQLite (users, passkeys, app registry, tokens)
-#   apps/<slug>/     per-app local files (registration token cache, blobs, archives)
+#   apps/<slug>/     per-app local files (registration token cache); blobs/archives live in object storage
 #
 # MANDATORY environment (compose refuses to start without them):
 #   ROOT_DOMAIN                 e.g. twodb.io  (no scheme, no leading dot)
@@ -266,8 +266,6 @@ services:
       <<: *app-env
       PORT: "6405"
       HTTP_URL: http://twochat:6405
-      TWOCHAT_TWODRIVE_URL: http://twodb:6400/apps/twodrive/api
-      TWOCHAT_STORAGE_DIR: /data/blobs
     volumes:
       - ${DATA_DIR:-./data}/apps/twochat:/data
 
@@ -303,7 +301,6 @@ services:
       <<: *app-env
       PORT: "6408"
       HTTP_URL: http://dispatch:6408
-      DISPATCH_ARCHIVE_DIR: /data/archives
     volumes:
       - ${DATA_DIR:-./data}/apps/dispatch:/data
 
@@ -370,7 +367,6 @@ services:
       <<: *app-env
       PORT: "6414"
       HTTP_URL: http://paintress:6414
-      LOCAL_STORAGE_DIR: /data/blobs
     volumes:
       - ${DATA_DIR:-./data}/apps/paintress:/data
 
@@ -404,7 +400,6 @@ services:
       <<: *app-env
       PORT: "6417"
       HTTP_URL: http://twoplan:6417
-      TWOPLAN_BLOB_DIR: /data/blobs
     volumes:
       - ${DATA_DIR:-./data}/apps/twoplan:/data
 

@@ -63,7 +63,7 @@ Default `Cache-Control`: HTML `max-age=0, must-revalidate`, everything else 1 h;
 
 ## Config (env)
 `CACHE_DIR` · `CACHE_MAX_MB` (2048) · `ADMIN_HOSTS` · `SITES_DOMAIN` (must not be under `ROOT_DOMAIN`) · `MAX_ZIP_MB` (1024; expanded limit 5×)
-· `MAX_FILE_MB` (512) · `MAX_FILES` (5000) · `LOCAL_STORAGE_DIR` (dev fallback when the control plane has no S3).
+· `MAX_FILE_MB` (512) · `MAX_FILES` (5000). Site blobs live in the control plane's S3 bucket (mandatory — TwoPager refuses to boot without it).
 The gateway buffers request bodies up to `TWODB_BODY_LIMIT_MB` (4096).
 
 ## Dev

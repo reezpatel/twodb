@@ -6,6 +6,7 @@ import { AppDetails } from "./routes/app-details/AppDetails.js";
 import { AppsRegistry } from "./routes/registry/AppsRegistry.js";
 import { ApiKeysView } from "./routes/keys/ApiKeysView.js";
 import { SpacesView } from "./routes/spaces/SpacesView.js";
+import { StorageView } from "./routes/storage/StorageView.js";
 import { HubChrome } from "./routes/shell/partials/HubChrome.js";
 import { useHubShell } from "./routes/shell/hooks/useHubShell.js";
 import { useBreadcrumbs } from "./routes/shell/hooks/useBreadcrumbs.js";
@@ -50,6 +51,7 @@ function ShellRoutes() {
         <Route path="/app/:slug/:tab" element={<AppDetails />} />
         <Route path="/keys" element={<ApiKeysView />} />
         <Route path="/spaces" element={<SpacesView />} />
+        <Route path="/storage" element={<StorageView />} />
         {/* Old explorer URLs */}
         <Route path="/hub/:slug/:tab" element={<LegacyHubRedirect />} />
         <Route path="/hub" element={<Navigate to="/apps" replace />} />

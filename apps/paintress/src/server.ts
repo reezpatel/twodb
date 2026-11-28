@@ -16,7 +16,7 @@ import { registerBuildRoutes } from "./routes/build.js";
 import { registerMiscRoutes } from "./routes/misc.js";
 import { registerBoardSocket } from "./ws.js";
 
-export async function buildServer(config: PaintressConfig, deps: { storage?: import("@twodb/core-data/storage").StorageAdapter | null } = {}) {
+export async function buildServer(config: PaintressConfig, deps: { storage: import("@twodb/core-data/storage").StorageAdapter }) {
   const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   // Tolerate an empty body under content-type: application/json (browsers send that for body-less POSTs).
   app.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
@@ -34,7 +34,7 @@ export async function buildServer(config: PaintressConfig, deps: { storage?: imp
   const db = createPgDb<PaintressDb>({ connectionString: config.DATABASE_URL, schema: "paintress" });
   await applySchema(db);
   const store = createStore(db);
-  const blobs = await createBlobStorage(config, deps.storage);
+  const blobs = createBlobStorage(deps.storage);
   const hub = createHub(store, config.DATABASE_URL, "paintress", app.log);
   await hub.start();
 

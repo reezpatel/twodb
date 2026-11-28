@@ -58,7 +58,11 @@ function sseWrite(reply: FastifyReply, event: string, data: unknown): boolean {
   return true;
 }
 
-export async function buildServer(config: DispatchConfig) {
+export async function buildServer(config: DispatchConfig, deps: { storage?: import("@twodb/core-data/storage").StorageAdapter | null } = {}) {
+  // /app archive store lives in the install's shared S3 bucket (prefix-scoped
+  // by the control plane) — mandatory, no local fallback.
+  const archiveStorage = deps.storage;
+  if (!archiveStorage) throw new Error("dispatch: S3 storage required (control plane must have TWODB_S3_* configured)");
   const app = Fastify({ rewriteUrl: webappRewriteUrl, logger: true, bodyLimit: BODY_LIMIT });
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
   await app.register(websocket);
@@ -67,12 +71,12 @@ export async function buildServer(config: DispatchConfig) {
   await applySchema(db);
   const repo: DispatchRepo = createDispatchRepo(db);
   const hub = new DispatchHub(repo);
-  registerArchiveStore(hub, repo);
+  registerArchiveStore(hub, repo, archiveStorage);
 
   // Pull-registration (docker-install flow).
 
   // --- runner WS (auth = runner key, not session) --------------------------
-  registerRunnerWs(app, hub, repo);
+  registerRunnerWs(app, hub, repo, archiveStorage);
 
   // --- runners ---------------------------------------------------------------
   app.post("/runners", async (req, reply) => {
@@ -509,7 +513,7 @@ export async function buildServer(config: DispatchConfig) {
     // Any previous lifecycle (idle-stopped or archived) means /app lives in
     // the archive store — the runner restores it. Rows get pruned; archives
     // outlive them, so a stored archive also forces resume.
-    const hasArchive = await archiveExists(body.identifier);
+    const hasArchive = await archiveExists(archiveStorage, body.identifier);
     const resume =
       hasArchive || Boolean(vm && (vm.status === "idle-stopped" || vm.status === "archived" || vm.status === "failed"));
     if (vm && vm.status === "archived") {
@@ -807,7 +811,7 @@ export async function buildServer(config: DispatchConfig) {
     const ctx = requireCtx(req, reply);
     if (!ctx) return reply;
     const { identifier } = req.params as { identifier: string };
-    const zip = await readLatestArchive(identifier);
+    const zip = await readLatestArchive(archiveStorage, identifier);
     if (!zip) return reply.code(404).send({ error: "no archive" });
     reply.type("application/zip");
     return reply.send(zip);

@@ -1,5 +1,5 @@
 import { AppShell, AppShellBody, AppShellMain, AppShellHeader, AppShellContent, NavSidebar, type NavGroupData, type NavItemData } from "@twodb/blocks";
-import { KeyRound, LayoutGrid, LogOut, Boxes } from "lucide-react";
+import { KeyRound, LayoutGrid, LogOut, Boxes, HardDrive } from "lucide-react";
 import { NavSidebarToggle } from "@twodb/blocks";
 import type { ReactNode } from "react";
 import type { Crumb } from "../hooks/useBreadcrumbs.js";
@@ -25,6 +25,7 @@ export function HubChrome(props: HubChromeProps) {
         { id: "apps", title: "Apps", icon: LayoutGrid },
         { id: "keys", title: "API keys", icon: KeyRound },
         { id: "spaces", title: "Spaces", icon: Boxes },
+        { id: "storage", title: "Storage", icon: HardDrive },
       ],
     },
   ];

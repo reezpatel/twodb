@@ -1,22 +1,22 @@
-import type { FastifyInstance } from "fastify";
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
 import type { DispatchHub } from "./hub.js";
 import type { DispatchRepo } from "../db/repository.js";
 import type { RunnerRow } from "../db/schema.js";
+import type { StorageAdapter } from "@twodb/core-data/storage";
 
 /**
- * /app archive store — the S3 STUB. Runners zip /app at VM shutdown and
- * ship it here over their authenticated WS (vmArchive frames); resume
- * downloads it back. Swapping in real S3 means replacing store/get only —
- * the wire protocol (b64 chunks over WS) stays.
+ * /app archive store — backed by the install's shared S3 bucket. Runners zip
+ * /app at VM shutdown and ship it here over their authenticated WS (vmArchive
+ * frames); resume downloads it back. The adapter arrives already prefix-scoped
+ * to `dispatch/` by the control plane. S3 is mandatory (dispatch refuses to
+ * boot without it) — there is no local-disk path.
  *
- * In-memory assembly keyed by identifier; sizes are bounded by the /app
- * quota we give microvms (2GB disk, realistically far less).
+ * Keys: `vm-archives/<identifier>/app-<utc-stamp>.zip`. In-memory assembly
+ * keyed by identifier; sizes are bounded by the /app quota we give microvms
+ * (2GB disk, realistically far less).
  */
 const assembling = new Map<string, { parts: Buffer[]; runnerId: string }>();
 
-export function registerArchiveStore(hub: DispatchHub, repo: DispatchRepo): void {
+export function registerArchiveStore(hub: DispatchHub, repo: DispatchRepo, storage: StorageAdapter): void {
   hub.onVmArchive(async (frame, runner) => {
     const identifier = String(frame.identifier ?? "");
     if (!identifier) return { error: "identifier required" };
@@ -34,31 +34,36 @@ export function registerArchiveStore(hub: DispatchHub, repo: DispatchRepo): void
       assembling.delete(identifier);
       const buf = Buffer.concat(entry.parts);
       if (entry.runnerId !== runner.id) return { error: "runner mismatch" };
-      const dir = process.env.DISPATCH_ARCHIVE_DIR ?? path.join(process.cwd(), ".work", "archives");
-      await fs.mkdir(path.join(dir, identifier), { recursive: true });
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-      await fs.writeFile(path.join(dir, identifier, `app-${stamp}.zip`), buf);
+      await storage.put(archiveKey(identifier, stamp), buf, { contentType: "application/zip" });
       return { ok: true, bytes: buf.length };
     }
     return { ok: true };
   });
 }
 
+function archiveKey(identifier: string, stamp: string): string {
+  return `vm-archives/${identifier}/app-${stamp}.zip`;
+}
+
 /** True when at least one archive zip exists for the identifier. */
-export async function archiveExists(identifier: string): Promise<boolean> {
-  return (await readLatestArchive(identifier)) !== null;
+export async function archiveExists(storage: StorageAdapter, identifier: string): Promise<boolean> {
+  return (await readLatestArchive(storage, identifier)) !== null;
 }
 
 /** Serves the newest stored archive zip for an identifier (runner resume path). */
-export async function readLatestArchive(identifier: string): Promise<Buffer | null> {
-  const dir = process.env.DISPATCH_ARCHIVE_DIR ?? path.join(process.cwd(), ".work", "archives");
+export async function readLatestArchive(storage: StorageAdapter, identifier: string): Promise<Buffer | null> {
   try {
-    const files = (await fs.readdir(path.join(dir, identifier))).filter((f) => f.endsWith(".zip")).sort();
-    if (!files.length) return null;
-    return await fs.readFile(path.join(dir, identifier, files[files.length - 1]));
+    const objects = (await storage.list(`vm-archives/${identifier}/`))
+      .filter((o) => o.key.endsWith(".zip"))
+      .sort((a, b) => (a.key < b.key ? -1 : 1));
+    const latest = objects[objects.length - 1];
+    if (!latest) return null;
+    return await storage.get(latest.key);
   } catch {
     return null;
   }
 }
 
-export type { FastifyInstance, DispatchHub, DispatchRepo, RunnerRow };
+export type { DispatchHub, DispatchRepo, RunnerRow };
+

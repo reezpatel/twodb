@@ -167,6 +167,31 @@ export const gatewayClient = {
     return fetch("/registry/spaces", { credentials: "include" }).then((r) => json(r));
   },
 
+  /** Install S3 config status (bucket is only present when configured). */
+  s3Info(): Promise<S3Info> {
+    return fetch("/registry/s3", { credentials: "include" }).then((r) => json(r));
+  },
+
+  /** One level of the bucket: folders (common prefixes) + objects directly under `prefix`. */
+  s3List(prefix: string): Promise<S3ListResult> {
+    return fetch(`/registry/s3/objects?prefix=${encodeURIComponent(prefix)}`, { credentials: "include" }).then((r) => json(r));
+  },
+
+  /** Uploads a file under `prefix` (raw body, content-type from the File). */
+  s3Upload(prefix: string, file: File): Promise<{ ok: true; key: string; size: number }> {
+    const key = prefix.replace(/\/+$/, "") + (prefix ? "/" : "") + file.name;
+    return fetch(`/registry/s3/object?key=${encodeURIComponent(key)}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "content-type": file.type || "application/octet-stream" },
+      body: file,
+    }).then((r) => json(r));
+  },
+
+  s3Delete(key: string): Promise<{ ok: true }> {
+    return fetch(`/registry/s3/object?key=${encodeURIComponent(key)}`, { method: "DELETE", credentials: "include" }).then((r) => json(r));
+  },
+
   createSpace(name: string): Promise<{ space: { id: string; name: string } }> {
     return fetch("/registry/spaces", {
       method: "POST",
@@ -195,3 +220,18 @@ export const gatewayClient = {
     return { status: res.status, body: await res.text() };
   },
 };
+
+export interface S3Info {
+  configured: boolean;
+  bucket: string | null;
+  endpoint: string | null;
+  region: string | null;
+}
+
+export interface S3ListResult {
+  bucket: string;
+  prefix: string;
+  folders: string[];
+  objects: Array<{ key: string; name: string; size: number; lastModified: string | null }>;
+  truncated: boolean;
+}

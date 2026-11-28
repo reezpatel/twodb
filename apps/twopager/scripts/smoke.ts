@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { zipSync, strToU8 } from "fflate";
 import { createPgDb, sql } from "@twodb/core-data/db";
+import { createLocalStorage } from "@twodb/core-data/storage";
+import { withKeyPrefix } from "@twodb/twodb-core";
 import { loadTwoPagerConfig } from "../src/config.js";
 import { buildServer } from "../src/server.js";
 
@@ -18,8 +20,10 @@ await sql`drop schema if exists twopager cascade`.execute(admin);
 await sql`create schema twopager`.execute(admin);
 
 const tmp = mkdtempSync(path.join(tmpdir(), "twopager-"));
-const config = { ...loadTwoPagerConfig({ DATABASE_URL: databaseUrl, LOCAL_STORAGE_DIR: path.join(tmp, "blobs"), CACHE_DIR: path.join(tmp, "cache"), ADMIN_HOSTS: "pager.example.com", SITES_DOMAIN: "pages.example.com" }) };
-const app = await buildServer(config);
+const config = { ...loadTwoPagerConfig({ DATABASE_URL: databaseUrl, CACHE_DIR: path.join(tmp, "cache"), ADMIN_HOSTS: "pager.example.com", SITES_DOMAIN: "pages.example.com" }) };
+// Production gets a prefix-scoped S3 adapter from the control plane; the smoke test uses local disk.
+const storage = withKeyPrefix(createLocalStorage({ rootDir: path.join(tmp, "blobs") }), "twopager/");
+const app = await buildServer(config, { storage });
 
 const as = (workspaceId: string, spaceIds = "") => ({ "x-twodb-auth-kind": "apiKey", "x-twodb-workspace-id": workspaceId, ...(spaceIds ? { "x-twodb-space-ids": spaceIds } : {}) });
 const ws1 = as("w1");

@@ -8,8 +8,6 @@ export const configSchema = z.object({
   /** Stable per-app key — delivered by the control plane at boot (twodb-core), never set by hand. */
   TWODB_DATA_KEY: z.string().optional(),
   HTTP_URL: z.string().url().default("http://localhost:6414"),
-  /** Local blob dir — only used when the control plane has no S3 configured (TWODB_S3_* on TwoDB). */
-  LOCAL_STORAGE_DIR: z.string().default("./.data/blobs"),
 });
 
 export type PaintressConfig = z.infer<typeof configSchema>;

@@ -10,6 +10,7 @@ export interface Crumb {
 const SECTIONS: Array<[prefix: string, label: string, to: string]> = [
   ["/keys", "API keys", "/keys"],
   ["/spaces", "Spaces", "/spaces"],
+  ["/storage", "Storage", "/storage"],
 ];
 
 /** Business hook: breadcrumb trail for the current route (the URL is the source of truth). */

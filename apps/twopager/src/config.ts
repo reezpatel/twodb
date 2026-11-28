@@ -7,8 +7,6 @@ export const configSchema = z.object({
   /** Stable per-app key — delivered by the control plane at boot (twodb-core), never set by hand. */
   TWODB_DATA_KEY: z.string().optional(),
   HTTP_URL: z.string().url().default("http://localhost:6420"),
-  /** Blob fallback when the control plane has no S3 configured (dev). */
-  LOCAL_STORAGE_DIR: z.string().default("./.data/blobs"),
   /** Local read-through cache of site files (served from here, filled from S3 on first hit). */
   CACHE_DIR: z.string().default("./.data/cache"),
   CACHE_MAX_MB: z.coerce.number().int().positive().default(2048),
@@ -33,7 +31,6 @@ export function loadTwoPagerConfig(source: Record<string, string | undefined> = 
     PORT: source.TWOPAGER_PORT ?? source.PORT ?? "6420",
     DATABASE_URL: source.TWOPAGER_DATABASE_URL ?? source.DATABASE_URL,
     HTTP_URL: source.TWOPAGER_HTTP_URL ?? source.HTTP_URL,
-    LOCAL_STORAGE_DIR: pick("LOCAL_STORAGE_DIR"),
     CACHE_DIR: pick("CACHE_DIR"),
     CACHE_MAX_MB: pick("CACHE_MAX_MB"),
     ADMIN_HOSTS: pick("ADMIN_HOSTS"),

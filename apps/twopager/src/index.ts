@@ -6,6 +6,8 @@ import { manifest } from "./manifest.js";
 async function main() {
   const config = loadTwoPagerConfig();
   const twodb = await connectTwoDb({ manifest, httpUrl: config.HTTP_URL, gatewayUrl: config.TWODB_GATEWAY_URL });
+  // Site blobs live in the install's shared S3 bucket — mandatory, no local fallback.
+  if (!twodb.storage) throw new Error("TwoPager requires S3: the control plane has no TWODB_S3_* configured");
   const server = await buildServer(
     { ...config, DATABASE_URL: twodb.config.postgres.connectionString, TWODB_DATA_KEY: twodb.dataKey ?? config.TWODB_DATA_KEY },
     { storage: twodb.storage },
